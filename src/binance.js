@@ -9,7 +9,7 @@ const { Logger } = require('./logger');
 
 const logger = new Logger('BINANCE-WS');
 
-const WS_URL = 'wss://stream.binance.com:9443/ws/btcusdt@aggTrade';
+const WS_URL = 'wss://stream.binance.com:443/ws/btcusdt@aggTrade';
 
 class BinanceWS {
   constructor() {
