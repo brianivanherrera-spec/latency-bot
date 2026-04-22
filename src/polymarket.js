@@ -72,35 +72,41 @@ class PolymarketClient {
    */
   async findBTCMarket() {
   try {
-  const response = await fetch(
-  `${GAMMA_API_BASE}/markets?active=true&closed=false&limit=50&tag_slug=crypto&order=volume24hr&ascending=false`
-);
+    // Buscar directamente por slug del evento
+    const response = await fetch(
+      `${GAMMA_API_BASE}/events?slug=btc-updown-5m-1776886800`
+    );
 
     if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
 
     const data = await response.json();
-    const markets = Array.isArray(data) ? data : (data.markets || data.data || []);
+    const events = Array.isArray(data) ? data : (data.events || data.data || []);
 
-    // Buscar mercado BTC 5 minutos - múltiples idiomas
-    const btc5min = markets.find(m => {
-      const q = (m.question || '').toLowerCase();
-      return (
-        (q.includes('btc') || q.includes('bitcoin')) &&
-        (q.includes('5 min') || q.includes('5min') || q.includes('5 minutos') || 
-         q.includes('5-min') || q.includes('five min')) &&
-        m.active && !m.closed && !m.archived
+    if (events.length === 0) {
+      // El slug tiene timestamp, buscar el evento activo más reciente
+      const response2 = await fetch(
+        `${GAMMA_API_BASE}/events?slug_contains=btc-updown-5m&active=true&limit=5`
       );
-    });
+      const data2 = await response2.json();
+      const events2 = Array.isArray(data2) ? data2 : (data2.events || data2.data || []);
 
-    if (btc5min) {
-      logger.info(`Mercado 5min encontrado: ${btc5min.question}`);
-      return this._formatMarket(btc5min);
+      if (events2.length === 0) {
+        logger.warn('No se encontró evento BTC 5min');
+        return null;
+      }
+
+      const event = events2[0];
+      logger.info(`Evento encontrado: ${event.title || event.slug}`);
+      const market = event.markets?.[0];
+      if (!market) return null;
+      return this._formatMarket({ ...market, question: event.title || market.question });
     }
 
- logger.warn('No se encontró mercado BTC 5min');
-const allQuestions = markets.slice(0, 20).map(m => m.question);
-logger.info('Mercados disponibles: ' + JSON.stringify(allQuestions));
-    return null;
+    const event = events[0];
+    logger.info(`Evento encontrado: ${event.title || event.slug}`);
+    const market = event.markets?.[0];
+    if (!market) return null;
+    return this._formatMarket({ ...market, question: event.title || market.question });
 
   } catch (err) {
     logger.error(`Error buscando mercados: ${err.message}`);
