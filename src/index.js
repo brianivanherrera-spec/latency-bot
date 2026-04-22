@@ -141,4 +141,4 @@ function buildOrder(signal, market) {
 main().catch((err) => {
   logger.error(`Fatal error: ${err.message}`);
   setTimeout(() => main(), 10000);
-});v
+});
