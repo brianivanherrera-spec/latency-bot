@@ -1,6 +1,7 @@
 const { BinanceWS } = require('./binance');
 const { SignalEngine } = require('./signal');
 const { PolymarketClient } = require('./polymarket');
+const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const config = require('./config');
 
@@ -13,6 +14,7 @@ async function main() {
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
   const ws = new BinanceWS();
+  const tracker = new PnLTracker();
 
   let activeMarket = null;
   let lastTradeTime = 0;
@@ -26,7 +28,7 @@ async function main() {
     if (now - lastTradeTime < COOLDOWN_MS) return;
 
     if (sig.direction !== 'NEUTRAL') {
-      logger.info(`📊 Señal: ${sig.direction} | Move: ${sig.movePct.toFixed(3)}% | Z: ${sig.zScore.toFixed(2)}`);
+      logger.info(`📊 Señal: ${sig.direction} | Move: ${sig.movePct.toFixed(3)}% | Z: ${sig.zScore.toFixed(2)} | Confianza: ${sig.confidence}/100`);
 
       try {
         if (!activeMarket) {
@@ -41,14 +43,21 @@ async function main() {
         const order = buildOrder(sig, activeMarket);
         if (!order) return;
 
-        logger.info(`📝 Orden: ${order.side} | Price: ${order.price} | Size: ${order.size}`);
+        logger.info(`📝 Orden simulada: ${order.side} | Price: $${order.price} | Size: ${order.size} | USDC: $${(order.price * order.size).toFixed(2)}`);
 
-        const result = await poly.placeLimitOrder(order);
-        if (result.success) {
-          logger.info(`✅ Orden colocada: ${result.orderId}`);
-          lastTradeTime = now;
-          setTimeout(() => { activeMarket = null; }, 5 * 60 * 1000);
-        }
+        // Registrar en tracker
+        tracker.openPosition({
+          marketId: activeMarket.conditionId,
+          marketQuestion: activeMarket.question,
+          side: order.side,
+          price: order.price,
+          size: order.size,
+          endDate: activeMarket.endDate,
+        });
+
+        lastTradeTime = now;
+        setTimeout(() => { activeMarket = null; }, 5 * 60 * 1000);
+
       } catch (err) {
         logger.error(`Error al operar: ${err.message}`);
         activeMarket = null;
@@ -76,13 +85,19 @@ async function main() {
     return main();
   }
 
-  setInterval(() => {
+  // Health check + P&L cada 5 minutos
+  setInterval(async () => {
     const stats = signal.getStats();
     logger.info(`💓 Health | Ticks: ${stats.ticks} | Señales: ${stats.signals} | WS: ${ws.isConnected() ? 'OK' : 'DOWN'}`);
+
+    // Chequear si hay posiciones cerradas para calcular P&L
+    await tracker.checkClosedPositions();
+    tracker.printSummary();
   }, 5 * 60 * 1000);
 
   process.on('SIGTERM', () => {
     logger.info('SIGTERM recibido, cerrando...');
+    tracker.printSummary();
     ws.close();
     process.exit(0);
   });
@@ -126,4 +141,4 @@ function buildOrder(signal, market) {
 main().catch((err) => {
   logger.error(`Fatal error: ${err.message}`);
   setTimeout(() => main(), 10000);
-});
+});v
