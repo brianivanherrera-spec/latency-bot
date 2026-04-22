@@ -72,9 +72,9 @@ class PolymarketClient {
    */
   async findBTCMarket() {
   try {
-    const response = await fetch(
-      `${GAMMA_API_BASE}/markets?active=true&closed=false&limit=50`
-    );
+  const response = await fetch(
+  `${GAMMA_API_BASE}/markets?active=true&closed=false&limit=50&tag_slug=crypto&order=volume24hr&ascending=false`
+);
 
     if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
 
