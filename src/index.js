@@ -1,9 +1,3 @@
-/**
- * LATENCY BOT - BTC 5min Polymarket
- * Estrategia: Binance WebSocket → señal matemática → limit orders Polymarket
- * Sin Claude API = costo $0 en inferencia
- */
-
 const { BinanceWS } = require('./binance');
 const { SignalEngine } = require('./signal');
 const { PolymarketClient } = require('./polymarket');
@@ -20,35 +14,30 @@ async function main() {
   const poly = new PolymarketClient();
   const ws = new BinanceWS();
 
-  // Estado del bot
   let activeMarket = null;
   let lastTradeTime = 0;
   const COOLDOWN_MS = config.COOLDOWN_SECONDS * 1000;
 
-  // Callback: cada tick de precio BTC
   ws.onPrice(async (priceData) => {
     const sig = signal.process(priceData);
-
-    if (!sig) return; // sin señal todavía
+    if (!sig) return;
 
     const now = Date.now();
-    if (now - lastTradeTime < COOLDOWN_MS) return; // cooldown activo
+    if (now - lastTradeTime < COOLDOWN_MS) return;
 
     if (sig.direction !== 'NEUTRAL') {
       logger.info(`📊 Señal: ${sig.direction} | Move: ${sig.movePct.toFixed(3)}% | Z: ${sig.zScore.toFixed(2)}`);
 
       try {
-        // Buscar mercado BTC 5min activo en Polymarket
         if (!activeMarket) {
           activeMarket = await poly.findBTCMarket();
           if (!activeMarket) {
-            logger.warn('No hay mercado BTC 5min activo en Polymarket');
+            logger.warn('No hay mercado BTC activo en Polymarket');
             return;
           }
           logger.info(`🎯 Mercado: ${activeMarket.question}`);
         }
 
-        // Calcular precio limite basado en señal
         const order = buildOrder(sig, activeMarket);
         if (!order) return;
 
@@ -58,12 +47,11 @@ async function main() {
         if (result.success) {
           logger.info(`✅ Orden colocada: ${result.orderId}`);
           lastTradeTime = now;
-          // Resetear mercado para próxima búsqueda (expira cada 5min)
           setTimeout(() => { activeMarket = null; }, 5 * 60 * 1000);
         }
       } catch (err) {
         logger.error(`Error al operar: ${err.message}`);
-        activeMarket = null; // resetear en error
+        activeMarket = null;
       }
     }
   });
@@ -76,17 +64,23 @@ async function main() {
     logger.info('🔄 WebSocket reconectado');
   });
 
-  // Iniciar WebSocket
-  await ws.connect();
-  logger.info('✅ Conectado a Binance WebSocket');
+  logger.info('Conectando a WebSocket...');
 
-  // Health check log cada 5 min
+  try {
+    await ws.connect();
+    logger.info('✅ Conectado al WebSocket');
+  } catch (err) {
+    logger.error(`No se pudo conectar: ${err.message}`);
+    logger.info('Reintentando en 10 segundos...');
+    await new Promise(r => setTimeout(r, 10000));
+    return main();
+  }
+
   setInterval(() => {
     const stats = signal.getStats();
     logger.info(`💓 Health | Ticks: ${stats.ticks} | Señales: ${stats.signals} | WS: ${ws.isConnected() ? 'OK' : 'DOWN'}`);
   }, 5 * 60 * 1000);
 
-  // Graceful shutdown
   process.on('SIGTERM', () => {
     logger.info('SIGTERM recibido, cerrando...');
     ws.close();
@@ -95,33 +89,28 @@ async function main() {
 }
 
 function buildOrder(signal, market) {
-  // Mapear dirección de señal a lado de apuesta en Polymarket
-  // Si BTC sube fuerte → apostar YES en "Will BTC be higher in 5min?"
   const isYesMarket = market.question.toLowerCase().includes('higher') ||
                       market.question.toLowerCase().includes('above') ||
                       market.question.toLowerCase().includes('up');
 
   let side;
   if (signal.direction === 'UP') {
-    side = isYesMarket ? 'BUY' : 'SELL'; // YES token
+    side = isYesMarket ? 'BUY' : 'SELL';
   } else {
-    side = isYesMarket ? 'SELL' : 'BUY'; // NO token
+    side = isYesMarket ? 'SELL' : 'BUY';
   }
 
-  // Precio limit con ventaja basada en fuerza de señal
   const basePrice = isYesMarket
     ? (signal.direction === 'UP' ? 0.62 : 0.35)
     : (signal.direction === 'UP' ? 0.35 : 0.62);
 
-  // Ajustar por fuerza de señal (z-score)
-  const strength = Math.min(signal.zScore / 3, 1); // normalizar 0-1
-  const priceAdj = strength * 0.05; // hasta 5 centavos de ajuste
+  const strength = Math.min(signal.zScore / 3, 1);
+  const priceAdj = strength * 0.05;
   const finalPrice = side === 'BUY'
-    ? Math.max(0.01, basePrice - priceAdj) // comprar más barato
-    : Math.min(0.99, basePrice + priceAdj); // vender más caro
+    ? Math.max(0.01, basePrice - priceAdj)
+    : Math.min(0.99, basePrice + priceAdj);
 
   const size = Math.floor(config.ORDER_SIZE_USDC / finalPrice);
-
   if (size < 1) return null;
 
   return {
@@ -135,6 +124,6 @@ function buildOrder(signal, market) {
 }
 
 main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
+  logger.error(`Fatal error: ${err.message}`);
+  setTimeout(() => main(), 10000);
 });
