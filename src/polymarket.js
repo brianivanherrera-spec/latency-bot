@@ -97,7 +97,9 @@ class PolymarketClient {
       return this._formatMarket(btc5min);
     }
 
-    logger.warn('No se encontró mercado BTC 5min');
+ logger.warn('No se encontró mercado BTC 5min');
+const allQuestions = markets.slice(0, 20).map(m => m.question);
+logger.info('Mercados disponibles: ' + JSON.stringify(allQuestions));
     return null;
 
   } catch (err) {
