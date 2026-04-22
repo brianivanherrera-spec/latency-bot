@@ -1,7 +1,7 @@
 /**
- * Binance WebSocket - BTC/USDT precio en tiempo real
- * Usa el stream público (no requiere API key)
- * Reconexión automática con backoff exponencial
+ * Coinbase WebSocket - BTC/USD precio en tiempo real
+ * Reemplaza Binance (bloqueado en Railway)
+ * No requiere API key
  */
 
 const WebSocket = require('ws');
@@ -9,7 +9,7 @@ const { Logger } = require('./logger');
 
 const logger = new Logger('BINANCE-WS');
 
-const WS_URL = 'wss://stream.binance.com:443/ws/btcusdt@aggTrade';
+const WS_URL = 'wss://advanced-trade-ws.coinbase.com';
 
 class BinanceWS {
   constructor() {
@@ -37,18 +37,29 @@ class BinanceWS {
 
       this.ws.on('open', () => {
         this._connected = true;
-        this._reconnectDelay = 1000; // reset backoff
+        this._reconnectDelay = 1000;
         logger.info(`Conectado: ${WS_URL}`);
+        // Suscribirse al canal de ticker BTC-USD
+        this.ws.send(JSON.stringify({
+          type: 'subscribe',
+          product_ids: ['BTC-USD'],
+          channel: 'ticker'
+        }));
         resolve();
       });
 
       this.ws.on('message', (data) => {
         try {
           const msg = JSON.parse(data);
-          // aggTrade: { p: price, T: tradeTime, m: isBuyerMaker }
-          const price = parseFloat(msg.p);
-          const timestamp = msg.T;
-          const isBuyerMaker = msg.m; // true = sell pressure, false = buy pressure
+          if (msg.channel !== 'ticker') return;
+          const event = msg.events?.[0];
+          if (!event) return;
+          const ticker = event.tickers?.[0];
+          if (!ticker) return;
+
+          const price = parseFloat(ticker.price);
+          const timestamp = Date.now();
+          const isBuyerMaker = parseFloat(ticker.price) < parseFloat(ticker.best_ask);
 
           if (!price || isNaN(price)) return;
 
@@ -58,9 +69,7 @@ class BinanceWS {
           if (this.priceCallback) {
             this.priceCallback({ price, timestamp, isBuyerMaker });
           }
-        } catch (e) {
-          // ignorar mensajes malformados
-        }
+        } catch (e) {}
       });
 
       this.ws.on('error', (err) => {
@@ -70,42 +79,5 @@ class BinanceWS {
         reject(err);
       });
 
-      this.ws.on('close', (code, reason) => {
+      this.ws.on('close', (code) => {
         this._connected = false;
-        if (!this._intentionalClose) {
-          logger.warn(`Desconectado (${code}). Reconectando en ${this._reconnectDelay}ms...`);
-          setTimeout(() => this._reconnect(), this._reconnectDelay);
-          this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
-        }
-      });
-
-      // Ping para mantener conexión viva
-      this._pingInterval = setInterval(() => {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          this.ws.ping();
-        }
-      }, 30000);
-    });
-  }
-
-  _reconnect() {
-    if (this._pingInterval) clearInterval(this._pingInterval);
-    this.connect().then(() => {
-      if (this.reconnectCallback) this.reconnectCallback();
-    }).catch((err) => {
-      logger.error(`Reconexión fallida: ${err.message}`);
-    });
-  }
-
-  close() {
-    this._intentionalClose = true;
-    if (this._pingInterval) clearInterval(this._pingInterval);
-    if (this.ws) this.ws.close();
-  }
-
-  getLastPrice() {
-    return { price: this._lastPrice, timestamp: this._lastTimestamp };
-  }
-}
-
-module.exports = { BinanceWS };
