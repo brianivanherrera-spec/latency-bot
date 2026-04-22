@@ -104,9 +104,11 @@ async function main() {
 }
 
 function buildOrder(signal, market) {
-  const isYesMarket = market.question.toLowerCase().includes('higher') ||
-                      market.question.toLowerCase().includes('above') ||
-                      market.question.toLowerCase().includes('up');
+const isYesMarket = market.question.toLowerCase().includes('higher') ||
+                    market.question.toLowerCase().includes('above') ||
+                    market.question.toLowerCase().includes('up') ||
+                    market.question.toLowerCase().includes('sube') ||
+                    market.question.toLowerCase().includes('arriba');
 
   let side;
   if (signal.direction === 'UP') {
