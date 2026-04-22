@@ -71,51 +71,40 @@ class PolymarketClient {
    * Retorna el mercado más cercano a su cierre (mayor urgencia)
    */
   async findBTCMarket() {
-    try {
-      const response = await fetch(
-        `${GAMMA_API_BASE}/markets?active=true&closed=false&tag_slug=bitcoin&limit=20`
+  try {
+    const response = await fetch(
+      `${GAMMA_API_BASE}/markets?active=true&closed=false&limit=50`
+    );
+
+    if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
+
+    const data = await response.json();
+    const markets = Array.isArray(data) ? data : (data.markets || data.data || []);
+
+    // Buscar mercado BTC 5 minutos - múltiples idiomas
+    const btc5min = markets.find(m => {
+      const q = (m.question || '').toLowerCase();
+      return (
+        (q.includes('btc') || q.includes('bitcoin')) &&
+        (q.includes('5 min') || q.includes('5min') || q.includes('5 minutos') || 
+         q.includes('5-min') || q.includes('five min')) &&
+        m.active && !m.closed && !m.archived
       );
+    });
 
-      if (!response.ok) {
-        throw new Error(`Gamma API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const markets = Array.isArray(data) ? data : (data.markets || data.data || []);
-
-      // Filtrar mercados de predicción BTC 5-minutos
-      const btcMinuteMarkets = markets.filter(m => {
-        const q = (m.question || '').toLowerCase();
-        return (
-          (q.includes('btc') || q.includes('bitcoin')) &&
-          (q.includes('5') || q.includes('five') || q.includes('minute')) &&
-          m.active && !m.closed && !m.archived
-        );
-      });
-
-      if (btcMinuteMarkets.length === 0) {
-        // Fallback: buscar cualquier mercado BTC con cierre próximo
-        const anyBtc = markets.filter(m => {
-          const q = (m.question || '').toLowerCase();
-          return (q.includes('btc') || q.includes('bitcoin')) && m.active && !m.closed;
-        });
-
-        if (anyBtc.length === 0) return null;
-
-        // Ordenar por fecha de cierre más próxima
-        anyBtc.sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
-        return this._formatMarket(anyBtc[0]);
-      }
-
-      // Tomar el que cierra más pronto
-      btcMinuteMarkets.sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
-      return this._formatMarket(btcMinuteMarkets[0]);
-
-    } catch (err) {
-      logger.error(`Error buscando mercados: ${err.message}`);
-      return null;
+    if (btc5min) {
+      logger.info(`Mercado 5min encontrado: ${btc5min.question}`);
+      return this._formatMarket(btc5min);
     }
+
+    logger.warn('No se encontró mercado BTC 5min');
+    return null;
+
+  } catch (err) {
+    logger.error(`Error buscando mercados: ${err.message}`);
+    return null;
   }
+}
 
   _formatMarket(m) {
     const tokens = m.tokens || m.clobTokenIds || [];
