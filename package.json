@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "ws": "^8.18.0",
-    "@polymarket/clob-client": "^3.4.0",
+    "@polymarket/clob-client": "^2.0.0",
     "ethers": "^5.7.2"
   },
   "engines": {
