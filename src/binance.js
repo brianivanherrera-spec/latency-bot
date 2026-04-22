@@ -81,3 +81,39 @@ class BinanceWS {
 
       this.ws.on('close', (code) => {
         this._connected = false;
+        if (!this._intentionalClose) {
+          logger.warn(`Desconectado (${code}). Reconectando en ${this._reconnectDelay}ms...`);
+          setTimeout(() => this._reconnect(), this._reconnectDelay);
+          this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
+        }
+      });
+
+      this._pingInterval = setInterval(() => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.ping();
+        }
+      }, 30000);
+    });
+  }
+
+  _reconnect() {
+    if (this._pingInterval) clearInterval(this._pingInterval);
+    this.connect().then(() => {
+      if (this.reconnectCallback) this.reconnectCallback();
+    }).catch((err) => {
+      logger.error(`Reconexión fallida: ${err.message}`);
+    });
+  }
+
+  close() {
+    this._intentionalClose = true;
+    if (this._pingInterval) clearInterval(this._pingInterval);
+    if (this.ws) this.ws.close();
+  }
+
+  getLastPrice() {
+    return { price: this._lastPrice, timestamp: this._lastTimestamp };
+  }
+}
+
+module.exports = { BinanceWS };
