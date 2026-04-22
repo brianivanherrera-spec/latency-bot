@@ -50,7 +50,7 @@ module.exports = {
   ORDER_SIZE_USDC: parseFloat(process.env.ORDER_SIZE_USDC || '5'),
 
   // Segundos de cooldown entre órdenes
-  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '120'),
+  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '99999'),
 
   // Máximo de órdenes activas simultáneas
   MAX_ACTIVE_ORDERS: parseInt(process.env.MAX_ACTIVE_ORDERS || '3'),
