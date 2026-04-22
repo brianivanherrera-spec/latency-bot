@@ -34,13 +34,13 @@ module.exports = {
 
   // Z-score mínimo para considerar movimiento significativo
   // 1.5 = movimiento moderado, 2.0 = fuerte, 2.5 = muy fuerte
-  ZSCORE_THRESHOLD: parseFloat(process.env.ZSCORE_THRESHOLD || '1.8'),
+  ZSCORE_THRESHOLD: parseFloat(process.env.ZSCORE_THRESHOLD || '1.2'),
 
   // Movimiento mínimo en % dentro de la ventana corta
-  MOVE_PCT_THRESHOLD: parseFloat(process.env.MOVE_PCT_THRESHOLD || '0.08'),
+  MOVE_PCT_THRESHOLD: parseFloat(process.env.MOVE_PCT_THRESHOLD || '0.03'),
 
   // Velocidad mínima del movimiento (%/segundo)
-  MIN_VELOCITY: parseFloat(process.env.MIN_VELOCITY || '0.005'),
+  MIN_VELOCITY: parseFloat(process.env.MIN_VELOCITY || '0.001'),
 
   // =============================================
   // GESTIÓN DE RIESGO
