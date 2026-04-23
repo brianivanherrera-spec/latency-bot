@@ -72,29 +72,36 @@ class PolymarketClient {
    */
 async findBTCMarket() {
   try {
-    // Buscar eventos BTC activos ordenados por volumen
+    // Buscar en CLOB API directamente
     const response = await fetch(
-      `${GAMMA_API_BASE}/events?active=true&closed=false&limit=20&order=volume&ascending=false`
+      'https://clob.polymarket.com/markets?next_cursor=&limit=100&active=true'
     );
 
-    if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
+    if (!response.ok) throw new Error(`CLOB API error: ${response.status}`);
 
     const data = await response.json();
-    const events = Array.isArray(data) ? data : (data.events || data.data || []);
+    const markets = data.data || [];
 
-    // Filtrar por slug que contenga btc-updown
-    const btcEvent = events.find(e => 
-      e.slug && e.slug.includes('btc-updown-5m')
-    );
+    // Filtrar por question que contenga BTC y up/down o 5
+    const btcMarket = markets.find(m => {
+      const q = (m.question || '').toLowerCase();
+      return q.includes('bitcoin') && 
+             (q.includes('up or down') || q.includes('5')) &&
+             m.active && !m.closed;
+    });
 
-    if (btcEvent) {
-      logger.info(`Evento encontrado: ${btcEvent.title || btcEvent.slug}`);
-      const market = btcEvent.markets?.[0];
-      if (!market) return null;
-      return this._formatMarket({ ...market, question: btcEvent.title || market.question });
+    if (btcMarket) {
+      logger.info(`Mercado CLOB encontrado: ${btcMarket.question}`);
+      return {
+        conditionId: btcMarket.condition_id,
+        question: btcMarket.question,
+        endDate: btcMarket.end_date_iso,
+        yesTokenId: btcMarket.tokens?.[0]?.token_id,
+        noTokenId: btcMarket.tokens?.[1]?.token_id,
+      };
     }
 
-    logger.warn('No se encontró evento btc-updown-5m en top 20 por volumen');
+    logger.warn('No se encontró mercado BTC 5min en CLOB API');
     return null;
 
   } catch (err) {
