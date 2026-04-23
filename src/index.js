@@ -46,14 +46,11 @@ async function main() {
         logger.info(`📝 Orden simulada: ${order.side} | Price: $${order.price} | Size: ${order.size} | USDC: $${(order.price * order.size).toFixed(2)}`);
 
         // Registrar en tracker
-        tracker.openPosition({
-          marketId: activeMarket.conditionId,
-          marketQuestion: activeMarket.question,
-          side: order.side,
-          price: order.price,
-          size: order.size,
-          endDate: activeMarket.endDate,
-        });
+tracker.openPosition({
+  marketId: activeMarket.conditionId,
+  gammaId: activeMarket.gammaId,
+  ...
+});
 
         lastTradeTime = now;
         setTimeout(() => { activeMarket = null; }, 4 * 60 * 1000);
