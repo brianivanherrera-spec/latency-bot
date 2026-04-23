@@ -35,7 +35,7 @@ openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate }) 
 
     for (const pos of toCheck) {
       try {
-        const result = await this._getMarketResult(pos.marketId);
+        const result = await this._getMarketResult(pos.marketId, pos.gammaId);
         if (result === null) continue; // mercado aún no resuelto
 
         this._closePosition(pos, result);
@@ -45,9 +45,10 @@ openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate }) 
     }
   }
 
-async _getMarketResult(marketId) {
+async _getMarketResult(marketId, gammaId) {
   try {
-    const res = await fetch(`${GAMMA_API}/markets/${marketId}`);
+    const id = gammaId || marketId;
+    const res = await fetch(`${GAMMA_API}/markets/${id}`);
     if (!res.ok) {
       logger.warn(`Gamma market fetch failed: ${res.status} for ${marketId}`);
       return null;
