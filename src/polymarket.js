@@ -110,17 +110,18 @@ async findBTCMarket() {
   }
 }
 
-  _formatMarket(m) {
-    const tokens = m.tokens || m.clobTokenIds || [];
-    return {
-      conditionId: m.conditionId || m.id,
-      question: m.question,
-      endDate: m.endDate,
-      yesTokenId: tokens[0] || m.clob_token_ids?.[0],
-      noTokenId: tokens[1] || m.clob_token_ids?.[1],
-      marketSlug: m.marketSlug,
-    };
-  }
+_formatMarket(m) {
+  const tokens = m.tokens || m.clobTokenIds || [];
+  return {
+    conditionId: m.conditionId || m.id,
+    gammaId: m.id,  // ID numérico para consultar resultado
+    question: m.question,
+    endDate: m.endDate,
+    yesTokenId: tokens[0] || m.clob_token_ids?.[0],
+    noTokenId: tokens[1] || m.clob_token_ids?.[1],
+    marketSlug: m.marketSlug,
+  };
+}
 
   /**
    * Colocar limit order en Polymarket
