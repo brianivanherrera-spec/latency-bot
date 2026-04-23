@@ -74,46 +74,34 @@ this._cacheTTL = 4 * 60 * 1000; // 4 minutos
    * Retorna el mercado más cercano a su cierre (mayor urgencia)
    */
 async findBTCMarket() {
-  // Usar cache para no llamar la API en cada señal
-  const now = Date.now();
-  if (this._cachedMarket && (now - this._cacheTime) < this._cacheTTL) {
-    return this._cachedMarket;
-  }
-
   try {
+    // El slug es determinístico — se calcula desde el reloj
+    const now = Math.floor(Date.now() / 1000);
+    const windowTs = now - (now % 300); // inicio del ciclo actual de 5min
+    const slug = `btc-updown-5m-${windowTs}`;
+
     const response = await fetch(
-      `${GAMMA_API_BASE}/markets?active=true&closed=false&tag_slug=crypto&limit=50&order=volume24hr&ascending=false`
+      `${GAMMA_API_BASE}/events?slug=${slug}`
     );
 
     if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
 
     const data = await response.json();
-    const markets = Array.isArray(data) ? data : (data.markets || data.data || []);
+    const events = Array.isArray(data) ? data : (data.events || data.data || []);
 
-    const nowDate = new Date();
-    const btcMarket = markets.find(m => {
-      const q = (m.question || '').toLowerCase();
-      const endDate = new Date(m.endDate || m.end_date_iso || 0);
-      return (
-        (q.includes('btc') || q.includes('bitcoin')) &&
-        (q.includes('up') || q.includes('down') || q.includes('5')) &&
-        endDate > nowDate &&
-        m.active && !m.closed
-      );
-    });
-
-    if (btcMarket) {
-      logger.info(`Mercado encontrado: ${btcMarket.question}`);
-      this._cachedMarket = this._formatMarket(btcMarket);
-      this._cacheTime = now;
-      return this._cachedMarket;
+    if (events.length > 0) {
+      const event = events[0];
+      logger.info(`Mercado encontrado: ${event.title || slug}`);
+      const market = event.markets?.[0];
+      if (!market) return null;
+      return this._formatMarket({
+        ...market,
+        question: event.title || market.question,
+        endDate: new Date((windowTs + 300) * 1000).toISOString()
+      });
     }
 
-    // Log solo cuando no hay mercado (no en cada señal)
-    if (now - this._cacheTime > this._cacheTTL) {
-      logger.warn('No se encontró mercado BTC activo en Gamma API');
-      this._cacheTime = now; // evitar spam de logs
-    }
+    logger.warn(`Mercado no encontrado para slug: ${slug}`);
     return null;
 
   } catch (err) {
