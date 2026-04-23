@@ -52,16 +52,24 @@ class PnLTracker {
     }
   }
 
-  async _getMarketResult(marketId) {
+async _getMarketResult(marketId) {
+  try {
     const res = await fetch(`${GAMMA_API}/markets/${marketId}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      logger.warn(`Gamma market fetch failed: ${res.status} for ${marketId}`);
+      return null;
+    }
     const market = await res.json();
+    logger.info(`Market status: resolved=${market.resolved} winner=${market.winner} resolutionPrice=${market.resolutionPrice}`);
 
     if (!market.resolved) return null;
 
-    // winner: "YES" o "NO"
     return market.winner || (market.resolutionPrice === 1 ? 'YES' : 'NO');
+  } catch (err) {
+    logger.error(`Error fetching market result: ${err.message}`);
+    return null;
   }
+}
 
   _closePosition(pos, winner) {
     // Determinar si ganamos
