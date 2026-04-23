@@ -23,6 +23,9 @@ const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
 
 class PolymarketClient {
   constructor() {
+    this._cachedMarket = null;
+this._cacheTime = 0;
+this._cacheTTL = 4 * 60 * 1000; // 4 minutos
     this.clobClient = null;
     this.wallet = null;
     this._initialized = false;
@@ -71,39 +74,46 @@ class PolymarketClient {
    * Retorna el mercado más cercano a su cierre (mayor urgencia)
    */
 async findBTCMarket() {
+  // Usar cache para no llamar la API en cada señal
+  const now = Date.now();
+  if (this._cachedMarket && (now - this._cacheTime) < this._cacheTTL) {
+    return this._cachedMarket;
+  }
+
   try {
-    // Buscar en CLOB API directamente
     const response = await fetch(
-      'https://clob.polymarket.com/markets?next_cursor=&limit=100&active=true'
+      `${GAMMA_API_BASE}/markets?active=true&closed=false&tag_slug=crypto&limit=50&order=volume24hr&ascending=false`
     );
 
-    if (!response.ok) throw new Error(`CLOB API error: ${response.status}`);
+    if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
 
     const data = await response.json();
-    const markets = data.data || [];
+    const markets = Array.isArray(data) ? data : (data.markets || data.data || []);
 
-    // Filtrar por question que contenga BTC y up/down o 5
+    const nowDate = new Date();
     const btcMarket = markets.find(m => {
       const q = (m.question || '').toLowerCase();
-      return q.includes('bitcoin') && 
-             (q.includes('up or down') || q.includes('5')) &&
-             m.active && !m.closed;
+      const endDate = new Date(m.endDate || m.end_date_iso || 0);
+      return (
+        (q.includes('btc') || q.includes('bitcoin')) &&
+        (q.includes('up') || q.includes('down') || q.includes('5')) &&
+        endDate > nowDate &&
+        m.active && !m.closed
+      );
     });
 
     if (btcMarket) {
-      logger.info(`Mercado CLOB encontrado: ${btcMarket.question}`);
-      return {
-        conditionId: btcMarket.condition_id,
-        question: btcMarket.question,
-        endDate: btcMarket.end_date_iso,
-        yesTokenId: btcMarket.tokens?.[0]?.token_id,
-        noTokenId: btcMarket.tokens?.[1]?.token_id,
-      };
+      logger.info(`Mercado encontrado: ${btcMarket.question}`);
+      this._cachedMarket = this._formatMarket(btcMarket);
+      this._cacheTime = now;
+      return this._cachedMarket;
     }
 
-    const sample = markets.slice(0, 5).map(m => m.question);
-logger.info('Muestra CLOB: ' + JSON.stringify(sample));
-logger.warn('No se encontró mercado BTC 5min en CLOB API');
+    // Log solo cuando no hay mercado (no en cada señal)
+    if (now - this._cacheTime > this._cacheTTL) {
+      logger.warn('No se encontró mercado BTC activo en Gamma API');
+      this._cacheTime = now; // evitar spam de logs
+    }
     return null;
 
   } catch (err) {
