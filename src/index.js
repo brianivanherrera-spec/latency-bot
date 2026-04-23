@@ -56,7 +56,7 @@ async function main() {
         });
 
         lastTradeTime = now;
-        setTimeout(() => { activeMarket = null; }, 5 * 60 * 1000);
+        setTimeout(() => { activeMarket = null; }, 4 * 60 * 1000);
 
       } catch (err) {
         logger.error(`Error al operar: ${err.message}`);
@@ -87,6 +87,7 @@ async function main() {
 
   // Health check + P&L cada 5 minutos
   setInterval(async () => {
+    activeMarket = null; // forzar búsqueda de mercado fresco cada ciclo
     const stats = signal.getStats();
     logger.info(`💓 Health | Ticks: ${stats.ticks} | Señales: ${stats.signals} | WS: ${ws.isConnected() ? 'OK' : 'DOWN'}`);
 
