@@ -16,19 +16,12 @@ class PnLTracker {
     this.losses = 0;
   }
 
-  openPosition({ marketId, marketQuestion, side, price, size, endDate }) {
-    const pos = {
-      id: `POS_${Date.now()}`,
-      marketId,
-      marketQuestion,
-      side,
-      entryPrice: price,
-      size,
-      usdcIn: parseFloat((price * size).toFixed(2)),
-      endDate: new Date(endDate),
-      openedAt: new Date(),
-      status: 'OPEN',
-    };
+openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate }) {
+  const pos = {
+    ...
+    gammaId,  // agregar esta línea
+    ...
+  };
     this.positions.push(pos);
     logger.info(`📂 Posición abierta: ${pos.id} | ${side} ${size}t @ $${price} | USDC: $${pos.usdcIn}`);
     logger.info(`   Mercado: ${marketQuestion}`);
