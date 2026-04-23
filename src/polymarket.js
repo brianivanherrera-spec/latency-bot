@@ -74,8 +74,8 @@ class PolymarketClient {
   try {
     // Buscar directamente por slug del evento
     const response = await fetch(
-      `${GAMMA_API_BASE}/events?slug=btc-updown-5m-1776886800`
-    );
+  `${GAMMA_API_BASE}/events?slug_contains=btc-updown-5m&active=true&limit=5&order=endDate&ascending=true`
+);
 
     if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
 
