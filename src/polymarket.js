@@ -101,7 +101,9 @@ async findBTCMarket() {
       };
     }
 
-    logger.warn('No se encontró mercado BTC 5min en CLOB API');
+    const sample = markets.slice(0, 5).map(m => m.question);
+logger.info('Muestra CLOB: ' + JSON.stringify(sample));
+logger.warn('No se encontró mercado BTC 5min en CLOB API');
     return null;
 
   } catch (err) {
