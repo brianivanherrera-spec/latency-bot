@@ -1,6 +1,3 @@
-
-Copiar
-
 /**
  * Polymarket CLOB API Client
  */
