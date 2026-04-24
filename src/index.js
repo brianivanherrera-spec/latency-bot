@@ -1,6 +1,3 @@
-
-Copiar
-
 const { BinanceWS } = require('./binance');
 const { SignalEngine } = require('./signal');
 const { PolymarketClient } = require('./polymarket');
