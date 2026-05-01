@@ -49,8 +49,17 @@ module.exports = {
   // USDC por orden (en modo live)
   ORDER_SIZE_USDC: parseFloat(process.env.ORDER_SIZE_USDC || '5'),
 
-  // Segundos de cooldown entre órdenes
-  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '99999'),
+  // Segundos de cooldown entre ordenes (300 = 1 por ventana de 5 min)
+  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '300'),
+
+  // === LATENCIA ===
+  // Sensibilidad: cuanto mueve el precio justo de YES por cada 0.1% de BTC
+  // Ej: 2.5 → BTC sube 0.1% → fairYes sube 2.5 puntos (de 0.50 a 0.525)
+  POLY_SENSITIVITY: parseFloat(process.env.POLY_SENSITIVITY || '2.5'),
+
+  // Edge minimo para operar (%) — diferencia entre precio justo y precio Polymarket
+  // Ej: 5 → solo operar si fairYes > polyYes * 1.05
+  MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '5'),
 
   // Máximo de órdenes activas simultáneas
   MAX_ACTIVE_ORDERS: parseInt(process.env.MAX_ACTIVE_ORDERS || '3'),
