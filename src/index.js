@@ -71,8 +71,14 @@ async function main() {
     }
     const prices = await fetchPolyPrice(cachedMarket.gammaId);
     if (prices) {
+      // Si YES=0 y NO=1, el mercado está resuelto — invalidar y buscar uno nuevo
+      if (prices.yes === 0 && prices.no === 1) {
+        logger.info('[POLY] Mercado resuelto/cerrado, buscando uno nuevo...');
+        cachedMarket = null;
+        return;
+      }
       signal.updatePolyPrice(prices.yes, prices.no);
-      logger.info(`[POLY] YES=$${prices.yes} NO=$${prices.no} (mercado: ${cachedMarket.question?.slice(0, 40)})`);
+      logger.info(`[POLY] YES=${prices.yes} NO=${prices.no} (mercado: ${cachedMarket.question?.slice(0, 40)})`);
     }
   }, 5000);
 
