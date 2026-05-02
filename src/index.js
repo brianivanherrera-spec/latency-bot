@@ -71,10 +71,17 @@ async function main() {
     }
     const prices = await fetchPolyPrice(cachedMarket.gammaId);
     if (prices) {
-      // Si YES=0 y NO=1, el mercado está resuelto — invalidar y buscar uno nuevo
-      if (prices.yes === 0 && prices.no === 1) {
+      // Si el mercado está resuelto (precios extremos 0/1), invalidar y buscar uno nuevo
+      const resuelto = (prices.yes === 0 && prices.no === 1) || (prices.yes === 1 && prices.no === 0);
+      if (resuelto) {
         logger.info('[POLY] Mercado resuelto/cerrado, buscando uno nuevo...');
         cachedMarket = null;
+        return;
+      }
+      // Precio válido = entre 0.05 y 0.95 (mercado activo con liquidez)
+      const precioValido = prices.yes >= 0.05 && prices.yes <= 0.95;
+      if (!precioValido) {
+        logger.warn(`[POLY] Precio dudoso (YES=${prices.yes}), ignorando...`);
         return;
       }
       signal.updatePolyPrice(prices.yes, prices.no);
@@ -98,9 +105,13 @@ async function main() {
       logger.info(`[EDGE] fairYes=$${e.fairYes} polyYes=$${e.polyYes} edgePct=${e.edgePct}% | ${e.reason}`);
     }
 
-    // Solo operar si hay edge real (o si no tenemos precio de Poly todavia → usar señal pura)
-    const edgeOk = !sig.edge || sig.edge.hasEdge || sig.edge.reason === 'NO_POLY_PRICE';
-    if (!edgeOk) {
+    // Solo operar si hay precio Poly válido Y edge real
+    // NUNCA operar sin precio Poly — el edge Infinity no es real
+    if (!sig.edge || sig.edge.reason === 'NO_POLY_PRICE' || sig.edge.reason === 'POLY_PRICE_STALE') {
+      logger.info(`[SKIP] Sin precio Poly válido (${sig.edge?.reason})`);
+      return;
+    }
+    if (!sig.edge.hasEdge) {
       logger.info(`[SKIP] Edge insuficiente (${sig.edge?.edgePct}% < ${config.MIN_EDGE_PCT || 5}% minimo)`);
       return;
     }
