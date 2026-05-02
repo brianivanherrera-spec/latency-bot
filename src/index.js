@@ -78,8 +78,8 @@ async function main() {
         cachedMarket = null;
         return;
       }
-      // Precio válido = entre 0.05 y 0.95 (mercado activo con liquidez)
-      const precioValido = prices.yes >= 0.05 && prices.yes <= 0.95;
+      // Precio válido = entre 0.10 y 0.90 (mercado activo con liquidez real)
+      const precioValido = prices.yes >= 0.10 && prices.yes <= 0.90;
       if (!precioValido) {
         logger.warn(`[POLY] Precio dudoso (YES=${prices.yes}), ignorando...`);
         return;
