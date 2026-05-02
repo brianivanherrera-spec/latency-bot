@@ -208,6 +208,8 @@ class SignalEngine {
       const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 5);
       return {
         hasEdge,
+        fairYes: parseFloat(fairYes.toFixed(3)),
+        polyYes: this.polyYesPrice,
         fairNo: parseFloat(fairNo.toFixed(3)),
         polyNo: this.polyNoPrice,
         edgePct: parseFloat(edgePct.toFixed(2)),
