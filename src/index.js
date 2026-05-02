@@ -54,16 +54,25 @@ async function main() {
   const tracker = new PnLTracker();
 
   let activeMarket = null;
+  let cachedMarket = null; // persiste entre trades para mantener precio Poly fresco
   let lastTradeTime = 0;
   const COOLDOWN_MS = config.COOLDOWN_SECONDS * 1000;
 
   // === Actualizar precio de Polymarket cada 5 segundos ===
+  // Usa cachedMarket (persiste entre trades) para no quedar stale
   setInterval(async () => {
-    if (!activeMarket?.gammaId) return;
-    const prices = await fetchPolyPrice(activeMarket.gammaId);
+    if (!cachedMarket?.gammaId) {
+      const m = await poly.findBTCMarket();
+      if (m) {
+        cachedMarket = m;
+        logger.info('[POLY] Mercado cacheado: ' + m.question);
+      }
+      return;
+    }
+    const prices = await fetchPolyPrice(cachedMarket.gammaId);
     if (prices) {
       signal.updatePolyPrice(prices.yes, prices.no);
-      logger.info(`[POLY] YES=$${prices.yes} NO=$${prices.no} (mercado: ${activeMarket.question?.slice(0, 40)})`);
+      logger.info(`[POLY] YES=$${prices.yes} NO=$${prices.no} (mercado: ${cachedMarket.question?.slice(0, 40)})`);
     }
   }, 5000);
 
