@@ -12,7 +12,7 @@
 
 const { BinanceWS } = require('./binance');
 const { SignalEngine } = require('./signal');
-const { PolymarketWebSocketClient } = require('./polymarket-ws');
+const { Polymarket } = require('./polymarket'); // Usar HTTP viejo temporalmente
 const { RiskManager } = require('./risk-manager');
 const { Logger } = require('./logger');
 const config = require('./config');
@@ -28,7 +28,7 @@ async function main() {
 
   // Componentes
   const signal = new SignalEngine();
-  const poly = new PolymarketWebSocketClient();
+  const poly = new Polymarket(); // Usar HTTP viejo temporalmente
   const ws = new BinanceWS();
   const risk = new RiskManager();
 
@@ -38,17 +38,17 @@ async function main() {
   let posicionAbierta = false;
   const COOLDOWN_MS = config.COOLDOWN_SECONDS * 1000;
 
-  // Callbacks de Polymarket WebSocket
-  poly.onPriceUpdate((prices) => {
-    signal.updatePolyPrice(prices.yes, prices.no);
-    logger.debug(`[POLY-WS] YES=${prices.yes.toFixed(3)} | Age=${prices.age}ms | Spread=${(prices.spread * 100).toFixed(2)}%`);
-  });
+  // Callbacks de Polymarket WebSocket (DESHABILITADO - usando HTTP)
+  // poly.onPriceUpdate((prices) => {
+  //   signal.updatePolyPrice(prices.yes, prices.no);
+  //   logger.debug(`[POLY-WS] YES=${prices.yes.toFixed(3)} | Age=${prices.age}ms | Spread=${(prices.spread * 100).toFixed(2)}%`);
+  // });
 
-  poly.onMarketInvalid((reason) => {
-    logger.warn(`❌ Mercado invalidado: ${reason}`);
-    activeMarket = null;
-    posicionAbierta = false;
-  });
+  // poly.onMarketInvalid((reason) => {
+  //   logger.warn(`❌ Mercado invalidado: ${reason}`);
+  //   activeMarket = null;
+  //   posicionAbierta = false;
+  // });
 
   // Callback de precios de Coinbase
   ws.onPrice(async (priceData) => {
@@ -84,15 +84,15 @@ async function main() {
       return;
     }
 
-    // 4. Verificar precio fresh de Polymarket
-    const polyPrice = poly.getCurrentPrice();
-    if (!polyPrice.valid) {
-      logger.warn(`[SKIP] Precio Poly no válido: ${polyPrice.reason}`);
-      if (polyPrice.age) {
-        logger.warn(`       Edad: ${polyPrice.age}s (max: ${polyPrice.maxAge}s)`);
-      }
-      return;
-    }
+    // 4. Verificar precio fresh de Polymarket (DESHABILITADO - usando HTTP)
+    // const polyPrice = poly.getCurrentPrice();
+    // if (!polyPrice.valid) {
+    //   logger.warn(`[SKIP] Precio Poly no válido: ${polyPrice.reason}`);
+    //   if (polyPrice.age) {
+    //     logger.warn(`       Edad: ${polyPrice.age}s (max: ${polyPrice.maxAge}s)`);
+    //   }
+    //   return;
+    // }
 
     // 5. Check de posición abierta
     if (posicionAbierta) {
@@ -229,7 +229,7 @@ async function main() {
   process.on('SIGTERM', () => {
     logger.info('SIGTERM recibido, cerrando...');
     risk.printSummary();
-    poly.cleanup();
+    // poly.cleanup(); // No existe en HTTP viejo
     ws.close();
     process.exit(0);
   });
@@ -237,7 +237,7 @@ async function main() {
   process.on('SIGINT', () => {
     logger.info('SIGINT recibido, cerrando...');
     risk.printSummary();
-    poly.cleanup();
+    // poly.cleanup(); // No existe en HTTP viejo
     ws.close();
     process.exit(0);
   });

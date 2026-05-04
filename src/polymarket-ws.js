@@ -8,13 +8,16 @@ const config = require('./config');
 
 const logger = new Logger('POLYMARKET-WS');
 
-let ClobClient, Side, OrderType, ethers;
+let ClobClient, Side, OrderType, ethers, HAS_CLOB_CLIENT = false;
 try {
   ({ ClobClient, Side, OrderType } = require('@polymarket/clob-client'));
   ethers = require('ethers');
+  HAS_CLOB_CLIENT = true;
+  logger.info('✓ @polymarket/clob-client disponible');
 } catch (e) {
-  logger.error('⚠️  CRÍTICO: @polymarket/clob-client no instalado. Instalar con: npm install @polymarket/clob-client');
-  throw new Error('Polymarket CLOB client requerido para operación');
+  logger.warn('⚠️  @polymarket/clob-client no instalado - usando fallback HTTP');
+  logger.warn('   Para mejor performance: npm install @polymarket/clob-client');
+  HAS_CLOB_CLIENT = false;
 }
 
 const CLOB_API_BASE = 'https://clob.polymarket.com';
@@ -52,6 +55,12 @@ class PolymarketWebSocketClient {
 
     if (config.DRY_RUN) {
       logger.info('✓ DRY RUN: Polymarket en modo simulación (sin WebSocket real)');
+      this._initialized = true;
+      return;
+    }
+
+    if (!HAS_CLOB_CLIENT) {
+      logger.warn('⚠️  Sin CLOB client - usando modo HTTP fallback');
       this._initialized = true;
       return;
     }
