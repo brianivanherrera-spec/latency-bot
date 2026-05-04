@@ -176,9 +176,11 @@ class SignalEngine {
       };
     }
 
-    // Staleness check: si el precio de Poly tiene mas de 30 segundos, ignorar
+    // Staleness check: si el precio de Poly tiene más de MAX_PRICE_AGE_MS, invalidar
     const polyAge = Date.now() - this.polyUpdatedAt;
-    if (polyAge > 30000) {
+    const MAX_AGE = config.MAX_PRICE_AGE_MS || 3000; // 3 segundos (antes 30!)
+    
+    if (polyAge > MAX_AGE) {
       return {
         hasEdge: false,
         fairYes: parseFloat(fairYes.toFixed(3)),
@@ -186,6 +188,8 @@ class SignalEngine {
         edgePct: null,
         side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO',
         reason: 'POLY_PRICE_STALE',
+        age: polyAge,
+        maxAge: MAX_AGE,
       };
     }
 
