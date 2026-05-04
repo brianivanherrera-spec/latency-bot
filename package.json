@@ -1,12 +1,15 @@
 {
   "name": "latency-bot",
-  "version": "1.0.0",
-  "description": "BTC latency bot - Binance WebSocket + Polymarket limit orders",
+  "version": "2.0.0",
+  "description": "BTC latency bot v2.0 - WebSocket optimizado + Risk Management",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
-    "test-signal": "node src/test-signal.js"
+    "start": "node src/index-fixed.js",
+    "start-old": "node src/index.js",
+    "dev": "node --watch src/index-fixed.js",
+    "test-signal": "node src/test-signal.js",
+    "analyze": "node scripts/analyze-now.js",
+    "monitor": "node scripts/monitor.js"
   },
   "dependencies": {
     "ws": "^8.18.0",
