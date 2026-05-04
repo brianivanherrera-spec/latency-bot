@@ -56,7 +56,9 @@ async function main() {
   let activeMarket = null;
   let cachedMarket = null; // persiste entre trades para mantener precio Poly fresco
   let lastTradeTime = 0;
+  let posicionAbierta = false; // flag para evitar doble entrada simultánea
   const COOLDOWN_MS = config.COOLDOWN_SECONDS * 1000;
+  const MAX_EDGE_PCT = 50; // edge máximo realista — si es mayor, el precio Poly es stale
 
   // === Actualizar precio de Polymarket cada 5 segundos ===
   // Usa cachedMarket (persiste entre trades) para no quedar stale
@@ -116,6 +118,18 @@ async function main() {
       return;
     }
 
+    // Fix: rechazar edges imposibles — indican precio Poly stale del mercado anterior
+    if (Math.abs(sig.edge.edgePct) > MAX_EDGE_PCT) {
+      logger.warn(`[SKIP] Edge sospechoso (${sig.edge.edgePct}% > ${MAX_EDGE_PCT}% max) — precio stale`);
+      return;
+    }
+
+    // Fix: evitar doble entrada simultanea al mismo mercado
+    if (posicionAbierta) {
+      logger.info(`[SKIP] Posicion ya abierta, esperando cierre`);
+      return;
+    }
+
     try {
       if (!activeMarket) {
         activeMarket = await poly.findBTCMarket();
@@ -141,11 +155,17 @@ async function main() {
         endDate: activeMarket.endDate,
       });
 
+      posicionAbierta = true;
       lastTradeTime = now;
-      setTimeout(() => { activeMarket = null; }, 4 * 60 * 1000);
+      // Liberar posición después de 6 minutos como máximo (mercado ya resuelto)
+      setTimeout(() => {
+        posicionAbierta = false;
+        activeMarket = null;
+      }, 6 * 60 * 1000);
 
     } catch (err) {
       logger.error(`Error al operar: ${err.message}`);
+      posicionAbierta = false;
       activeMarket = null;
     }
   });
