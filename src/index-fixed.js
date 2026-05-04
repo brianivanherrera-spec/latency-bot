@@ -12,7 +12,7 @@
 
 const { BinanceWS } = require('./binance');
 const { SignalEngine } = require('./signal');
-const { Polymarket } = require('./polymarket'); // Usar HTTP viejo temporalmente
+const { PolymarketClient } = require('./polymarket'); // Usar HTTP viejo temporalmente
 const { RiskManager } = require('./risk-manager');
 const { Logger } = require('./logger');
 const config = require('./config');
@@ -28,7 +28,7 @@ async function main() {
 
   // Componentes
   const signal = new SignalEngine();
-  const poly = new Polymarket(); // Usar HTTP viejo temporalmente
+  const poly = new PolymarketClient(); // Usar HTTP viejo temporalmente
   const ws = new BinanceWS();
   const risk = new RiskManager();
 
