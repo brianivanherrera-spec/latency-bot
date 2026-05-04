@@ -204,12 +204,20 @@ async function main() {
       const res = await fetch(url);
       if (!res.ok) return null;
       const data = await res.json();
-      if (!data.clobTokenIds || data.clobTokenIds.length < 2) return null;
       
-      const yes = parseFloat(data.outcomePrices?.[0] || 0);
-      const no = parseFloat(data.outcomePrices?.[1] || 0);
+      // outcomePrices puede ser string o array
+      if (data.outcomePrices) {
+        const prices = typeof data.outcomePrices === 'string'
+          ? JSON.parse(data.outcomePrices)
+          : data.outcomePrices;
+        
+        return {
+          yes: parseFloat(prices[0]),
+          no: parseFloat(prices[1]),
+        };
+      }
       
-      return { yes, no };
+      return null;
     } catch (err) {
       return null;
     }
