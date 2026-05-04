@@ -195,6 +195,59 @@ async function main() {
     return main();
   }
 
+  // === Polling de precios de Polymarket cada 5 segundos ===
+  let cachedMarket = null;
+  
+  const fetchPolyPrice = async (gammaId) => {
+    try {
+      const url = `https://gamma-api.polymarket.com/markets/${gammaId}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data.clobTokenIds || data.clobTokenIds.length < 2) return null;
+      
+      const yes = parseFloat(data.outcomePrices?.[0] || 0);
+      const no = parseFloat(data.outcomePrices?.[1] || 0);
+      
+      return { yes, no };
+    } catch (err) {
+      return null;
+    }
+  };
+
+  setInterval(async () => {
+    if (!cachedMarket?.gammaId) {
+      const m = await poly.findBTCMarket();
+      if (m) {
+        cachedMarket = m;
+        logger.info(`[POLY] Mercado encontrado: ${m.question}`);
+      }
+      return;
+    }
+    
+    const prices = await fetchPolyPrice(cachedMarket.gammaId);
+    if (prices) {
+      // Validar que no esté resuelto
+      const resuelto = (prices.yes === 0 && prices.no === 1) || (prices.yes === 1 && prices.no === 0);
+      if (resuelto) {
+        logger.info('[POLY] Mercado resuelto, buscando nuevo...');
+        cachedMarket = null;
+        return;
+      }
+      
+      // Validar precio razonable
+      const precioValido = prices.yes >= 0.10 && prices.yes <= 0.90;
+      if (!precioValido) {
+        logger.warn(`[POLY] Precio dudoso (YES=${prices.yes}), ignorando...`);
+        return;
+      }
+      
+      // Actualizar signal engine
+      signal.updatePolyPrice(prices.yes, prices.no);
+      logger.debug(`[POLY] YES=${prices.yes.toFixed(3)} NO=${prices.no.toFixed(3)}`);
+    }
+  }, 5000); // Cada 5 segundos
+
   // Health check y resumen cada 5 minutos
   setInterval(async () => {
     // Forzar refresh de mercado
