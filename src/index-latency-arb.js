@@ -11,6 +11,7 @@
 
 const { BinanceWS } = require('./binance');
 const { PolymarketClient } = require('./polymarket');
+const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const config = require('./config');
 
@@ -23,11 +24,9 @@ let polymarketPrice = { yes: 0.50, no: 0.50 };
 let polymarketUpdate = null;
 let currentMarket = null;
 
-// Tracking de posiciones
-const positions = new Map();
-let totalPnL = 0;
-let wins = 0;
-let losses = 0;
+// Tracking de posiciones CON PnLTracker (consulta Polymarket real)
+const tracker = new PnLTracker();
+const activePositions = new Map(); // Solo para límites de risk
 
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 
@@ -200,124 +199,45 @@ function openPosition(signal) {
   const exposure = price * size;
   
   // Límites de risk
-  if (positions.size >= 10) return;
+  if (activePositions.size >= 10) return;
   
-  const totalExposure = Array.from(positions.values()).reduce((sum, p) => sum + p.exposure, 0);
+  const totalExposure = Array.from(activePositions.values()).reduce((sum, p) => sum + p.exposure, 0);
   if (totalExposure + exposure > 100) return;
   
-  positions.set(posId, {
-    id: posId,
-    openTime: Date.now(),
-    direction: signal.direction,
+  // Registrar en tracker (consultará Polymarket para resultado real)
+  tracker.openPosition({
+    marketId: currentMarket.conditionId,
+    gammaId: currentMarket.gammaId,
+    marketQuestion: currentMarket.question,
+    side: signal.direction,
     price: price,
     size: size,
-    exposure: exposure,
-    edge: signal.edge,
-    btcMovement: signal.btcMovement,
-    marketId: currentMarket.gammaId,
-    marketQuestion: currentMarket.question
+    endDate: currentMarket.endDate
+  });
+  
+  // Mantener en activePositions solo para límites
+  activePositions.set(posId, {
+    id: posId,
+    openTime: Date.now(),
+    exposure: exposure
   });
   
   logger.info(`[OPEN] ${signal.direction} @ $${price.toFixed(3)} | Edge: ${signal.edge}% | BTC Δ: ${signal.btcMovement}% | Latency: ${signal.latencyMs}ms`);
   logger.info(`  Fair: $${signal.fairPrice} vs Poly: $${signal.polyPrice}`);
   logger.info(`  Exposure: $${exposure.toFixed(2)} | Total: $${(totalExposure + exposure).toFixed(2)}/100`);
+  
+  // Programar liberación de slot después de 8 minutos
+  setTimeout(() => {
+    activePositions.delete(posId);
+  }, 8 * 60 * 1000);
 }
 
 // ============================================================================
-// Cerrar Posiciones (con resultado real de Polymarket)
+// Verificar Posiciones Cerradas (usa PnLTracker que consulta Polymarket)
 // ============================================================================
 
-async function closeOldPositions() {
-  const now = Date.now();
-  
-  for (const [id, pos] of positions.entries()) {
-    const age = now - pos.openTime;
-    
-    // Cerrar después de 7 minutos
-    if (age > 7 * 60 * 1000) {
-      await closePosition(id, pos);
-    }
-  }
-}
-
-async function closePosition(id, pos) {
-  try {
-    // Consultar resultado real de Polymarket
-    const winner = await getMarketResult(pos.marketId);
-    
-    if (!winner) {
-      // Mercado aún no resuelto - simular resultado basado en si acertamos
-      const simulatedWin = Math.random() > 0.5;
-      calculatePnL(id, pos, simulatedWin);
-      return;
-    }
-    
-    // Resultado real disponible
-    const won = (pos.direction === 'BUY' && winner === 'YES') ||
-                (pos.direction === 'SELL' && winner === 'NO');
-    
-    calculatePnL(id, pos, won, winner);
-    
-  } catch (err) {
-    logger.error(`Error closing ${id}: ${err.message}`);
-    positions.delete(id);
-  }
-}
-
-async function getMarketResult(gammaId) {
-  try {
-    const res = await fetch(`${GAMMA_API}/markets/${gammaId}`);
-    if (!res.ok) return null;
-    
-    const market = await res.json();
-    
-    // Verificar si está resuelto
-    const isResolved = market.resolved === true || 
-                       market.closed === true || 
-                       market.active === false;
-    
-    if (!isResolved) return null;
-    
-    // Obtener ganador
-    if (market.winner === 'YES' || market.winner === 'NO') {
-      return market.winner;
-    }
-    
-    if (market.outcomePrices) {
-      const prices = typeof market.outcomePrices === 'string'
-        ? JSON.parse(market.outcomePrices)
-        : market.outcomePrices;
-      
-      if (parseFloat(prices[0]) >= 0.99) return 'YES';
-      if (parseFloat(prices[1]) >= 0.99) return 'NO';
-    }
-    
-    return null;
-  } catch (err) {
-    return null;
-  }
-}
-
-function calculatePnL(id, pos, won, winner = null) {
-  let pnl;
-  
-  if (won) {
-    // Ganancia = (1 - precio_entrada) * contratos
-    pnl = (1 - pos.price) * pos.size;
-    wins++;
-  } else {
-    // Pérdida = -precio_entrada * contratos
-    pnl = -pos.price * pos.size;
-    losses++;
-  }
-  
-  totalPnL += pnl;
-  
-  const result = winner ? `Result: ${winner}` : 'Simulated';
-  logger.info(`[CLOSE] ${id} | ${won ? 'WIN ✓' : 'LOSS ✗'} | ${result}`);
-  logger.info(`  P&L: ${pnl > 0 ? '+' : ''}$${pnl.toFixed(2)} | Total: $${totalPnL.toFixed(2)} | ${wins}W/${losses}L`);
-  
-  positions.delete(id);
+async function checkClosedPositions() {
+  await tracker.checkClosedPositions();
 }
 
 // ============================================================================
@@ -355,8 +275,8 @@ async function main() {
   // Actualizar precio Polymarket cada 2 segundos
   setInterval(updatePolymarketPrice, 2000);
   
-  // Cerrar posiciones viejas cada 30 segundos
-  setInterval(closeOldPositions, 30000);
+  // Verificar posiciones cerradas cada minuto (consulta Polymarket real)
+  setInterval(checkClosedPositions, 60000);
   
   // WebSocket de Coinbase
   ws.onPrice((data) => {
@@ -378,17 +298,19 @@ async function main() {
   
   // Health check cada 5 min
   setInterval(() => {
-    const total = wins + losses;
-    const winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : '0.0';
+    const stats = tracker.getSummary();
     
     logger.info('─'.repeat(60));
     logger.info('[HEALTH]');
     logger.info(`  BTC Price: $${lastBTCPrice?.toFixed(2) || 'N/A'} (${lastBTCUpdate ? Math.floor((Date.now() - lastBTCUpdate) / 1000) : 'N/A'}s ago)`);
     logger.info(`  Poly YES: ${polymarketPrice.yes.toFixed(3)} (${polymarketUpdate ? Math.floor((Date.now() - polymarketUpdate) / 1000) : 'N/A'}s ago)`);
-    logger.info(`  Positions: ${positions.size}/10`);
-    logger.info(`  Trades: ${total} (${wins}W/${losses}L)`);
-    logger.info(`  Win Rate: ${winRate}%`);
-    logger.info(`  P&L: $${totalPnL.toFixed(2)}`);
+    logger.info(`  Active Positions: ${activePositions.size}/10`);
+    logger.info('');
+    logger.info('=== P&L TRACKER (REAL Polymarket Results) ===');
+    logger.info(`  Open: ${stats.openPositions} | Closed: ${stats.closedPositions}`);
+    logger.info(`  Wins: ${stats.wins} | Losses: ${stats.losses}`);
+    logger.info(`  Win Rate: ${stats.winRate}`);
+    logger.info(`  Total P&L: ${stats.totalPnL}`);
     logger.info('─'.repeat(60));
   }, 5 * 60 * 1000);
 }
