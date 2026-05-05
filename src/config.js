@@ -50,7 +50,7 @@ module.exports = {
   ORDER_SIZE_USDC: parseFloat(process.env.ORDER_SIZE_USDC || '5'),
 
   // Límites de posiciones y capital
-  MAX_POSITIONS: parseInt(process.env.MAX_POSITIONS || '5'),
+  MAX_POSITIONS: parseInt(process.env.MAX_POSITIONS || '10'),
   MAX_TOTAL_EXPOSURE_USDC: parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '100'),
   MAX_POSITION_SIZE_USDC: parseFloat(process.env.MAX_POSITION_SIZE_USDC || '20'),
   STOP_LOSS_PERCENT: parseFloat(process.env.STOP_LOSS_PERCENT || '10'),
