@@ -4,9 +4,11 @@
   "description": "BTC latency bot v2.0 - WebSocket optimizado + Risk Management",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index-fixed.js",
-    "start-old": "node src/index.js",
-    "dev": "node --watch src/index-fixed.js",
+    "start": "node src/index-v3.js",
+    "start:v1": "node src/index.js",
+    "start:v2": "node src/index-fixed.js",
+    "start:v3": "node src/index-v3.js",
+    "dev": "node --watch src/index-v3.js",
     "test-signal": "node src/test-signal.js",
     "analyze": "node scripts/analyze-now.js",
     "monitor": "node scripts/monitor.js"
