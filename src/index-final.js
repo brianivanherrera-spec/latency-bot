@@ -12,7 +12,6 @@ const { BinanceWS } = require('./binance');
 const { SignalEngine } = require('./signal');
 const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
-const { TradeFilters } = require('./filters');
 const { Logger } = require('./logger');
 const config = require('./config');
 
@@ -28,22 +27,15 @@ const COOLDOWN = 3 * 60 * 1000; // 3 MINUTOS
 
 async function main() {
   logger.info('═'.repeat(70));
-  logger.info('🎯 LATENCY BOT - Versión Final + Filtros Ajustados');
+  logger.info('🎯 LATENCY BOT - Versión Final');
   logger.info('═'.repeat(70));
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE'}`);
   logger.info('Cooldown: 3 minutos entre trades');
-  logger.info('');
-  logger.info('🛡️  FILTROS ACTIVOS (Soft - Opción D):');
-  logger.info('  • Edge mínimo: 3% (UP) / 3.5% (DOWN)');
-  logger.info('  • Movimiento mínimo: 0.025%');
-  logger.info('  • Edge máximo: 15% (anti-anomalías)');
-  logger.info('  • Impacto: ~40 trades/día | 60% WR | $40/día');
   logger.info('');
 
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
   const ws = new BinanceWS();
-  const filters = new TradeFilters();
 
   let cachedMarket = null;
 
@@ -103,13 +95,6 @@ async function main() {
     if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
     if (sig.edge.edgePct < 3 || sig.edge.edgePct > 15) return;
 
-    // === FILTROS DE TRADING ===
-    const filterResult = filters.evaluate(sig);
-    if (!filterResult.pass) {
-      // Trade rechazado por filtros - el filtro ya loggeó la razón
-      return;
-    }
-
     // Límites de risk
     if (activePositions.size >= 10) return;
     
@@ -164,20 +149,11 @@ async function main() {
   setInterval(() => {
     const stats = tracker.getSummary();
     const sigStats = signal.getStats();
-    const filterStats = filters.getStats();
     
     logger.info('─'.repeat(60));
     logger.info('[HEALTH]');
     logger.info(`  Señales: ${sigStats.signals}`);
     logger.info(`  Active slots: ${activePositions.size}/10`);
-    logger.info('');
-    logger.info('=== FILTROS ===');
-    logger.info(`  Evaluados: ${filterStats.total}`);
-    logger.info(`  Aprobados: ${filterStats.passed} (${filterStats.passRate})`);
-    logger.info(`  Rechazados: ${filterStats.rejected}`);
-    logger.info(`    - Edge bajo: ${filterStats.rejectionReasons.edge}`);
-    logger.info(`    - Move chico: ${filterStats.rejectionReasons.move}`);
-    logger.info(`    - Edge alto: ${filterStats.rejectionReasons.edgeMax}`);
     logger.info('');
     logger.info('=== P&L TRACKER (REAL Polymarket) ===');
     logger.info(`  Open: ${stats.openPositions} | Closed: ${stats.closedPositions}`);
