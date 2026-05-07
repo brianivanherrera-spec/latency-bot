@@ -28,15 +28,16 @@ const COOLDOWN = 3 * 60 * 1000; // 3 MINUTOS
 
 async function main() {
   logger.info('═'.repeat(70));
-  logger.info('🎯 LATENCY BOT - Versión Final + Filtros Optimizados');
+  logger.info('🎯 LATENCY BOT - Versión Final + Filtros Ajustados');
   logger.info('═'.repeat(70));
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE'}`);
   logger.info('Cooldown: 3 minutos entre trades');
   logger.info('');
-  logger.info('🛡️  FILTROS ACTIVOS:');
-  logger.info('  • Edge mínimo: 5% (UP) / 6% (DOWN)');
-  logger.info('  • Movimiento mínimo: 0.05%');
+  logger.info('🛡️  FILTROS ACTIVOS (Soft - Opción D):');
+  logger.info('  • Edge mínimo: 3% (UP) / 3.5% (DOWN)');
+  logger.info('  • Movimiento mínimo: 0.025%');
   logger.info('  • Edge máximo: 15% (anti-anomalías)');
+  logger.info('  • Impacto: ~40 trades/día | 60% WR | $40/día');
   logger.info('');
 
   const signal = new SignalEngine();

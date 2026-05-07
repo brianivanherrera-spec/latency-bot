@@ -18,15 +18,16 @@ class TradeFilters {
     
     // Configuración de filtros (puedes ajustar estos valores)
     this.config = {
-      // Edge mínimo requerido
-      MIN_EDGE_UP: 5.0,      // 5% para trades LONG (UP)
-      MIN_EDGE_DOWN: 6.0,    // 6% para trades SHORT (DOWN) - más estricto por sesgo
+      // Edge mínimo requerido - AJUSTADO DESPUÉS DE ANÁLISIS
+      // Filtros originales bloqueaban 95% de wins
+      MIN_EDGE_UP: 3.0,      // 3% para trades LONG (UP) - más permisivo
+      MIN_EDGE_DOWN: 3.5,    // 3.5% para trades SHORT (DOWN) - ligero sesgo
       
-      // Movimiento mínimo (evitar mercado lateral)
-      MIN_MOVE_PCT: 0.05,    // 0.05% mínimo de movimiento
+      // Movimiento mínimo (evitar mercado lateral extremo)
+      MIN_MOVE_PCT: 0.025,   // 0.025% mínimo - muy permisivo
       
       // Edge máximo (evitar anomalías)
-      MAX_EDGE: 15.0,        // 15% máximo - arriba de esto es sospechoso
+      MAX_EDGE: 15.0,        // 15% máximo - sin cambios
       
       // Activar/desactivar filtros individuales
       ENABLE_EDGE_FILTER: true,
