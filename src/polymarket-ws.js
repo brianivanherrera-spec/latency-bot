@@ -5,6 +5,7 @@
 
 const { Logger } = require('./logger');
 const config = require('./config');
+const WebSocket = require('ws');
 
 const logger = new Logger('POLYMARKET-WS');
 
@@ -22,6 +23,7 @@ try {
 
 const CLOB_API_BASE = 'https://clob.polymarket.com';
 const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
+const CLOB_WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 
 class PolymarketWebSocketClient {
   constructor() {
@@ -29,6 +31,12 @@ class PolymarketWebSocketClient {
     this.wallet = null;
     this._initialized = false;
     this._orderHistory = [];
+    
+    // WebSocket connection
+    this.ws = null;
+    this.wsConnected = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
     
     // Orderbook state
     this.currentMarket = null;
@@ -102,24 +110,180 @@ class PolymarketWebSocketClient {
     try {
       await this.init();
       
-      // Obtener orderbook inicial
+      // Obtener orderbook inicial vía REST
       const book = await this.clobClient.getOrderBook(tokenId);
       this._updateOrderbook(book);
       
-      logger.info(`✓ Suscrito a orderbook del token ${tokenId}`);
+      logger.info(`✓ Orderbook inicial obtenido para token ${tokenId}`);
       
-      // En producción real, aquí iría la suscripción WebSocket
-      // Por ahora, polling mejorado cada 1 segundo (mucho mejor que 5)
-      this._startPolling(tokenId);
+      // Conectar WebSocket REAL para updates en tiempo real
+      this._connectWebSocket(tokenId);
       
     } catch (err) {
       logger.error(`Error suscribiendo a mercado: ${err.message}`);
+      // Fallback a polling si falla
+      this._startFallbackPolling(tokenId);
     }
   }
 
-  _startPolling(tokenId) {
-    // Polling optimizado: 1 segundo en vez de 5
+  /**
+   * Conectar WebSocket REAL a Polymarket CLOB
+   * Latencia <100ms vs 1-5 segundos del polling
+   */
+  _connectWebSocket(tokenId) {
+    if (config.DRY_RUN) {
+      logger.info('[DRY RUN] WebSocket simulado (sin conexión real)');
+      // En dry run, usar polling ligero cada 2s
+      this._startFallbackPolling(tokenId);
+      return;
+    }
+
+    try {
+      this.ws = new WebSocket(CLOB_WS_URL);
+      
+      this.ws.on('open', () => {
+        logger.info('🟢 WebSocket conectado a Polymarket CLOB');
+        this.wsConnected = true;
+        this.reconnectAttempts = 0;
+        
+        // Suscribirse al token específico
+        const subscribeMsg = {
+          type: 'market',
+          assets_ids: [tokenId],
+          custom_feature_enabled: true, // Habilita best_bid_ask
+        };
+        
+        this.ws.send(JSON.stringify(subscribeMsg));
+        logger.info(`✓ Suscrito a token: ${tokenId}`);
+      });
+      
+      this.ws.on('message', (data) => {
+        try {
+          const message = JSON.parse(data.toString());
+          this._handleWebSocketMessage(message);
+        } catch (err) {
+          logger.warn(`Error parseando mensaje WS: ${err.message}`);
+        }
+      });
+      
+      this.ws.on('error', (err) => {
+        logger.error(`❌ WebSocket error: ${err.message}`);
+        this.wsConnected = false;
+      });
+      
+      this.ws.on('close', () => {
+        logger.warn('⚠️  WebSocket desconectado');
+        this.wsConnected = false;
+        
+        // Intentar reconexión
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.reconnectAttempts++;
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+          logger.info(`Reconectando en ${delay/1000}s... (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+          
+          setTimeout(() => {
+            this._connectWebSocket(tokenId);
+          }, delay);
+        } else {
+          logger.error('❌ Max intentos de reconexión alcanzados, usando fallback polling');
+          this._startFallbackPolling(tokenId);
+        }
+      });
+      
+    } catch (err) {
+      logger.error(`Error conectando WebSocket: ${err.message}`);
+      this._startFallbackPolling(tokenId);
+    }
+  }
+
+  /**
+   * Manejar mensajes del WebSocket
+   */
+  _handleWebSocketMessage(message) {
+    const eventType = message.event_type || message.type;
+    
+    switch (eventType) {
+      case 'best_bid_ask':
+        // Mejor bid/ask actualizado (latencia <100ms)
+        this._updateFromBestBidAsk(message);
+        break;
+        
+      case 'book':
+        // Snapshot completo del orderbook
+        this._updateOrderbook(message);
+        break;
+        
+      case 'price_change':
+        // Cambio de precio individual
+        this._updateFromPriceChange(message);
+        break;
+        
+      case 'last_trade_price':
+        // Nueva trade ejecutada
+        logger.debug(`Nueva trade: ${message.price}`);
+        break;
+        
+      case 'market_resolved':
+        // Mercado resuelto
+        logger.warn('⚠️  Mercado resuelto');
+        this._invalidateMarket('MARKET_RESOLVED');
+        break;
+        
+      default:
+        logger.debug(`Mensaje WS no manejado: ${eventType}`);
+    }
+  }
+
+  /**
+   * Actualizar desde best_bid_ask (lo más rápido)
+   */
+  _updateFromBestBidAsk(message) {
+    const bestBid = parseFloat(message.best_bid);
+    const bestAsk = parseFloat(message.best_ask);
+    
+    if (!bestBid || !bestAsk || isNaN(bestBid) || isNaN(bestAsk)) {
+      logger.warn('⚠️  Best bid/ask inválidos');
+      return;
+    }
+    
+    const midPrice = (bestBid + bestAsk) / 2;
+    const spread = bestAsk - bestBid;
+    
+    // Validar precio razonable
+    if (midPrice < 0.05 || midPrice > 0.95) {
+      logger.warn(`⚠️  Precio sospechoso: ${midPrice.toFixed(3)}`);
+      this._invalidateMarket('INVALID_PRICE');
+      return;
+    }
+    
+    this.currentPrices = {
+      yes: midPrice,
+      no: 1 - midPrice,
+      timestamp: Date.now(),
+      staleCount: 0,
+      spread: spread,
+      bestBid: bestBid,
+      bestAsk: bestAsk,
+    };
+    
+    // Callback para notificar update
+    if (this.priceUpdateCallback) {
+      this.priceUpdateCallback(this.currentPrices);
+    }
+    
+    logger.debug(`📊 WS Update: YES=${midPrice.toFixed(3)} | Spread=${(spread * 100).toFixed(2)}% | Latency: <100ms`);
+  }
+
+  /**
+   * Fallback: Polling si WebSocket falla
+   */
+  _startFallbackPolling(tokenId) {
+    logger.warn('⚠️  Usando polling fallback (1s) - latencia reducida vs WebSocket');
+    
+    // Polling optimizado: 1 segundo
     this.pollingInterval = setInterval(async () => {
+      if (!this.clobClient) return;
+      
       try {
         const book = await this.clobClient.getOrderBook(tokenId);
         this._updateOrderbook(book);
@@ -192,6 +356,52 @@ class PolymarketWebSocketClient {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
     }
+  }
+
+  /**
+   * Validar liquidez del orderbook
+   * Para orden de $5, necesitamos mínimo $15 (3x buffer)
+   */
+  checkLiquidity(minLiquidityUSD = 15) {
+    if (!this.orderbook.bids || !this.orderbook.asks) {
+      return {
+        valid: false,
+        reason: 'NO_ORDERBOOK',
+        bidLiquidity: 0,
+        askLiquidity: 0,
+      };
+    }
+    
+    // Calcular liquidez en top 3 niveles
+    const bidLiquidity = this._calculateLiquidity(this.orderbook.bids.slice(0, 3));
+    const askLiquidity = this._calculateLiquidity(this.orderbook.asks.slice(0, 3));
+    
+    const valid = bidLiquidity >= minLiquidityUSD && askLiquidity >= minLiquidityUSD;
+    
+    if (!valid) {
+      logger.debug(`⚠️  Liquidez insuficiente: BID=$${bidLiquidity.toFixed(2)} ASK=$${askLiquidity.toFixed(2)} (min: $${minLiquidityUSD})`);
+    }
+    
+    return {
+      valid,
+      reason: valid ? 'OK' : 'INSUFFICIENT_LIQUIDITY',
+      bidLiquidity: parseFloat(bidLiquidity.toFixed(2)),
+      askLiquidity: parseFloat(askLiquidity.toFixed(2)),
+      spread: this.currentPrices.spread,
+    };
+  }
+
+  /**
+   * Calcular liquidez total de un array de niveles de precio
+   */
+  _calculateLiquidity(levels) {
+    if (!levels || levels.length === 0) return 0;
+    
+    return levels.reduce((total, level) => {
+      const price = parseFloat(level.price);
+      const size = parseFloat(level.size);
+      return total + (price * size);
+    }, 0);
   }
 
   /**
@@ -363,6 +573,11 @@ class PolymarketWebSocketClient {
   }
 
   cleanup() {
+    if (this.ws && this.wsConnected) {
+      logger.info('Cerrando WebSocket...');
+      this.ws.close();
+    }
+    
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
     }

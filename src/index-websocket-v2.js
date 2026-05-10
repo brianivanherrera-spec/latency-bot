@@ -8,8 +8,8 @@ const config = require('./config');
 const logger = new Logger('MAIN');
 
 /**
- * Calcular en qué minuto (0-4) estamos dentro de la ventana de 5 minutos
- * Retorna: 0, 1, 2, 3, o 4
+ * ✅ MEJORA #2: Calcular en qué minuto (0-4) estamos dentro de la ventana de 5 minutos
+ * Solo operamos en minutos 1-3 (evitar volatilidad inicial y rush final)
  */
 function getWindowMinute(endDate) {
   const end = new Date(endDate).getTime();
@@ -20,91 +20,56 @@ function getWindowMinute(endDate) {
   return Math.max(0, Math.min(4, minute)); // Clamp entre 0-4
 }
  
-// Fetch precio actual de Polymarket para el mercado activo
-async function fetchPolyPrice(gammaId) {
-  try {
-    const res = await fetch(`https://gamma-api.polymarket.com/markets/${gammaId}`);
-    if (!res.ok) return null;
-    const m = await res.json();
- 
-    // outcomePrices: '["0.62","0.38"]' => [yesPrice, noPrice]
-    if (m.outcomePrices) {
-      const prices = typeof m.outcomePrices === 'string'
-        ? JSON.parse(m.outcomePrices)
-        : m.outcomePrices;
-      return {
-        yes: parseFloat(prices[0]),
-        no: parseFloat(prices[1]),
-      };
-    }
- 
-    // Fallback: tokens array
-    if (m.tokens && Array.isArray(m.tokens)) {
-      const yes = m.tokens.find(t => t.outcome === 'Yes' || t.outcome === 'YES');
-      const no  = m.tokens.find(t => t.outcome === 'No'  || t.outcome === 'NO');
-      if (yes && no) {
-        return {
-          yes: parseFloat(yes.price || yes.lastTradePrice || 0.5),
-          no:  parseFloat(no.price  || no.lastTradePrice  || 0.5),
-        };
-      }
-    }
- 
-    return null;
-  } catch (err) {
-    logger.warn(`fetchPolyPrice error: ${err.message}`);
-    return null;
-  }
-}
- 
 async function main() {
-  logger.info('Latency Bot iniciando...');
+  logger.info('='.repeat(60));
+  logger.info('🚀 Latency Bot v2.0 - WebSocket + Timing + Liquidez');
+  logger.info('='.repeat(60));
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING (DRY RUN)' : 'LIVE TRADING'}`);
+  logger.info(`Capital por trade: $${config.ORDER_SIZE_USDC}`);
+  logger.info(`Max posiciones: ${config.MAX_POSITIONS}`);
+  logger.info(`Ventana de entrada: Minutos 1-3`);
+  logger.info(`Min liquidez requerida: $${config.ORDER_SIZE_USDC * 3}`);
+  logger.info('='.repeat(60));
  
   const signal = new SignalEngine();
-  const poly = new PolymarketClient();
-  const ws = new BinanceWS();
+  const polyWS = new PolymarketWebSocketClient(); // ✅ WebSocket client
+  const binanceWS = new BinanceWS();
   const tracker = new PnLTracker();
  
   let activeMarket = null;
-  let cachedMarket = null; // persiste entre trades para mantener precio Poly fresco
   let lastTradeTime = 0;
-  let posicionAbierta = false; // flag para evitar doble entrada simultánea
+  let posicionAbierta = false;
   const COOLDOWN_MS = config.COOLDOWN_SECONDS * 1000;
-  const MAX_EDGE_PCT = 50; // edge máximo realista — si es mayor, el precio Poly es stale
- 
-  // === Actualizar precio de Polymarket cada 5 segundos ===
-  // Usa cachedMarket (persiste entre trades) para no quedar stale
-  setInterval(async () => {
-    if (!cachedMarket?.gammaId) {
-      const m = await poly.findBTCMarket();
-      if (m) {
-        cachedMarket = m;
-        logger.info('[POLY] Mercado cacheado: ' + m.question);
-      }
-      return;
+  const MAX_EDGE_PCT = 50;
+  const MIN_LIQUIDITY_USD = config.ORDER_SIZE_USDC * 3; // 3x buffer
+
+  // ✅ MEJORA #1: Configurar callback de WebSocket para updates de precio en tiempo real
+  polyWS.onPriceUpdate((prices) => {
+    signal.updatePolyPrice(prices.yes, prices.no);
+    logger.debug(`[POLY-WS] YES=${prices.yes.toFixed(3)} NO=${prices.no.toFixed(3)} | Spread=${(prices.spread * 100).toFixed(2)}%`);
+  });
+
+  // Callback cuando mercado se invalida
+  polyWS.onMarketInvalid((reason) => {
+    logger.warn(`[POLY-WS] ❌ Mercado invalidado: ${reason}`);
+    activeMarket = null;
+    posicionAbierta = false;
+  });
+
+  // Buscar mercado inicial y suscribirse vía WebSocket
+  try {
+    const initialMarket = await polyWS.findBTCMarket();
+    if (initialMarket) {
+      activeMarket = initialMarket;
+      logger.info(`[MARKET] ✓ ${activeMarket.question}`);
+    } else {
+      logger.warn('[MARKET] ⚠️  No se encontró mercado inicial, se buscará en el siguiente ciclo');
     }
-    const prices = await fetchPolyPrice(cachedMarket.gammaId);
-    if (prices) {
-      // Si el mercado está resuelto (precios extremos 0/1), invalidar y buscar uno nuevo
-      const resuelto = (prices.yes === 0 && prices.no === 1) || (prices.yes === 1 && prices.no === 0);
-      if (resuelto) {
-        logger.info('[POLY] Mercado resuelto/cerrado, buscando uno nuevo...');
-        cachedMarket = null;
-        return;
-      }
-      // Precio válido = entre 0.10 y 0.90 (mercado activo con liquidez real)
-      const precioValido = prices.yes >= 0.10 && prices.yes <= 0.90;
-      if (!precioValido) {
-        logger.warn(`[POLY] Precio dudoso (YES=${prices.yes}), ignorando...`);
-        return;
-      }
-      signal.updatePolyPrice(prices.yes, prices.no);
-      logger.info(`[POLY] YES=${prices.yes} NO=${prices.no} (mercado: ${cachedMarket.question?.slice(0, 40)})`);
-    }
-  }, 5000);
+  } catch (err) {
+    logger.error(`Error buscando mercado inicial: ${err.message}`);
+  }
  
-  ws.onPrice(async (priceData) => {
+  binanceWS.onPrice(async (priceData) => {
     const sig = signal.process(priceData);
     if (!sig) return;
     if (sig.direction === 'NEUTRAL') return;
@@ -130,38 +95,56 @@ async function main() {
       return;
     }
  
-    // Fix: rechazar edges imposibles — indican precio Poly stale del mercado anterior
+    // Rechazar edges imposibles — indican precio Poly stale del mercado anterior
     if (Math.abs(sig.edge.edgePct) > MAX_EDGE_PCT) {
       logger.warn(`[SKIP] Edge sospechoso (${sig.edge.edgePct}% > ${MAX_EDGE_PCT}% max) — precio stale`);
       return;
     }
  
-    // FIX RACE CONDITION: setear flag ANTES del check, no después
-    // Así dos ticks que llegan con milisegundos de diferencia no pasan ambos
+    // FIX RACE CONDITION: setear flag ANTES del check
     if (posicionAbierta) {
       logger.info(`[SKIP] Posicion ya abierta, esperando cierre`);
       return;
     }
-    posicionAbierta = true; // <-- MOVIDO AQUÍ, antes del try
+    posicionAbierta = true;
  
     try {
       if (!activeMarket) {
-        activeMarket = await poly.findBTCMarket();
+        activeMarket = await polyWS.findBTCMarket();
         if (!activeMarket) {
           logger.warn('No hay mercado BTC activo en Polymarket');
-          posicionAbierta = false; // liberar si no hay mercado
+          posicionAbierta = false;
           return;
         }
         logger.info(`[MARKET] ${activeMarket.question}`);
       }
+
+      // ✅ MEJORA #2: Validar timing de entrada (solo minutos 1-3)
+      const windowMinute = getWindowMinute(activeMarket.endDate);
+      if (windowMinute < 1 || windowMinute > 3) {
+        logger.info(`[SKIP] ⏱️  Fuera de ventana óptima (minuto ${windowMinute}/4) - Solo operamos en minutos 1-3`);
+        posicionAbierta = false;
+        return;
+      }
+      logger.info(`[TIMING] ✓ Minuto ${windowMinute}/4 - Ventana óptima`);
+
+      // ✅ MEJORA #3: Validar liquidez del orderbook
+      const liquidityCheck = polyWS.checkLiquidity(MIN_LIQUIDITY_USD);
+      if (!liquidityCheck.valid) {
+        logger.warn(`[SKIP] 💧 Liquidez insuficiente: BID=$${liquidityCheck.bidLiquidity} ASK=$${liquidityCheck.askLiquidity} (min: $${MIN_LIQUIDITY_USD})`);
+        posicionAbierta = false;
+        return;
+      }
+      logger.info(`[LIQUIDITY] ✓ BID=$${liquidityCheck.bidLiquidity} ASK=$${liquidityCheck.askLiquidity} | Spread=${(liquidityCheck.spread * 100).toFixed(2)}%`);
  
       const order = buildOrder(sig, activeMarket);
       if (!order) {
-        posicionAbierta = false; // liberar si no hay orden válida
+        posicionAbierta = false;
         return;
       }
  
-      logger.info(`[ORDER] ${order.side} | Price: $${order.price} | Size: ${order.size} | USDC: $${(order.price * order.size).toFixed(2)} | Edge: ${sig.edge?.edgePct ?? 'n/a'}%`);
+      logger.info(`[OPEN] ${order.side === 'BUY' ? 'UP' : 'DOWN'} @ $${order.price} | Edge: ${sig.edge?.edgePct ?? 'n/a'}% | Move: ${sig.movePct.toFixed(3)}%`);
+      logger.info(`  Exposure: $${(order.price * order.size).toFixed(2)} | Size: ${order.size} contratos`);
  
       tracker.openPosition({
         marketId: activeMarket.conditionId,
@@ -187,13 +170,13 @@ async function main() {
     }
   });
  
-  ws.onError((err) => logger.error(`WebSocket error: ${err.message}`));
-  ws.onReconnect(() => logger.info('WebSocket reconectado'));
+  binanceWS.onError((err) => logger.error(`WebSocket error: ${err.message}`));
+  binanceWS.onReconnect(() => logger.info('WebSocket reconectado'));
  
-  logger.info('Conectando a WebSocket Coinbase...');
+  logger.info('Conectando a WebSocket Binance...');
   try {
-    await ws.connect();
-    logger.info('Conectado al WebSocket');
+    await binanceWS.connect();
+    logger.info('✓ Conectado al WebSocket Binance');
   } catch (err) {
     logger.error(`No se pudo conectar: ${err.message}`);
     await new Promise(r => setTimeout(r, 10000));
@@ -202,19 +185,27 @@ async function main() {
  
   // Health check + P&L cada 5 minutos
   setInterval(async () => {
-    activeMarket = null; // forzar mercado fresco cada ciclo
- 
+    logger.info('─'.repeat(60));
+    logger.info('[HEALTH]');
+    
     const stats = signal.getStats();
-    logger.info(`[HEALTH] Ticks: ${stats.ticks} | Senales: ${stats.signals} | WS: ${ws.isConnected() ? 'OK' : 'DOWN'} | polyYes: ${stats.polyYes} (${stats.polyAge} ago)`);
- 
+    logger.info(`  Señales: ${stats.signals}`);
+    logger.info(`  Active slots: ${posicionAbierta ? '1' : '0'}/${config.MAX_POSITIONS}`);
+    logger.info(``);
+    
     await tracker.checkClosedPositions();
     tracker.printSummary();
+    
+    // Buscar mercado fresco cada ciclo
+    activeMarket = null;
+    
   }, 5 * 60 * 1000);
  
   process.on('SIGTERM', () => {
     logger.info('SIGTERM recibido, cerrando...');
     tracker.printSummary();
-    ws.close();
+    binanceWS.close();
+    polyWS.cleanup();
     process.exit(0);
   });
 }
