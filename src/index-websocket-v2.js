@@ -3,6 +3,7 @@ const { SignalEngine } = require('./signal');
 const { PolymarketWebSocketClient } = require('./polymarket-ws');
 const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
+const { DailyStopLoss } = require('./stop-loss');
 const config = require('./config');
  
 const logger = new Logger('MAIN');
@@ -35,6 +36,7 @@ async function main() {
   const polyWS = new PolymarketWebSocketClient(); // ✅ WebSocket client
   const binanceWS = new BinanceWS();
   const tracker = new PnLTracker();
+  const stopLoss = new DailyStopLoss(); // ✅ Stop loss protection
  
   let activeMarket = null;
   let lastTradeTime = 0;
@@ -106,6 +108,13 @@ async function main() {
       logger.info(`[SKIP] Posicion ya abierta, esperando cierre`);
       return;
     }
+
+    // ✅ PROTECCIÓN: Verificar stop loss diario
+    if (!stopLoss.canTrade()) {
+      logger.warn(`[SKIP] 🛑 Stop loss activado - Trading detenido`);
+      return;
+    }
+
     posicionAbierta = true;
  
     try {
@@ -191,6 +200,17 @@ async function main() {
     const stats = signal.getStats();
     logger.info(`  Señales: ${stats.signals}`);
     logger.info(`  Active slots: ${posicionAbierta ? '1' : '0'}/${config.MAX_POSITIONS}`);
+    
+    // Stop loss stats
+    const slStats = stopLoss.getStats();
+    logger.info(`\n[STOP LOSS DIARIO]`);
+    logger.info(`  P&L hoy: ${slStats.dailyPnL >= 0 ? '+' : ''}$${slStats.dailyPnL.toFixed(2)}`);
+    logger.info(`  Trades hoy: ${slStats.tradesToday}`);
+    logger.info(`  Pérdidas consecutivas: ${slStats.consecutiveLosses}`);
+    logger.info(`  Estado: ${slStats.isStopped ? '⛔ DETENIDO' : '✅ ACTIVO'}`);
+    if (slStats.isStopped) {
+      logger.info(`  Razón: ${slStats.stopReason}`);
+    }
     logger.info(``);
     
     await tracker.checkClosedPositions();
