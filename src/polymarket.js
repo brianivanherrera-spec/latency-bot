@@ -45,19 +45,37 @@ class PolymarketClient {
  
     try {
       this.wallet = new ethers.Wallet(config.POLY_PRIVATE_KEY);
+      logger.info(`Wallet EOA: ${this.wallet.address}`);
+
+      // Paso 1: Cliente L1 para obtener/derivar API credentials
+      const l1Client = new ClobClient(CLOB_API_BASE, 137, this.wallet);
+
+      let creds;
+      if (config.POLY_API_KEY && config.POLY_API_SECRET && config.POLY_PASSPHRASE) {
+        // Usar credentials ya configuradas
+        creds = {
+          key: config.POLY_API_KEY,
+          secret: config.POLY_API_SECRET,
+          passphrase: config.POLY_PASSPHRASE,
+        };
+        logger.info(`Usando API credentials configuradas: ${creds.key.slice(0,8)}...`);
+      } else {
+        // Derivar automáticamente (requiere firma EIP-712)
+        logger.info(`Derivando API credentials desde private key...`);
+        creds = await l1Client.createOrDeriveApiKey();
+        logger.info(`API credentials obtenidas: ${creds.key.slice(0,8)}...`);
+      }
+
+      // Paso 2: Cliente L2 autenticado para trading
       this.clobClient = new ClobClient(
         CLOB_API_BASE,
         137,
         this.wallet,
-        {
-          key: config.POLY_API_KEY,
-          secret: config.POLY_API_SECRET,
-          passphrase: config.POLY_PASSPHRASE,
-        }
+        creds
       );
-      await this.clobClient.deriveApiKey();
+
       this._initialized = true;
-      logger.info(`Wallet: ${this.wallet.address}`);
+      logger.info(`✅ Polymarket CLOB inicializado correctamente`);
     } catch (err) {
       throw new Error(`Error inicializando Polymarket: ${err.message}`);
     }
