@@ -1,268 +1,221 @@
+/**
+ * LATENCY BOT - VERSIÓN FINAL
+ * ✅ SignalEngine + PnLTracker + Cooldown + Live orders + Diagnóstico
+ */
+
 const { BinanceWS } = require('./binance');
 const { SignalEngine } = require('./signal');
-const { PolymarketWebSocketClient } = require('./polymarket-ws');
+const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const config = require('./config');
- 
+
 const logger = new Logger('MAIN');
 
-/**
- * Calcular en qué minuto (0-4) estamos dentro de la ventana de 5 minutos
- * Retorna: 0, 1, 2, 3, o 4
- */
-function getWindowMinute(endDate) {
-  const end = new Date(endDate).getTime();
-  const windowStart = end - (5 * 60 * 1000); // 5 minutos antes
-  const now = Date.now();
-  const elapsed = now - windowStart;
-  const minute = Math.floor(elapsed / 60000); // Dividir por 60000ms = 1 minuto
-  return Math.max(0, Math.min(4, minute)); // Clamp entre 0-4
-}
- 
-// Fetch precio actual de Polymarket para el mercado activo
-async function fetchPolyPrice(gammaId) {
-  try {
-    const res = await fetch(`https://gamma-api.polymarket.com/markets/${gammaId}`);
-    if (!res.ok) return null;
-    const m = await res.json();
- 
-    // outcomePrices: '["0.62","0.38"]' => [yesPrice, noPrice]
-    if (m.outcomePrices) {
-      const prices = typeof m.outcomePrices === 'string'
-        ? JSON.parse(m.outcomePrices)
-        : m.outcomePrices;
-      return {
-        yes: parseFloat(prices[0]),
-        no: parseFloat(prices[1]),
-      };
-    }
- 
-    // Fallback: tokens array
-    if (m.tokens && Array.isArray(m.tokens)) {
-      const yes = m.tokens.find(t => t.outcome === 'Yes' || t.outcome === 'YES');
-      const no  = m.tokens.find(t => t.outcome === 'No'  || t.outcome === 'NO');
-      if (yes && no) {
-        return {
-          yes: parseFloat(yes.price || yes.lastTradePrice || 0.5),
-          no:  parseFloat(no.price  || no.lastTradePrice  || 0.5),
-        };
-      }
-    }
- 
-    return null;
-  } catch (err) {
-    logger.warn(`fetchPolyPrice error: ${err.message}`);
-    return null;
-  }
-}
- 
+const tracker = new PnLTracker();
+const activePositions = new Map();
+
+let lastTradeTime = 0;
+const COOLDOWN = 3 * 60 * 1000; // 3 MINUTOS
+
 async function main() {
-  logger.info('Latency Bot iniciando...');
-  logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING (DRY RUN)' : 'LIVE TRADING'}`);
- 
+  logger.info('═'.repeat(70));
+  logger.info('🎯 LATENCY BOT - Versión Final');
+  logger.info('═'.repeat(70));
+  logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE 🔴'}`);
+  logger.info(`Cooldown: 3 minutos | Min edge: ${config.MIN_EDGE_PCT}%`);
+  logger.info('');
+
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
   const ws = new BinanceWS();
-  const tracker = new PnLTracker();
- 
-  let activeMarket = null;
-  let cachedMarket = null; // persiste entre trades para mantener precio Poly fresco
-  let lastTradeTime = 0;
-  let posicionAbierta = false; // flag para evitar doble entrada simultánea
-  const COOLDOWN_MS = config.COOLDOWN_SECONDS * 1000;
-  const MAX_EDGE_PCT = 50; // edge máximo realista — si es mayor, el precio Poly es stale
- 
-  // === Actualizar precio de Polymarket cada 5 segundos ===
-  // Usa cachedMarket (persiste entre trades) para no quedar stale
-  setInterval(async () => {
+
+  let cachedMarket = null;
+  let lastPolyPrice = '';
+
+  async function actualizarPrecioPolymarket() {
     if (!cachedMarket?.gammaId) {
       const m = await poly.findBTCMarket();
       if (m) {
         cachedMarket = m;
-        logger.info('[POLY] Mercado cacheado: ' + m.question);
-      }
-      return;
-    }
-    const prices = await fetchPolyPrice(cachedMarket.gammaId);
-    if (prices) {
-      // Si el mercado está resuelto (precios extremos 0/1), invalidar y buscar uno nuevo
-      const resuelto = (prices.yes === 0 && prices.no === 1) || (prices.yes === 1 && prices.no === 0);
-      if (resuelto) {
-        logger.info('[POLY] Mercado resuelto/cerrado, buscando uno nuevo...');
-        cachedMarket = null;
+        logger.info(`[POLY] Mercado: ${m.question}`);
+        logger.info(`[POLY] yesToken: ${m.yesTokenId}`);
+        logger.info(`[POLY] noToken: ${m.noTokenId}`);
+      } else {
         return;
       }
-      // Precio válido = entre 0.10 y 0.90 (mercado activo con liquidez real)
-      const precioValido = prices.yes >= 0.10 && prices.yes <= 0.90;
-      if (!precioValido) {
-        logger.warn(`[POLY] Precio dudoso (YES=${prices.yes}), ignorando...`);
+    }
+    try {
+      const res = await fetch(`https://gamma-api.polymarket.com/markets/${cachedMarket.gammaId}`);
+      if (!res.ok) {
+        logger.warn(`[POLY] Gamma API error: ${res.status}`);
         return;
       }
-      signal.updatePolyPrice(prices.yes, prices.no);
-      logger.info(`[POLY] YES=${prices.yes} NO=${prices.no} (mercado: ${cachedMarket.question?.slice(0, 40)})`);
+      const data = await res.json();
+      if (data.outcomePrices) {
+        const prices = typeof data.outcomePrices === 'string'
+          ? JSON.parse(data.outcomePrices)
+          : data.outcomePrices;
+        const yes = parseFloat(prices[0]);
+        const no = parseFloat(prices[1]);
+        if (yes >= 0.05 && yes <= 0.95) {
+          signal.updatePolyPrice(yes, no);
+          const tag = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
+          if (tag !== lastPolyPrice) {
+            logger.info(`[POLY] ${tag}`);
+            lastPolyPrice = tag;
+          }
+        } else {
+          logger.info(`[POLY] Mercado resuelto (YES=${yes}), buscando nuevo...`);
+          cachedMarket = null;
+          lastPolyPrice = '';
+        }
+      }
+    } catch (err) {
+      logger.warn(`[POLY] Error actualizando precio: ${err.message}`);
     }
-  }, 5000);
- 
+  }
+
+  logger.info('[POLY] Obteniendo precio inicial...');
+  await actualizarPrecioPolymarket();
+
+  setInterval(actualizarPrecioPolymarket, 2000);
+
+  setInterval(async () => {
+    await tracker.checkClosedPositions();
+  }, 60000);
+
   ws.onPrice(async (priceData) => {
     const sig = signal.process(priceData);
-    if (!sig) return;
-    if (sig.direction === 'NEUTRAL') return;
- 
+    if (!sig || sig.direction === 'NEUTRAL') return;
+
     const now = Date.now();
-    if (now - lastTradeTime < COOLDOWN_MS) return;
- 
-    logger.info(`[SIGNAL] ${sig.direction} | Move: ${sig.movePct.toFixed(3)}% | Z: ${sig.zScore.toFixed(2)} | Conf: ${sig.confidence}/100`);
- 
-    // Log del edge calculado
-    if (sig.edge) {
-      const e = sig.edge;
-      logger.info(`[EDGE] fairYes=$${e.fairYes} polyYes=$${e.polyYes} edgePct=${e.edgePct}% | ${e.reason}`);
-    }
- 
-    // Solo operar si hay precio Poly válido Y edge real
-    if (!sig.edge || sig.edge.reason === 'NO_POLY_PRICE' || sig.edge.reason === 'POLY_PRICE_STALE') {
-      logger.info(`[SKIP] Sin precio Poly válido (${sig.edge?.reason})`);
+
+    if (now - lastTradeTime < COOLDOWN) return;
+
+    // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
+    logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
+
+    if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
+    if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > 15) return;
+
+    if (activePositions.size >= 10) return;
+
+    const exposure = 5;
+    const totalExposure = Array.from(activePositions.values())
+      .reduce((sum, p) => sum + p.exposure, 0);
+    if (totalExposure + exposure > 100) return;
+
+    if (!cachedMarket?.gammaId) {
+      logger.warn('[SKIP] No hay mercado disponible');
       return;
     }
-    if (!sig.edge.hasEdge) {
-      logger.info(`[SKIP] Edge insuficiente (${sig.edge?.edgePct}% < ${config.MIN_EDGE_PCT || 5}% minimo)`);
+
+    const marketEnd = new Date(cachedMarket.endDate).getTime();
+    const msRestantes = marketEnd - now;
+    const segsRestantes = Math.floor(msRestantes / 1000);
+
+    if (msRestantes <= 0) {
+      logger.warn(`[SKIP] ⏱️ Mercado YA CERRADO hace ${Math.abs(segsRestantes)}s`);
+      cachedMarket = null;
       return;
     }
- 
-    // Fix: rechazar edges imposibles — indican precio Poly stale del mercado anterior
-    if (Math.abs(sig.edge.edgePct) > MAX_EDGE_PCT) {
-      logger.warn(`[SKIP] Edge sospechoso (${sig.edge.edgePct}% > ${MAX_EDGE_PCT}% max) — precio stale`);
+
+    if (segsRestantes < 60) {
+      logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde`);
       return;
     }
- 
-    // FIX RACE CONDITION: setear flag ANTES del check, no después
-    // Así dos ticks que llegan con milisegundos de diferencia no pasan ambos
-    if (posicionAbierta) {
-      logger.info(`[SKIP] Posicion ya abierta, esperando cierre`);
+
+    logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
+
+    const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
+    const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
+    const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
+    const size = Math.floor(exposure / price);
+
+    if (size < 1) {
+      logger.warn('[SKIP] Size < 1');
       return;
     }
-    posicionAbierta = true; // <-- MOVIDO AQUÍ, antes del try
- 
-    try {
-      if (!activeMarket) {
-        activeMarket = await poly.findBTCMarket();
-        if (!activeMarket) {
-          logger.warn('No hay mercado BTC activo en Polymarket');
-          posicionAbierta = false; // liberar si no hay mercado
+
+    logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
+    logger.info(`  Exposure: $${exposure} | Size: ${size} | Token: ${tokenId}`);
+
+    // ✅ Actualizar cooldown ANTES de ejecutar
+    lastTradeTime = now;
+    const posId = `POS_${Date.now()}`;
+    activePositions.set(posId, { exposure, openTime: now });
+
+    // ✅ Ejecutar orden real (solo en LIVE)
+    if (!config.DRY_RUN) {
+      try {
+        const orderResult = await poly.placeLimitOrder({
+          marketId: cachedMarket.conditionId,
+          tokenId,
+          side: 'BUY',
+          price,
+          size,
+          marketQuestion: cachedMarket.question,
+        });
+
+        if (!orderResult.success) {
+          logger.error(`[LIVE] ❌ Orden fallida: ${orderResult.error}`);
+          activePositions.delete(posId);
           return;
         }
-        logger.info(`[MARKET] ${activeMarket.question}`);
-      }
- 
-      const order = buildOrder(sig, activeMarket);
-      if (!order) {
-        posicionAbierta = false; // liberar si no hay orden válida
+
+        logger.info(`[LIVE] ✅ Orden colocada: ${orderResult.orderId}`);
+
+      } catch (err) {
+        logger.error(`[LIVE] ❌ Error: ${err.message}`);
+        activePositions.delete(posId);
         return;
       }
- 
-      logger.info(`[ORDER] ${order.side} | Price: $${order.price} | Size: ${order.size} | USDC: $${(order.price * order.size).toFixed(2)} | Edge: ${sig.edge?.edgePct ?? 'n/a'}%`);
- 
-      tracker.openPosition({
-        marketId: activeMarket.conditionId,
-        gammaId: activeMarket.gammaId,
-        marketQuestion: activeMarket.question,
-        side: order.side,
-        price: order.price,
-        size: order.size,
-        endDate: activeMarket.endDate,
-      });
- 
-      lastTradeTime = now;
-      // Liberar posición después de 6 minutos como máximo (mercado ya resuelto)
-      setTimeout(() => {
-        posicionAbierta = false;
-        activeMarket = null;
-      }, 6 * 60 * 1000);
- 
-    } catch (err) {
-      logger.error(`Error al operar: ${err.message}`);
-      posicionAbierta = false;
-      activeMarket = null;
     }
+
+    tracker.openPosition({
+      marketId: cachedMarket.conditionId,
+      gammaId: cachedMarket.gammaId,
+      marketQuestion: cachedMarket.question,
+      side,
+      price,
+      size,
+      endDate: cachedMarket.endDate,
+    });
+
+    setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
   });
- 
-  ws.onError((err) => logger.error(`WebSocket error: ${err.message}`));
-  ws.onReconnect(() => logger.info('WebSocket reconectado'));
- 
-  logger.info('Conectando a WebSocket Coinbase...');
-  try {
-    await ws.connect();
-    logger.info('Conectado al WebSocket');
-  } catch (err) {
-    logger.error(`No se pudo conectar: ${err.message}`);
-    await new Promise(r => setTimeout(r, 10000));
-    return main();
-  }
- 
-  // Health check + P&L cada 5 minutos
-  setInterval(async () => {
-    activeMarket = null; // forzar mercado fresco cada ciclo
- 
-    const stats = signal.getStats();
-    logger.info(`[HEALTH] Ticks: ${stats.ticks} | Senales: ${stats.signals} | WS: ${ws.isConnected() ? 'OK' : 'DOWN'} | polyYes: ${stats.polyYes} (${stats.polyAge} ago)`);
- 
-    await tracker.checkClosedPositions();
-    tracker.printSummary();
+
+  ws.onError((err) => logger.error(`WS error: ${err.message}`));
+
+  logger.info('Conectando a Coinbase WebSocket...');
+  await ws.connect();
+  logger.info('✓ Conectado\n');
+
+  setInterval(() => {
+    const stats = tracker.getSummary();
+    const sigStats = signal.getStats();
+
+    logger.info('─'.repeat(60));
+    logger.info('[HEALTH]');
+    logger.info(`  Señales: ${sigStats.signals} | BTC: $${sigStats.lastPrice?.toFixed(2) ?? 'n/a'}`);
+    logger.info(`  Poly YES: ${sigStats.polyYes ?? 'n/a'} | Poly age: ${sigStats.polyAge}`);
+    logger.info(`  Active slots: ${activePositions.size}/10`);
+    logger.info(`  Cooldown: ${Math.max(0, Math.ceil((lastTradeTime + COOLDOWN - Date.now()) / 1000))}s`);
+    logger.info('');
+    logger.info('=== P&L TRACKER ===');
+    logger.info(`  Open: ${stats.openPositions} | Closed: ${stats.closedPositions}`);
+    logger.info(`  Wins: ${stats.wins} | Losses: ${stats.losses}`);
+    logger.info(`  Win Rate: ${stats.winRate}`);
+    logger.info(`  Total P&L: ${stats.totalPnL}`);
+    logger.info('─'.repeat(60));
   }, 5 * 60 * 1000);
- 
-  process.on('SIGTERM', () => {
-    logger.info('SIGTERM recibido, cerrando...');
-    tracker.printSummary();
-    ws.close();
-    process.exit(0);
-  });
 }
- 
-function buildOrder(sig, market) {
-  const isYesMarket = market.question.toLowerCase().includes('higher') ||
-                      market.question.toLowerCase().includes('above') ||
-                      market.question.toLowerCase().includes('up') ||
-                      market.question.toLowerCase().includes('sube') ||
-                      market.question.toLowerCase().includes('arriba');
- 
-  let side;
-  if (sig.direction === 'UP') {
-    side = isYesMarket ? 'BUY' : 'SELL';
-  } else {
-    side = isYesMarket ? 'SELL' : 'BUY';
-  }
- 
-  // Usar precio de Polymarket si lo tenemos, sino usar estimado conservador
-  let entryPrice;
-  if (sig.edge?.polyYes) {
-    entryPrice = side === 'BUY' ? sig.edge.polyYes : (1 - sig.edge.polyYes);
-  } else {
-    const basePrice = isYesMarket
-      ? (sig.direction === 'UP' ? 0.62 : 0.35)
-      : (sig.direction === 'UP' ? 0.35 : 0.62);
-    const strength = Math.min(sig.zScore / 3, 1);
-    entryPrice = side === 'BUY'
-      ? Math.max(0.01, basePrice - strength * 0.05)
-      : Math.min(0.99, basePrice + strength * 0.05);
-  }
- 
-  entryPrice = parseFloat(entryPrice.toFixed(2));
-  const size = Math.floor(config.ORDER_SIZE_USDC / entryPrice);
-  if (size < 1) return null;
- 
-  return {
-    marketId: market.conditionId,
-    tokenId: market.yesTokenId,
-    side,
-    price: entryPrice,
-    size,
-    marketQuestion: market.question,
-  };
-}
- 
-main().catch((err) => {
-  const logger = new (require('./logger').Logger)('MAIN');
-  logger.error(`Fatal error: ${err.message}`);
-  setTimeout(() => main(), 10000);
+
+main().catch(err => {
+  logger.error(`Fatal: ${err.message}`);
+  process.exit(1);
 });
+
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
