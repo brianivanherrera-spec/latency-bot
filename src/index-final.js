@@ -109,6 +109,27 @@ async function main() {
       return;
     }
 
+    // ✅ FIX CRÍTICO: Validar que el mercado todavía está abierto
+    // Sin esto el bot entra en mercados ya cerrados (inválido en live trading)
+    const marketEnd = new Date(cachedMarket.endDate).getTime();
+    const msRestantes = marketEnd - now;
+    const segsRestantes = Math.floor(msRestantes / 1000);
+
+    if (msRestantes <= 0) {
+      // Mercado ya cerrado — descartarlo para que el intervalo busque uno nuevo
+      logger.warn(`[SKIP] ⏱️ Mercado YA CERRADO hace ${Math.abs(segsRestantes)}s — descartando`);
+      cachedMarket = null;
+      return;
+    }
+
+    if (segsRestantes < 60) {
+      // Menos de 60 segundos — demasiado tarde para una entrada limpia
+      logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — demasiado tarde para entrar`);
+      return;
+    }
+
+    logger.info(`[TIMING] ✅ ${segsRestantes}s restantes en ventana — OK para entrar`);
+
     // === ABRIR POSICIÓN ===
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
