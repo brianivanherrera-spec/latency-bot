@@ -28,20 +28,33 @@ class PolymarketClient {
  
   async _init() {
     if (this._initialized) return;
+ 
     if (config.DRY_RUN) {
       logger.info('DRY RUN: Polymarket client en modo simulación');
       this._initialized = true;
       return;
     }
-    if (!config.POLY_PRIVATE_KEY) throw new Error('POLY_PRIVATE_KEY no configurada');
-    if (!ethers || !ClobClient) throw new Error('Dependencias de Polymarket no instaladas');
+ 
+    if (!config.POLY_PRIVATE_KEY) {
+      throw new Error('POLY_PRIVATE_KEY no configurada');
+    }
+ 
+    if (!ethers || !ClobClient) {
+      throw new Error('Dependencias de Polymarket no instaladas');
+    }
+ 
     try {
       this.wallet = new ethers.Wallet(config.POLY_PRIVATE_KEY);
-      this.clobClient = new ClobClient(CLOB_API_BASE, 137, this.wallet, {
-        key: config.POLY_API_KEY,
-        secret: config.POLY_API_SECRET,
-        passphrase: config.POLY_PASSPHRASE,
-      });
+      this.clobClient = new ClobClient(
+        CLOB_API_BASE,
+        137,
+        this.wallet,
+        {
+          key: config.POLY_API_KEY,
+          secret: config.POLY_API_SECRET,
+          passphrase: config.POLY_PASSPHRASE,
+        }
+      );
       await this.clobClient.deriveApiKey();
       this._initialized = true;
       logger.info(`Wallet: ${this.wallet.address}`);
@@ -52,32 +65,39 @@ class PolymarketClient {
  
   async findBTCMarket() {
     try {
+      // El slug es determinístico — calculado desde el reloj
       const now = Math.floor(Date.now() / 1000);
       const windowTs = now - (now % 300);
       const slug = `btc-updown-5m-${windowTs}`;
-      const response = await fetch(`${GAMMA_API_BASE}/events?slug=${slug}`);
+ 
+      const response = await fetch(
+        `${GAMMA_API_BASE}/events?slug=${slug}`
+      );
+ 
       if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
+ 
       const data = await response.json();
       const events = Array.isArray(data) ? data : (data.events || data.data || []);
+ 
       if (events.length > 0) {
         const event = events[0];
         logger.info(`Mercado encontrado: ${event.title || slug}`);
         const market = event.markets?.[0];
         if (!market) return null;
-
-        // 🔍 LOG TEMPORAL
+        // LOG TEMPORAL: ver estructura completa
         logger.info(`RAW market keys: ${Object.keys(market).join(', ')}`);
         logger.info(`RAW clobTokenIds[0]: ${JSON.stringify(market.clobTokenIds?.[0])}`);
         logger.info(`RAW clobTokenIds[1]: ${JSON.stringify(market.clobTokenIds?.[1])}`);
-
         return this._formatMarket({
           ...market,
           question: event.title || market.question,
           endDate: new Date((windowTs + 300) * 1000).toISOString(),
         });
       }
+ 
       logger.warn(`Mercado no encontrado para slug: ${slug}`);
       return null;
+ 
     } catch (err) {
       logger.error(`Error buscando mercados: ${err.message}`);
       return null;
@@ -85,26 +105,25 @@ class PolymarketClient {
   }
  
   _formatMarket(m) {
-    const tokens = m.tokens || m.clobTokenIds || [];
-
-    function extractTokenId(token) {
-      if (!token) return null;
-      if (typeof token === 'string') return token;
-      if (Array.isArray(token)) return extractTokenId(token[0]);
-      if (typeof token === 'object') return token.token_id || token.id || null;
-      return null;
+    // ✅ FIX: clobTokenIds llega como string JSON, hay que parsearlo
+    let tokens = m.tokens || [];
+    if (!tokens.length && m.clobTokenIds) {
+      try {
+        tokens = typeof m.clobTokenIds === 'string'
+          ? JSON.parse(m.clobTokenIds)
+          : m.clobTokenIds;
+      } catch(e) {
+        tokens = [];
+      }
     }
-
-    const yesTokenId = extractTokenId(tokens[0]) || m.clob_token_ids?.[0];
-    const noTokenId = extractTokenId(tokens[1]) || m.clob_token_ids?.[1];
 
     return {
       conditionId: m.conditionId || m.id,
       gammaId: m.id,
       question: m.question,
       endDate: m.endDate,
-      yesTokenId,
-      noTokenId,
+      yesTokenId: tokens[0] || null,
+      noTokenId: tokens[1] || null,
       marketSlug: m.marketSlug,
     };
   }
@@ -112,10 +131,16 @@ class PolymarketClient {
   async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion }) {
     const orderRecord = {
       timestamp: new Date().toISOString(),
-      marketId, marketQuestion, tokenId, side, price, size,
+      marketId,
+      marketQuestion,
+      tokenId,
+      side,
+      price,
+      size,
       usdcValue: (price * size).toFixed(2),
       status: 'PENDING',
     };
+ 
     if (config.DRY_RUN) {
       orderRecord.status = 'DRY_RUN';
       orderRecord.orderId = `DRY_${Date.now()}`;
@@ -123,22 +148,31 @@ class PolymarketClient {
       logger.info(`[DRY RUN] ${side} ${size} tokens @ $${price} (${marketQuestion})`);
       return { success: true, orderId: orderRecord.orderId, dryRun: true };
     }
-    if (!tokenId) {
-      logger.error(`Token ID inválido para: ${marketQuestion}`);
-      return { success: false, error: 'Token ID no disponible' };
-    }
+ 
     try {
       await this._init();
+ 
       const clobSide = side === 'BUY' ? Side.BUY : Side.SELL;
+ 
       const signedOrder = await this.clobClient.createOrder({
-        tokenID: tokenId, price, size, side: clobSide,
-        orderType: OrderType.LIMIT, feeRateBps: '0', nonce: '0', expiration: '0',
+        tokenID: tokenId,
+        price,
+        size,
+        side: clobSide,
+        orderType: OrderType.LIMIT,
+        feeRateBps: '0',
+        nonce: '0',
+        expiration: '0',
       });
+ 
       const result = await this.clobClient.postOrder(signedOrder, OrderType.LIMIT);
+ 
       orderRecord.status = 'PLACED';
       orderRecord.orderId = result?.orderID || result?.order?.id;
       this._orderHistory.push(orderRecord);
+ 
       return { success: true, orderId: orderRecord.orderId };
+ 
     } catch (err) {
       orderRecord.status = 'FAILED';
       orderRecord.error = err.message;
@@ -148,7 +182,9 @@ class PolymarketClient {
     }
   }
  
-  getOrderHistory() { return this._orderHistory; }
+  getOrderHistory() {
+    return this._orderHistory;
+  }
 }
  
 module.exports = { PolymarketClient };
