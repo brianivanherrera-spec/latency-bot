@@ -1,6 +1,6 @@
 /**
  * LATENCY BOT - VERSIÓN FINAL
- * ✅ SignalEngine + PnLTracker + Cooldown + Ejecución real
+ * ✅ SignalEngine + PnLTracker + Cooldown + Live orders + Diagnóstico
  */
 
 const { BinanceWS } = require('./binance');
@@ -23,7 +23,7 @@ async function main() {
   logger.info('🎯 LATENCY BOT - Versión Final');
   logger.info('═'.repeat(70));
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE 🔴'}`);
-  logger.info('Cooldown: 3 minutos entre trades');
+  logger.info(`Cooldown: 3 minutos | Min edge: ${config.MIN_EDGE_PCT}%`);
   logger.info('');
 
   const signal = new SignalEngine();
@@ -31,7 +31,7 @@ async function main() {
   const ws = new BinanceWS();
 
   let cachedMarket = null;
-  let lastPolyLog = ''; // ✅ Evitar logs repetidos de precio
+  let lastPolyPrice = '';
 
   async function actualizarPrecioPolymarket() {
     if (!cachedMarket?.gammaId) {
@@ -60,16 +60,15 @@ async function main() {
         const no = parseFloat(prices[1]);
         if (yes >= 0.05 && yes <= 0.95) {
           signal.updatePolyPrice(yes, no);
-          // ✅ Solo loggear si el precio cambió
-          const logLine = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
-          if (logLine !== lastPolyLog) {
-            logger.info(`[POLY] ${logLine}`);
-            lastPolyLog = logLine;
+          const tag = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
+          if (tag !== lastPolyPrice) {
+            logger.info(`[POLY] ${tag}`);
+            lastPolyPrice = tag;
           }
         } else {
           logger.info(`[POLY] Mercado resuelto (YES=${yes}), buscando nuevo...`);
           cachedMarket = null;
-          lastPolyLog = '';
+          lastPolyPrice = '';
         }
       }
     } catch (err) {
@@ -92,11 +91,13 @@ async function main() {
 
     const now = Date.now();
 
-    // ✅ COOLDOWN: bloquea múltiples entradas
     if (now - lastTradeTime < COOLDOWN) return;
 
+    // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
+    logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
+
     if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
-    if (sig.edge.edgePct < 3 || sig.edge.edgePct > 15) return;
+    if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > 15) return;
 
     if (activePositions.size >= 10) return;
 
@@ -133,61 +134,56 @@ async function main() {
     const size = Math.floor(exposure / price);
 
     if (size < 1) {
-      logger.warn('[SKIP] Size < 1, precio demasiado alto');
+      logger.warn('[SKIP] Size < 1');
       return;
     }
 
     logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
-    logger.info(`  Exposure: $${exposure.toFixed(2)} | Size: ${size} contratos | Token: ${tokenId}`);
+    logger.info(`  Exposure: $${exposure} | Size: ${size} | Token: ${tokenId}`);
 
-    // ✅ FIX COOLDOWN: actualizar ANTES de ejecutar
-    // Así si la orden falla no reintenta en el mismo segundo
+    // ✅ Actualizar cooldown ANTES de ejecutar
     lastTradeTime = now;
     const posId = `POS_${Date.now()}`;
     activePositions.set(posId, { exposure, openTime: now });
 
-    // Ejecutar orden real en Polymarket (solo en LIVE)
+    // ✅ Ejecutar orden real (solo en LIVE)
     if (!config.DRY_RUN) {
       try {
         const orderResult = await poly.placeLimitOrder({
           marketId: cachedMarket.conditionId,
-          tokenId: tokenId,
+          tokenId,
           side: 'BUY',
-          price: price,
-          size: size,
+          price,
+          size,
           marketQuestion: cachedMarket.question,
         });
 
         if (!orderResult.success) {
           logger.error(`[LIVE] ❌ Orden fallida: ${orderResult.error}`);
-          activePositions.delete(posId); // Liberar slot
+          activePositions.delete(posId);
           return;
         }
 
-        logger.info(`[LIVE] ✅ Orden colocada en Polymarket: ${orderResult.orderId}`);
+        logger.info(`[LIVE] ✅ Orden colocada: ${orderResult.orderId}`);
 
       } catch (err) {
-        logger.error(`[LIVE] ❌ Error ejecutando orden: ${err.message}`);
+        logger.error(`[LIVE] ❌ Error: ${err.message}`);
         activePositions.delete(posId);
         return;
       }
     }
 
-    // Registrar en tracker solo si la orden fue exitosa (o es paper trading)
     tracker.openPosition({
       marketId: cachedMarket.conditionId,
       gammaId: cachedMarket.gammaId,
       marketQuestion: cachedMarket.question,
-      side: side,
-      price: price,
-      size: size,
-      endDate: cachedMarket.endDate
+      side,
+      price,
+      size,
+      endDate: cachedMarket.endDate,
     });
 
-    // Liberar slot después de 8 minutos
-    setTimeout(() => {
-      activePositions.delete(posId);
-    }, 8 * 60 * 1000);
+    setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
   });
 
   ws.onError((err) => logger.error(`WS error: ${err.message}`));
@@ -196,18 +192,18 @@ async function main() {
   await ws.connect();
   logger.info('✓ Conectado\n');
 
-  // Health check cada 5 minutos
   setInterval(() => {
     const stats = tracker.getSummary();
     const sigStats = signal.getStats();
 
     logger.info('─'.repeat(60));
     logger.info('[HEALTH]');
-    logger.info(`  Señales: ${sigStats.signals}`);
+    logger.info(`  Señales: ${sigStats.signals} | BTC: $${sigStats.lastPrice?.toFixed(2) ?? 'n/a'}`);
+    logger.info(`  Poly YES: ${sigStats.polyYes ?? 'n/a'} | Poly age: ${sigStats.polyAge}`);
     logger.info(`  Active slots: ${activePositions.size}/10`);
-    logger.info(`  Cooldown restante: ${Math.max(0, Math.ceil((lastTradeTime + COOLDOWN - Date.now()) / 1000))}s`);
+    logger.info(`  Cooldown: ${Math.max(0, Math.ceil((lastTradeTime + COOLDOWN - Date.now()) / 1000))}s`);
     logger.info('');
-    logger.info('=== P&L TRACKER (REAL Polymarket) ===');
+    logger.info('=== P&L TRACKER ===');
     logger.info(`  Open: ${stats.openPositions} | Closed: ${stats.closedPositions}`);
     logger.info(`  Wins: ${stats.wins} | Losses: ${stats.losses}`);
     logger.info(`  Win Rate: ${stats.winRate}`);
