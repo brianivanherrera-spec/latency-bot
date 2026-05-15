@@ -1,27 +1,3 @@
-#!/bin/bash
-
-# Script de deployment automático para WebSocket
-# Uso: bash deploy-websocket.sh
-
-set -e
-
-echo "════════════════════════════════════════════════════════"
-echo "  🚀 DEPLOYMENT AUTOMÁTICO - WEBSOCKET"
-echo "════════════════════════════════════════════════════════"
-echo ""
-
-# Verificar que estamos en el directorio correcto
-if [ ! -d ".git" ]; then
-    echo "❌ ERROR: Este script debe ejecutarse en la raíz del repo latency-bot"
-    echo "Ejecutar: cd latency-bot && bash deploy-websocket.sh"
-    exit 1
-fi
-
-echo "📥 Descargando archivos actualizados..."
-echo ""
-
-# Crear index-websocket.js
-cat > src/index-websocket.js << 'EOFJS'
 /**
  * LATENCY BOT - VERSIÓN WEBSOCKET
  * 
@@ -53,8 +29,8 @@ async function main() {
   logger.info('═'.repeat(70));
   logger.info('🎯 LATENCY BOT - WebSocket Edition');
   logger.info('═'.repeat(70));
-  logger.info(\`Modo: \${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE'}\`);
-  logger.info(\`Cooldown: \${COOLDOWN / 1000}s entre trades\`);
+  logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE'}`);
+  logger.info(`Cooldown: ${COOLDOWN / 1000}s entre trades`);
   logger.info('');
 
   const signal = new SignalEngine();
@@ -70,7 +46,7 @@ async function main() {
     
     // CRÍTICO: Bloquear precios resueltos (0 o 1)
     if (yes === 0 || yes === 1 || no === 0 || no === 1) {
-      logger.warn(\`⚠️  Precio resuelto detectado: YES=\${yes} NO=\${no} - BLOQUEANDO\`);
+      logger.warn(`⚠️  Precio resuelto detectado: YES=${yes} NO=${no} - BLOQUEANDO`);
       polyPriceValid = false;
       currentMarket = null; // Invalidar mercado
       return;
@@ -78,7 +54,7 @@ async function main() {
     
     // Validar rango razonable
     if (yes < 0.05 || yes > 0.95) {
-      logger.warn(\`⚠️  Precio fuera de rango: YES=\${yes} - BLOQUEANDO\`);
+      logger.warn(`⚠️  Precio fuera de rango: YES=${yes} - BLOQUEANDO`);
       polyPriceValid = false;
       return;
     }
@@ -87,12 +63,12 @@ async function main() {
     signal.updatePolyPrice(yes, no);
     polyPriceValid = true;
     
-    logger.debug(\`📊 Poly WS: YES=\${yes.toFixed(3)} NO=\${no.toFixed(3)} | Spread=\${(spread * 100).toFixed(2)}%\`);
+    logger.debug(`📊 Poly WS: YES=${yes.toFixed(3)} NO=${no.toFixed(3)} | Spread=${(spread * 100).toFixed(2)}%`);
   });
 
   // === Callback: Mercado invalidado ===
   polyWs.onMarketInvalid((reason) => {
-    logger.warn(\`❌ Mercado invalidado: \${reason}\`);
+    logger.warn(`❌ Mercado invalidado: ${reason}`);
     polyPriceValid = false;
     currentMarket = null;
   });
@@ -102,8 +78,8 @@ async function main() {
   currentMarket = await polyWs.findBTCMarket();
   
   if (currentMarket) {
-    logger.info(\`✓ Mercado encontrado: \${currentMarket.question}\`);
-    logger.info(\`  Token ID: \${currentMarket.yesTokenId}\`);
+    logger.info(`✓ Mercado encontrado: ${currentMarket.question}`);
+    logger.info(`  Token ID: ${currentMarket.yesTokenId}`);
   } else {
     logger.warn('⚠️  No se encontró mercado activo');
   }
@@ -114,7 +90,7 @@ async function main() {
     const newMarket = await polyWs.findBTCMarket();
     
     if (newMarket && newMarket.conditionId !== currentMarket?.conditionId) {
-      logger.info(\`✓ Nuevo mercado: \${newMarket.question}\`);
+      logger.info(`✓ Nuevo mercado: ${newMarket.question}`);
       currentMarket = newMarket;
       polyPriceValid = false; // Esperar primer precio válido
     }
@@ -152,7 +128,7 @@ async function main() {
     
     const polyPrice = polyWs.getCurrentPrice();
     if (!polyPrice.valid) {
-      logger.warn(\`[SKIP] Precio Poly stale: \${polyPrice.reason}\`);
+      logger.warn(`[SKIP] Precio Poly stale: ${polyPrice.reason}`);
       return;
     }
 
@@ -161,14 +137,14 @@ async function main() {
     
     const minEdge = config.MIN_EDGE_PCT || 3;
     if (sig.edge.edgePct < minEdge || sig.edge.edgePct > 15) {
-      logger.debug(\`[SKIP] Edge fuera de rango: \${sig.edge.edgePct.toFixed(2)}%\`);
+      logger.debug(`[SKIP] Edge fuera de rango: ${sig.edge.edgePct.toFixed(2)}%`);
       return;
     }
 
     // 5. Validar liquidez del orderbook
     const liquidity = polyWs.checkLiquidity(15); // Mínimo $15
     if (!liquidity.valid) {
-      logger.warn(\`[SKIP] Liquidez insuficiente: \${liquidity.reason}\`);
+      logger.warn(`[SKIP] Liquidez insuficiente: ${liquidity.reason}`);
       return;
     }
 
@@ -189,8 +165,8 @@ async function main() {
 
     // === ABRIR POSICIÓN ===
     
-    logger.info(\`[SIGNAL] \${sig.direction} | Move: \${sig.movePct.toFixed(3)}% | Z: \${sig.zscore.toFixed(2)} | Conf: \${sig.confidence}/100\`);
-    logger.info(\`[EDGE] fairYes=$\${sig.edge.fairYes.toFixed(3)} polyYes=$\${sig.edge.polyYes.toFixed(3)} edgePct=\${sig.edge.edgePct.toFixed(2)}% | \${sig.edge.reason}\`);
+    logger.info(`[SIGNAL] ${sig.direction} | Move: ${sig.movePct.toFixed(3)}% | Z: ${sig.zscore.toFixed(2)} | Conf: ${sig.confidence}/100`);
+    logger.info(`[EDGE] fairYes=$${sig.edge.fairYes.toFixed(3)} polyYes=$${sig.edge.polyYes.toFixed(3)} edgePct=${sig.edge.edgePct.toFixed(2)}% | ${sig.edge.reason}`);
     
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
@@ -207,12 +183,12 @@ async function main() {
       endDate: currentMarket.endDate
     });
 
-    logger.info(\`[OPEN] \${sig.direction} @ $\${price.toFixed(3)} | Edge: \${sig.edge.edgePct.toFixed(2)}% | Move: \${sig.movePct.toFixed(3)}%\`);
-    logger.info(\`  Exposure: $\${exposure.toFixed(2)} | Size: \${size} contratos\`);
-    logger.info(\`  Liquidez: BID=$\${liquidity.bidLiquidity} ASK=$\${liquidity.askLiquidity}\`);
+    logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
+    logger.info(`  Exposure: $${exposure.toFixed(2)} | Size: ${size} contratos`);
+    logger.info(`  Liquidez: BID=$${liquidity.bidLiquidity} ASK=$${liquidity.askLiquidity}`);
 
     // Actualizar tracking
-    const posId = \`POS_\${Date.now()}\`;
+    const posId = `POS_${Date.now()}`;
     activePositions.set(posId, { exposure, openTime: now });
     lastTradeTime = now;
 
@@ -222,7 +198,7 @@ async function main() {
     }, 8 * 60 * 1000);
   });
 
-  btcWs.onError((err) => logger.error(\`BTC WS error: \${err.message}\`));
+  btcWs.onError((err) => logger.error(`BTC WS error: ${err.message}`));
 
   // === Conectar BTC WebSocket ===
   logger.info('Conectando a Coinbase WebSocket...');
@@ -236,22 +212,22 @@ async function main() {
     
     logger.info('─'.repeat(60));
     logger.info('[HEALTH]');
-    logger.info(\`  Señales: \${sigStats.signals}\`);
-    logger.info(\`  Active slots: \${activePositions.size}/10\`);
-    logger.info(\`  Mercado actual: \${currentMarket?.question || 'N/A'}\`);
-    logger.info(\`  Poly precio válido: \${polyPriceValid ? '✓' : '✗'}\`);
+    logger.info(`  Señales: ${sigStats.signals}`);
+    logger.info(`  Active slots: ${activePositions.size}/10`);
+    logger.info(`  Mercado actual: ${currentMarket?.question || 'N/A'}`);
+    logger.info(`  Poly precio válido: ${polyPriceValid ? '✓' : '✗'}`);
     
     if (polyPriceValid) {
       const price = polyWs.getCurrentPrice();
-      logger.info(\`  Último precio: YES=\${price.yes?.toFixed(3)} (age: \${price.age}ms)\`);
+      logger.info(`  Último precio: YES=${price.yes?.toFixed(3)} (age: ${price.age}ms)`);
     }
     
     logger.info('');
     logger.info('=== P&L TRACKER (REAL Polymarket) ===');
-    logger.info(\`  Open: \${stats.openPositions} | Closed: \${stats.closedPositions}\`);
-    logger.info(\`  Wins: \${stats.wins} | Losses: \${stats.losses}\`);
-    logger.info(\`  Win Rate: \${stats.winRate}\`);
-    logger.info(\`  Total P&L: \${stats.totalPnL}\`);
+    logger.info(`  Open: ${stats.openPositions} | Closed: ${stats.closedPositions}`);
+    logger.info(`  Wins: ${stats.wins} | Losses: ${stats.losses}`);
+    logger.info(`  Win Rate: ${stats.winRate}`);
+    logger.info(`  Total P&L: ${stats.totalPnL}`);
     logger.info('─'.repeat(60));
   }, 5 * 60 * 1000);
 
@@ -270,109 +246,6 @@ async function main() {
 }
 
 main().catch(err => {
-  logger.error(\`Fatal: \${err.message}\`);
+  logger.error(`Fatal: ${err.message}`);
   process.exit(1);
 });
-EOFJS
-
-echo "✅ index-websocket.js creado"
-
-# Actualizar package.json
-cat > package.json << 'EOFJSON'
-{
-  "name": "latency-bot",
-  "version": "2.0.0",
-  "description": "BTC latency bot v2.0 - WebSocket optimizado + Risk Management",
-  "main": "src/index.js",
-  "scripts": {
-    "start": "node src/index-websocket.js",
-    "start:v1": "node src/index.js",
-    "start:simple": "node src/index-simple.js",
-    "start:arb": "node src/index-latency-arb.js",
-    "start:final": "node src/index-final.js",
-    "start:ws": "node src/index-websocket.js",
-    "dev": "node --watch src/index-websocket.js",
-    "test-signal": "node src/test-signal.js",
-    "analyze": "node scripts/analyze-now.js",
-    "monitor": "node scripts/monitor.js"
-  },
-  "dependencies": {
-    "ws": "^8.18.0",
-    "@polymarket/clob-client": "^2.0.0",
-    "ethers": "^5.7.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
-}
-EOFJSON
-
-echo "✅ package.json actualizado"
-
-# Crear README
-cat > WEBSOCKET_README.md << 'EOFMD'
-# Latency Bot - WebSocket Edition
-
-## 🚀 Cambios Implementados
-
-### ✅ WebSocket en Tiempo Real
-- **ANTES:** HTTP polling cada 2 segundos → latencia 2-5 segundos
-- **AHORA:** WebSocket CLOB → latencia <100ms
-
-### ✅ Bloqueo de Mercados Resueltos
-- Detecta y **bloquea** trades cuando precios = 0 o 1 (mercado cerrado)
-- Invalida automáticamente mercados resueltos
-
-### ✅ Validación de Precios Stale
-- Máximo 3 segundos de antigüedad
-- Bloquea trades con datos desactualizados
-
-### ✅ Verificación de Liquidez
-- Valida mínimo $15 de liquidez antes de tradear
-- Previene slippage excesivo
-
----
-
-## ⚠️ VALIDACIÓN REQUERIDA
-
-**NO ir a LIVE hasta:**
-- ✅ 20-30 trades válidos acumulados
-- ✅ 0% de trades contra mercados resueltos
-- ✅ Win rate > 55%
-- ✅ P&L positivo consistente
-
-Ver logs en Railway para verificar.
-EOFMD
-
-echo "✅ WEBSOCKET_README.md creado"
-echo ""
-
-# Git add, commit, push
-echo "📤 Subiendo cambios a GitHub..."
-git add src/index-websocket.js package.json WEBSOCKET_README.md
-
-git commit -m "feat: Implementar WebSocket CLOB para trading en tiempo real
-
-✅ Cambios principales:
-- WebSocket Polymarket CLOB (latencia <100ms vs 2-5s HTTP)
-- Bloqueo estricto de mercados resueltos (precios 0 o 1)
-- Validación de precios stale (máx 3 segundos)
-- Verificación de liquidez pre-trade (mín \$15)
-
-⚠️ IMPORTANTE: NO ir a LIVE sin validar 20-30 trades limpios"
-
-echo ""
-echo "🚀 Haciendo push a GitHub..."
-git push origin main
-
-echo ""
-echo "════════════════════════════════════════════════════════"
-echo "  ✅ DEPLOYMENT COMPLETADO"
-echo "════════════════════════════════════════════════════════"
-echo ""
-echo "🔍 Próximos pasos:"
-echo "  1. Railway detectará cambios automáticamente (2-3 min)"
-echo "  2. Verificar logs: Railway Dashboard → Deployments → View Logs"
-echo "  3. Buscar: '🟢 WebSocket conectado a Polymarket CLOB'"
-echo "  4. Monitorear 20-30 trades antes de considerar LIVE"
-echo ""
