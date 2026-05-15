@@ -65,10 +65,10 @@ class PolymarketClient {
         const market = event.markets?.[0];
         if (!market) return null;
 
-        // 🔍 LOG TEMPORAL: ver estructura exacta de tokens
-        logger.info(`RAW tokens: ${JSON.stringify(market.tokens)}`);
-        logger.info(`RAW clobTokenIds: ${JSON.stringify(market.clobTokenIds)}`);
-        logger.info(`RAW clob_token_ids: ${JSON.stringify(market.clob_token_ids)}`);
+        // 🔍 LOG TEMPORAL
+        logger.info(`RAW market keys: ${Object.keys(market).join(', ')}`);
+        logger.info(`RAW clobTokenIds[0]: ${JSON.stringify(market.clobTokenIds?.[0])}`);
+        logger.info(`RAW clobTokenIds[1]: ${JSON.stringify(market.clobTokenIds?.[1])}`);
 
         return this._formatMarket({
           ...market,
