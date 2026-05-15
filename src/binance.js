@@ -23,6 +23,7 @@ class BinanceWS {
     this._intentionalClose = false;
     this._lastPrice = null;
     this._lastTimestamp = null;
+    this._loggedFirst = false;  // ← LOG TEMPORAL
   }
 
   onPrice(cb) { this.priceCallback = cb; }
@@ -39,7 +40,6 @@ class BinanceWS {
         this._connected = true;
         this._reconnectDelay = 1000;
         logger.info(`Conectado: ${WS_URL}`);
-        // Suscribirse al canal de ticker BTC-USD
         this.ws.send(JSON.stringify({
           type: 'subscribe',
           product_ids: ['BTC-USD'],
@@ -51,6 +51,13 @@ class BinanceWS {
       this.ws.on('message', (data) => {
         try {
           const msg = JSON.parse(data);
+
+          // ✅ LOG TEMPORAL: ver los primeros 3 mensajes
+          if (!this._loggedFirst) {
+            logger.info(`RAW MSG tipo=${msg.type} channel=${msg.channel}: ${data.toString().slice(0, 400)}`);
+            this._loggedFirst = true;
+          }
+
           if (msg.channel !== 'ticker') return;
           const event = msg.events?.[0];
           if (!event) return;
@@ -69,7 +76,9 @@ class BinanceWS {
           if (this.priceCallback) {
             this.priceCallback({ price, timestamp, isBuyerMaker });
           }
-        } catch (e) {}
+        } catch (e) {
+          logger.warn(`Error parseando mensaje WS: ${e.message}`);
+        }
       });
 
       this.ws.on('error', (err) => {
