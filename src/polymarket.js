@@ -69,9 +69,7 @@ class PolymarketClient {
       const windowTs = now - (now % 300);
       const slug = `btc-updown-5m-${windowTs}`;
  
-      const response = await fetch(
-        `${GAMMA_API_BASE}/events?slug=${slug}`
-      );
+      const response = await fetch(`${GAMMA_API_BASE}/events?slug=${slug}`);
  
       if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
  
@@ -101,16 +99,26 @@ class PolymarketClient {
  
   _formatMarket(m) {
     const tokens = m.tokens || m.clobTokenIds || [];
-    // ✅ FIX: Los tokens pueden ser objetos {token_id, outcome} o strings
-    const yesToken = tokens[0];
-    const noToken = tokens[1];
+
+    // ✅ FIX: Extraer token_id de cualquier formato posible
+    function extractTokenId(token) {
+      if (!token) return null;
+      if (typeof token === 'string') return token;
+      if (Array.isArray(token)) return extractTokenId(token[0]);
+      if (typeof token === 'object') return token.token_id || token.id || null;
+      return null;
+    }
+
+    const yesTokenId = extractTokenId(tokens[0]) || m.clob_token_ids?.[0];
+    const noTokenId = extractTokenId(tokens[1]) || m.clob_token_ids?.[1];
+
     return {
       conditionId: m.conditionId || m.id,
       gammaId: m.id,
       question: m.question,
       endDate: m.endDate,
-      yesTokenId: yesToken?.token_id || yesToken || m.clob_token_ids?.[0],
-      noTokenId: noToken?.token_id || noToken || m.clob_token_ids?.[1],
+      yesTokenId,
+      noTokenId,
       marketSlug: m.marketSlug,
     };
   }
@@ -138,7 +146,7 @@ class PolymarketClient {
 
     // ✅ Validar tokenId antes de intentar
     if (!tokenId) {
-      logger.error(`Token ID inválido para mercado: ${marketQuestion}`);
+      logger.error(`Token ID inválido para: ${marketQuestion}`);
       return { success: false, error: 'Token ID no disponible' };
     }
  
