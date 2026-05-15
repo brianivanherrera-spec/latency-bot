@@ -65,7 +65,6 @@ class PolymarketClient {
  
   async findBTCMarket() {
     try {
-      // El slug es determinístico — calculado desde el reloj
       const now = Math.floor(Date.now() / 1000);
       const windowTs = now - (now % 300);
       const slug = `btc-updown-5m-${windowTs}`;
@@ -102,13 +101,16 @@ class PolymarketClient {
  
   _formatMarket(m) {
     const tokens = m.tokens || m.clobTokenIds || [];
+    // ✅ FIX: Los tokens pueden ser objetos {token_id, outcome} o strings
+    const yesToken = tokens[0];
+    const noToken = tokens[1];
     return {
       conditionId: m.conditionId || m.id,
-      gammaId: m.id,  // ID numérico para consultar resultado en Gamma API
+      gammaId: m.id,
       question: m.question,
       endDate: m.endDate,
-      yesTokenId: tokens[0] || m.clob_token_ids?.[0],
-      noTokenId: tokens[1] || m.clob_token_ids?.[1],
+      yesTokenId: yesToken?.token_id || yesToken || m.clob_token_ids?.[0],
+      noTokenId: noToken?.token_id || noToken || m.clob_token_ids?.[1],
       marketSlug: m.marketSlug,
     };
   }
@@ -132,6 +134,12 @@ class PolymarketClient {
       this._orderHistory.push(orderRecord);
       logger.info(`[DRY RUN] ${side} ${size} tokens @ $${price} (${marketQuestion})`);
       return { success: true, orderId: orderRecord.orderId, dryRun: true };
+    }
+
+    // ✅ Validar tokenId antes de intentar
+    if (!tokenId) {
+      logger.error(`Token ID inválido para mercado: ${marketQuestion}`);
+      return { success: false, error: 'Token ID no disponible' };
     }
  
     try {
@@ -173,4 +181,3 @@ class PolymarketClient {
 }
  
 module.exports = { PolymarketClient };
- 
