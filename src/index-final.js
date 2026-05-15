@@ -39,41 +39,50 @@ async function main() {
 
   let cachedMarket = null;
 
-  // === Actualizar precios Polymarket cada 2 segundos ===
-  setInterval(async () => {
+  // ✅ FIX: Función reutilizable para actualizar precio de Polymarket
+  async function actualizarPrecioPolymarket() {
     if (!cachedMarket?.gammaId) {
       const m = await poly.findBTCMarket();
       if (m) {
         cachedMarket = m;
         logger.info(`[POLY] Mercado: ${m.question}`);
+      } else {
+        return;
       }
-      return;
     }
-
     try {
       const res = await fetch(`https://gamma-api.polymarket.com/markets/${cachedMarket.gammaId}`);
+      if (!res.ok) {
+        logger.warn(`[POLY] Gamma API error: ${res.status}`);
+        return;
+      }
       const data = await res.json();
-      
       if (data.outcomePrices) {
         const prices = typeof data.outcomePrices === 'string'
           ? JSON.parse(data.outcomePrices)
           : data.outcomePrices;
-        
         const yes = parseFloat(prices[0]);
         const no = parseFloat(prices[1]);
-        
-        // Validar precio razonable
         if (yes >= 0.05 && yes <= 0.95) {
           signal.updatePolyPrice(yes, no);
+          logger.info(`[POLY] YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`);
         } else {
-          // Mercado resuelto/cerrado
+          logger.info(`[POLY] Mercado resuelto (YES=${yes}), buscando nuevo...`);
           cachedMarket = null;
         }
       }
     } catch (err) {
-      // Silent
+      logger.warn(`[POLY] Error actualizando precio: ${err.message}`);
     }
-  }, 2000);
+  }
+
+  // ✅ FIX: Fetch INMEDIATO antes de conectar WebSocket
+  // Así cuando llegue la primera señal ya tenemos precio de Polymarket
+  logger.info('[POLY] Obteniendo precio inicial...');
+  await actualizarPrecioPolymarket();
+
+  // Actualizar cada 2 segundos
+  setInterval(actualizarPrecioPolymarket, 2000);
 
   // === Verificar posiciones cerradas cada minuto ===
   setInterval(async () => {
