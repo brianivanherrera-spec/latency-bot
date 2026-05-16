@@ -1,5 +1,6 @@
 /**
  * Polymarket CLOB API Client - V2
+ * Configurado para browser wallet (Rabby/MetaMask) con Gnosis Safe proxy
  */
 
 const { Logger } = require('./logger');
@@ -41,10 +42,10 @@ class PolymarketClient {
     }
 
     if (!config.POLY_PRIVATE_KEY) throw new Error('POLY_PRIVATE_KEY no configurada');
+    if (!config.POLY_FUNDER_ADDRESS) throw new Error('POLY_FUNDER_ADDRESS no configurada');
     if (!HAS_CLOB_V2) throw new Error('clob-client-v2 no instalado');
 
     try {
-      // Crear signer con viem (requerido por V2)
       const privateKey = config.POLY_PRIVATE_KEY.startsWith('0x')
         ? config.POLY_PRIVATE_KEY
         : `0x${config.POLY_PRIVATE_KEY}`;
@@ -55,13 +56,16 @@ class PolymarketClient {
         transport: http('https://polygon-rpc.com'),
       });
 
-      logger.info(`Wallet EOA: ${account.address}`);
+      logger.info(`Wallet EOA (firmante): ${account.address}`);
+      logger.info(`Funder address (proxy): ${config.POLY_FUNDER_ADDRESS}`);
 
-      // Paso 1: Cliente L1 para obtener API credentials
+      // Cliente L1 para derivar credenciales
       const l1Client = new ClobClient({
         host: CLOB_API_BASE,
         chain: Chain.POLYGON,
         signer: walletClient,
+        funderAddress: config.POLY_FUNDER_ADDRESS,
+        signatureType: 2, // GNOSIS_SAFE — browser wallet con proxy
       });
 
       let creds;
@@ -78,16 +82,18 @@ class PolymarketClient {
         logger.info(`Credentials obtenidas: ${creds.key.slice(0, 8)}...`);
       }
 
-      // Paso 2: Cliente L2 autenticado
+      // Cliente L2 autenticado con signatureType 2 y funder
       this.clobClient = new ClobClient({
         host: CLOB_API_BASE,
         chain: Chain.POLYGON,
         signer: walletClient,
         creds,
+        funderAddress: config.POLY_FUNDER_ADDRESS,
+        signatureType: 2, // GNOSIS_SAFE
       });
 
       this._initialized = true;
-      logger.info('✅ Polymarket CLOB V2 inicializado');
+      logger.info('✅ Polymarket CLOB V2 inicializado (Gnosis Safe mode)');
 
     } catch (err) {
       throw new Error(`Error inicializando Polymarket: ${err.message}`);
@@ -128,7 +134,6 @@ class PolymarketClient {
   }
 
   _formatMarket(m) {
-    // clobTokenIds llega como string JSON
     let tokens = m.tokens || [];
     if (!tokens.length && m.clobTokenIds) {
       try {
@@ -175,7 +180,6 @@ class PolymarketClient {
     try {
       await this._init();
 
-      // ✅ V2: createAndPostOrder en una sola llamada
       const result = await this.clobClient.createAndPostOrder({
         tokenID: tokenId,
         price,
@@ -184,12 +188,10 @@ class PolymarketClient {
         orderType: OrderType.GTC,
       });
 
-      // Log completo para diagnóstico
       logger.info(`[LIVE] SDK response: ${JSON.stringify(result)}`);
 
-      // La API devuelve { success, errorMsg, orderID, status, ... }
       if (!result?.success) {
-        const errMsg = result?.errorMsg || 'Respuesta inesperada del SDK';
+        const errMsg = result?.errorMsg || result?.error || 'Respuesta inesperada del SDK';
         logger.error(`[LIVE] ❌ Orden rechazada: ${errMsg}`);
         orderRecord.status = 'REJECTED';
         orderRecord.error = errMsg;
@@ -197,7 +199,6 @@ class PolymarketClient {
         return { success: false, error: errMsg };
       }
 
-      // orderID con D mayúscula es el campo correcto del SDK v2
       const orderId = result?.orderID || result?.orderId || result?.id;
       orderRecord.status = 'PLACED';
       orderRecord.orderId = orderId;

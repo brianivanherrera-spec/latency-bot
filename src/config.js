@@ -21,6 +21,9 @@ module.exports = {
   POLY_API_SECRET: process.env.POLY_API_SECRET || '',
   POLY_PASSPHRASE: process.env.POLY_PASSPHRASE || '',
 
+  // Funder address = proxy wallet de Polymarket (distinta a la EOA de Rabby)
+  POLY_FUNDER_ADDRESS: process.env.POLY_FUNDER_ADDRESS || '',
+
   // =============================================
   // PARÁMETROS DE SEÑAL MATEMÁTICA
   // =============================================
