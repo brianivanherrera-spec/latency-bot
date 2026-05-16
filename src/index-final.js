@@ -121,8 +121,8 @@ async function main() {
       return;
     }
 
-    if (segsRestantes < 60) {
-      logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde`);
+    if (segsRestantes < 120) {
+      logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde (mínimo 120s)`);
       return;
     }
 

@@ -134,40 +134,27 @@ class SignalEngine {
   }
 
   /**
-   * Calcular edge de latencia:
-   * Estimar precio "justo" de YES segun el movimiento de BTC
-   * y compararlo con el precio actual de Polymarket.
+   * Calcular edge de latencia: VERSIÓN CORREGIDA
+   * 
+   * Estimar precio "justo" de YES/NO según el movimiento RECIENTE de BTC
+   * y compararlo con el precio ACTUAL de Polymarket.
    *
-   * Modelo simple: precio base + ajuste por movimiento
-   * - BTC +0.05% en 30seg → YES deberia cotizar ~0.60-0.65
-   * - BTC -0.05% en 30seg → YES deberia cotizar ~0.35-0.40
-   * - El mercado "5 min" tiene mucha incertidumbre → rango estrecho
+   * CAMBIO CRÍTICO: No usar precio base 0.50, sino ajustar INCREMENTALMENTE
+   * desde el precio actual de Polymarket. Esto evita edges irreales de 100%+
+   * cuando el mercado ya se movió significativamente.
+   * 
+   * Ejemplo:
+   * - Polymarket está en YES=0.25 (BTC bajó mucho)
+   * - BTC rebota +0.04% → fairYes = 0.25 + ajuste incremental
+   * - Edge realista: 5-10%, NO 135%
    */
   _calcEdge(direction, movePct, absZ) {
-    // Precio base neutral (mercado 50/50 si BTC no se mueve)
-    const BASE_YES = 0.50;
-
-    // Sensibilidad: cuanto se mueve el precio justo por cada 0.1% de BTC
-    // Conservador porque el mercado es de 5 minutos (mucho tiempo aun)
-    const SENSITIVITY = config.POLY_SENSITIVITY || 2.5; // puntos de probabilidad por 0.1% de BTC
-
-    const absMoveP = Math.abs(movePct);
-    const adjustment = Math.min((absMoveP / 0.1) * SENSITIVITY / 100, 0.20); // max 20 puntos
-
-    // Precio justo estimado
-    const fairYes = direction === 'UP'
-      ? Math.min(0.85, BASE_YES + adjustment)
-      : Math.max(0.15, BASE_YES - adjustment);
-
-    const fairNo = 1 - fairYes;
-
     // Si no tenemos precio de Polymarket, no podemos calcular edge
-    // Pero igual devolvemos estimado para logging
     if (this.polyYesPrice === null) {
       return {
         hasEdge: false,
-        fairYes: parseFloat(fairYes.toFixed(3)),
-        fairNo: parseFloat(fairNo.toFixed(3)),
+        fairYes: null,
+        fairNo: null,
         polyYes: null,
         polyNo: null,
         edgePct: null,
@@ -178,12 +165,12 @@ class SignalEngine {
 
     // Staleness check: si el precio de Poly tiene más de MAX_PRICE_AGE_MS, invalidar
     const polyAge = Date.now() - this.polyUpdatedAt;
-    const MAX_AGE = config.MAX_PRICE_AGE_MS || 3000; // 3 segundos (antes 30!)
+    const MAX_AGE = config.MAX_PRICE_AGE_MS || 5000; // 5 segundos (antes 3)
     
     if (polyAge > MAX_AGE) {
       return {
         hasEdge: false,
-        fairYes: parseFloat(fairYes.toFixed(3)),
+        fairYes: null,
         polyYes: this.polyYesPrice,
         edgePct: null,
         side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO',
@@ -193,11 +180,33 @@ class SignalEngine {
       };
     }
 
+    // Sensibilidad: cuanto se mueve el precio justo por cada 0.1% de BTC
+    // Aumentado de 2.5 a 5.0 para capturar más oportunidades
+    const SENSITIVITY = config.POLY_SENSITIVITY || 5.0;
+
+    const absMoveP = Math.abs(movePct);
+    // Ajuste en puntos de probabilidad (0-1 scale)
+    const adjustment = Math.min((absMoveP / 0.1) * (SENSITIVITY / 100), 0.25); // max 25 puntos
+
+    // ✅ CAMBIO CRÍTICO: Ajustar desde el precio ACTUAL, no desde 0.50
+    let fairYes, fairNo;
+    
+    if (direction === 'UP') {
+      // BTC subió → YES debería subir
+      fairYes = Math.min(0.90, this.polyYesPrice + adjustment);
+      fairNo = 1 - fairYes;
+    } else {
+      // BTC bajó → YES debería bajar (NO debería subir)
+      fairYes = Math.max(0.10, this.polyYesPrice - adjustment);
+      fairNo = 1 - fairYes;
+    }
+
     // Calcular edge
     if (direction === 'UP') {
-      // Queremos comprar YES: edge = fairYes - polyYes
+      // Queremos comprar YES: edge = (fairYes - polyYes) / polyYes
       const edgePct = ((fairYes - this.polyYesPrice) / this.polyYesPrice) * 100;
-      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 5); // minimo 5% de edge
+      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2.5);
+      
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),
@@ -207,9 +216,10 @@ class SignalEngine {
         reason: hasEdge ? 'EDGE_FOUND' : 'EDGE_TOO_SMALL',
       };
     } else {
-      // Queremos comprar NO: edge = fairNo - polyNo
+      // Queremos comprar NO: edge = (fairNo - polyNo) / polyNo
       const edgePct = ((fairNo - this.polyNoPrice) / this.polyNoPrice) * 100;
-      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 5);
+      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2.5);
+      
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),

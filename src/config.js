@@ -34,10 +34,12 @@ module.exports = {
 
   // Z-score mínimo para considerar movimiento significativo
   // 1.5 = movimiento moderado, 2.0 = fuerte, 2.5 = muy fuerte
-  ZSCORE_THRESHOLD: parseFloat(process.env.ZSCORE_THRESHOLD || '1.2'),
+  // AJUSTADO: subido de 1.2 a 1.5 para reducir señales débiles
+  ZSCORE_THRESHOLD: parseFloat(process.env.ZSCORE_THRESHOLD || '1.5'),
 
   // Movimiento mínimo en % dentro de la ventana corta
-  MOVE_PCT_THRESHOLD: parseFloat(process.env.MOVE_PCT_THRESHOLD || '0.03'),
+  // AJUSTADO: subido de 0.03 a 0.04 para filtrar mejor
+  MOVE_PCT_THRESHOLD: parseFloat(process.env.MOVE_PCT_THRESHOLD || '0.04'),
 
   // Velocidad mínima del movimiento (%/segundo)
   MIN_VELOCITY: parseFloat(process.env.MIN_VELOCITY || '0.001'),
@@ -63,15 +65,17 @@ module.exports = {
   // =============================================
 
   // Máxima antigüedad del precio de Polymarket (milisegundos)
-  // 3000ms = 3 segundos (antes era 30 segundos, CRÍTICO)
-  MAX_PRICE_AGE_MS: parseInt(process.env.MAX_PRICE_AGE_MS || '3000'),
+  // AJUSTADO: de 3000ms a 5000ms para reducir rechazos por staleness
+  MAX_PRICE_AGE_MS: parseInt(process.env.MAX_PRICE_AGE_MS || '5000'),
 
   // Sensibilidad: cuanto mueve el precio justo de YES por cada 0.1% de BTC
-  // Ej: 2.5 → BTC sube 0.1% → fairYes sube 2.5 puntos (de 0.50 a 0.525)
-  POLY_SENSITIVITY: parseFloat(process.env.POLY_SENSITIVITY || '2.5'),
+  // Ej: 5.0 → BTC sube 0.1% → fairYes sube 5 puntos (ajuste incremental)
+  // AJUSTADO: subido de 2.5 a 5.0 para capturar más oportunidades
+  POLY_SENSITIVITY: parseFloat(process.env.POLY_SENSITIVITY || '5.0'),
 
   // Edge mínimo para operar (%)
-  MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '2'),
+  // AJUSTADO: bajado de 3% a 2.5% para aumentar conversión
+  MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '2.5'),
 
   // Edge máximo realista (%) — edges mayores indican precio stale
   MAX_REALISTIC_EDGE: parseFloat(process.env.MAX_REALISTIC_EDGE || '15'),
