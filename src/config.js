@@ -68,11 +68,6 @@ module.exports = {
   // AJUSTADO: de 3000ms a 5000ms para reducir rechazos por staleness
   MAX_PRICE_AGE_MS: parseInt(process.env.MAX_PRICE_AGE_MS || '5000'),
 
-  // Sensibilidad: cuanto mueve el precio justo de YES por cada 0.1% de BTC
-  // Ej: 5.0 → BTC sube 0.1% → fairYes sube 5 puntos (ajuste incremental)
-  // AJUSTADO: subido de 2.5 a 5.0 para capturar más oportunidades
-  POLY_SENSITIVITY: parseFloat(process.env.POLY_SENSITIVITY || '5.0'),
-
   // Edge mínimo para operar (%)
   // AJUSTADO: bajado de 3% a 2.5% para aumentar conversión
   MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '2.5'),

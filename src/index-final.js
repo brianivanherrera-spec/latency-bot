@@ -97,7 +97,7 @@ async function main() {
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
 
     if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
-    if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > 15) return;
+    if (sig.edge.edgePct < config.MIN_EDGE_PCT) return;
 
     if (activePositions.size >= 10) return;
 

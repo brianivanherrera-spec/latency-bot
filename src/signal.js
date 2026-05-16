@@ -134,19 +134,13 @@ class SignalEngine {
   }
 
   /**
-   * Calcular edge de latencia: VERSIÓN CORREGIDA
+   * Calcular edge de latencia: VERSIÓN CORREGIDA v2.1.1
    * 
-   * Estimar precio "justo" de YES/NO según el movimiento RECIENTE de BTC
-   * y compararlo con el precio ACTUAL de Polymarket.
-   *
-   * CAMBIO CRÍTICO: No usar precio base 0.50, sino ajustar INCREMENTALMENTE
-   * desde el precio actual de Polymarket. Esto evita edges irreales de 100%+
-   * cuando el mercado ya se movió significativamente.
+   * CAMBIO CRÍTICO: Sensibilidad ADAPTATIVA basada en el tamaño del movimiento.
+   * - Movimientos pequeños (<0.05%) → sensibilidad baja (conservador)
+   * - Movimientos grandes (>0.1%) → sensibilidad alta (agresivo)
    * 
-   * Ejemplo:
-   * - Polymarket está en YES=0.25 (BTC bajó mucho)
-   * - BTC rebota +0.04% → fairYes = 0.25 + ajuste incremental
-   * - Edge realista: 5-10%, NO 135%
+   * Esto previene edges irreales cuando el precio de Polymarket ya se movió mucho.
    */
   _calcEdge(direction, movePct, absZ) {
     // Si no tenemos precio de Polymarket, no podemos calcular edge
@@ -165,7 +159,7 @@ class SignalEngine {
 
     // Staleness check: si el precio de Poly tiene más de MAX_PRICE_AGE_MS, invalidar
     const polyAge = Date.now() - this.polyUpdatedAt;
-    const MAX_AGE = config.MAX_PRICE_AGE_MS || 5000; // 5 segundos (antes 3)
+    const MAX_AGE = config.MAX_PRICE_AGE_MS || 5000; // 5 segundos
     
     if (polyAge > MAX_AGE) {
       return {
@@ -180,15 +174,29 @@ class SignalEngine {
       };
     }
 
-    // Sensibilidad: cuanto se mueve el precio justo por cada 0.1% de BTC
-    // Aumentado de 2.5 a 5.0 para capturar más oportunidades
-    const SENSITIVITY = config.POLY_SENSITIVITY || 5.0;
-
+    // ✅ SENSIBILIDAD ADAPTATIVA basada en el tamaño del movimiento
     const absMoveP = Math.abs(movePct);
-    // Ajuste en puntos de probabilidad (0-1 scale)
-    const adjustment = Math.min((absMoveP / 0.1) * (SENSITIVITY / 100), 0.25); // max 25 puntos
+    let sensitivity;
+    
+    if (absMoveP < 0.03) {
+      // Movimiento muy pequeño (<0.03%) → ultra conservador
+      sensitivity = 1.5;
+    } else if (absMoveP < 0.05) {
+      // Movimiento pequeño (0.03-0.05%) → conservador
+      sensitivity = 2.0;
+    } else if (absMoveP < 0.08) {
+      // Movimiento moderado (0.05-0.08%) → balanceado
+      sensitivity = 3.0;
+    } else {
+      // Movimiento grande (>0.08%) → agresivo
+      sensitivity = 4.0;
+    }
 
-    // ✅ CAMBIO CRÍTICO: Ajustar desde el precio ACTUAL, no desde 0.50
+    // Ajuste en puntos de probabilidad (0-1 scale)
+    // MAX 15 puntos (0.15) para evitar edges extremos
+    const adjustment = Math.min((absMoveP / 0.1) * (sensitivity / 100), 0.15);
+
+    // ✅ Ajustar desde el precio ACTUAL
     let fairYes, fairNo;
     
     if (direction === 'UP') {
@@ -207,6 +215,18 @@ class SignalEngine {
       const edgePct = ((fairYes - this.polyYesPrice) / this.polyYesPrice) * 100;
       const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2.5);
       
+      // ✅ FILTRO DE SEGURIDAD: rechazar si edge >12%
+      if (edgePct > 12) {
+        return {
+          hasEdge: false,
+          fairYes: parseFloat(fairYes.toFixed(3)),
+          polyYes: this.polyYesPrice,
+          edgePct: parseFloat(edgePct.toFixed(2)),
+          side: 'BUY_YES',
+          reason: 'EDGE_TOO_HIGH',
+        };
+      }
+      
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),
@@ -219,6 +239,20 @@ class SignalEngine {
       // Queremos comprar NO: edge = (fairNo - polyNo) / polyNo
       const edgePct = ((fairNo - this.polyNoPrice) / this.polyNoPrice) * 100;
       const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2.5);
+      
+      // ✅ FILTRO DE SEGURIDAD: rechazar si edge >12%
+      if (edgePct > 12) {
+        return {
+          hasEdge: false,
+          fairYes: parseFloat(fairYes.toFixed(3)),
+          polyYes: this.polyYesPrice,
+          fairNo: parseFloat(fairNo.toFixed(3)),
+          polyNo: this.polyNoPrice,
+          edgePct: parseFloat(edgePct.toFixed(2)),
+          side: 'BUY_NO',
+          reason: 'EDGE_TOO_HIGH',
+        };
+      }
       
       return {
         hasEdge,
