@@ -184,11 +184,27 @@ class PolymarketClient {
         orderType: OrderType.GTC,
       });
 
+      // Log completo para diagnóstico
+      logger.info(`[LIVE] SDK response: ${JSON.stringify(result)}`);
+
+      // La API devuelve { success, errorMsg, orderID, status, ... }
+      if (!result?.success) {
+        const errMsg = result?.errorMsg || 'Respuesta inesperada del SDK';
+        logger.error(`[LIVE] ❌ Orden rechazada: ${errMsg}`);
+        orderRecord.status = 'REJECTED';
+        orderRecord.error = errMsg;
+        this._orderHistory.push(orderRecord);
+        return { success: false, error: errMsg };
+      }
+
+      // orderID con D mayúscula es el campo correcto del SDK v2
+      const orderId = result?.orderID || result?.orderId || result?.id;
       orderRecord.status = 'PLACED';
-      orderRecord.orderId = result?.orderId || result?.orderID;
+      orderRecord.orderId = orderId;
       this._orderHistory.push(orderRecord);
 
-      return { success: true, orderId: orderRecord.orderId };
+      logger.info(`[LIVE] ✅ Order ID: ${orderId}`);
+      return { success: true, orderId };
 
     } catch (err) {
       orderRecord.status = 'FAILED';
