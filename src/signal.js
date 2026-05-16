@@ -7,11 +7,6 @@
  * Edge: Si BTC sube 0.05% en Coinbase, el mercado "BTC higher in 5min"
  * todavia cotiza como si BTC no se hubiera movido. Compramos YES barato
  * antes de que el mercado actualice.
- *
- * Logica:
- * 1. Detectar movimiento brusco de BTC en Coinbase (Z-score + momentum)
- * 2. Estimar el precio "justo" de YES segun el movimiento
- * 3. Si el precio de Polymarket < precio justo → hay edge → operar
  */
 
 const config = require('./config');
@@ -23,7 +18,6 @@ class SignalEngine {
     this.buyPressure = [];
     this.maxBuffer = config.SIGNAL_WINDOW;
 
-    // Precio actual de Polymarket (se actualiza desde index.js)
     this.polyYesPrice = null;
     this.polyNoPrice = null;
     this.polyUpdatedAt = null;
@@ -33,19 +27,12 @@ class SignalEngine {
     this._lastSignalTime = 0;
   }
 
-  /**
-   * Actualizar precio de Polymarket desde afuera
-   * Llamar periodicamente desde index.js
-   */
   updatePolyPrice(yesPrice, noPrice) {
     this.polyYesPrice = yesPrice;
     this.polyNoPrice = noPrice;
     this.polyUpdatedAt = Date.now();
   }
 
-  /**
-   * Procesar nuevo tick de precio Coinbase
-   */
   process({ price, timestamp, isBuyerMaker }) {
     this._totalTicks++;
 
@@ -67,7 +54,6 @@ class SignalEngine {
   _evaluate(currentPrice, currentTimestamp) {
     const n = this.prices.length;
 
-    // === Estadisticas de precio ===
     const mean = this.prices.reduce((a, b) => a + b, 0) / n;
     const variance = this.prices.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / n;
     const stdDev = Math.sqrt(variance);
@@ -75,20 +61,16 @@ class SignalEngine {
 
     const zScore = (currentPrice - mean) / stdDev;
 
-    // === Momentum ventana corta ===
     const shortWindow = Math.min(30, Math.floor(n / 3));
     const priceShortAgo = this.prices[n - shortWindow];
     const movePct = ((currentPrice - priceShortAgo) / priceShortAgo) * 100;
 
-    // === Velocidad (%/segundo) ===
     const timeElapsedSec = (currentTimestamp - this.timestamps[n - shortWindow]) / 1000;
     const velocity = timeElapsedSec > 0 ? Math.abs(movePct) / timeElapsedSec : 0;
 
-    // === Presion de compra/venta ===
     const recentPressure = this.buyPressure.slice(-50);
     const buyRatio = recentPressure.reduce((a, b) => a + b, 0) / recentPressure.length;
 
-    // === Filtros basicos ===
     const absZ = Math.abs(zScore);
     const absMoveP = Math.abs(movePct);
 
@@ -96,7 +78,6 @@ class SignalEngine {
     if (absMoveP < config.MOVE_PCT_THRESHOLD) return null;
     if (velocity < config.MIN_VELOCITY) return null;
 
-    // === Direccion ===
     let direction;
     if (zScore > 0 && movePct > 0 && buyRatio > 0.55) {
       direction = 'UP';
@@ -112,7 +93,6 @@ class SignalEngine {
                confidence: 0, timestamp: currentTimestamp, edge: null };
     }
 
-    // === Calculo de edge vs Polymarket ===
     const edge = this._calcEdge(direction, movePct, absZ);
 
     this._totalSignals++;
@@ -129,26 +109,29 @@ class SignalEngine {
       stdDev,
       confidence: this._calcConfidence(absZ, absMoveP, velocity, buyRatio, direction),
       timestamp: currentTimestamp,
-      edge, // { hasEdge, fairPrice, polyPrice, edgePct, side }
+      edge,
     };
   }
 
-  /**
-   * Calcular edge de latencia: VERSIÓN CORREGIDA v2.1.1
-   * 
-   * CAMBIO CRÍTICO: Sensibilidad ADAPTATIVA basada en el tamaño del movimiento.
-   * - Movimientos pequeños (<0.05%) → sensibilidad baja (conservador)
-   * - Movimientos grandes (>0.1%) → sensibilidad alta (agresivo)
-   * 
-   * Esto previene edges irreales cuando el precio de Polymarket ya se movió mucho.
-   */
   _calcEdge(direction, movePct, absZ) {
-    // Si no tenemos precio de Polymarket, no podemos calcular edge
+    // Precio base neutral
+    const BASE_YES = 0.50;
+    const SENSITIVITY = config.POLY_SENSITIVITY || 2.5;
+
+    const absMoveP = Math.abs(movePct);
+    const adjustment = Math.min((absMoveP / 0.1) * SENSITIVITY / 100, 0.20);
+
+    const fairYes = direction === 'UP'
+      ? Math.min(0.85, BASE_YES + adjustment)
+      : Math.max(0.15, BASE_YES - adjustment);
+
+    const fairNo = 1 - fairYes;
+
     if (this.polyYesPrice === null) {
       return {
         hasEdge: false,
-        fairYes: null,
-        fairNo: null,
+        fairYes: parseFloat(fairYes.toFixed(3)),
+        fairNo: parseFloat(fairNo.toFixed(3)),
         polyYes: null,
         polyNo: null,
         edgePct: null,
@@ -157,14 +140,13 @@ class SignalEngine {
       };
     }
 
-    // Staleness check: si el precio de Poly tiene más de MAX_PRICE_AGE_MS, invalidar
     const polyAge = Date.now() - this.polyUpdatedAt;
-    const MAX_AGE = config.MAX_PRICE_AGE_MS || 5000; // 5 segundos
-    
+    const MAX_AGE = config.MAX_PRICE_AGE_MS || 3000;
+
     if (polyAge > MAX_AGE) {
       return {
         hasEdge: false,
-        fairYes: null,
+        fairYes: parseFloat(fairYes.toFixed(3)),
         polyYes: this.polyYesPrice,
         edgePct: null,
         side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO',
@@ -174,59 +156,9 @@ class SignalEngine {
       };
     }
 
-    // ✅ SENSIBILIDAD ADAPTATIVA basada en el tamaño del movimiento
-    const absMoveP = Math.abs(movePct);
-    let sensitivity;
-    
-    if (absMoveP < 0.03) {
-      // Movimiento muy pequeño (<0.03%) → ultra conservador
-      sensitivity = 1.5;
-    } else if (absMoveP < 0.05) {
-      // Movimiento pequeño (0.03-0.05%) → conservador
-      sensitivity = 2.0;
-    } else if (absMoveP < 0.08) {
-      // Movimiento moderado (0.05-0.08%) → balanceado
-      sensitivity = 3.0;
-    } else {
-      // Movimiento grande (>0.08%) → agresivo
-      sensitivity = 4.0;
-    }
-
-    // Ajuste en puntos de probabilidad (0-1 scale)
-    // MAX 15 puntos (0.15) para evitar edges extremos
-    const adjustment = Math.min((absMoveP / 0.1) * (sensitivity / 100), 0.15);
-
-    // ✅ Ajustar desde el precio ACTUAL
-    let fairYes, fairNo;
-    
     if (direction === 'UP') {
-      // BTC subió → YES debería subir
-      fairYes = Math.min(0.90, this.polyYesPrice + adjustment);
-      fairNo = 1 - fairYes;
-    } else {
-      // BTC bajó → YES debería bajar (NO debería subir)
-      fairYes = Math.max(0.10, this.polyYesPrice - adjustment);
-      fairNo = 1 - fairYes;
-    }
-
-    // Calcular edge
-    if (direction === 'UP') {
-      // Queremos comprar YES: edge = (fairYes - polyYes) / polyYes
       const edgePct = ((fairYes - this.polyYesPrice) / this.polyYesPrice) * 100;
-      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2.5);
-      
-      // ✅ FILTRO DE SEGURIDAD: rechazar si edge >12%
-      if (edgePct > 12) {
-        return {
-          hasEdge: false,
-          fairYes: parseFloat(fairYes.toFixed(3)),
-          polyYes: this.polyYesPrice,
-          edgePct: parseFloat(edgePct.toFixed(2)),
-          side: 'BUY_YES',
-          reason: 'EDGE_TOO_HIGH',
-        };
-      }
-      
+      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 3);
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),
@@ -236,24 +168,8 @@ class SignalEngine {
         reason: hasEdge ? 'EDGE_FOUND' : 'EDGE_TOO_SMALL',
       };
     } else {
-      // Queremos comprar NO: edge = (fairNo - polyNo) / polyNo
       const edgePct = ((fairNo - this.polyNoPrice) / this.polyNoPrice) * 100;
-      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2.5);
-      
-      // ✅ FILTRO DE SEGURIDAD: rechazar si edge >12%
-      if (edgePct > 12) {
-        return {
-          hasEdge: false,
-          fairYes: parseFloat(fairYes.toFixed(3)),
-          polyYes: this.polyYesPrice,
-          fairNo: parseFloat(fairNo.toFixed(3)),
-          polyNo: this.polyNoPrice,
-          edgePct: parseFloat(edgePct.toFixed(2)),
-          side: 'BUY_NO',
-          reason: 'EDGE_TOO_HIGH',
-        };
-      }
-      
+      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 3);
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),
