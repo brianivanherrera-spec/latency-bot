@@ -81,8 +81,7 @@ class PolymarketClient {
       'POLY_ADDRESS':   depositWalletAddress,
       'POLY_SIGNATURE': sig,
       'POLY_TIMESTAMP': `${ts}`,
-      'POLY_NONCE':     `${nonce}`,
-      'Content-Type':   'application/json',
+      'POLY_NONCE':     '0',
     };
   }
 
