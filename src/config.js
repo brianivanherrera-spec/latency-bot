@@ -21,8 +21,16 @@ module.exports = {
   POLY_API_SECRET: process.env.POLY_API_SECRET || '',
   POLY_PASSPHRASE: process.env.POLY_PASSPHRASE || '',
 
-  // Funder address = proxy wallet de Polymarket (distinta a la EOA de Rabby)
+  // Funder address = proxy wallet (para cuentas Rabby/MetaMask legacy)
   POLY_FUNDER_ADDRESS: process.env.POLY_FUNDER_ADDRESS || '',
+
+  // Deposit wallet address (para nuevas cuentas email/Google)
+  // Se puede dejar vacío y el bot lo deriva automáticamente
+  POLY_DEPOSIT_WALLET: process.env.POLY_DEPOSIT_WALLET || '',
+
+  // Relayer API Key (de Polymarket Settings → API Keys del Relayer)
+  POLY_RELAYER_API_KEY: process.env.POLY_RELAYER_API_KEY || '',
+  POLY_RELAYER_API_KEY_ADDRESS: process.env.POLY_RELAYER_API_KEY_ADDRESS || '',
 
   // =============================================
   // PARÁMETROS DE SEÑAL MATEMÁTICA

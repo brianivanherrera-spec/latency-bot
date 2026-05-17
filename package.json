@@ -7,11 +7,13 @@
     "start": "node src/index-final.js"
   },
   "dependencies": {
-    "ws": "^8.18.0",
+    "@polymarket/builder-relayer-client": "latest",
+    "@polymarket/builder-signing-sdk": "latest",
     "@polymarket/clob-client-v2": "latest",
-    "viem": "^2.0.0",
     "ethers": "^5.7.2",
-    "tslib": "^2.6.2"
+    "tslib": "^2.6.2",
+    "viem": "^2.0.0",
+    "ws": "^8.18.0"
   },
   "engines": {
     "node": ">=18.0.0"
