@@ -146,7 +146,7 @@ class PolymarketClient {
       chain:         Chain?.POLYGON ?? 137,
       signer:        walletClient,
       creds,
-      signatureType: SignatureTypeV2.POLY_1271,
+      signatureType: SignatureTypeV2.POLY_PROXY,
       funderAddress: depositWalletAddress,
     });
 
