@@ -56,7 +56,7 @@ class PolymarketClient {
   // Construir L1 auth headers con depositWallet como POLY_ADDRESS
   async _buildL1Headers(walletClient, depositWalletAddress) {
     const ts    = Math.floor(Date.now() / 1000);
-    const nonce = 0;
+    const nonce = 0n; // BigInt — viem es estricto con uint256
 
     const sig = await walletClient.signTypedData({
       domain: { name: 'ClobAuthDomain', version: '1', chainId: 137 },
