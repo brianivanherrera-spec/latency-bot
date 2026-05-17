@@ -70,7 +70,7 @@ module.exports = {
   POLY_SENSITIVITY: parseFloat(process.env.POLY_SENSITIVITY || '2.5'),
 
   // Edge mínimo para operar (%)
-  MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '3'),
+  MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '0.5'),
 
   // Edge máximo realista — mayor indica precio stale
   MAX_REALISTIC_EDGE: parseFloat(process.env.MAX_REALISTIC_EDGE || '15'),

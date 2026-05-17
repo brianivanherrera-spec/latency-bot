@@ -113,52 +113,36 @@ class SignalEngine {
     };
   }
 
-  _calcEdge(direction, movePct, absZ) {
-    // Precio base neutral
-    const BASE_YES = 0.50;
-    const SENSITIVITY = config.POLY_SENSITIVITY || 2.5;
-
-    const absMoveP = Math.abs(movePct);
-    const adjustment = Math.min((absMoveP / 0.1) * SENSITIVITY / 100, 0.20);
-
-    const fairYes = direction === 'UP'
-      ? Math.min(0.85, BASE_YES + adjustment)
-      : Math.max(0.15, BASE_YES - adjustment);
-
-    const fairNo = 1 - fairYes;
-
+_calcEdge(direction, movePct, absZ) {
     if (this.polyYesPrice === null) {
-      return {
-        hasEdge: false,
-        fairYes: parseFloat(fairYes.toFixed(3)),
-        fairNo: parseFloat(fairNo.toFixed(3)),
-        polyYes: null,
-        polyNo: null,
-        edgePct: null,
-        side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO',
-        reason: 'NO_POLY_PRICE',
-      };
+      return { hasEdge: false, edgePct: null, reason: 'NO_POLY_PRICE',
+               side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO' };
     }
 
     const polyAge = Date.now() - this.polyUpdatedAt;
     const MAX_AGE = config.MAX_PRICE_AGE_MS || 3000;
-
     if (polyAge > MAX_AGE) {
-      return {
-        hasEdge: false,
-        fairYes: parseFloat(fairYes.toFixed(3)),
-        polyYes: this.polyYesPrice,
-        edgePct: null,
-        side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO',
-        reason: 'POLY_PRICE_STALE',
-        age: polyAge,
-        maxAge: MAX_AGE,
-      };
+      return { hasEdge: false, edgePct: null, polyYes: this.polyYesPrice,
+               reason: 'POLY_PRICE_STALE', age: polyAge, maxAge: MAX_AGE,
+               side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO' };
+    }
+
+    const SENSITIVITY = config.POLY_SENSITIVITY || 2.5;
+    const absMoveP = Math.abs(movePct);
+    const adjustment = Math.min((absMoveP / 0.1) * (SENSITIVITY / 100), 0.10);
+
+    let fairYes, fairNo;
+    if (direction === 'UP') {
+      fairYes = Math.min(0.95, this.polyYesPrice + adjustment);
+      fairNo  = 1 - fairYes;
+    } else {
+      fairYes = Math.max(0.05, this.polyYesPrice - adjustment);
+      fairNo  = 1 - fairYes;
     }
 
     if (direction === 'UP') {
-      const edgePct = ((fairYes - this.polyYesPrice) / this.polyYesPrice) * 100;
-      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 3);
+      const edgePct = (fairYes - this.polyYesPrice) * 100;
+      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2);
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),
@@ -168,8 +152,8 @@ class SignalEngine {
         reason: hasEdge ? 'EDGE_FOUND' : 'EDGE_TOO_SMALL',
       };
     } else {
-      const edgePct = ((fairNo - this.polyNoPrice) / this.polyNoPrice) * 100;
-      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 3);
+      const edgePct = (fairNo - this.polyNoPrice) * 100;
+      const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2);
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),
@@ -182,6 +166,7 @@ class SignalEngine {
       };
     }
   }
+
 
   _calcConfidence(absZ, absMoveP, velocity, buyRatio, direction) {
     let score = 0;
