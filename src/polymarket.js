@@ -1,13 +1,12 @@
 /**
- * Polymarket CLOB API Client - Deposit Wallet Flow v4
+ * Polymarket CLOB API Client - Deposit Wallet Flow v5
  *
- * PROBLEMA DEL SDK: ClobClient.createOrDeriveApiKey() no pasa funderAddress
- * a createL1Headers → creds quedan registradas contra la EOA → al firmar
- * órdenes con POLY_1271 (maker=depositWallet), Polymarket rechaza:
- * "the order signer address has to be the address of the API KEY"
+ * PREREQUISITO: El deposit wallet debe estar deployado en Polygon.
+ * Hacerlo desde la UI de Polymarket antes de usar este bot en LIVE.
  *
- * SOLUCIÓN: Bypassear SDK para derivar API creds manualmente,
- * pasando depositWalletAddress como `address` en EIP-712 headers.
+ * FLUJO: SDK crea API creds para la EOA, pero las órdenes se firman
+ * con POLY_1271 donde maker=signer=depositWallet. El contrato deposit
+ * wallet valida la firma ERC-7739 de la EOA on-chain.
  */
 
 const { Logger } = require('./logger');
@@ -19,7 +18,6 @@ const DEPOSIT_WALLET_FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
 const DEPOSIT_WALLET_IMPL    = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
 const CLOB_API_BASE          = 'https://clob.polymarket.com';
 const GAMMA_API_BASE         = 'https://gamma-api.polymarket.com';
-const MSG_TO_SIGN            = 'This message attests that I have read and agree to the polymarket.com Terms of Use.';
 
 let ClobClient, SignatureTypeV2, Chain, Side, OrderType;
 let createWalletClient, http, privateKeyToAccount;
@@ -53,63 +51,6 @@ class PolymarketClient {
     this._depositWalletAddress = null;
   }
 
-  // Construir L1 auth headers con depositWallet como POLY_ADDRESS
-  async _buildL1Headers(walletClient, depositWalletAddress) {
-    const ts    = Math.floor(Date.now() / 1000);
-    const nonce = 0n; // BigInt — viem es estricto con uint256
-
-    const sig = await walletClient.signTypedData({
-      domain: { name: 'ClobAuthDomain', version: '1', chainId: 137 },
-      types: {
-        ClobAuth: [
-          { name: 'address',   type: 'address' },
-          { name: 'timestamp', type: 'string'  },
-          { name: 'nonce',     type: 'uint256' },
-          { name: 'message',   type: 'string'  },
-        ],
-      },
-      primaryType: 'ClobAuth',
-      message: {
-        address:   depositWalletAddress,
-        timestamp: `${ts}`,
-        nonce,
-        message:   MSG_TO_SIGN,
-      },
-    });
-
-    return {
-      'POLY_ADDRESS':   depositWalletAddress,
-      'POLY_SIGNATURE': sig,
-      'POLY_TIMESTAMP': `${ts}`,
-      'POLY_NONCE':     '0',
-    };
-  }
-
-  // Crear o derivar creds registradas contra la deposit wallet (bypass SDK)
-  async _deriveCredsForDepositWallet(walletClient, depositWalletAddress) {
-    // Intentar crear primero
-    try {
-      const h = await this._buildL1Headers(walletClient, depositWalletAddress);
-      const res = await fetch(`${CLOB_API_BASE}/auth/api-key`, { method: 'POST', headers: h });
-      const d = await res.json();
-      if (d.apiKey) {
-        logger.info('API key creada para deposit wallet');
-        return { key: d.apiKey, secret: d.secret, passphrase: d.passphrase };
-      }
-      logger.info(`Create respondió: ${JSON.stringify(d)} — intentando derive`);
-    } catch (e) {
-      logger.warn(`POST /auth/api-key: ${e.message}`);
-    }
-
-    // Derivar si ya existe
-    const h2 = await this._buildL1Headers(walletClient, depositWalletAddress);
-    const res2 = await fetch(`${CLOB_API_BASE}/auth/derive-api-key`, { method: 'GET', headers: h2 });
-    const d2 = await res2.json();
-    if (!d2.apiKey) throw new Error(`derive-api-key falló: ${JSON.stringify(d2)}`);
-    logger.info('API key derivada para deposit wallet');
-    return { key: d2.apiKey, secret: d2.secret, passphrase: d2.passphrase };
-  }
-
   async _init() {
     if (this._initialized) return;
 
@@ -134,25 +75,31 @@ class PolymarketClient {
 
     logger.info(`EOA: ${account.address}`);
 
-    // Paso 1: Deposit wallet (determinista, sync)
+    // Deposit wallet determinista
     const depositWalletAddress = config.POLY_DEPOSIT_WALLET ||
       deriveDepositWallet(account.address, DEPOSIT_WALLET_FACTORY, DEPOSIT_WALLET_IMPL);
-
     logger.info(`Deposit wallet: ${depositWalletAddress}`);
     this._depositWalletAddress = depositWalletAddress;
 
-    // Paso 2: API creds (registradas contra deposit wallet)
+    // API creds — derivadas con la EOA (el SDK las registra contra el EOA)
     let creds;
     if (config.POLY_API_KEY && config.POLY_API_SECRET && config.POLY_PASSPHRASE) {
       creds = { key: config.POLY_API_KEY, secret: config.POLY_API_SECRET, passphrase: config.POLY_PASSPHRASE };
       logger.info(`API creds desde config: ${creds.key.slice(0, 8)}...`);
     } else {
-      logger.info('Derivando API creds para deposit wallet (bypass SDK)...');
-      creds = await this._deriveCredsForDepositWallet(walletClient, depositWalletAddress);
+      logger.info('Derivando API creds con EOA...');
+      // Client temporal SIN signatureType/funderAddress — creds se registran contra EOA
+      const tempClient = new ClobClient({
+        host:  CLOB_API_BASE,
+        chain: Chain?.POLYGON ?? 137,
+        signer: walletClient,
+      });
+      creds = await tempClient.createOrDeriveApiKey();
       logger.info(`API creds: ${creds.key.slice(0, 8)}...`);
     }
 
-    // Paso 3: ClobClient con POLY_1271 (maker=signer=depositWallet)
+    // Client autenticado con POLY_1271: órdenes con maker=signer=depositWallet
+    // El contrato deposit wallet valida la firma ERC-7739 de la EOA on-chain
     this.clobClient = new ClobClient({
       host:          CLOB_API_BASE,
       chain:         Chain?.POLYGON ?? 137,
