@@ -1,12 +1,12 @@
 /**
- * Polymarket CLOB API Client - Deposit Wallet Flow v5
+ * Polymarket CLOB API Client - Deposit Wallet Flow v6
  *
- * PREREQUISITO: El deposit wallet debe estar deployado en Polygon.
- * Hacerlo desde la UI de Polymarket antes de usar este bot en LIVE.
+ * PROBLEMA: SDK registra API creds contra EOA, pero POLY_1271 requiere
+ * que el signer de la orden sea la deposit wallet → mismatch.
  *
- * FLUJO: SDK crea API creds para la EOA, pero las órdenes se firman
- * con POLY_1271 donde maker=signer=depositWallet. El contrato deposit
- * wallet valida la firma ERC-7739 de la EOA on-chain.
+ * SOLUCIÓN: Firmar ClobAuth EIP-712 con address=depositWallet →
+ * creds quedan vinculadas a la deposit wallet → match con maker/signer en órdenes.
+ * REQUISITO: deposit wallet ya deployado on-chain (confirmado).
  */
 
 const { Logger } = require('./logger');
@@ -18,6 +18,7 @@ const DEPOSIT_WALLET_FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
 const DEPOSIT_WALLET_IMPL    = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
 const CLOB_API_BASE          = 'https://clob.polymarket.com';
 const GAMMA_API_BASE         = 'https://gamma-api.polymarket.com';
+const MSG_TO_SIGN            = 'This message attests that I have read and agree to the polymarket.com Terms of Use.';
 
 let ClobClient, SignatureTypeV2, Chain, Side, OrderType;
 let createWalletClient, http, privateKeyToAccount;
@@ -51,6 +52,58 @@ class PolymarketClient {
     this._depositWalletAddress = null;
   }
 
+  // L1 headers firmados con la EOA pero con POLY_ADDRESS = depositWallet
+  async _buildL1Headers(walletClient, depositWalletAddress) {
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = await walletClient.signTypedData({
+      domain: { name: 'ClobAuthDomain', version: '1', chainId: 137 },
+      types: {
+        ClobAuth: [
+          { name: 'address',   type: 'address' },
+          { name: 'timestamp', type: 'string'  },
+          { name: 'nonce',     type: 'uint256' },
+          { name: 'message',   type: 'string'  },
+        ],
+      },
+      primaryType: 'ClobAuth',
+      message: {
+        address:   depositWalletAddress,
+        timestamp: `${ts}`,
+        nonce:     0n,
+        message:   MSG_TO_SIGN,
+      },
+    });
+    return {
+      'POLY_ADDRESS':   depositWalletAddress,
+      'POLY_SIGNATURE': sig,
+      'POLY_TIMESTAMP': `${ts}`,
+      'POLY_NONCE':     '0',
+    };
+  }
+
+  async _deriveCredsForDepositWallet(walletClient, depositWalletAddress) {
+    // Intentar crear
+    try {
+      const h = await this._buildL1Headers(walletClient, depositWalletAddress);
+      const res = await fetch(`${CLOB_API_BASE}/auth/api-key`, { method: 'POST', headers: h });
+      const d = await res.json();
+      if (d.apiKey) {
+        logger.info('API key creada para deposit wallet');
+        return { key: d.apiKey, secret: d.secret, passphrase: d.passphrase };
+      }
+      logger.info(`Create respondió: ${JSON.stringify(d)} — intentando derive`);
+    } catch (e) {
+      logger.warn(`POST /auth/api-key: ${e.message}`);
+    }
+    // Derivar si ya existe
+    const h2 = await this._buildL1Headers(walletClient, depositWalletAddress);
+    const res2 = await fetch(`${CLOB_API_BASE}/auth/derive-api-key`, { method: 'GET', headers: h2 });
+    const d2 = await res2.json();
+    if (!d2.apiKey) throw new Error(`derive-api-key falló: ${JSON.stringify(d2)}`);
+    logger.info('API key derivada para deposit wallet');
+    return { key: d2.apiKey, secret: d2.secret, passphrase: d2.passphrase };
+  }
+
   async _init() {
     if (this._initialized) return;
 
@@ -72,34 +125,22 @@ class PolymarketClient {
       account,
       transport: http('https://polygon-rpc.com'),
     });
-
     logger.info(`EOA: ${account.address}`);
 
-    // Deposit wallet determinista
     const depositWalletAddress = config.POLY_DEPOSIT_WALLET ||
       deriveDepositWallet(account.address, DEPOSIT_WALLET_FACTORY, DEPOSIT_WALLET_IMPL);
     logger.info(`Deposit wallet: ${depositWalletAddress}`);
     this._depositWalletAddress = depositWalletAddress;
 
-    // API creds — derivadas con la EOA (el SDK las registra contra el EOA)
     let creds;
     if (config.POLY_API_KEY && config.POLY_API_SECRET && config.POLY_PASSPHRASE) {
       creds = { key: config.POLY_API_KEY, secret: config.POLY_API_SECRET, passphrase: config.POLY_PASSPHRASE };
-      logger.info(`API creds desde config: ${creds.key.slice(0, 8)}...`);
+      logger.info(`API creds config: ${creds.key.slice(0, 8)}...`);
     } else {
-      logger.info('Derivando API creds con EOA...');
-      // Client temporal SIN signatureType/funderAddress — creds se registran contra EOA
-      const tempClient = new ClobClient({
-        host:  CLOB_API_BASE,
-        chain: Chain?.POLYGON ?? 137,
-        signer: walletClient,
-      });
-      creds = await tempClient.createOrDeriveApiKey();
-      logger.info(`API creds: ${creds.key.slice(0, 8)}...`);
+      logger.info('Derivando API creds para deposit wallet...');
+      creds = await this._deriveCredsForDepositWallet(walletClient, depositWalletAddress);
     }
 
-    // Client autenticado con POLY_1271: órdenes con maker=signer=depositWallet
-    // El contrato deposit wallet valida la firma ERC-7739 de la EOA on-chain
     this.clobClient = new ClobClient({
       host:          CLOB_API_BASE,
       chain:         Chain?.POLYGON ?? 137,
@@ -110,7 +151,7 @@ class PolymarketClient {
     });
 
     this._initialized = true;
-    logger.info(`✅ CLOB V2 inicializado — deposit wallet: ${depositWalletAddress}`);
+    logger.info(`✅ CLOB V2 listo — deposit wallet: ${depositWalletAddress}`);
   }
 
   async findBTCMarket() {
@@ -118,13 +159,10 @@ class PolymarketClient {
       const now = Math.floor(Date.now() / 1000);
       const windowTs = now - (now % 300);
       const slug = `btc-updown-5m-${windowTs}`;
-
       const response = await fetch(`${GAMMA_API_BASE}/events?slug=${slug}`);
       if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
-
       const data = await response.json();
       const events = Array.isArray(data) ? data : (data.events || data.data || []);
-
       if (events.length > 0) {
         const event = events[0];
         logger.info(`Mercado encontrado: ${event.title || slug}`);
@@ -136,7 +174,6 @@ class PolymarketClient {
           endDate: new Date((windowTs + 300) * 1000).toISOString(),
         });
       }
-
       logger.warn(`Mercado no encontrado: ${slug}`);
       return null;
     } catch (err) {
@@ -148,9 +185,8 @@ class PolymarketClient {
   _formatMarket(m) {
     let tokens = m.tokens || [];
     if (!tokens.length && m.clobTokenIds) {
-      try {
-        tokens = typeof m.clobTokenIds === 'string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds;
-      } catch(e) { tokens = []; }
+      try { tokens = typeof m.clobTokenIds === 'string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds; }
+      catch(e) { tokens = []; }
     }
     return {
       conditionId: m.conditionId || m.id,
@@ -186,7 +222,6 @@ class PolymarketClient {
 
     try {
       await this._init();
-
       const result = await this.clobClient.createAndPostOrder({
         tokenID:   tokenId,
         price,
@@ -210,7 +245,6 @@ class PolymarketClient {
       orderRecord.status  = 'PLACED';
       orderRecord.orderId = orderId;
       this._orderHistory.push(orderRecord);
-
       logger.info(`[LIVE] ✅ Order ID: ${orderId}`);
       return { success: true, orderId };
 
