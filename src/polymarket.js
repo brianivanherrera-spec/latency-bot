@@ -42,7 +42,7 @@ class PolymarketClient {
     }
 
     if (!config.POLY_PRIVATE_KEY) throw new Error('POLY_PRIVATE_KEY no configurada');
-    if (!config.POLY_FUNDER_ADDRESS) throw new Error('POLY_FUNDER_ADDRESS no configurada');
+    // POLY_FUNDER_ADDRESS es opcional (solo necesaria para cuentas con Rabby/MetaMask)
     if (!HAS_CLOB_V2) throw new Error('clob-client-v2 no instalado');
 
     try {
@@ -60,12 +60,12 @@ class PolymarketClient {
       logger.info(`Funder address (proxy): ${config.POLY_FUNDER_ADDRESS}`);
 
       // Cliente L1 para derivar credenciales
+      const useFunder = !!config.POLY_FUNDER_ADDRESS;
       const l1Client = new ClobClient({
         host: CLOB_API_BASE,
         chain: Chain.POLYGON,
         signer: walletClient,
-        funderAddress: config.POLY_FUNDER_ADDRESS,
-        signatureType: 2, // GNOSIS_SAFE — browser wallet con proxy
+        ...(useFunder && { funderAddress: config.POLY_FUNDER_ADDRESS, signatureType: 2 }),
       });
 
       let creds;
@@ -82,14 +82,13 @@ class PolymarketClient {
         logger.info(`Credentials obtenidas: ${creds.key.slice(0, 8)}...`);
       }
 
-      // Cliente L2 autenticado con signatureType 2 y funder
+      // Cliente L2 autenticado
       this.clobClient = new ClobClient({
         host: CLOB_API_BASE,
         chain: Chain.POLYGON,
         signer: walletClient,
         creds,
-        funderAddress: config.POLY_FUNDER_ADDRESS,
-        signatureType: 2, // GNOSIS_SAFE
+        ...(useFunder && { funderAddress: config.POLY_FUNDER_ADDRESS, signatureType: 2 }),
       });
 
       this._initialized = true;
