@@ -86,7 +86,7 @@ class PolymarketClient {
       chain:         Chain?.POLYGON ?? 137,
       signer:        walletClient,
       creds,
-      signatureType: SignatureTypeV2.POLY_PROXY,   // = 1, correcto para email/Magic
+      signatureType: SignatureTypeV2.POLY_GNOSIS_SAFE, // = 2, para Rabby/MetaMask con proxy wallet
       funderAddress: proxyAddress,
     });
 
