@@ -141,7 +141,7 @@ async function main() {
       price,
       edge: sig.edge.edgePct,
       move: sig.movePct,
-      zscore: sig.zscore,
+      zscore: sig.zScore,
       segsRestantes,
       market: cachedMarket,
       size,
