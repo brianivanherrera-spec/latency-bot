@@ -130,6 +130,11 @@ async function main() {
 
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
 
+    const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
+    const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
+    const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
+    const size = Math.floor(exposure / price);
+
     // 🔔 Alerta Discord para trade manual
     alertTradeSignal({
       direction: sig.direction,
@@ -142,11 +147,6 @@ async function main() {
       size,
       exposure,
     });
-
-    const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
-    const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
-    const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
-    const size = Math.floor(exposure / price);
 
     if (size < 1) {
       logger.warn('[SKIP] Size < 1');
