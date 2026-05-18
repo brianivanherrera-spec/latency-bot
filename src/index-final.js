@@ -9,6 +9,7 @@ const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const config = require('./config');
+const { alertTradeSignal, alertBotStart } = require('./alerts');
 
 const logger = new Logger('MAIN');
 
@@ -25,6 +26,7 @@ async function main() {
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE 🔴'}`);
   logger.info(`Cooldown: 3 minutos | Min edge: ${config.MIN_EDGE_PCT}%`);
   logger.info('');
+  alertBotStart({ dryRun: config.DRY_RUN });
 
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
@@ -127,6 +129,19 @@ async function main() {
     }
 
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
+
+    // 🔔 Alerta Discord para trade manual
+    alertTradeSignal({
+      direction: sig.direction,
+      price,
+      edge: sig.edge.edgePct,
+      move: sig.movePct,
+      zscore: sig.zscore,
+      segsRestantes,
+      market: cachedMarket,
+      size,
+      exposure,
+    });
 
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
