@@ -90,7 +90,7 @@ class SignalEngine {
     if (direction === 'NEUTRAL') {
       this._totalSignals++;
       return { direction, zScore, movePct, velocity, buyRatio, currentPrice, mean, stdDev,
-               confidence: 0, timestamp: currentTimestamp, edge: null };
+               confidence: 0, timestamp: currentTimestamp, edge: null, bufferSize: this.prices.length };
     }
 
     const edge = this._calcEdge(direction, movePct, absZ);
@@ -110,6 +110,7 @@ class SignalEngine {
       confidence: this._calcConfidence(absZ, absMoveP, velocity, buyRatio, direction),
       timestamp: currentTimestamp,
       edge,
+      bufferSize: this.prices.length,
     };
   }
 
