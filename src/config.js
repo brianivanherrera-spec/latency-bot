@@ -89,3 +89,5 @@ module.exports = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   LOG_FILE: process.env.LOG_FILE || './logs/bot.log',
 };
+// =============================================
+// TAKE PROFIT
