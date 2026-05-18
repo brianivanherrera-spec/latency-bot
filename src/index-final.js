@@ -123,7 +123,7 @@ async function main() {
       return;
     }
 
-    if (segsRestantes < 60) {
+    if (segsRestantes < 90) {
       logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde`);
       return;
     }
