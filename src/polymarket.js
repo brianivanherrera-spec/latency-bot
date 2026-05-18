@@ -1,11 +1,11 @@
 /**
- * Polymarket CLOB API Client - v7 SIMPLE
+ * Polymarket CLOB v8 — POLY_1271 con balance cache update
  *
- * Cuentas email/Google (Magic Link) = signatureType POLY_PROXY (1)
- * - API creds: derivadas via SDK con EOA (sin bypass manual)
- * - Órdenes: firmadas con POLY_PROXY, funder = proxy/deposit wallet
- *
- * POLY_PROXY es el tipo correcto para cuentas nuevas email según docs oficiales.
+ * Flujo correcto según docs oficiales:
+ * 1. Derivar deposit wallet (determinista)
+ * 2. Derivar API creds con EOA
+ * 3. Actualizar balance cache: GET /balance-allowance/update?asset_type=COLLATERAL&signature_type=3
+ * 4. Órdenes con signatureType=POLY_1271, maker=signer=depositWallet
  */
 
 const { Logger } = require('./logger');
@@ -58,40 +58,59 @@ class PolymarketClient {
     const walletClient = createWalletClient({ account, transport: http('https://polygon-rpc.com') });
     logger.info(`EOA: ${account.address}`);
 
-    // Proxy wallet (donde están los fondos)
-    let proxyAddress = config.POLY_FUNDER_ADDRESS || config.POLY_DEPOSIT_WALLET;
-    if (!proxyAddress && HAS_RELAYER) {
-      proxyAddress = deriveDepositWallet(account.address, DEPOSIT_WALLET_FACTORY, DEPOSIT_WALLET_IMPL);
+    // Paso 1: Deposit wallet
+    let depositWallet = config.POLY_FUNDER_ADDRESS || config.POLY_DEPOSIT_WALLET;
+    if (!depositWallet && HAS_RELAYER) {
+      depositWallet = deriveDepositWallet(account.address, DEPOSIT_WALLET_FACTORY, DEPOSIT_WALLET_IMPL);
     }
-    logger.info(`Proxy/funder wallet: ${proxyAddress}`);
-    this._depositWalletAddress = proxyAddress;
+    logger.info(`Deposit wallet: ${depositWallet}`);
+    this._depositWalletAddress = depositWallet;
 
-    // API creds via SDK con EOA (sin ningún bypass)
+    // Paso 2: API creds via EOA
     let creds;
     if (config.POLY_API_KEY && config.POLY_API_SECRET && config.POLY_PASSPHRASE) {
       creds = { key: config.POLY_API_KEY, secret: config.POLY_API_SECRET, passphrase: config.POLY_PASSPHRASE };
-      logger.info(`Creds desde config: ${creds.key.slice(0,8)}...`);
+      logger.info(`Creds config: ${creds.key.slice(0,8)}...`);
     } else {
-      // Derivar con EOA puro — sin signatureType, sin funderAddress
-      const tempClient = new ClobClient({
-        host: CLOB_API_BASE, chain: Chain?.POLYGON ?? 137, signer: walletClient,
-      });
+      const tempClient = new ClobClient({ host: CLOB_API_BASE, chain: Chain?.POLYGON ?? 137, signer: walletClient });
       creds = await tempClient.createOrDeriveApiKey();
-      logger.info(`Creds derivadas (EOA): ${creds.key.slice(0,8)}...`);
+      logger.info(`Creds derivadas: ${creds.key.slice(0,8)}...`);
     }
 
-    // Cliente final con POLY_PROXY para órdenes
+    // Paso 3: Cliente con POLY_1271
     this.clobClient = new ClobClient({
       host:          CLOB_API_BASE,
       chain:         Chain?.POLYGON ?? 137,
       signer:        walletClient,
       creds,
-      signatureType: SignatureTypeV2.POLY_GNOSIS_SAFE, // = 2, para Rabby/MetaMask con proxy wallet
-      funderAddress: proxyAddress,
+      signatureType: SignatureTypeV2.POLY_1271,
+      funderAddress: depositWallet,
     });
 
+    // Paso 4: Actualizar balance cache (CRÍTICO — docs oficiales)
+    try {
+      logger.info('Actualizando balance cache para deposit wallet...');
+      await this.clobClient.updateBalanceAllowance({ assetType: 'COLLATERAL', signatureType: 3 });
+      logger.info('✓ Balance cache actualizado');
+    } catch (e) {
+      // Intentar via fetch directo si el SDK no tiene el método
+      try {
+        const res = await fetch(`${CLOB_API_BASE}/balance-allowance/update?asset_type=COLLATERAL&signature_type=3`, {
+          method: 'GET',
+          headers: {
+            'POLY_ADDRESS': depositWallet,
+            'POLY-API-KEY': creds.key,
+          },
+        });
+        const d = await res.json();
+        logger.info(`Balance cache update: ${JSON.stringify(d).slice(0,100)}`);
+      } catch (e2) {
+        logger.warn(`Balance cache update falló (puede estar OK): ${e2.message}`);
+      }
+    }
+
     this._initialized = true;
-    logger.info(`✅ CLOB V2 listo (POLY_PROXY) — funder: ${proxyAddress}`);
+    logger.info(`✅ CLOB V2 listo (POLY_1271) — deposit wallet: ${depositWallet}`);
   }
 
   async findBTCMarket() {
@@ -135,7 +154,7 @@ class PolymarketClient {
       logger.info(`[DRY RUN] ${side} ${size} @ $${price}`);
       return { success: true, orderId: rec.orderId, dryRun: true };
     }
-    if (!tokenId) { logger.error(`Token ID inválido`); return { success: false, error: 'Token ID no disponible' }; }
+    if (!tokenId) return { success: false, error: 'Token ID no disponible' };
 
     try {
       await this._init();
@@ -164,7 +183,7 @@ class PolymarketClient {
     } catch (err) {
       rec.status = 'FAILED'; rec.error = err.message;
       this._orderHistory.push(rec);
-      logger.error(`Error colocando orden: ${err.message}`);
+      logger.error(`Error: ${err.message}`);
       return { success: false, error: err.message };
     }
   }
