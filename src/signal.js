@@ -51,6 +51,18 @@ class SignalEngine {
     return this._evaluate(price, timestamp);
   }
 
+  // ─── Tendencia macro: precio hace N ticks vs ahora ─────────────────
+  // Retorna 'UP', 'DOWN' o 'FLAT' según la dirección dominante
+  _macroTrend(currentPrice, windowTicks = 150) {
+    const n = this.prices.length;
+    if (n < windowTicks) return 'FLAT';
+    const priceThen = this.prices[n - windowTicks];
+    const changePct = ((currentPrice - priceThen) / priceThen) * 100;
+    if (changePct > 0.04) return 'UP';
+    if (changePct < -0.04) return 'DOWN';
+    return 'FLAT';
+  }
+
   _evaluate(currentPrice, currentTimestamp) {
     const n = this.prices.length;
 
@@ -85,6 +97,15 @@ class SignalEngine {
       direction = 'DOWN';
     } else {
       direction = 'NEUTRAL';
+    }
+
+    // ─── Filtro de tendencia macro ────────────────────────────────────
+    // Si la tendencia de los últimos ~2.5 minutos es CONTRARIA a la señal,
+    // ignoramos — el mercado está en reversión y la señal es ruido.
+    if (direction !== 'NEUTRAL') {
+      const macro = this._macroTrend(currentPrice);
+      if (macro === 'UP' && direction === 'DOWN') return null;   // BTC subiendo → no apostar DOWN
+      if (macro === 'DOWN' && direction === 'UP') return null;   // BTC bajando → no apostar UP
     }
 
     if (direction === 'NEUTRAL') {

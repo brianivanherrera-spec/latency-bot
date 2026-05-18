@@ -43,10 +43,10 @@ module.exports = {
   MIN_TICKS_REQUIRED: parseInt(process.env.MIN_TICKS_REQUIRED || '100'),
 
   // Z-score mínimo — los que funcionaban con 63.9% win rate
-  ZSCORE_THRESHOLD: parseFloat(process.env.ZSCORE_THRESHOLD || '1.2'),
+  ZSCORE_THRESHOLD: parseFloat(process.env.ZSCORE_THRESHOLD || '1.5'),
 
   // Movimiento mínimo en %
-  MOVE_PCT_THRESHOLD: parseFloat(process.env.MOVE_PCT_THRESHOLD || '0.03'),
+  MOVE_PCT_THRESHOLD: parseFloat(process.env.MOVE_PCT_THRESHOLD || '0.04'),
 
   // Velocidad mínima del movimiento (%/segundo)
   MIN_VELOCITY: parseFloat(process.env.MIN_VELOCITY || '0.001'),
@@ -65,7 +65,7 @@ module.exports = {
   STOP_LOSS_PERCENT: parseFloat(process.env.STOP_LOSS_PERCENT || '10'),
 
   // Cooldown entre órdenes
-  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '300'),
+  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '360'),
 
   // =============================================
   // LATENCIA Y FRESHNESS DE DATOS
@@ -78,7 +78,7 @@ module.exports = {
   POLY_SENSITIVITY: parseFloat(process.env.POLY_SENSITIVITY || '2.5'),
 
   // Edge mínimo para operar (%)
-  MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '0.5'),
+  MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '0.8'),
 
   // Edge máximo realista — mayor indica precio stale
   MAX_REALISTIC_EDGE: parseFloat(process.env.MAX_REALISTIC_EDGE || '15'),
