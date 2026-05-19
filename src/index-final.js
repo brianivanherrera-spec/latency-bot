@@ -244,7 +244,7 @@ async function main() {
     logger.info('=== BALANCE REAL ===');
     if (config.DRY_RUN) {
       const s = tracker.getSummary();
-      const paperPnL = parseFloat(s.totalPnL?.replace('+','') ?? 0);
+      const paperPnL = parseFloat((s.totalPnL ?? '0').replace('+','').replace('$','')) || 0;
       const paperBalance = (parseFloat(process.env.PAPER_CAPITAL || '25') + paperPnL).toFixed(2);
       const sign = paperPnL >= 0 ? '+' : '';
       logger.info(`  📋 PAPER TRADING (capital inicial: $${process.env.PAPER_CAPITAL || '25'})`);
