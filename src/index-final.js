@@ -243,9 +243,14 @@ async function main() {
     logger.info('');
     logger.info('=== BALANCE REAL ===');
     if (config.DRY_RUN) {
-      logger.info('  Modo DRY RUN — sin trades reales');
       const s = tracker.getSummary();
-      logger.info(`  Paper W:${s.wins} L:${s.losses} | Win Rate: ${s.winRate}`);
+      const paperPnL = parseFloat(s.totalPnL?.replace('+','') ?? 0);
+      const paperBalance = (parseFloat(process.env.PAPER_CAPITAL || '25') + paperPnL).toFixed(2);
+      const sign = paperPnL >= 0 ? '+' : '';
+      logger.info(`  📋 PAPER TRADING (capital inicial: $${process.env.PAPER_CAPITAL || '25'})`);
+      logger.info(`  💰 Balance simulado: $${paperBalance} USDC`);
+      logger.info(`  📈 P&L simulado: ${sign}$${paperPnL.toFixed(2)}`);
+      logger.info(`  Trades W:${s.wins} L:${s.losses} | Win Rate: ${s.winRate}`);
     } else {
       logger.info(`  💰 Balance: $${currentBalance ?? 'consultando...'} USDC`);
       logger.info(`  📈 P&L sesión: ${pnlSign}$${pnlReal}`);
