@@ -175,10 +175,11 @@ class PolymarketClient {
       }
 
       const orderId = result?.orderID || result?.orderId || result?.id;
+      const orderStatus = result?.status || 'unknown'; // 'matched' o 'live'
       rec.status = 'PLACED'; rec.orderId = orderId;
       this._orderHistory.push(rec);
-      logger.info(`[LIVE] ✅ Order ID: ${orderId}`);
-      return { success: true, orderId };
+      logger.info(`[LIVE] ✅ Order ID: ${orderId} | status: ${orderStatus}`);
+      return { success: true, orderId, status: orderStatus };
 
     } catch (err) {
       rec.status = 'FAILED'; rec.error = err.message;

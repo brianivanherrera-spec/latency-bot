@@ -193,7 +193,15 @@ async function main() {
           return;
         }
 
-        logger.info(`[LIVE] ✅ Orden colocada: ${orderResult.orderId}`);
+        // Verificar si la orden se llenó (matched) o quedó pendiente (live)
+        if (orderResult.status === 'live') {
+          logger.warn(`[LIVE] ⚠️ Orden en libro, no llenada aún: ${orderResult.orderId}`);
+          logger.warn(`[LIVE] No registramos posición hasta confirmar llenado`);
+          activePositions.delete(posId);
+          return;
+        }
+
+        logger.info(`[LIVE] ✅ Orden llenada (matched): ${orderResult.orderId}`);
 
       } catch (err) {
         logger.error(`[LIVE] ❌ Error: ${err.message}`);
