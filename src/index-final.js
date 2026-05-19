@@ -90,6 +90,7 @@ async function main() {
   ws.onPrice(async (priceData) => {
     const sig = signal.process(priceData);
     if (!sig || sig.direction === 'NEUTRAL') return;
+    if (sig.bufferSize !== undefined && sig.bufferSize < 200) return; // warmup
 
     const now = Date.now();
 
