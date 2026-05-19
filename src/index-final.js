@@ -207,9 +207,32 @@ async function main() {
   await ws.connect();
   logger.info('✓ Conectado\n');
 
-  setInterval(() => {
+  // Balance inicial al arrancar
+  let initialBalance = null;
+  let currentBalance = null;
+
+  polyClient.getBalance().then(b => {
+    if (b !== null) {
+      initialBalance = b;
+      currentBalance = b;
+      logger.info(`💰 Balance inicial Polymarket: $${b} USDC`);
+    }
+  }).catch(() => {});
+
+  setInterval(async () => {
     const stats = tracker.getSummary();
     const sigStats = signal.getStats();
+
+    // Actualizar balance real cada 5 minutos
+    if (!config.DRY_RUN) {
+      const bal = await polyClient.getBalance().catch(() => null);
+      if (bal !== null) currentBalance = bal;
+    }
+
+    const pnlReal = (currentBalance !== null && initialBalance !== null)
+      ? (currentBalance - initialBalance).toFixed(2)
+      : 'n/a';
+    const pnlSign = parseFloat(pnlReal) >= 0 ? '+' : '';
 
     logger.info('─'.repeat(60));
     logger.info('[HEALTH]');
@@ -218,11 +241,16 @@ async function main() {
     logger.info(`  Active slots: ${activePositions.size}/10`);
     logger.info(`  Cooldown: ${Math.max(0, Math.ceil((lastTradeTime + COOLDOWN - Date.now()) / 1000))}s`);
     logger.info('');
-    logger.info('=== P&L TRACKER ===');
-    logger.info(`  Open: ${stats.openPositions} | Closed: ${stats.closedPositions}`);
-    logger.info(`  Wins: ${stats.wins} | Losses: ${stats.losses}`);
-    logger.info(`  Win Rate: ${stats.winRate}`);
-    logger.info(`  Total P&L: ${stats.totalPnL}`);
+    logger.info('=== BALANCE REAL ===');
+    if (config.DRY_RUN) {
+      logger.info('  Modo DRY RUN — sin trades reales');
+      const s = tracker.getSummary();
+      logger.info(`  Paper W:${s.wins} L:${s.losses} | Win Rate: ${s.winRate}`);
+    } else {
+      logger.info(`  💰 Balance: $${currentBalance ?? 'consultando...'} USDC`);
+      logger.info(`  📈 P&L sesión: ${pnlSign}$${pnlReal}`);
+      logger.info(`  Trades W:${stats.wins} L:${stats.losses} | Win Rate: ${stats.winRate}`);
+    }
     logger.info('─'.repeat(60));
   }, 5 * 60 * 1000);
 }

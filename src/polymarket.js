@@ -189,6 +189,47 @@ class PolymarketClient {
   }
 
   getOrderHistory() { return this._orderHistory; }
+
+  // Consultar balance USDC real de la deposit wallet en el CLOB
+  async getBalance() {
+    try {
+      await this._init();
+      const result = await this.clobClient.getBalanceAllowance({
+        asset_type: 'COLLATERAL',
+      });
+      // El CLOB devuelve el balance en unidades USDC (6 decimales)
+      const raw = result?.balance ?? result?.allowance ?? result?.data?.balance;
+      if (raw === undefined) return null;
+      return parseFloat((parseFloat(raw) / 1e6).toFixed(2));
+    } catch (e) {
+      // Fallback: consultar via fetch directo
+      try {
+        const h = await this._buildAuthHeaders();
+        const res = await fetch(`${CLOB_API_BASE}/balance-allowance?asset_type=COLLATERAL`, {
+          method: 'GET', headers: h,
+        });
+        const d = await res.json();
+        const raw = d?.balance ?? d?.data?.balance;
+        if (raw === undefined) return null;
+        return parseFloat((parseFloat(raw) / 1e6).toFixed(2));
+      } catch (e2) {
+        return null;
+      }
+    }
+  }
+
+  // Headers L2 autenticados para llamadas directas
+  async _buildAuthHeaders() {
+    if (!this.clobClient?.creds) return {};
+    const ts = Math.floor(Date.now() / 1000);
+    return {
+      'POLY_ADDRESS':    this._depositWalletAddress,
+      'POLY-API-KEY':    this.clobClient.creds.key,
+      'POLY-SECRET':     this.clobClient.creds.secret,
+      'POLY-PASSPHRASE': this.clobClient.creds.passphrase,
+      'POLY-TIMESTAMP':  String(ts),
+    };
+  }
 }
 
 module.exports = { PolymarketClient };
