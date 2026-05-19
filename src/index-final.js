@@ -130,6 +130,7 @@ async function main() {
     }
 
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
+    logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)}`);
 
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;

@@ -67,6 +67,11 @@ class BinanceWS {
           const price = parseFloat(ticker.price);
           const timestamp = Date.now();
           const isBuyerMaker = parseFloat(ticker.price) < parseFloat(ticker.best_ask);
+          const bestBid = parseFloat(ticker.best_bid) || price;
+          const bestAsk = parseFloat(ticker.best_ask) || price;
+          const bidQty = parseFloat(ticker.best_bid_quantity) || 0;
+          const askQty = parseFloat(ticker.best_ask_quantity) || 0;
+          const spread = bestAsk - bestBid;
 
           if (!price || isNaN(price)) return;
 
@@ -74,7 +79,7 @@ class BinanceWS {
           this._lastTimestamp = timestamp;
 
           if (this.priceCallback) {
-            this.priceCallback({ price, timestamp, isBuyerMaker });
+            this.priceCallback({ price, timestamp, isBuyerMaker, bestBid, bestAsk, bidQty, askQty, spread });
           }
         } catch (e) {
           logger.warn(`Error parseando mensaje WS: ${e.message}`);

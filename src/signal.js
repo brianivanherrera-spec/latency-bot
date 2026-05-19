@@ -25,6 +25,11 @@ class SignalEngine {
     this._totalTicks = 0;
     this._totalSignals = 0;
     this._lastSignalTime = 0;
+
+    // Orderbook imbalance buffer
+    this.imbalances = [];   // (bidQty - askQty) / (bidQty + askQty)
+    this.spreads = [];      // best_ask - best_bid
+    this.tickFrequency = []; // timestamps para calcular frecuencia
   }
 
   updatePolyPrice(yesPrice, noPrice) {
@@ -33,22 +38,73 @@ class SignalEngine {
     this.polyUpdatedAt = Date.now();
   }
 
-  process({ price, timestamp, isBuyerMaker }) {
+  process({ price, timestamp, isBuyerMaker, bidQty = 0, askQty = 0, spread = 0 }) {
     this._totalTicks++;
 
     this.prices.push(price);
     this.timestamps.push(timestamp);
     this.buyPressure.push(isBuyerMaker ? 0 : 1);
+    this.tickFrequency.push(timestamp);
+
+    // Orderbook imbalance: +1 = todo bids, -1 = todo asks
+    const totalQty = bidQty + askQty;
+    const imbalance = totalQty > 0 ? (bidQty - askQty) / totalQty : 0;
+    this.imbalances.push(imbalance);
+    this.spreads.push(spread);
 
     if (this.prices.length > this.maxBuffer) {
       this.prices.shift();
       this.timestamps.shift();
       this.buyPressure.shift();
+      this.imbalances.shift();
+      this.spreads.shift();
     }
+    // Mantener solo los últimos 60 timestamps para frecuencia
+    if (this.tickFrequency.length > 60) this.tickFrequency.shift();
 
     if (this.prices.length < config.MIN_TICKS_REQUIRED) return null;
 
     return this._evaluate(price, timestamp);
+  }
+
+  // ─── Orderbook imbalance promedio (últimos N ticks) ─────────────────
+  _avgImbalance(window = 20) {
+    const recent = this.imbalances.slice(-window);
+    if (!recent.length) return 0;
+    return recent.reduce((a, b) => a + b, 0) / recent.length;
+  }
+
+  // ─── Spread promedio vs spread actual ────────────────────────────────
+  _spreadSignal(window = 20) {
+    const recent = this.spreads.slice(-window);
+    if (!recent.length) return 1;
+    const avgSpread = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const currentSpread = this.spreads[this.spreads.length - 1] || avgSpread;
+    return currentSpread / (avgSpread || 1); // >1 = spread amplio = más volátil
+  }
+
+  // ─── Frecuencia de ticks (últimos 10 segundos) ───────────────────────
+  _tickFrequency() {
+    const now = Date.now();
+    const last10s = this.tickFrequency.filter(t => now - t < 10000);
+    return last10s.length; // ticks en los últimos 10 segundos
+  }
+
+  // ─── RSI sobre el buffer de precios ──────────────────────────────────
+  _rsi(period = 14) {
+    if (this.prices.length < period + 1) return 50;
+    const recent = this.prices.slice(-(period + 1));
+    let gains = 0, losses = 0;
+    for (let i = 1; i < recent.length; i++) {
+      const diff = recent[i] - recent[i - 1];
+      if (diff > 0) gains += diff;
+      else losses += Math.abs(diff);
+    }
+    const avgGain = gains / period;
+    const avgLoss = losses / period;
+    if (avgLoss === 0) return 100;
+    const rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
   }
 
   // ─── Tendencia macro: precio hace N ticks vs ahora ─────────────────
@@ -100,18 +156,29 @@ class SignalEngine {
     }
 
     // ─── Filtro de tendencia macro ────────────────────────────────────
-    // Si la tendencia de los últimos ~2.5 minutos es CONTRARIA a la señal,
-    // ignoramos — el mercado está en reversión y la señal es ruido.
     if (direction !== 'NEUTRAL') {
       const macro = this._macroTrend(currentPrice);
-      if (macro === 'UP' && direction === 'DOWN') return null;   // BTC subiendo → no apostar DOWN
-      if (macro === 'DOWN' && direction === 'UP') return null;   // BTC bajando → no apostar UP
+      if (macro === 'UP' && direction === 'DOWN') return null;
+      if (macro === 'DOWN' && direction === 'UP') return null;
     }
+
+    // ─── Filtro orderbook imbalance ───────────────────────────────────
+    // Si el orderbook dice lo contrario a nuestra señal, es ruido
+    // DOWN pero imbalance positivo (más bids que asks) → no entrar
+    // UP pero imbalance negativo (más asks que bids) → no entrar
+    const imbalance = this._avgImbalance(20);
+    if (direction === 'DOWN' && imbalance > 0.3) return null;  // compradores dominan
+    if (direction === 'UP'   && imbalance < -0.3) return null; // vendedores dominan
+
+    const spreadRatio = this._spreadSignal(20);
+    const tickFreq = this._tickFrequency();
+    const rsi = this._rsi(14);
 
     if (direction === 'NEUTRAL') {
       this._totalSignals++;
       return { direction, zScore, movePct, velocity, buyRatio, currentPrice, mean, stdDev,
-               confidence: 0, timestamp: currentTimestamp, edge: null, bufferSize: this.prices.length };
+               confidence: 0, timestamp: currentTimestamp, edge: null, bufferSize: this.prices.length,
+               imbalance, spreadRatio, tickFreq, rsi };
     }
 
     const edge = this._calcEdge(direction, movePct, absZ);
@@ -132,6 +199,10 @@ class SignalEngine {
       timestamp: currentTimestamp,
       edge,
       bufferSize: this.prices.length,
+      imbalance,      // orderbook imbalance [-1, +1]
+      spreadRatio,    // spread actual vs promedio (>1 = más volátil)
+      tickFreq,       // ticks en últimos 10s (volumen proxy)
+      rsi,            // RSI sobre buffer de precios
     };
   }
 
