@@ -211,7 +211,7 @@ async function main() {
   let initialBalance = null;
   let currentBalance = null;
 
-  polyClient.getBalance().then(b => {
+  poly.getBalance().then(b => {
     if (b !== null) {
       initialBalance = b;
       currentBalance = b;
@@ -225,7 +225,7 @@ async function main() {
 
     // Actualizar balance real cada 5 minutos
     if (!config.DRY_RUN) {
-      const bal = await polyClient.getBalance().catch(() => null);
+      const bal = await poly.getBalance().catch(() => null);
       if (bal !== null) currentBalance = bal;
     }
 
