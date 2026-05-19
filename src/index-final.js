@@ -129,20 +129,7 @@ async function main() {
       return;
     }
 
-    // ─── Filtro de confirmación Polymarket ──────────────────────────────
-    // Si el mercado no 'cree' el movimiento de BTC todavía, es probable ruido
-    // DOWN: necesitamos que NO ya esté en 0.52+ (mercado inclinado a que baje)
-    // UP:   necesitamos que YES ya esté en 0.52+ (mercado inclinado a que suba)
-    const polyConfirm = sig.direction === 'DOWN'
-      ? sig.edge.polyNo                // precio actual de NO
-      : sig.edge.polyYes;              // precio actual de YES
-    const POLY_MIN_CONFIRM = parseFloat(process.env.POLY_MIN_CONFIRM || '0.52');
-    if (polyConfirm < POLY_MIN_CONFIRM) {
-      logger.info(`[SKIP] Poly no confirma: ${sig.direction} precio=${polyConfirm?.toFixed(3)} < ${POLY_MIN_CONFIRM}`);
-      return;
-    }
-
-    logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar | Poly confirma: ${polyConfirm?.toFixed(3)}`);
+    logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
 
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
