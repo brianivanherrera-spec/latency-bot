@@ -159,8 +159,8 @@ async function main() {
       exposure,
     });
 
-    if (size < 1) {
-      logger.warn('[SKIP] Size < 1');
+    if (size < 5) {
+      logger.warn(`[SKIP] Size ${size} < mínimo 5 tokens de Polymarket (subí ORDER_SIZE_USDC)`);
       return;
     }
 
