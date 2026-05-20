@@ -10,6 +10,7 @@ const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const config = require('./config');
 const { alertTradeSignal, alertBotStart } = require('./alerts');
+const signalLogger = require('./signal-logger');
 
 const logger = new Logger('MAIN');
 
@@ -141,6 +142,10 @@ async function main() {
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
     logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)}`);
 
+    // Registrar señal en volumen persistente
+    const utcHour = new Date().getUTCHours();
+    signalLogger.logSignalOpen({ posId, direction: sig.direction, price, size, market: cachedMarket, sig, utcHour });
+
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
@@ -253,6 +258,11 @@ async function main() {
       : 'n/a';
     const pnlSign = parseFloat(pnlReal) >= 0 ? '+' : '';
 
+    // Mostrar stats del volumen si hay datos
+    const volStats = signalLogger.getStats();
+    if (volStats && volStats.closedTrades >= 5) {
+      logger.info(`  📊 Stats volumen: ${volStats.closedTrades} trades | WR: ${volStats.winRate} | P&L: $${volStats.totalPnL}`);
+    }
     logger.info('─'.repeat(60));
     logger.info('[HEALTH]');
     logger.info(`  Señales: ${sigStats.signals} | BTC: $${sigStats.lastPrice?.toFixed(2) ?? 'n/a'}`);
