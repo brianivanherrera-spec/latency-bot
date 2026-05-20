@@ -147,9 +147,6 @@ async function main() {
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
     const size = Math.floor(exposure / price);
 
-    // Registrar señal en volumen persistente
-    const utcHour = new Date().getUTCHours();
-    signalLogger.logSignalOpen({ posId, direction: sig.direction, price, size, market: cachedMarket, sig, utcHour });
     alertTradeSignal({
       direction: sig.direction,
       price,
