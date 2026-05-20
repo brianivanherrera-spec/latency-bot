@@ -92,6 +92,15 @@ async function main() {
     if (!sig || sig.direction === 'NEUTRAL') return;
     if (sig.bufferSize !== undefined && sig.bufferSize < 200) return; // warmup
 
+    // ─── Filtro de horario ────────────────────────────────────────────
+    // Basado en backtest de 2531 mercados: algunas horas tienen <45% win rate
+    if (config.TRADING_HOURS_ENABLED) {
+      const utcHour = new Date().getUTCHours();
+      if (config.TRADING_HOURS_BLOCKED_UTC.includes(utcHour)) {
+        return; // hora bloqueada — win rate histórico < 45%
+      }
+    }
+
     const now = Date.now();
 
     if (now - lastTradeTime < COOLDOWN) return;
