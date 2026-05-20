@@ -142,14 +142,14 @@ async function main() {
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
     logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)}`);
 
-    // Registrar señal en volumen persistente
-    const utcHour = new Date().getUTCHours();
-    signalLogger.logSignalOpen({ posId, direction: sig.direction, price, size, market: cachedMarket, sig, utcHour });
-
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
     const size = Math.floor(exposure / price);
+
+    // Registrar señal en volumen persistente
+    const utcHour = new Date().getUTCHours();
+    signalLogger.logSignalOpen({ posId, direction: sig.direction, price, size, market: cachedMarket, sig, utcHour });
 
     // 🔔 Alerta Discord para trade manual
     alertTradeSignal({
