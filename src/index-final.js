@@ -150,8 +150,6 @@ async function main() {
     // Registrar señal en volumen persistente
     const utcHour = new Date().getUTCHours();
     signalLogger.logSignalOpen({ posId, direction: sig.direction, price, size, market: cachedMarket, sig, utcHour });
-
-    // 🔔 Alerta Discord para trade manual
     alertTradeSignal({
       direction: sig.direction,
       price,
@@ -176,6 +174,10 @@ async function main() {
     lastTradeTime = now;
     const posId = `POS_${Date.now()}`;
     activePositions.set(posId, { exposure, openTime: now });
+
+    // Registrar señal en volumen persistente
+    const utcHour = new Date().getUTCHours();
+    signalLogger.logSignalOpen({ posId, direction: sig.direction, price, size, market: cachedMarket, sig, utcHour });
 
     // ✅ Ejecutar orden real (solo en LIVE)
     if (!config.DRY_RUN) {
