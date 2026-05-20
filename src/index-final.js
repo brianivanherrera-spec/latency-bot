@@ -114,10 +114,10 @@ async function main() {
 
     if (activePositions.size >= 10) return;
 
-    const exposure = 5;
+    const exposure = config.ORDER_SIZE_USDC;
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);
-    if (totalExposure + exposure > 100) return;
+    if (totalExposure + exposure > config.MAX_TOTAL_EXPOSURE_USDC) return;
 
     if (!cachedMarket?.gammaId) {
       logger.warn('[SKIP] No hay mercado disponible');
