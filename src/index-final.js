@@ -174,7 +174,24 @@ async function main() {
 
     // Registrar señal en volumen persistente
     const utcHour = new Date().getUTCHours();
-    signalLogger.logSignalOpen({ posId, direction: sig.direction, price, size, market: cachedMarket, sig, utcHour });
+    const btcPriceAtSignal = sig.currentPrice;
+    signalLogger.logSignalOpen({
+      posId,
+      direction: sig.direction,
+      price,
+      size,
+      market: cachedMarket,
+      sig,
+      utcHour,
+      btcPrice: btcPriceAtSignal,
+      // getPolyPrice: usa los precios de la señal (ya disponibles)
+      getPolyPrice: (dir) => dir === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo,
+    });
+
+    // BTC snapshot 30s después
+    setTimeout(() => {
+      signalLogger.logBtcSnapshot30s(posId, btcPriceAtSignal, signal.getStats()?.lastPrice);
+    }, 30000);
 
     // ✅ Ejecutar orden real (solo en LIVE)
     if (!config.DRY_RUN) {
