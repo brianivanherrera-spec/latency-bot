@@ -2,159 +2,29 @@
 
 ## Estado actual (Mayo 2026)
 - Bot corriendo en **PAPER TRADING** en Railway
-- Capital real disponible: $4.68 USDC en Polymarket
-- Win rate overnight más reciente: 75% (30W/10L, 40 trades)
-- Signal logger activo guardando en Railway Volume `/data/signals.jsonl`
+- Capital real disponible: $1.68 USDC en Polymarket (recargar el lunes)
+- Win rate última sesión: 68.4% (39W/18L, 57 trades, 20 horas continuas)
+- Signal logger v2 activo guardando en Railway Volume `/data/signals.jsonl`
 - Filtro de horarios activo basado en backtest de 2531 mercados históricos
+- Todos los filtros activos y estables sin reinicios en 20+ horas
 
 ---
 
-## Próximos pasos inmediatos
+## Plan inmediato
 
-### Esta semana
-- Dejar paper trading acumular 200-300 trades sin tocar nada
-- Signal logger guardando: zscore, movePct, imbalance, RSI, spread, tickFreq, hora AR, resultado
+### Lunes
+1. **Descargar signals.jsonl del Railway Volume:**
+   - Railway → tu servicio → Volumes → descargar `/data/signals.jsonl`
+   - Copiar el archivo a la carpeta del repo
+   - Correr: `node analyze_signals.js signals.jsonl`
+   - El script muestra win rate por hora, Z-score, RSI, imbalance, edge decay
 
-### Fin de semana (cuando haya datos)
-- Descargar `signals.jsonl` del Railway Volume
-- Analizar qué indicadores correlacionan realmente con wins:
-  - ¿Z-score alto mejora win rate?
-  - ¿RSI extremo (<20 o >80) ayuda?
-  - ¿Imbalance tiene señal real o es ruido?
-  - ¿Qué horas nuestras señales son más precisas (no solo el backtest)?
-- Identificar los pesos reales de cada factor
+2. **Decisión de go live:**
+   - Si el análisis confirma 65%+ WR sostenido → recargar $25 en Polymarket
+   - Configurar `DRY_RUN=false`, `ORDER_SIZE_USDC=3`, `MAX_TOTAL_EXPOSURE_USDC=10`
+   - Actualizar `PAPER_CAPITAL` con el nuevo capital
 
-### Semana siguiente
-- Decisión de go live basada en datos reales
-- Implementar signal score dinámico (ver abajo)
-- Recargar capital si el paper trading confirma 65%+ win rate sostenido
-
----
-
-## Mejoras planificadas
-
-### 1. Signal Score Dinámico (ALTA PRIORIDAD)
-**Qué es:** en lugar de apostar siempre el mismo monto, el bot calcula
-un score de confianza y apuesta en proporción.
-
-**Lógica:**
-```
-score = zscore_weight + imbalance_weight + rsi_weight + hour_weight + spread_weight
-
-Score 50-65% → $1 por trade
-Score 65-75% → $3 por trade  
-Score 75-85% → $7 por trade
-Score 85%+   → $15 por trade
-```
-
-**Por qué no implementar todavía:** los pesos deben basarse en datos
-reales del signal logger. Sin datos, los pesos son inventados y pueden
-multiplicar las pérdidas en lugar de las ganancias.
-
-**Cuándo implementar:** cuando tengamos 200+ trades en signals.jsonl
-y sepamos el win rate real por cada indicador.
-
-**Impacto esperado:** si el score es bueno, multiplica ganancias en
-trades de alta confianza sin aumentar el riesgo en trades débiles.
-
----
-
-### 2. Edge Decay Measurement (ALTA PRIORIDAD)
-**Qué es:** medir cuánto tiempo tarda Polymarket en corregir su precio
-después de que Coinbase se mueve.
-
-**Por qué es importante:** define si Railway alcanza o necesitamos VPS
-en Nueva York. Si el edge dura 3-5 segundos, Railway está bien.
-Si dura 300ms, necesitamos VPS urgente.
-
-**Implementación:** agregar al signal logger snapshots del precio de
-Polymarket en T+0, T+1s, T+2s, T+5s después de cada señal.
-
-**Cómo implementarlo:**
-```javascript
-// En index-final.js, después de detectar señal:
-const polySnapshot = {
-  t0: cachedMarket.yesPrice,      // precio al momento de la señal
-  btcPrice: sig.currentPrice,
-  timestamp: Date.now(),
-};
-// 1 segundo después:
-setTimeout(() => { polySnapshot.t1 = getCurrentPolyPrice(); }, 1000);
-// 2 segundos después:
-setTimeout(() => { polySnapshot.t2 = getCurrentPolyPrice(); }, 2000);
-// 5 segundos después:
-setTimeout(() => { polySnapshot.t5 = getCurrentPolyPrice(); }, 5000);
-// Guardar en signal logger junto con la señal
-```
-
----
-
-### 3. ETH Markets (MEDIA PRIORIDAD)
-**Qué es:** replicar la misma estrategia en mercados ETH Up/Down 5min
-de Polymarket usando la señal de ETH-USD de Coinbase.
-
-**Por qué:** duplica las oportunidades sin agregar complejidad.
-ETH y BTC están correlacionados pero no siempre se mueven juntos,
-lo que da señales independientes.
-
-**Implementación:** segundo WebSocket ETH-USD + buscar mercados
-`eth-updown-5m-*` en paralelo al bot de BTC.
-
-**Cuándo:** cuando el bot de BTC esté en live generando ganancias
-consistentes.
-
----
-
-### 4. Correlación BTC/ETH como señal anticipatoria (MEDIA PRIORIDAD)
-**Qué es:** cuando ETH se mueve fuerte y BTC todavía no lo siguió,
-BTC generalmente lo sigue en 30-60 segundos. Usar ETH como señal
-adicional para confirmar o filtrar señales de BTC.
-
-**Implementación:** segundo WebSocket ETH-USD, calcular si ETH se
-movió en la misma dirección en los últimos 30s.
-
----
-
-### 5. VPS Nueva York (BAJA PRIORIDAD AHORA)
-**Qué es:** mover el bot de Railway (us-west) a un VPS en NY/NJ
-más cercano a los servidores de Polymarket (AWS us-east-1).
-
-**Impacto:** latencia de ~400ms → ~150ms. Importante cuando el
-capital sea suficiente para que esos 250ms importen.
-
-**Costo:** ~$6/mes en Hetzner o Vultr.
-
-**Cuándo:** cuando el balance llegue a $100+ y los trades sean $10+.
-
----
-
-### 6. Circuit Breaker (MEDIA PRIORIDAD)
-**Qué es:** si el bot pierde 3 trades seguidos, se pausa
-automáticamente por 30-60 minutos.
-
-**Por qué:** las rachas malas suelen ocurrir cuando el mercado
-cambió de régimen (lateral, reversión de tendencia). Una pausa
-automática protege el capital.
-
-**Implementación:** contador de losses consecutivos en index-final.js.
-Si llega a 3, setea una variable `pauseUntil = Date.now() + 30*60*1000`.
-
----
-
-### 7. Rolling Analytics / Degradación del Edge (BAJA PRIORIDAD)
-**Qué es:** calcular el win rate de las últimas N señales (ventana
-deslizante) y compararlo con el histórico. Si cae mucho, alertar.
-
-**Por qué:** si más bots hacen lo mismo o Polymarket mejora su
-latencia, el edge se comprime gradualmente. Detectarlo temprano
-permite ajustar parámetros antes de perder capital.
-
-**Implementación:** en el análisis de signals.jsonl, calcular win
-rate rolling de últimas 20, 50, 100 señales y comparar tendencia.
-
----
-
-## Escala de capital recomendada
+3. **Escala gradual de capital:**
 
 | Balance Poly | ORDER_SIZE_USDC | Ganancia esperada/día |
 |-------------|----------------|----------------------|
@@ -167,24 +37,143 @@ rate rolling de últimas 20, 50, 100 señales y comparar tendencia.
 
 *Basado en 65% win rate y ~30 trades/día*
 
+**Regla importante:** nunca subir el size si perdés 3 seguidos — bajás a $1 y esperás.
+
+---
+
+## Lo que está implementado
+
+### Señales y filtros (en cascada)
+1. **Z-score ≥ 1.5** — movimiento estadísticamente anómalo
+2. **Movimiento ≥ 0.04%** — movimiento real, no ruido
+3. **Warmup 200 ticks** — espera ~3 min tras reinicio
+4. **Timing mínimo 90s** — no entrar si quedan menos de 90s al cierre
+5. **Tendencia macro** — no apostar DOWN si BTC lleva 2.5 min subiendo (y viceversa)
+6. **Filtro de horarios** — bloquea horas con WR histórico < 45% (backtest 2531 mercados)
+7. **Orderbook imbalance** — si compradores dominan (+0.3), no apostar DOWN
+
+### Indicadores calculados (para análisis futuro)
+- **RSI(14)** sobre buffer de precios
+- **Orderbook imbalance** — ratio bid/ask quantity de Coinbase
+- **Spread ratio** — spread actual vs promedio
+- **Tick frequency** — ticks en últimos 10s (proxy de volumen)
+
+### Signal Logger v2 — campos guardados en signals.jsonl
+- `filled_price` — precio exacto de entrada
+- `zscore, movePct, imbalance, rsi, spreadRatio, tickFreq` — todos los indicadores
+- `consecutive_losses` — losses seguidos al momento de la señal
+- `btc_price_entry` — precio BTC al disparo
+- `poly_price_t0/t1/t2/t5` — precio Polymarket en T+0,1,2,5s (edge decay)
+- `btc_price_change_30s` — cambio de BTC 30s después (momentum)
+- `trade_duration_seconds` — duración del trade
+- `result / pnl` — resultado y ganancia/pérdida
+
+### Infraestructura
+- **Railway** — hosting, redeploy automático desde GitHub
+- **Railway Volume** — `/data` para persistencia de signals.jsonl entre reinicios
+- **Discord Webhooks** — alertas en cada señal con dirección, precio, edge, tiempo
+- **GitHub** — `brianivanherrera-spec/latency-bot`, rama `main`
+
+### Scripts disponibles
+- `node backtest.js` — descarga 30 días de mercados históricos y analiza
+- `node analyze_signals.js [archivo]` — analiza signals.jsonl del Volume
+
 ---
 
 ## Variables clave en Railway
 
 | Variable | Valor actual | Descripción |
 |----------|-------------|-------------|
-| DRY_RUN | true | Paper trading (cambiar a false para live) |
-| ORDER_SIZE_USDC | 1 | Monto por trade |
-| PAPER_CAPITAL | 4.68 | Capital inicial para simulación |
+| DRY_RUN | true | Paper trading (false para live) |
+| ORDER_SIZE_USDC | 3 | Monto por trade |
+| PAPER_CAPITAL | 25 | Capital inicial para simulación |
+| MAX_TOTAL_EXPOSURE_USDC | 100 | Máximo simultáneo |
 | DATA_DIR | /data | Directorio del Railway Volume |
 | DISCORD_WEBHOOK_URL | configurado | Alertas de trades |
-| ZSCORE_THRESHOLD | 1.5 | Umbral Z-score para señal |
+| ZSCORE_THRESHOLD | 1.5 | Umbral Z-score |
 | MOVE_PCT_THRESHOLD | 0.04 | Movimiento mínimo % |
 | MIN_EDGE_PCT | 0.8 | Edge mínimo vs precio Polymarket |
 | COOLDOWN_SECONDS | 360 | Segundos entre trades |
 | TRADING_HOURS_ENABLED | true | Filtro de horarios activo |
+| TRADING_HOURS_BLOCKED_UTC | 0,12,16,20,23 | Horas bloqueadas |
 | POLY_PRIVATE_KEY | configurado | Private key de la wallet |
 | POLY_FUNDER_ADDRESS | configurado | Deposit wallet address |
+
+---
+
+## Mejoras planificadas
+
+### 1. Signal Score Dinámico (ALTA PRIORIDAD — implementar post-análisis)
+En lugar de apostar siempre el mismo monto, calcular un score de confianza:
+
+```
+score = zscore_weight + imbalance_weight + rsi_weight + hour_weight + spread_weight
+
+Score 50-65% → $1
+Score 65-75% → $3
+Score 75-85% → $7
+Score 85%+   → $15
+```
+
+**Cuándo:** después de analizar signals.jsonl con 200+ trades y saber
+el peso real de cada indicador sobre el win rate.
+
+---
+
+### 2. Circuit Breaker (ALTA PRIORIDAD — implementar lunes)
+Si el bot pierde 3 trades seguidos, pausar 30 minutos automáticamente.
+
+```javascript
+// En index-final.js, antes de ejecutar:
+if (signalLogger.getConsecutiveLosses() >= 3) {
+  logger.warn('[CIRCUIT BREAKER] 3 losses seguidos — pausando 30min');
+  lastTradeTime = now + 30 * 60 * 1000;
+  return;
+}
+```
+
+Ya tenemos `getConsecutiveLosses()` en el signal logger. Es 5 líneas.
+
+---
+
+### 3. Size Dinámico por Hora (ALTA PRIORIDAD — implementar con datos)
+Una vez que `analyze_signals.js` confirme qué horas son buenas:
+
+```javascript
+const hourSizes = {
+  9: 8, 11: 8, 14: 5, 16: 5,   // horas buenas
+  // resto: ORDER_SIZE_USDC default
+};
+const exposure = hourSizes[argHour] || config.ORDER_SIZE_USDC;
+```
+
+---
+
+### 4. ETH Markets (MEDIA PRIORIDAD)
+Replicar la misma estrategia en mercados ETH Up/Down 5min.
+Mismo signal engine, segundo WebSocket ETH-USD, buscar `eth-updown-5m-*`.
+Duplica oportunidades sin agregar complejidad.
+**Cuándo:** cuando el bot de BTC esté en live generando ganancias.
+
+---
+
+### 5. VPS Nueva York (MEDIA PRIORIDAD)
+Mover el bot de Railway (us-west) a VPS en NY/NJ más cerca de Polymarket
+(AWS us-east-1). Latencia: ~400ms → ~150ms.
+Costo: ~$6/mes en Hetzner o Vultr.
+**Cuándo:** cuando el balance llegue a $100+ y los trades sean $10+.
+
+---
+
+### 6. Correlación BTC/ETH (BAJA PRIORIDAD)
+Cuando ETH se mueve fuerte y BTC no lo siguió todavía, BTC lo sigue
+en 30-60 segundos. Segundo WebSocket ETH-USD como señal anticipatoria.
+
+---
+
+### 7. Rolling Analytics (BAJA PRIORIDAD)
+Win rate de las últimas N señales (ventana deslizante). Si cae mucho
+vs el histórico, alertar degradación del edge.
 
 ---
 
@@ -193,27 +182,47 @@ rate rolling de últimas 20, 50, 100 señales y comparar tendencia.
 ```
 Coinbase WebSocket (BTC-USD tick data)
     ↓
-SignalEngine (zscore + momentum + macro trend + orderbook)
+SignalEngine
+  - Z-score sobre buffer 300 ticks
+  - Momentum (movePct, velocity)
+  - Tendencia macro (últimos 150 ticks)
+  - Orderbook imbalance (bid/ask qty)
+  - RSI(14), spread ratio, tick frequency
     ↓
-Filtros (warmup + timing + horario + imbalance)
+Filtros en cascada
+  1. Warmup 200 ticks
+  2. Filtro horario (UTC bloqueados)
+  3. Cooldown 6 minutos
+  4. Edge mínimo 0.8%
+  5. Timing mínimo 90s
+  6. Imbalance filter
     ↓
 PolymarketClient (CLOB V2, POLY_1271, deposit wallet)
     ↓
-Tracker + SignalLogger (/data/signals.jsonl)
+Signal Logger v2 (/data/signals.jsonl)
+  - Indicadores completos
+  - Edge decay Polymarket T+0/1/2/5s
+  - BTC snapshot 30s después
+  - Consecutive losses
     ↓
-Discord Alerts + Railway Logs
+Tracker + Discord Alerts + Railway Logs
 ```
 
 ---
 
 ## Historial de decisiones importantes
 
-- **Railway bloqueaba Binance** → cambiamos a Coinbase WebSocket
-- **POLY SDK roto para cuentas nuevas** → implementamos bypass con balance cache update
-- **Rachas malas de madrugada** → agregamos filtro de horarios basado en backtest
-- **Tracker inflado vs balance real** → agregamos consulta real al CLOB
-- **Reinicios de Railway perdían cooldown** → warmup de 200 ticks
-- **Filtro confirmación Polymarket eliminado** → contradecía la estrategia de latency arb
+| Fecha | Decisión | Por qué |
+|-------|----------|---------|
+| May 17 | Railway bloqueaba Binance → Coinbase WebSocket | Coinbase no bloqueado |
+| May 18 | POLY SDK roto para cuentas nuevas | Bypass con balance cache update (POLY_1271) |
+| May 18 | Rachas malas de madrugada | Warmup 200 ticks + timing 90s |
+| May 18 | Tracker inflado vs balance real | Consulta real al CLOB cada 5 min |
+| May 19 | Filtro confirmación Polymarket eliminado | Contradecía latency arb — el edge es que Poly está atrasado |
+| May 19 | Filtro horarios implementado | Backtest 2531 mercados reveló diferencias enormes |
+| May 20 | Railway Volume montado en /data | Persistencia de signals.jsonl entre reinicios |
+| May 20 | Signal Logger v2 | Edge decay, consecutive losses, BTC snapshot 30s |
+| May 20 | ORDER_SIZE_USDC hardcodeado en $5 | Fix: ahora lee la variable de Railway correctamente |
 
 ---
 *Última actualización: Mayo 2026*
