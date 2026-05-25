@@ -13,6 +13,49 @@ const { alertTradeSignal, alertBotStart } = require('./alerts');
 const signalLogger = require('./signal-logger');
 
 const logger = new Logger('MAIN');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+// ─── Servidor HTTP para descargar signals.jsonl desde el browser ──────────
+const PORT = process.env.PORT || 3000;
+const SECRET = process.env.DOWNLOAD_SECRET || 'latency2026';
+
+const httpServer = http.createServer((req, res) => {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+  
+  if (url.pathname === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', mode: process.env.DRY_RUN === 'true' ? 'paper' : 'live' }));
+    return;
+  }
+  
+  if (url.pathname === '/signals' && url.searchParams.get('key') === SECRET) {
+    const file = path.join(process.env.DATA_DIR || '/data', 'signals.jsonl');
+    if (!fs.existsSync(file)) {
+      res.writeHead(404); res.end('No signals file yet'); return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': 'attachment; filename=signals.jsonl',
+    });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
+  
+  if (url.pathname === '/stats' && url.searchParams.get('key') === SECRET) {
+    const stats = signalLogger.getStats();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(stats || { message: 'No stats yet' }, null, 2));
+    return;
+  }
+  
+  res.writeHead(401); res.end('Unauthorized');
+});
+
+httpServer.listen(PORT, () => {
+  logger.info(`🌐 HTTP server en puerto ${PORT} — /signals?key=${SECRET} para descargar`);
+});
 
 const tracker = new PnLTracker();
 const activePositions = new Map();
