@@ -210,8 +210,7 @@ async function main() {
     logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
     logger.info(`  Exposure: $${exposure} | Size: ${size} | Token: ${tokenId}`);
 
-    // ✅ Actualizar cooldown ANTES de ejecutar
-    lastTradeTime = now;
+    // posId para tracking
     const posId = `POS_${Date.now()}`;
     activePositions.set(posId, { exposure, openTime: now });
 
@@ -263,6 +262,7 @@ async function main() {
         }
 
         logger.info(`[LIVE] ✅ Orden llenada (matched): ${orderResult.orderId}`);
+        lastTradeTime = now; // cooldown solo si orden se llenó
 
       } catch (err) {
         logger.error(`[LIVE] ❌ Error: ${err.message}`);
