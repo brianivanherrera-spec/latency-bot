@@ -279,6 +279,7 @@ async function main() {
       price,
       size,
       endDate: cachedMarket.endDate,
+      posId,  // mismo posId que el signal logger — para poder hacer match al cerrar
     });
 
     setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);

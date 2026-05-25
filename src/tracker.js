@@ -3,6 +3,7 @@
  */
  
 const { Logger } = require('./logger');
+const signalLogger = require('./signal-logger');
 const logger = new Logger('TRACKER');
  
 const GAMMA_API = 'https://gamma-api.polymarket.com';
@@ -16,9 +17,9 @@ class PnLTracker {
     this.losses = 0;
   }
  
-  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate }) {
+  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId }) {
     const pos = {
-      id: `POS_${Date.now()}`,
+      id: posId || `POS_${Date.now()}`,
       marketId,
       gammaId,
       marketQuestion,
@@ -142,6 +143,8 @@ class PnLTracker {
     logger.info(`[${emoji}] Posicion cerrada: ${pos.id}`);
     logger.info(`   Resultado: ${winner} | PnL: ${pnl > 0 ? '+' : ''}$${pnl}`);
     logger.info(`   P&L Total acumulado: ${this.totalPnL > 0 ? '+' : ''}$${this.totalPnL.toFixed(2)} | W:${this.wins} L:${this.losses}`);
+    // Registrar resultado en signal logger
+    signalLogger.logSignalClose(pos.id, won ? 'WIN' : 'LOSS', pnl);
   }
  
   getSummary() {
