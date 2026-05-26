@@ -2,11 +2,13 @@
 
 ## Estado actual (Mayo 2026)
 - Bot corriendo en **PAPER TRADING** en Railway
-- Capital real disponible: $1.68 USDC en Polymarket (recargar el lunes)
-- Win rate última sesión: 68.4% (39W/18L, 57 trades, 20 horas continuas)
-- Signal logger v2 activo guardando en Railway Volume `/data/signals.jsonl`
-- Filtro de horarios activo basado en backtest de 2531 mercados históricos
-- Todos los filtros activos y estables sin reinicios en 20+ horas
+- Capital real: $0 (perdido en racha bajista de BTC — recargar cuando BTC estabilice)
+- Signal logger v2 activo — 537 señales acumuladas, 54 con resultado
+- Análisis real de 54 trades completado — filtros calibrados con datos propios
+- **Filtro RSI activo** — solo entra RSI <40 o >80 (basado en análisis real)
+- **Horarios bloqueados UTC** — 0,1,2,9,17 (basado en análisis real)
+- **ZSCORE_THRESHOLD=1.5** — calibrado con datos reales
+- WR simulado con ambos filtros: **76.7%** vs 53.7% sin filtros
 
 ---
 
@@ -49,7 +51,8 @@
 3. **Warmup 200 ticks** — espera ~3 min tras reinicio
 4. **Timing mínimo 90s** — no entrar si quedan menos de 90s al cierre
 5. **Tendencia macro** — no apostar DOWN si BTC lleva 2.5 min subiendo (y viceversa)
-6. **Filtro de horarios** — bloquea horas con WR histórico < 45% (backtest 2531 mercados)
+6. **Filtro de horarios** — bloquea UTC 0,1,2,9,17 (calibrado con datos reales de 54 trades)
+7. **Filtro RSI** — solo entra RSI <40 o >80 (datos reales: RSI 40-80 = 17-38% WR)
 7. **Orderbook imbalance** — si compradores dominan (+0.3), no apostar DOWN
 
 ### Indicadores calculados (para análisis futuro)
@@ -221,6 +224,11 @@ Tracker + Discord Alerts + Railway Logs
 | May 19 | Filtro confirmación Polymarket eliminado | Contradecía latency arb — el edge es que Poly está atrasado |
 | May 19 | Filtro horarios implementado | Backtest 2531 mercados reveló diferencias enormes |
 | May 20 | Railway Volume montado en /data | Persistencia de signals.jsonl entre reinicios |
+| May 25 | HTTP server para descargar signals.jsonl | Sin Shell en Railway plan actual |
+| May 25 | Signal logger v2 — edge decay, consecutive losses | Datos para calibrar signal score |
+| May 26 | Análisis de 54 trades reales del volumen | Filtros RSI + horas calibrados con datos propios |
+| May 26 | Filtro RSI (no entrar RSI 40-80) | 53.7% → 76.7% WR simulado |
+| May 26 | ZSCORE_THRESHOLD 1.2 → 1.5 | Z<1.5 tenía 18% WR en datos reales |
 | May 20 | Signal Logger v2 | Edge decay, consecutive losses, BTC snapshot 30s |
 | May 20 | ORDER_SIZE_USDC hardcodeado en $5 | Fix: ahora lee la variable de Railway correctamente |
 
