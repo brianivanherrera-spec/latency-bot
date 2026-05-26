@@ -170,6 +170,11 @@ class SignalEngine {
     if (direction === 'DOWN' && imbalance > 0.3) return null;  // compradores dominan
     if (direction === 'UP'   && imbalance < -0.3) return null; // vendedores dominan
 
+    // ─── Filtro RSI (basado en análisis de 54 trades reales) ─────────────
+    // RSI 40-80: 17-38% WR → peor que el azar, no entrar
+    // RSI <40 o >80: 61-90% WR → señales confiables
+    if (rsi >= 40 && rsi <= 80) return null;
+
     const spreadRatio = this._spreadSignal(20);
     const tickFreq = this._tickFrequency();
     const rsi = this._rsi(14);
