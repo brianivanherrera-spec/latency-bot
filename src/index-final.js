@@ -155,12 +155,13 @@ async function main() {
     if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
     if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > 15) return;
 
-    if (activePositions.size >= 10) return;
+    if (activePositions.size >= 1) return; // máximo 1 posición simultánea
 
     const exposure = config.ORDER_SIZE_USDC;
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);
-    if (totalExposure + exposure > config.MAX_TOTAL_EXPOSURE_USDC) return;
+    const maxExposure = Math.min(config.MAX_TOTAL_EXPOSURE_USDC, config.ORDER_SIZE_USDC * 2);
+    if (totalExposure + exposure > maxExposure) return;
 
     if (!cachedMarket?.gammaId) {
       logger.warn('[SKIP] No hay mercado disponible');
@@ -210,7 +211,8 @@ async function main() {
     logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
     logger.info(`  Exposure: $${exposure} | Size: ${size} | Token: ${tokenId}`);
 
-    // posId para tracking
+    // Cooldown siempre activo — sin excepción
+    lastTradeTime = now;
     const posId = `POS_${Date.now()}`;
     activePositions.set(posId, { exposure, openTime: now });
 
@@ -262,7 +264,6 @@ async function main() {
         }
 
         logger.info(`[LIVE] ✅ Orden llenada (matched): ${orderResult.orderId}`);
-        lastTradeTime = now; // cooldown solo si orden se llenó
 
       } catch (err) {
         logger.error(`[LIVE] ❌ Error: ${err.message}`);
