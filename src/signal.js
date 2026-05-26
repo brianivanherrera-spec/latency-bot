@@ -163,21 +163,18 @@ class SignalEngine {
     }
 
     // ─── Filtro orderbook imbalance ───────────────────────────────────
-    // Si el orderbook dice lo contrario a nuestra señal, es ruido
-    // DOWN pero imbalance positivo (más bids que asks) → no entrar
-    // UP pero imbalance negativo (más asks que bids) → no entrar
     const imbalance = this._avgImbalance(20);
-    if (direction === 'DOWN' && imbalance > 0.3) return null;  // compradores dominan
-    if (direction === 'UP'   && imbalance < -0.3) return null; // vendedores dominan
+    if (direction === 'DOWN' && imbalance > 0.3) return null;
+    if (direction === 'UP'   && imbalance < -0.3) return null;
+
+    const spreadRatio = this._spreadSignal(20);
+    const tickFreq = this._tickFrequency();
+    const rsi = this._rsi(14);
 
     // ─── Filtro RSI (basado en análisis de 54 trades reales) ─────────────
     // RSI 40-80: 17-38% WR → peor que el azar, no entrar
     // RSI <40 o >80: 61-90% WR → señales confiables
     if (rsi >= 40 && rsi <= 80) return null;
-
-    const spreadRatio = this._spreadSignal(20);
-    const tickFreq = this._tickFrequency();
-    const rsi = this._rsi(14);
 
     if (direction === 'NEUTRAL') {
       this._totalSignals++;
