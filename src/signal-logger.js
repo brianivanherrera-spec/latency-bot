@@ -26,6 +26,7 @@ function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, bt
 
   const record = {
     posId,
+    mode:             process.env.DRY_RUN === 'true' ? 'paper' : 'live',
     timestamp:        new Date().toISOString(),
     utcHour,
     argHour:          (utcHour - 3 + 24) % 24,
