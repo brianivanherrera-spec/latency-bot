@@ -255,10 +255,9 @@ async function main() {
           return;
         }
 
-        // Verificar si la orden se llenó (matched) o quedó pendiente (live)
-        if (orderResult.status === 'live') {
-          logger.warn(`[LIVE] ⚠️ Orden en libro, no llenada aún: ${orderResult.orderId}`);
-          logger.warn(`[LIVE] No registramos posición hasta confirmar llenado`);
+        // Verificar si la orden se llenó — con FOK: matched=ok, cancelled=no fill
+        if (orderResult.status === 'live' || orderResult.status === 'cancelled') {
+          logger.warn(`[LIVE] ⚠️ Orden no llenada (${orderResult.status}) — sin liquidez en este momento`);
           activePositions.delete(posId);
           return;
         }

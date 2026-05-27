@@ -161,7 +161,7 @@ class PolymarketClient {
       const result = await this.clobClient.createAndPostOrder({
         tokenID: tokenId, price, size,
         side: side === 'BUY' ? Side.BUY : Side.SELL,
-        orderType: OrderType.GTC,
+        orderType: OrderType.FOK, // Fill Or Kill — se llena al instante o se cancela
       });
 
       logger.info(`[LIVE] response: ${JSON.stringify(result)}`);
