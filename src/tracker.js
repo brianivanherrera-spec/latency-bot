@@ -69,7 +69,19 @@ class PnLTracker {
       // Log completo para diagnostico
       logger.info(`Market raw fields: resolved=${market.resolved} closed=${market.closed} active=${market.active} winner=${market.winner} resolutionPrice=${market.resolutionPrice} outcomePrices=${market.outcomePrices} winnerIndex=${market.winnerIndex}`);
 
-      // La Gamma API puede indicar resolucion de varias formas
+      // PRIORITARIO: outcomePrices — Polymarket los actualiza antes que closed/resolved
+      // ["1","0"] = YES ganó | ["0","1"] = NO ganó
+      if (market.outcomePrices) {
+        try {
+          const prices = typeof market.outcomePrices === 'string'
+            ? JSON.parse(market.outcomePrices)
+            : market.outcomePrices;
+          if (parseFloat(prices[0]) >= 0.99) return 'YES';
+          if (parseFloat(prices[1]) >= 0.99) return 'NO';
+        } catch (_) {}
+      }
+
+      // Fallback: campos estándar de resolución
       const isResolved = market.resolved === true || market.closed === true || market.active === false;
       if (!isResolved) return null;
 
@@ -83,19 +95,7 @@ class PnLTracker {
         return parseFloat(market.resolutionPrice) === 1 ? 'YES' : 'NO';
       }
 
-      // Forma 3: outcomePrices es un array JSON stringificado
-      // Ej: '["1","0"]' => YES gano; '["0","1"]' => NO gano
-      if (market.outcomePrices) {
-        try {
-          const prices = typeof market.outcomePrices === 'string'
-            ? JSON.parse(market.outcomePrices)
-            : market.outcomePrices;
-          if (parseFloat(prices[0]) === 1) return 'YES';
-          if (parseFloat(prices[1]) === 1) return 'NO';
-        } catch (_) {}
-      }
-
-      // Forma 4: winnerIndex (0 = YES, 1 = NO)
+      // winnerIndex (0 = YES, 1 = NO)
       if (market.winnerIndex !== undefined && market.winnerIndex !== null) {
         return market.winnerIndex === 0 ? 'YES' : 'NO';
       }
