@@ -163,9 +163,9 @@ class SignalEngine {
     }
 
     // ─── Filtro orderbook imbalance ───────────────────────────────────
+    // Datos reales: imbalance >0.3 (buyers dominan fuerte) = 42% WR — bloquear
     const imbalance = this._avgImbalance(20);
-    if (direction === 'DOWN' && imbalance > 0.3) return null;
-    if (direction === 'UP'   && imbalance < -0.3) return null;
+    if (Math.abs(imbalance) > config.IMBALANCE_MAX) return null;
 
     const spreadRatio = this._spreadSignal(20);
     const tickFreq = this._tickFrequency();

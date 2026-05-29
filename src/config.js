@@ -84,6 +84,23 @@ module.exports = {
   MAX_REALISTIC_EDGE: parseFloat(process.env.MAX_REALISTIC_EDGE || '15'),
 
   // =============================================
+  // FILTROS DE HORARIO
+  // =============================================
+  TRADING_HOURS_ENABLED: process.env.TRADING_HOURS_ENABLED !== 'false',
+
+  // Horas UTC bloqueadas — calibradas con datos reales de signals.jsonl
+  // Horas doradas: 3,4,5,8,12,13,14 | Malas: todo lo demás listado abajo
+  TRADING_HOURS_BLOCKED_UTC: (process.env.TRADING_HOURS_BLOCKED_UTC || '0,1,2,9,11,16,17,18,19,20,23')
+    .split(',').map(Number),
+
+  // =============================================
+  // FILTROS DE SEÑAL ADICIONALES
+  // =============================================
+
+  // Imbalance máximo permitido — datos reales: imb>0.3 tiene 42% WR
+  IMBALANCE_MAX: parseFloat(process.env.IMBALANCE_MAX || '0.3'),
+
+  // =============================================
   // LOGGING
   // =============================================
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
