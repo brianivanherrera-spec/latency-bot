@@ -149,6 +149,22 @@ async function main() {
 
     if (now - lastTradeTime < COOLDOWN) return;
 
+    // ─── Circuit Breaker ──────────────────────────────────────────────────
+    // 3 losses consecutivos → pausa 30 minutos para evitar rachas malas
+    const CIRCUIT_BREAKER_LOSSES = parseInt(process.env.CIRCUIT_BREAKER_LOSSES || '3');
+    const CIRCUIT_BREAKER_PAUSE_MS = parseInt(process.env.CIRCUIT_BREAKER_PAUSE_MIN || '30') * 60 * 1000;
+    const consecLosses = signalLogger.getConsecutiveLosses();
+    if (consecLosses >= CIRCUIT_BREAKER_LOSSES) {
+      if (!global._lastCircuitBreakTime) global._lastCircuitBreakTime = now;
+      const pauseRemaining = Math.max(0, CIRCUIT_BREAKER_PAUSE_MS - (now - global._lastCircuitBreakTime));
+      if (pauseRemaining > 0) {
+        logger.warn(`[CIRCUIT BREAKER] ${consecLosses} losses seguidos — pausa ${Math.ceil(pauseRemaining/60000)}min restantes`);
+        return;
+      }
+    } else {
+      global._lastCircuitBreakTime = null;
+    }
+
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
 
@@ -184,7 +200,7 @@ async function main() {
     }
 
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
-    logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)}`);
+    logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)} Score:${sig.signalScore}`);
 
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;

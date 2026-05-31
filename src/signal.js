@@ -171,17 +171,24 @@ class SignalEngine {
     const tickFreq = this._tickFrequency();
     const rsi = this._rsi(14);
 
-    // ─── Filtro RSI (basado en análisis de 54 trades reales) ─────────────
-    // RSI 40-80: 17-38% WR → peor que el azar, no entrar
-    // RSI <40 o >80: 61-90% WR → señales confiables
+    // ─── Filtro RSI (125 trades reales) ──────────────────────────────────
+    // RSI 40-80: 17-43% WR → no entrar
+    // RSI <40 o >80: 52-83% WR → señales confiables
     if (rsi >= 40 && rsi <= 80) return null;
 
     if (direction === 'NEUTRAL') {
       this._totalSignals++;
       return { direction, zScore, movePct, velocity, buyRatio, currentPrice, mean, stdDev,
                confidence: 0, timestamp: currentTimestamp, edge: null, bufferSize: this.prices.length,
-               imbalance, spreadRatio, tickFreq, rsi };
+               imbalance, spreadRatio, tickFreq, rsi, signalScore: 0 };
     }
+
+    // ─── Signal Score (calibrado con 125 trades reales) ───────────────────
+    // Gate mínimo: score >= 55 → 77.1% WR sobre 48 trades
+    // Sin hora en el score (las horas las maneja TRADING_HOURS_BLOCKED_UTC)
+    const signalScore = this._calcSignalScore(rsi, absZ, imbalance, direction);
+    const MIN_SCORE = config.MIN_SIGNAL_SCORE || 55;
+    if (signalScore < MIN_SCORE) return null;
 
     const edge = this._calcEdge(direction, movePct, absZ);
 
@@ -205,6 +212,7 @@ class SignalEngine {
       spreadRatio,    // spread actual vs promedio (>1 = más volátil)
       tickFreq,       // ticks en últimos 10s (volumen proxy)
       rsi,            // RSI sobre buffer de precios
+      signalScore,    // score de calidad 0-100
     };
   }
 
@@ -284,6 +292,41 @@ _calcEdge(direction, movePct, absZ) {
       polyYes: this.polyYesPrice,
       polyAge: this.polyUpdatedAt ? Math.round((Date.now() - this.polyUpdatedAt) / 1000) + 's' : 'never',
     };
+  }
+
+  // ─── Signal Score — calibrado con 125 trades reales ──────────────────────
+  // RSI 20-30 DOWN: 83% WR (+22) | Z 3-4: 69% WR (+14) | imb>0.3: 42% WR (-18)
+  // DOWN sistemáticamente mejor que UP (+8 DOWN, -5 UP)
+  _calcSignalScore(rsi, absZ, imbalance, direction) {
+    let score = 50;
+
+    // RSI contribution
+    if      (rsi < 20)  score += 12;
+    else if (rsi < 30)  score += 22;  // sweet spot DOWN: 83% WR
+    else if (rsi < 40)  score += 6;
+    else if (rsi < 60)  score -= 12;
+    else if (rsi < 80)  score -= 25;  // peor bucket: 17% WR
+    else if (rsi < 90)  score += 6;
+    else                score += 3;   // 90-100: 52% WR, moderado
+
+    // Z-score contribution
+    if      (absZ < 1.5) score -= 20;
+    else if (absZ < 2)   score += 4;
+    else if (absZ < 2.5) score += 12; // 66% WR
+    else if (absZ < 3)   score += 7;
+    else if (absZ < 4)   score += 14; // 69% WR — mejor bucket
+    else                 score += 5;
+
+    // Imbalance contribution
+    if      (imbalance > 0.3)                         score -= 18; // 42% WR
+    else if (imbalance < 0 && direction === 'DOWN')   score += 8;
+    else if (imbalance > 0 && direction === 'UP')     score += 5;
+
+    // Dirección — DOWN 62% WR vs UP 49% WR
+    if (direction === 'DOWN') score += 8;
+    else                      score -= 5;
+
+    return Math.min(Math.max(score, 0), 100);
   }
 }
 
