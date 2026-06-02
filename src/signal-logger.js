@@ -41,6 +41,7 @@ function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, bt
     spreadRatio:      parseFloat(sig?.spreadRatio?.toFixed(3) || 1),
     tickFreq:         sig?.tickFreq || 0,
     rsi:              parseFloat(sig?.rsi?.toFixed(1) || 50),
+    signalScore:      sig?.signalScore || null,
     bufferSize:       sig?.bufferSize || 0,
     // Estado del bot al momento de la señal
     consecutive_losses: consecutiveLosses,

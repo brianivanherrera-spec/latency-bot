@@ -90,7 +90,8 @@ module.exports = {
 
   // Horas UTC bloqueadas — calibradas con datos reales de signals.jsonl
   // Horas doradas: 3,4,5,8,12,13,14 | Malas: todo lo demás listado abajo
-  TRADING_HOURS_BLOCKED_UTC: (process.env.TRADING_HOURS_BLOCKED_UTC || '0,1,2,6,7,9,10,11,16,17,18,19,20,22,23')
+  // UTC 06 (62% WR) y UTC 07 (70% WR) desbloqueados con 187 trades reales
+  TRADING_HOURS_BLOCKED_UTC: (process.env.TRADING_HOURS_BLOCKED_UTC || '0,1,2,9,10,11,16,17,18,19,20,22,23')
     .split(',').map(Number),
 
   // =============================================
