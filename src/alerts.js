@@ -11,16 +11,19 @@ const WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
 
 async function sendDiscordAlert(payload) {
   if (!WEBHOOK_URL) return;
-  try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) logger.warn(`Discord webhook error: ${res.status}`);
-  } catch (e) {
-    logger.warn(`Discord send failed: ${e.message}`);
-  }
+  // Ejecutar en el próximo tick — no bloquea el loop principal
+  setImmediate(async () => {
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) logger.warn(`Discord webhook error: ${res.status}`);
+    } catch (e) {
+      logger.warn(`Discord send failed: ${e.message}`);
+    }
+  });
 }
 
 /**

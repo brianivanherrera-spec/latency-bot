@@ -207,6 +207,7 @@ async function main() {
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
     const size = Math.floor(exposure / price);
 
+    // Fire-and-forget — no bloquea la ejecución de la orden
     alertTradeSignal({
       direction: sig.direction,
       price,
@@ -217,7 +218,7 @@ async function main() {
       market: cachedMarket,
       size,
       exposure,
-    });
+    }).catch(e => logger.warn(`Discord alert failed: ${e.message}`));
 
     if (size < 1) {
       logger.warn(`[SKIP] Size ${size} < mínimo 1 token (ORDER_SIZE_USDC muy bajo o precio muy alto)`);
