@@ -101,6 +101,9 @@ module.exports = {
   // Imbalance máximo permitido — datos reales: imb>0.3 tiene 42% WR
   IMBALANCE_MAX: parseFloat(process.env.IMBALANCE_MAX || '0.3'),
 
+  // GTC timeout — segundos que espera fill antes de cancelar la orden
+  GTC_TIMEOUT_SECONDS: parseInt(process.env.GTC_TIMEOUT_SECONDS || '60'),
+
   // Signal Score mínimo para ejecutar — calibrado con 125 trades reales
   // Score>=55: 77.1% WR (48 trades) | Score>=60: 75.6% WR (45 trades)
   MIN_SIGNAL_SCORE: parseInt(process.env.MIN_SIGNAL_SCORE || '55'),

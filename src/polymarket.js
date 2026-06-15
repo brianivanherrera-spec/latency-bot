@@ -158,10 +158,13 @@ class PolymarketClient {
 
     try {
       await this._init();
+      // GTC con timeout — pone orden límite en el book y espera hasta GTC_TIMEOUT_SECONDS
+      const GTC_TIMEOUT_MS = (config.GTC_TIMEOUT_SECONDS || 60) * 1000;
+
       const result = await this.clobClient.createAndPostOrder({
         tokenID: tokenId, price, size,
         side: side === 'BUY' ? Side.BUY : Side.SELL,
-        orderType: OrderType.FOK, // Fill Or Kill — se llena al instante o se cancela
+        orderType: OrderType.GTC, // Good Till Cancelled — espera fill en el book
       });
 
       logger.info(`[LIVE] response: ${JSON.stringify(result)}`);
@@ -175,10 +178,54 @@ class PolymarketClient {
       }
 
       const orderId = result?.orderID || result?.orderId || result?.id;
-      const orderStatus = result?.status || 'unknown'; // 'matched' o 'live'
+      let orderStatus = result?.status || 'unknown';
       rec.status = 'PLACED'; rec.orderId = orderId;
       this._orderHistory.push(rec);
-      logger.info(`[LIVE] ✅ Order ID: ${orderId} | status: ${orderStatus}`);
+      logger.info(`[LIVE] ✅ GTC Order ID: ${orderId} | status inicial: ${orderStatus}`);
+
+      // Si ya llenó al instante → retornar inmediatamente
+      if (orderStatus === 'matched') {
+        return { success: true, orderId, status: 'matched' };
+      }
+
+      // Orden en el book ('live') → polling hasta fill o timeout
+      if (orderStatus === 'live') {
+        logger.info(`[LIVE] 📋 Orden en book — esperando fill (timeout: ${GTC_TIMEOUT_MS/1000}s)`);
+        const deadline = Date.now() + GTC_TIMEOUT_MS;
+        const POLL_INTERVAL_MS = 5000;
+
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+          try {
+            const orderData = await this.clobClient.getOrder(orderId);
+            orderStatus = orderData?.status || orderStatus;
+            const sizeFilled = orderData?.size_matched || orderData?.sizeFilled || 0;
+            logger.info(`[LIVE] 🔄 Poll: status=${orderStatus} filled=${sizeFilled}/${size}`);
+
+            if (orderStatus === 'matched') {
+              logger.info(`[LIVE] ✅ Orden llenada (GTC poll)`);
+              return { success: true, orderId, status: 'matched' };
+            }
+            if (orderStatus === 'cancelled' || orderStatus === 'canceled') {
+              logger.warn(`[LIVE] ⚠️ Orden cancelada durante poll`);
+              return { success: false, error: 'cancelled', orderId };
+            }
+          } catch (pollErr) {
+            logger.warn(`[LIVE] Poll error: ${pollErr.message}`);
+          }
+        }
+
+        // Timeout — cancelar la orden para no quedar expuesto
+        logger.warn(`[LIVE] ⏱️ Timeout GTC (${GTC_TIMEOUT_MS/1000}s) — cancelando orden ${orderId}`);
+        try {
+          await this.clobClient.cancelOrder({ orderId });
+          logger.info(`[LIVE] 🚫 Orden GTC cancelada por timeout`);
+        } catch (cancelErr) {
+          logger.error(`[LIVE] Error cancelando orden: ${cancelErr.message}`);
+        }
+        return { success: false, error: 'gtc_timeout', orderId };
+      }
+
       return { success: true, orderId, status: orderStatus };
 
     } catch (err) {

@@ -272,14 +272,15 @@ async function main() {
           return;
         }
 
-        // Verificar si la orden se llenó — con FOK: matched=ok, cancelled=no fill
-        if (orderResult.status === 'live' || orderResult.status === 'cancelled') {
-          logger.warn(`[LIVE] ⚠️ Orden no llenada (${orderResult.status}) — sin liquidez en este momento`);
+        // Verificar resultado GTC — matched=ok, gtc_timeout/cancelled=no fill
+        if (!orderResult.success || orderResult.error === 'gtc_timeout' || orderResult.error === 'cancelled') {
+          const reason = orderResult.error === 'gtc_timeout' ? 'timeout 60s sin fill' : 'cancelada/sin liquidez';
+          logger.warn(`[LIVE] ⚠️ Orden no llenada (${reason})`);
           activePositions.delete(posId);
           return;
         }
 
-        logger.info(`[LIVE] ✅ Orden llenada (matched): ${orderResult.orderId}`);
+        logger.info(`[LIVE] ✅ Orden llenada (GTC matched): ${orderResult.orderId}`);
 
       } catch (err) {
         logger.error(`[LIVE] ❌ Error: ${err.message}`);
