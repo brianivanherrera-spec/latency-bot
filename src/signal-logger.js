@@ -36,6 +36,7 @@ function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, bt
     market:           market?.question?.slice(-30) || '',
     // Indicadores de señal
     zscore:           parseFloat(sig?.zScore?.toFixed(3) || 0),
+    mode:             process.env.DRY_RUN === 'true' ? 'paper' : 'live',
     movePct:          parseFloat(sig?.movePct?.toFixed(4) || 0),
     imbalance:        parseFloat(sig?.imbalance?.toFixed(3) || 0),
     spreadRatio:      parseFloat(sig?.spreadRatio?.toFixed(3) || 1),

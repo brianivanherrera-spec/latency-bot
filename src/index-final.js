@@ -207,6 +207,12 @@ async function main() {
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
     const size = Math.floor(exposure / price);
 
+    // Fix 1: size check ANTES del Discord alert — no alertar órdenes que no van a ejecutarse
+    if (size < 5) {
+      logger.warn(`[SKIP] Size ${size} < mínimo 5 tokens de Polymarket (ORDER_SIZE_USDC=$${exposure} muy bajo)`);
+      return;
+    }
+
     // Fire-and-forget — no bloquea la ejecución de la orden
     alertTradeSignal({
       direction: sig.direction,
@@ -219,11 +225,6 @@ async function main() {
       size,
       exposure,
     }).catch(e => logger.warn(`Discord alert failed: ${e.message}`));
-
-    if (size < 1) {
-      logger.warn(`[SKIP] Size ${size} < mínimo 1 token (ORDER_SIZE_USDC muy bajo o precio muy alto)`);
-      return;
-    }
 
     logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
     logger.info(`  Exposure: $${exposure} | Size: ${size} | Token: ${tokenId}`);
@@ -266,41 +267,68 @@ async function main() {
           marketQuestion: cachedMarket.question,
         });
 
+        // Fix 2: GTC — verificar fill antes de abrir posición en tracker
         if (!orderResult.success) {
-          logger.error(`[LIVE] ❌ Orden fallida: ${orderResult.error}`);
+          const reason = orderResult.error === 'gtc_timeout'
+            ? `timeout ${config.GTC_TIMEOUT_SECONDS || 60}s sin fill`
+            : (orderResult.error || 'sin liquidez');
+          logger.warn(`[LIVE] ⚠️ Orden no llenada — ${reason}`);
+          // Marcar señal como NO ejecutada en signal logger
+          signalLogger.logSignalClose(posId, 'NO_FILL', 0);
           activePositions.delete(posId);
           return;
         }
 
-        // Verificar resultado GTC — matched=ok, gtc_timeout/cancelled=no fill
-        if (!orderResult.success || orderResult.error === 'gtc_timeout' || orderResult.error === 'cancelled') {
-          const reason = orderResult.error === 'gtc_timeout' ? 'timeout 60s sin fill' : 'cancelada/sin liquidez';
-          logger.warn(`[LIVE] ⚠️ Orden no llenada (${reason})`);
-          activePositions.delete(posId);
-          return;
-        }
+        logger.info(`[LIVE] ✅ Orden llenada (GTC): ${orderResult.orderId}`);
 
-        logger.info(`[LIVE] ✅ Orden llenada (GTC matched): ${orderResult.orderId}`);
+        // Fix 2: tracker solo se abre DESPUÉS de fill confirmado
+        tracker.openPosition({
+          marketId: cachedMarket.conditionId,
+          gammaId: cachedMarket.gammaId,
+          marketQuestion: cachedMarket.question,
+          side,
+          price,
+          size,
+          endDate: cachedMarket.endDate,
+          posId,
+          mode: 'live',  // Fix 4: marcar como live
+        });
+
+        setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
 
       } catch (err) {
         logger.error(`[LIVE] ❌ Error: ${err.message}`);
+        signalLogger.logSignalClose(posId, 'NO_FILL', 0);
         activePositions.delete(posId);
         return;
       }
+
+    } else {
+      // PAPER: simular fill rate realista (GTC no siempre llena)
+      const paperFillRate = parseFloat(process.env.PAPER_FILL_RATE || '0.75');
+      const filled = Math.random() < paperFillRate;
+
+      if (!filled) {
+        logger.warn(`[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);
+        signalLogger.logSignalClose(posId, 'NO_FILL', 0);
+        activePositions.delete(posId);
+        return;
+      }
+
+      tracker.openPosition({
+        marketId: cachedMarket.conditionId,
+        gammaId: cachedMarket.gammaId,
+        marketQuestion: cachedMarket.question,
+        side,
+        price,
+        size,
+        endDate: cachedMarket.endDate,
+        posId,
+        mode: 'paper',
+      });
+
+      setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
     }
-
-    tracker.openPosition({
-      marketId: cachedMarket.conditionId,
-      gammaId: cachedMarket.gammaId,
-      marketQuestion: cachedMarket.question,
-      side,
-      price,
-      size,
-      endDate: cachedMarket.endDate,
-      posId,  // mismo posId que el signal logger — para poder hacer match al cerrar
-    });
-
-    setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
   });
 
   ws.onError((err) => logger.error(`WS error: ${err.message}`));

@@ -101,6 +101,9 @@ module.exports = {
   // Imbalance máximo permitido — datos reales: imb>0.3 tiene 42% WR
   IMBALANCE_MAX: parseFloat(process.env.IMBALANCE_MAX || '0.3'),
 
+  // Fill rate simulado en paper — 0.75 = 75% de órdenes se llenan (refleja GTC real)
+  PAPER_FILL_RATE: parseFloat(process.env.PAPER_FILL_RATE || '0.75'),
+
   // GTC timeout — segundos que espera fill antes de cancelar la orden
   GTC_TIMEOUT_SECONDS: parseInt(process.env.GTC_TIMEOUT_SECONDS || '60'),
 
