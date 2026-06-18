@@ -184,6 +184,12 @@ class PolymarketWS {
         logger.info(`[POLY-WS] Último trade indica resolución: $${price}`);
         if (this._resolvedCallback) this._resolvedCallback(price >= 0.99 ? 'YES' : 'NO');
       }
+      return;
+    }
+
+    // Log cualquier otro tipo para ver el formato real que manda Polymarket
+    if (type && type !== 'heartbeat') {
+      logger.info(`[POLY-WS] RAW tipo=${type}: ${JSON.stringify(msg).slice(0, 150)}`);
     }
   }
 
