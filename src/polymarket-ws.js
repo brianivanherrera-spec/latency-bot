@@ -119,59 +119,66 @@ class PolymarketWS {
 
   _sendSubscribe(tokenIds) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
+    // Polymarket CLOB v2 WebSocket subscribe format
+    // Canal "market" con markets array
     this.ws.send(JSON.stringify({
+      auth: {},
+      markets: tokenIds,
       type: 'subscribe',
-      channel: 'price_change',
-      assets_ids: tokenIds,
     }));
   }
 
   _sendUnsubscribe(tokenIds) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
     this.ws.send(JSON.stringify({
+      auth: {},
+      markets: tokenIds,
       type: 'unsubscribe',
-      channel: 'price_change',
-      assets_ids: tokenIds,
     }));
   }
 
   _handleMessage(msg) {
-    // Ignorar mensajes de control
-    if (!msg || msg.event_type === 'heartbeat') return;
+    if (!msg) return;
+    const type = msg.event_type || msg.type || '';
+    if (type === 'heartbeat' || type === 'subscribed') return;
 
-    const type = msg.event_type || msg.type;
+    const tokens = [...this._subscribedTokens];
+    if (tokens.length < 2) return;
+    const [yesTokenId, noTokenId] = tokens;
 
-    if (type === 'price_change') {
-      const changes = msg.asset_ids_price_changes || [];
-      let yesPrice = null;
-      let noPrice = null;
+    // Formato book: { event_type: "book", asset_id: tokenId, bids: [], asks: [] }
+    if (type === 'book' || type === 'price_change') {
+      const tokenId = msg.asset_id || msg.market;
+      // Mejor precio disponible: mejor ask para comprar
+      const bestAsk = msg.asks?.[0]?.price || msg.price;
+      if (!bestAsk || !tokenId) return;
+      const price = parseFloat(bestAsk);
+      if (isNaN(price) || price <= 0) return;
 
-      for (const change of changes) {
-        const tokenId = change.asset_id;
-        const price = parseFloat(change.price);
-        if (isNaN(price)) continue;
+      let yesPrice = null, noPrice = null;
+      if (tokenId === yesTokenId) yesPrice = price;
+      if (tokenId === noTokenId) noPrice = price;
 
-        // Determinar si es YES o NO por posición en el par suscrito
-        // YES es el primer token, NO el segundo
-        const tokens = [...this._subscribedTokens];
-        if (tokens[0] === tokenId) yesPrice = price;
-        if (tokens[1] === tokenId) noPrice = price;
-      }
+      // Completar el par con el complemento si solo tenemos uno
+      if (yesPrice !== null && noPrice === null) noPrice = parseFloat((1 - yesPrice).toFixed(3));
+      if (noPrice !== null && yesPrice === null) yesPrice = parseFloat((1 - noPrice).toFixed(3));
 
       if (yesPrice !== null && noPrice !== null && this._priceCallback) {
-        // Detectar mercado resuelto
         if (yesPrice >= 0.99 || noPrice >= 0.99) {
           const winner = yesPrice >= 0.99 ? 'YES' : 'NO';
           logger.info(`[POLY-WS] Mercado resuelto: ${winner}`);
           if (this._resolvedCallback) this._resolvedCallback(winner);
           return;
         }
-        this._priceCallback(yesPrice, noPrice);
+        if (yesPrice >= 0.05 && yesPrice <= 0.95) {
+          logger.info(`[POLY-WS] 💰 YES=${yesPrice.toFixed(3)} NO=${noPrice.toFixed(3)}`);
+          this._priceCallback(yesPrice, noPrice);
+        }
       }
     }
 
+    // last_trade_price: { event_type: "last_trade_price", price: "0.99", ... }
     if (type === 'last_trade_price') {
-      // Precio del último trade — datos adicionales de liquidez
       const price = parseFloat(msg.price);
       if (!isNaN(price) && price >= 0.99) {
         logger.info(`[POLY-WS] Último trade indica resolución: $${price}`);
