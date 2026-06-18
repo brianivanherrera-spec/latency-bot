@@ -4,6 +4,7 @@
  */
 
 const { BinanceWS } = require('./binance');
+const { PolymarketWS } = require('./polymarket-ws');
 const { SignalEngine } = require('./signal');
 const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
@@ -75,6 +76,7 @@ async function main() {
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
   const ws = new BinanceWS();
+  const polyWs = new PolymarketWS(); // Fix B: WebSocket en tiempo real
 
   let cachedMarket = null;
   let nextMarketCache = null;   // FIX A: mercado pre-fetcheado
@@ -120,6 +122,9 @@ async function main() {
           logger.info(`[POLY] ✅ Mercado pre-cacheado activado: ${cachedMarket.question}`);
           logger.info(`[POLY] yesToken: ${cachedMarket.yesTokenId}`);
           logger.info(`[POLY] noToken: ${cachedMarket.noTokenId}`);
+          // Fix B: suscribir al nuevo mercado via WS
+          polyWs.unsubscribeAll();
+          polyWs.subscribe(cachedMarket.yesTokenId, cachedMarket.noTokenId);
         }
       }
       // Si no hay pre-cache, buscar normalmente
@@ -130,6 +135,9 @@ async function main() {
           logger.info(`[POLY] Mercado: ${m.question}`);
           logger.info(`[POLY] yesToken: ${m.yesTokenId}`);
           logger.info(`[POLY] noToken: ${m.noTokenId}`);
+          // Fix B: suscribir al WS de Polymarket para precio en tiempo real
+          polyWs.unsubscribeAll();
+          polyWs.subscribe(m.yesTokenId, m.noTokenId);
         } else {
           return;
         }
@@ -173,9 +181,31 @@ async function main() {
     }
   }
 
+  // Fix B: callback del WS de Polymarket — precio en tiempo real (<50ms)
+  polyWs.onPrice((yes, no) => {
+    signal.updatePolyPrice(yes, no);
+    const tag = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
+    if (tag !== lastPolyPrice) {
+      logger.info(`[POLY-WS] ${tag}`);
+      lastPolyPrice = tag;
+    }
+  });
+
+  polyWs.onResolved((winner) => {
+    logger.info(`[POLY-WS] Mercado resuelto (${winner}), preparando transición...`);
+    cachedMarket = null;
+    lastPolyPrice = '';
+    preFetchScheduled = false;
+    polyWs.unsubscribeAll();
+  });
+
+  // Conectar WS de Polymarket en paralelo
+  polyWs.connect().catch(err => logger.warn(`Polymarket WS no disponible: ${err.message} — usando HTTP polling`));
+
   logger.info('[POLY] Obteniendo precio inicial...');
   await actualizarPrecioPolymarket();
 
+  // HTTP polling cada 2s como fallback si el WS falla
   setInterval(actualizarPrecioPolymarket, 2000);
 
   setInterval(async () => {
