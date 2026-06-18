@@ -13,7 +13,13 @@ const { Logger } = require('./logger');
 const logger = new Logger('POLY-WS');
 // Polymarket CLOB WebSocket — endpoint oficial
 // Docs: https://docs.polymarket.com/#websocket-api
-const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
+// Polymarket CLOB WebSocket — intentar ambos endpoints
+const WS_URLS = [
+  'wss://ws-subscriptions-clob.polymarket.com/ws/',
+  'wss://ws-subscriptions-clob.polymarket.com/ws/market',
+];
+let _wsUrlIdx = 0;
+const WS_URL = WS_URLS[0];
 
 class PolymarketWS {
   constructor() {
@@ -40,6 +46,7 @@ class PolymarketWS {
 
       this.ws.on('open', () => {
         this._connected = true;
+        this._connectedAt = Date.now();
         this._reconnectDelay = 1000;
         logger.info('✅ Polymarket WS conectado');
         // Re-suscribir tokens si había suscripciones previas
@@ -74,15 +81,22 @@ class PolymarketWS {
       this.ws.on('close', (code) => {
         this._connected = false;
         if (!this._intentionalClose) {
-          // Si 404 persiste después de 5 intentos → desactivar WS, usar HTTP fallback
-          if (this._404count >= 5) {
-            logger.warn(`WS endpoint no disponible (404x${this._404count}) — usando HTTP fallback`);
-            return;
+          this._closeCount = (this._closeCount || 0) + 1;
+
+          // Si se desconecta en los primeros 200ms = el servidor rechaza la conexión
+          const connDuration = Date.now() - (this._connectedAt || Date.now());
+          if (connDuration < 200) {
+            this._fastCloseCount = (this._fastCloseCount || 0) + 1;
           }
-          if (this._try404Fallback) {
-            this._404count = (this._404count || 0) + 1;
-            this._try404Fallback = false;
+
+          // Después de 5 cierres rápidos → desactivar WS, usar HTTP fallback silenciosamente
+          if (this._fastCloseCount >= 5) {
+            if (this._fastCloseCount === 5) {
+              logger.warn(`WS no disponible (${this._fastCloseCount} cierres rápidos) — usando HTTP polling como fallback`);
+            }
+            return; // No reconectar más
           }
+
           logger.warn(`Desconectado (${code}). Reconectando en ${this._reconnectDelay}ms...`);
           setTimeout(() => this._reconnect(), this._reconnectDelay);
           this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
