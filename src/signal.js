@@ -187,8 +187,10 @@ class SignalEngine {
     // Gate mínimo: score >= 55 → 77.1% WR sobre 48 trades
     // Sin hora en el score (las horas las maneja TRADING_HOURS_BLOCKED_UTC)
     const signalScore = this._calcSignalScore(rsi, absZ, imbalance, direction);
-    const MIN_SCORE = config.MIN_SIGNAL_SCORE || 55;
-    if (signalScore < MIN_SCORE) return null;
+    const MIN_SCORE = config.MIN_SIGNAL_SCORE || 60;
+    const MAX_SCORE = config.MAX_SIGNAL_SCORE || 89;
+    // Score 90-99: 53% WR — señales en momentos extremos donde el mercado ya se movió
+    if (signalScore < MIN_SCORE || signalScore > MAX_SCORE) return null;
 
     const edge = this._calcEdge(direction, movePct, absZ);
 

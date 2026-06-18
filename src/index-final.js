@@ -194,8 +194,9 @@ async function main() {
       return;
     }
 
-    if (segsRestantes < 90) {
-      logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde`);
+    const MIN_SECS = parseInt(process.env.MIN_SECONDS_REMAINING || '60');
+    if (segsRestantes < MIN_SECS) {
+      logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde (mín ${MIN_SECS}s)`);
       return;
     }
 

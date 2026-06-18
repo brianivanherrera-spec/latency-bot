@@ -104,12 +104,16 @@ module.exports = {
   // Fill rate simulado en paper — 0.75 = 75% de órdenes se llenan (refleja GTC real)
   PAPER_FILL_RATE: parseFloat(process.env.PAPER_FILL_RATE || '0.75'),
 
+  // Segundos mínimos restantes en el mercado para entrar (60 = más ventana que 90)
+  MIN_SECONDS_REMAINING: parseInt(process.env.MIN_SECONDS_REMAINING || '60'),
+
   // GTC timeout — segundos que espera fill antes de cancelar la orden
   GTC_TIMEOUT_SECONDS: parseInt(process.env.GTC_TIMEOUT_SECONDS || '60'),
 
-  // Signal Score mínimo para ejecutar — calibrado con 125 trades reales
-  // Score>=55: 77.1% WR (48 trades) | Score>=60: 75.6% WR (45 trades)
-  MIN_SIGNAL_SCORE: parseInt(process.env.MIN_SIGNAL_SCORE || '55'),
+  // Signal Score mínimo y máximo — calibrado con 652 trades reales
+  // Score 90-99 tiene solo 53% WR (señales en momentos extremos de BTC)
+  MIN_SIGNAL_SCORE: parseInt(process.env.MIN_SIGNAL_SCORE || '60'),
+  MAX_SIGNAL_SCORE: parseInt(process.env.MAX_SIGNAL_SCORE || '89'),
 
   // =============================================
   // LOGGING
