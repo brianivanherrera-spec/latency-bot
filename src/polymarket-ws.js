@@ -11,7 +11,9 @@ const WebSocket = require('ws');
 const { Logger } = require('./logger');
 
 const logger = new Logger('POLY-WS');
-const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/';
+// Polymarket CLOB WebSocket — endpoint oficial
+// Docs: https://docs.polymarket.com/#websocket-api
+const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 
 class PolymarketWS {
   constructor() {
@@ -61,6 +63,10 @@ class PolymarketWS {
 
       this.ws.on('error', (err) => {
         this._connected = false;
+        // Si es 404, probar URL alternativa antes de rendirse
+        if (err.message.includes('404')) {
+          this._try404Fallback = true;
+        }
         logger.error(`WS error: ${err.message}`);
         reject(err);
       });
@@ -68,6 +74,15 @@ class PolymarketWS {
       this.ws.on('close', (code) => {
         this._connected = false;
         if (!this._intentionalClose) {
+          // Si 404 persiste después de 5 intentos → desactivar WS, usar HTTP fallback
+          if (this._404count >= 5) {
+            logger.warn(`WS endpoint no disponible (404x${this._404count}) — usando HTTP fallback`);
+            return;
+          }
+          if (this._try404Fallback) {
+            this._404count = (this._404count || 0) + 1;
+            this._try404Fallback = false;
+          }
           logger.warn(`Desconectado (${code}). Reconectando en ${this._reconnectDelay}ms...`);
           setTimeout(() => this._reconnect(), this._reconnectDelay);
           this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
