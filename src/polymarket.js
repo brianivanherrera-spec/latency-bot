@@ -113,6 +113,29 @@ class PolymarketClient {
     logger.info(`✅ CLOB V2 listo (POLY_1271) — deposit wallet: ${depositWallet}`);
   }
 
+  // Pre-fetch del próximo mercado por timestamp conocido
+  async findNextBTCMarket(nextWindowTs) {
+    try {
+      const slug = `btc-updown-5m-${nextWindowTs}`;
+      const response = await fetch(`${GAMMA_API_BASE}/events?slug=${slug}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      const events = Array.isArray(data) ? data : (data.events || data.data || []);
+      if (events.length > 0) {
+        const event = events[0];
+        const market = event.markets?.[0];
+        if (!market) return null;
+        return this._formatMarket({ ...market,
+          question: event.title || market.question,
+          endDate: new Date((nextWindowTs + 300) * 1000).toISOString() });
+      }
+      return null;
+    } catch (err) {
+      logger.warn(`[POLY] Pre-fetch failed: ${err.message}`);
+      return null;
+    }
+  }
+
   async findBTCMarket() {
     try {
       const now = Math.floor(Date.now() / 1000);

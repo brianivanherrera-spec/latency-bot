@@ -104,6 +104,10 @@ module.exports = {
   // Fill rate simulado en paper — 0.75 = 75% de órdenes se llenan (refleja GTC real)
   PAPER_FILL_RATE: parseFloat(process.env.PAPER_FILL_RATE || '0.75'),
 
+  // Buffer mínimo de ticks antes de operar (warmup)
+  // 100 ticks @ 56 ticks/10s = ~18s warmup vs 35s con 200 ticks
+  MIN_BUFFER_SIZE: parseInt(process.env.MIN_BUFFER_SIZE || '100'),
+
   // Segundos mínimos restantes en el mercado para entrar (60 = más ventana que 90)
   MIN_SECONDS_REMAINING: parseInt(process.env.MIN_SECONDS_REMAINING || '60'),
 

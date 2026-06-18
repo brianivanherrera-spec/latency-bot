@@ -77,20 +77,65 @@ async function main() {
   const ws = new BinanceWS();
 
   let cachedMarket = null;
+  let nextMarketCache = null;   // FIX A: mercado pre-fetcheado
   let lastPolyPrice = '';
+  let preFetchScheduled = false;
+
+  // FIX A: calcular timestamp del próximo mercado de 5 minutos
+  function getNextWindowTs() {
+    const now = Math.floor(Date.now() / 1000);
+    const currentWindow = now - (now % 300);
+    return currentWindow + 300; // próximo múltiplo de 300s
+  }
+
+  // FIX A: pre-fetchear el próximo mercado antes de que el actual cierre
+  async function preFetchNextMarket() {
+    if (preFetchScheduled) return;
+    preFetchScheduled = true;
+    const nextTs = getNextWindowTs();
+    const msUntilNext = (nextTs * 1000) - Date.now();
+    // Pre-fetchear 30s antes del próximo mercado
+    const delay = Math.max(0, msUntilNext - 30000);
+    logger.info(`[POLY] Pre-fetch próximo mercado en ${Math.round(delay/1000)}s (T-30s antes de apertura)`);
+    setTimeout(async () => {
+      preFetchScheduled = false;
+      const m = await poly.findNextBTCMarket(nextTs);
+      if (m) {
+        nextMarketCache = m;
+        logger.info(`[POLY] ✅ Próximo mercado pre-cacheado: ${m.question}`);
+      }
+    }, delay);
+  }
 
   async function actualizarPrecioPolymarket() {
+    // Si no hay mercado activo, usar el pre-cacheado si está disponible
     if (!cachedMarket?.gammaId) {
-      const m = await poly.findBTCMarket();
-      if (m) {
-        cachedMarket = m;
-        logger.info(`[POLY] Mercado: ${m.question}`);
-        logger.info(`[POLY] yesToken: ${m.yesTokenId}`);
-        logger.info(`[POLY] noToken: ${m.noTokenId}`);
-      } else {
-        return;
+      if (nextMarketCache) {
+        // Verificar que el próximo mercado ya empezó
+        const now = Date.now();
+        const marketStart = new Date(nextMarketCache.endDate).getTime() - 300000;
+        if (now >= marketStart) {
+          cachedMarket = nextMarketCache;
+          nextMarketCache = null;
+          logger.info(`[POLY] ✅ Mercado pre-cacheado activado: ${cachedMarket.question}`);
+          logger.info(`[POLY] yesToken: ${cachedMarket.yesTokenId}`);
+          logger.info(`[POLY] noToken: ${cachedMarket.noTokenId}`);
+        }
+      }
+      // Si no hay pre-cache, buscar normalmente
+      if (!cachedMarket?.gammaId) {
+        const m = await poly.findBTCMarket();
+        if (m) {
+          cachedMarket = m;
+          logger.info(`[POLY] Mercado: ${m.question}`);
+          logger.info(`[POLY] yesToken: ${m.yesTokenId}`);
+          logger.info(`[POLY] noToken: ${m.noTokenId}`);
+        } else {
+          return;
+        }
       }
     }
+
     try {
       const res = await fetch(`https://gamma-api.polymarket.com/markets/${cachedMarket.gammaId}`);
       if (!res.ok) {
@@ -111,10 +156,16 @@ async function main() {
             logger.info(`[POLY] ${tag}`);
             lastPolyPrice = tag;
           }
+          // FIX A: pre-fetchear próximo mercado cuando quedan ~60s
+          const msRestantes = new Date(cachedMarket.endDate).getTime() - Date.now();
+          if (msRestantes < 60000 && msRestantes > 0 && !nextMarketCache) {
+            preFetchNextMarket();
+          }
         } else {
-          logger.info(`[POLY] Mercado resuelto (YES=${yes}), buscando nuevo...`);
+          logger.info(`[POLY] Mercado resuelto (YES=${yes}), activando pre-cache...`);
           cachedMarket = null;
           lastPolyPrice = '';
+          preFetchScheduled = false;
         }
       }
     } catch (err) {
@@ -134,7 +185,8 @@ async function main() {
   ws.onPrice(async (priceData) => {
     const sig = signal.process(priceData);
     if (!sig || sig.direction === 'NEUTRAL') return;
-    if (sig.bufferSize !== undefined && sig.bufferSize < 200) return; // warmup
+    const MIN_BUFFER = parseInt(process.env.MIN_BUFFER_SIZE || '100');
+    if (sig.bufferSize !== undefined && sig.bufferSize < MIN_BUFFER) return; // warmup
 
     // ─── Filtro de horario ────────────────────────────────────────────
     // Basado en backtest de 2531 mercados: algunas horas tienen <45% win rate
