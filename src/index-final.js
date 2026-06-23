@@ -362,7 +362,11 @@ async function main() {
           return;
         }
 
-        logger.info(`[LIVE] ✅ Orden llenada (GTC): ${orderResult.orderId}`);
+        const fillMs = orderResult.fillTimeMs || null;
+        logger.info(`[LIVE] ✅ Orden llenada (GTC): ${orderResult.orderId} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
+
+        // Guardar fill_time_ms en signal logger
+        if (fillMs !== null) signalLogger.updateFillTime(posId, fillMs);
 
         // Fix 2: tracker solo se abre DESPUÉS de fill confirmado
         tracker.openPosition({

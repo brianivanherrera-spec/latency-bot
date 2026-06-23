@@ -206,9 +206,13 @@ class PolymarketClient {
       this._orderHistory.push(rec);
       logger.info(`[LIVE] ✅ GTC Order ID: ${orderId} | status inicial: ${orderStatus}`);
 
-      // Si ya llenó al instante → retornar inmediatamente
+      const orderPlacedAt = Date.now(); // para calcular fill_time_ms
+
+      // Si ya llenó al instante → retornar con fill_time_ms
       if (orderStatus === 'matched') {
-        return { success: true, orderId, status: 'matched' };
+        const fillTimeMs = Date.now() - orderPlacedAt;
+        logger.info(`[LIVE] ⚡ Fill instantáneo: ${fillTimeMs}ms`);
+        return { success: true, orderId, status: 'matched', fillTimeMs };
       }
 
       // Orden en el book ('live') → polling hasta fill o timeout
@@ -226,8 +230,9 @@ class PolymarketClient {
             logger.info(`[LIVE] 🔄 Poll: status=${orderStatus} filled=${sizeFilled}/${size}`);
 
             if (orderStatus === 'matched') {
-              logger.info(`[LIVE] ✅ Orden llenada (GTC poll)`);
-              return { success: true, orderId, status: 'matched' };
+              const fillTimeMs = Date.now() - orderPlacedAt;
+              logger.info(`[LIVE] ✅ Orden llenada (GTC poll) en ${fillTimeMs}ms`);
+              return { success: true, orderId, status: 'matched', fillTimeMs };
             }
             if (orderStatus === 'cancelled' || orderStatus === 'canceled') {
               logger.warn(`[LIVE] ⚠️ Orden cancelada durante poll`);

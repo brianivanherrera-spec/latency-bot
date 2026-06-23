@@ -43,6 +43,7 @@ function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, bt
     tickFreq:         sig?.tickFreq || 0,
     rsi:              parseFloat(sig?.rsi?.toFixed(1) || 50),
     signalScore:      sig?.signalScore || null,
+    fill_time_ms:     null,  // se actualiza después del fill GTC
     bufferSize:       sig?.bufferSize || 0,
     // Estado del bot al momento de la señal
     consecutive_losses: consecutiveLosses,
@@ -263,4 +264,25 @@ function getStats() {
 
 function getConsecutiveLosses() { return consecutiveLosses; }
 
-module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot30s, getStats, getConsecutiveLosses };
+function updateFillTime(posId, fillTimeMs) {
+  try {
+    const raw = fs.readFileSync(SIGNALS_FILE, 'utf8');
+    const lines = raw.split('\n');
+    const updated = lines.map(line => {
+      if (!line.trim()) return line;
+      try {
+        const record = JSON.parse(line);
+        if (record.posId === posId) {
+          record.fill_time_ms = fillTimeMs;
+          return JSON.stringify(record);
+        }
+      } catch (parseErr) { }
+      return line;
+    });
+    fs.writeFileSync(SIGNALS_FILE, updated.join('\n'));
+  } catch (e) {
+    // Non-critical — no afecta el trading
+  }
+}
+
+module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot30s, getStats, getConsecutiveLosses, updateFillTime };
