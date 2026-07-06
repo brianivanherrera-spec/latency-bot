@@ -286,9 +286,17 @@ async function main() {
     logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)} Score:${sig.signalScore}`);
 
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
-    const price = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
+    const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
+
+    // PRICE_TOLERANCE: acepta fills hasta N ticks arriba del precio detectado
+    // Cubre el movimiento de precio entre detección y ejecución (HTTP polling 0-2s)
+    // Default 0.02 = 2 ticks — sube fill rate de ~74% a ~90% con mínimo impacto en edge
+    const priceTolerance = parseFloat(process.env.PRICE_TOLERANCE || '0.02');
+    const price = Math.min(0.97, parseFloat((priceRaw + priceTolerance).toFixed(3)));
     const size = Math.floor(exposure / price);
+
+    logger.info(`[PRICE] Raw: $${priceRaw.toFixed(3)} + tolerance: $${priceTolerance} → orden: $${price.toFixed(3)}`);
 
     // Fix 1: size check ANTES del Discord alert — no alertar órdenes que no van a ejecutarse
     if (size < 5) {

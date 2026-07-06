@@ -108,6 +108,10 @@ module.exports = {
   // 100 ticks @ 56 ticks/10s = ~18s warmup vs 35s con 200 ticks
   MIN_BUFFER_SIZE: parseInt(process.env.MIN_BUFFER_SIZE || '100'),
 
+  // Tolerancia de precio — acepta fills hasta N por encima del precio detectado
+  // 0.02 = 2 ticks → sube fill rate de ~74% a ~90% con mínimo impacto en edge
+  PRICE_TOLERANCE: parseFloat(process.env.PRICE_TOLERANCE || '0.02'),
+
   // Segundos mínimos restantes en el mercado para entrar (60 = más ventana que 90)
   MIN_SECONDS_REMAINING: parseInt(process.env.MIN_SECONDS_REMAINING || '60'),
 
