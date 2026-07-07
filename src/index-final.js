@@ -27,7 +27,22 @@ const httpServer = http.createServer((req, res) => {
   
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', mode: process.env.DRY_RUN === 'true' ? 'paper' : 'live' }));
+    const sigStats = signal?.getStats() || {};
+    const trackerStats = tracker?.getStats() || {};
+    res.end(JSON.stringify({
+      status: 'ok',
+      mode: process.env.DRY_RUN === 'true' ? 'paper' : 'live',
+      orderType: process.env.ORDER_TYPE || 'GTC',
+      btcTrendFilter: parseInt(process.env.BTC_TREND_FILTER || '0'),
+      uptime: process.uptime(),
+      btcPrice: sigStats.lastPrice || null,
+      polyYes: sigStats.polyYes || null,
+      wins: trackerStats.wins || 0,
+      losses: trackerStats.losses || 0,
+      totalPnL: trackerStats.totalPnL || 0,
+      openPositions: trackerStats.openPositions || 0,
+      signals: sigStats.signals || 0,
+    }));
     return;
   }
   
@@ -212,18 +227,46 @@ async function main() {
     await tracker.checkClosedPositions();
   }, 60000);
 
+  // Historial de precio BTC para filtro de tendencia (últimos 60 minutos)
+  const btcPriceHistory = [];
+  const BTC_HISTORY_MINS = 60;
+
   ws.onPrice(async (priceData) => {
+    // Guardar historial de precio BTC
+    const now60 = Date.now();
+    btcPriceHistory.push(priceData.price || priceData.currentPrice || 0);
+    // Mantener solo los últimos 60 minutos (~3600 ticks a 1/s)
+    const maxTicks = BTC_HISTORY_MINS * 60;
+    if (btcPriceHistory.length > maxTicks) btcPriceHistory.shift();
+
     const sig = signal.process(priceData);
     if (!sig || sig.direction === 'NEUTRAL') return;
     const MIN_BUFFER = parseInt(process.env.MIN_BUFFER_SIZE || '100');
     if (sig.bufferSize !== undefined && sig.bufferSize < MIN_BUFFER) return; // warmup
 
     // ─── Filtro de horario ────────────────────────────────────────────
-    // Basado en backtest de 2531 mercados: algunas horas tienen <45% win rate
     if (config.TRADING_HOURS_ENABLED) {
       const utcHour = new Date().getUTCHours();
       if (config.TRADING_HOURS_BLOCKED_UTC.includes(utcHour)) {
         return; // hora bloqueada — win rate histórico < 45%
+      }
+    }
+
+    // ─── Filtro de tendencia BTC ──────────────────────────────────────
+    // Si BTC se movió más de N USD en la última hora → no operar contra la tendencia
+    // Evita losses masivos cuando BTC está en tendencia fuerte alcista o bajista
+    const trendFilter = parseInt(process.env.BTC_TREND_FILTER || '0');
+    if (trendFilter > 0 && sig.currentPrice) {
+      const btcMoveLastHour = btcPriceHistory.length > 0
+        ? sig.currentPrice - btcPriceHistory[0]
+        : 0;
+      if (btcMoveLastHour > trendFilter && sig.direction === 'DOWN') {
+        logger.warn(`[SKIP] 📈 Tendencia alcista BTC +$${btcMoveLastHour.toFixed(0)} (>${trendFilter}) — bloqueando DOWN`);
+        return;
+      }
+      if (btcMoveLastHour < -trendFilter && sig.direction === 'UP') {
+        logger.warn(`[SKIP] 📉 Tendencia bajista BTC $${btcMoveLastHour.toFixed(0)} (<-${trendFilter}) — bloqueando UP`);
+        return;
       }
     }
 

@@ -184,11 +184,26 @@ class PolymarketClient {
       // GTC con timeout — pone orden límite en el book y espera hasta GTC_TIMEOUT_SECONDS
       const GTC_TIMEOUT_MS = (config.GTC_TIMEOUT_SECONDS || 60) * 1000;
 
-      const result = await this.clobClient.createAndPostOrder({
-        tokenID: tokenId, price, size,
+      const orderMode = (config.ORDER_TYPE || 'GTC').toUpperCase();
+      const isMarket = orderMode === 'MARKET';
+
+      const orderParams = {
+        tokenID: tokenId, size,
         side: side === 'BUY' ? Side.BUY : Side.SELL,
-        orderType: OrderType.GTC, // Good Till Cancelled — espera fill en el book
-      });
+      };
+
+      if (isMarket) {
+        // MARKET order — fill inmediato al mejor precio disponible
+        orderParams.orderType = OrderType.FOK;
+        orderParams.price = price; // precio de referencia para FOK market
+        logger.info(`[LIVE] 📈 MARKET order — fill inmediato al precio disponible`);
+      } else {
+        // GTC — orden límite con tolerancia de precio
+        orderParams.orderType = OrderType.GTC;
+        orderParams.price = price;
+      }
+
+      const result = await this.clobClient.createAndPostOrder(orderParams);
 
       logger.info(`[LIVE] response: ${JSON.stringify(result)}`);
 

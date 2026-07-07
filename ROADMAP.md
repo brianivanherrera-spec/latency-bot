@@ -1,130 +1,107 @@
 # Latency Bot — Roadmap & Estado Actual
 
-## Estado actual (Junio 2026)
-- Bot corriendo en **PAPER TRADING** en Railway (Servidor A)
-- Capital live: $0 — se agotó en primeras pruebas live (Jun 12-15)
-- **652 trades acumulados con resultado** en signals.jsonl (22 días de datos)
-- WR paper horas libres: **63.2%** | WR live real: bajo por bugs (ya corregidos)
-- PnL acumulado paper (con $5/trade): **$1,032**
-- Próximo live: cuando se recargue capital (mes que viene)
+## Estado actual (Julio 2026)
+- Bot en **PAPER TRADING** mientras se evalúa la estrategia live
+- Capital live en Polymarket: **$30 USDC** listo para test
+- **1,000+ trades** acumulados en signals.jsonl (paper + live)
+- WR paper: **63.7%** (907 trades) | WR live estimado real: **~52%**
+- PnL paper acumulado: **$3,941** | PnL live real: **+$33.34** (2 días)
+- Balance Polymarket actual: **$63.34**
 
 ---
 
-## Bugs corregidos ✅
+## Hallazgos del primer live (Jul 06-07)
 
-### Críticos (afectaban live vs paper)
-1. **FOK → GTC con polling** — el FOK rechazaba 87% de órdenes por falta de liquidez instantánea. GTC pone la orden en el book y espera hasta 60s
-2. **Tracker post-fill** — el tracker abría posición ANTES de confirmar fill. Ahora solo se abre después de GTC matched
-3. **Paper fill rate simulado** — paper asumía 100% fill rate. Ahora simula 75% (PAPER_FILL_RATE=0.75) para ser realista
-4. **GTC timeout bug duplicado** — doble check contradictorio en index-final.js. Eliminado
-5. **Size check antes de Discord** — mandaba alerta de orden que luego rechazaba. Movido antes
-6. **Modo live/paper en signals.jsonl** — cada trade ahora guarda `mode: "live"` o `"paper"`
+### Problema identificado — Dirección vs Tendencia BTC
+- UP live: **60% WR** ✅ (igual que paper)
+- DOWN live: **7% WR** ⚠️ (paper tenía 65%)
+- Causa: BTC subió $4,000 en 2 días → bot apostó DOWN contra tendencia
+- Solución: **BTC_TREND_FILTER** — bloquea señales contra tendencia cuando BTC se mueve >$300/hora
 
-### Filtros y calibración
-7. **MAX_SIGNAL_SCORE=89** — score 90-99 tiene solo 53% WR (señales en momentos extremos). Ahora bloqueado
-8. **MIN_SECONDS_REMAINING=60** — bajado de 90s a 60s para más ventana de entrada
-9. **Discord non-blocking** — setImmediate + fire-and-forget, no bloquea ejecución
-10. **COOLDOWN_SECONDS=60** — bajado de 360→90→60 para más trades/día
-11. **Hour blocking actualizado** — UTC 0,1,2,6,7,9,10,11,16,17,18,19,20,22,23 bloqueados
-12. **Signal Score gate 60-89** — calibrado con 652 trades reales
+### Fill rate real
+- GTC fill rate: **29%** (vs 75% simulado en paper)
+- Con precio alcista nadie vende NO tokens → GTC protege de losses involuntariamente
+- El GTC actuó como filtro protector no diseñado
+
+### Tracker incompleto
+- Signals.jsonl mostró -$30 pero Polymarket mostró +$33
+- Causa: redeploy de Railway borró posiciones de RAM
+- Solución: **persistencia en disco** (/data/positions.json)
 
 ---
 
-## Variables Railway actuales
+## Cambios aplicados Jul 07 (redeploy nocturno)
+
+### Nuevas variables Railway
+| Variable | Valor test | Descripción |
+|---|---|---|
+| `ORDER_TYPE` | `GTC` o `MARKET` | Tipo de orden |
+| `BTC_TREND_FILTER` | `300` | Bloquea contra tendencia si BTC movió >$N/hora |
+| `TRADING_HOURS_BLOCKED_UTC` | `0,1,2,6,9,10,11,16,17,18,19,20,22,23` | UTC 06 bloqueado |
+
+### Código nuevo
+1. **MARKET order** — fill 100% garantizado para test de WR real
+2. **BTC_TREND_FILTER** — no apuesta DOWN si BTC subió >$300/hora (ni UP si bajó)
+3. **Persistencia de posiciones** — tracker sobrevive redeploys (/data/positions.json)
+4. **Endpoint /health mejorado** — expone stats en tiempo real
+
+---
+
+## Variables Railway completas
 
 | Variable | Valor | Descripción |
 |---|---|---|
-| `DRY_RUN` | `true` | Cambiar a `false` para live |
-| `ORDER_SIZE_USDC` | `3` | $3/trade = 5 tokens mínimo Polymarket |
-| `COOLDOWN_SECONDS` | `60` | 1 minuto entre trades |
-| `MIN_SIGNAL_SCORE` | `60` | Score mínimo para entrar |
-| `MAX_SIGNAL_SCORE` | `89` | Score máximo (>89 = señal extrema, evitar) |
-| `TRADING_HOURS_ENABLED` | `true` | Horas bloqueadas activas |
-| `TRADING_HOURS_BLOCKED_UTC` | `0,1,2,9,10,11,16,17,18,19,20,22,23` | Horas con WR <60% |
-| `IMBALANCE_MAX` | `0.3` | Imbalance máximo permitido |
-| `CIRCUIT_BREAKER_LOSSES` | `3` | Losses seguidos → pausa |
-| `CIRCUIT_BREAKER_PAUSE_MIN` | `30` | Minutos de pausa tras CB |
-| `GTC_TIMEOUT_SECONDS` | `60` | Segundos esperando fill GTC |
-| `PAPER_FILL_RATE` | `0.75` | Fill rate simulado en paper |
-| `MIN_SECONDS_REMAINING` | `60` | Segundos mínimos en mercado para entrar |
-| `PAPER_CAPITAL` | `50` | Capital inicial paper |
+| `DRY_RUN` | `false` | LIVE activo |
+| `ORDER_SIZE_USDC` | `3` | $3/trade = 5-6 tokens |
+| `ORDER_TYPE` | `GTC` | GTC o MARKET |
+| `COOLDOWN_SECONDS` | `60` | 1 min entre trades |
+| `MIN_SIGNAL_SCORE` | `60` | Score mínimo |
+| `MAX_SIGNAL_SCORE` | `89` | Score máximo |
+| `BTC_TREND_FILTER` | `300` | Filtro tendencia BTC |
+| `PRICE_TOLERANCE` | `0.02` | Tolerancia de precio |
+| `TRADING_HOURS_BLOCKED_UTC` | `0,1,2,6,9,10,11,16,17,18,19,20,22,23` | Horas bloqueadas |
+| `GTC_TIMEOUT_SECONDS` | `60` | Timeout GTC |
+| `PAPER_FILL_RATE` | `0.75` | Fill rate simulado paper |
+| `MIN_BUFFER_SIZE` | `100` | Warmup ticks |
+| `MIN_SECONDS_REMAINING` | `60` | Segundos mínimos en mercado |
+| `CIRCUIT_BREAKER_LOSSES` | `3` | Losses para CB |
+| `CIRCUIT_BREAKER_PAUSE_MIN` | `30` | Minutos pausa CB |
 | `ZSCORE_THRESHOLD` | `1.5` | Z-score mínimo |
-| `MIN_EDGE_PCT` | `0.3` | Edge mínimo para operar |
+| `MIN_EDGE_PCT` | `0.3` | Edge mínimo |
 
 ---
 
-## Horas libres (11 horas UTC)
+## Plan de tests
 
-| UTC | ARG | WR histórico (652 trades) | Trades/día |
+### Test actual — Market order con $30
+- Capital: $30 USDC en Polymarket
+- `ORDER_TYPE=MARKET` → fill 100% garantizado
+- `BTC_TREND_FILTER=300` → no apuesta contra tendencia
+- Objetivo: confirmar WR real sin interferencia del fill rate
+- Meta: 50+ trades para estadística confiable
+
+### Escala progresiva (post-validación)
+| Capital | Order | PnL/día est. | PnL/mes est. |
 |---|---|---|---|
-| 03 | 00hs | 68% | 1.9 |
-| 04 | 01hs ⭐ | **75%** | 2.0 |
-| 05 | 02hs | 69% | 2.2 |
-| 06 | 03hs | 58% | 2.0 |
-| 07 | 04hs | 56% | 2.3 |
-| 08 | 05hs | 57% | 2.2 |
-| 12 | 09hs ⭐ | **71%** | 2.5 |
-| 13 | 10hs ⭐ | **64%** | 2.9 |
-| 14 | 11hs | 60% | 2.4 |
-| 15 | 12hs | 58% | 3.0 |
-| 21 | 18hs | 61% | 2.1 |
-
-**Horas doradas:** UTC 04 (ARG 01hs) y UTC 12 (ARG 09hs)
+| $30 | $3 | $15-22 | $450-660 |
+| $100 | $5 | $35-50 | $1,050-1,500 |
+| $200 | $10 | $70-100 | $2,100-3,000 |
+| $500 | $20 | $175-250 | $5,250-7,500 |
+| $1,000+ | $50 | $437-600 | $13,000-18,000 |
 
 ---
 
-## Plan de escala (próximo live)
-
-### Checklist go live
-- [ ] Cargar capital en Polymarket (mínimo $30)
-- [ ] Cambiar `DRY_RUN=false` en Railway
-- [ ] Verificar `ORDER_SIZE_USDC=3` (5 tokens mínimo)
-- [ ] Arrancar UTC 03-04 (ARG 00-01hs) — mejor franja
-
-### Escala de capital
-| Capital | Order size | Tokens | PnL/día est. | PnL/mes est. |
-|---|---|---|---|---|
-| $30 | $3 | 5 | $21 | $634 |
-| $60 | $5 | 9 | $35 | $1,056 |
-| $150 | $10 | 19 | $70 | $2,113 |
-| $300 | $20 | 39 | $141 | $4,225 |
-| $500 | $50 | 99 | $353 | $10,563 |
-
-*Basado en 63% WR, 28 trades/día horas libres, fill rate 75%*
-
-### Hito $1,000
-Con reinversión total desde $30:
-- Día 2: ~$75 → subir a $5/trade
-- Día 6: ~$280 → subir a $20/trade
-- Día 9: ~$1,000 → retirar $500, dejar $500 + $30 reserva
-
----
-
-## Problemas pendientes
+## Pendientes
 
 ### Alta prioridad
-1. **Conversión 11.2%** — de 535 señales, solo 60 se ejecutan. Con los fixes de cooldown (60s) y MIN_SECONDS_REMAINING (60s) debería subir a ~18-20%. Monitorear en próxima sesión paper
-2. **Score 90-99 tiene 53% WR** — ya bloqueado con MAX_SIGNAL_SCORE=89. Investigar por qué señales extremas fallan
-3. **BTC lateral = CB en cascada** — cuando BTC se mueve menos de $100 en una hora, el bot entra en rachas de losses y el CB se dispara repetidamente. Posible fix: filtro de volatilidad mínima de BTC
+1. **Validar WR real** con market order y BTC_TREND_FILTER — test en curso
+2. **Dashboard web** — página HTML conectada a /health endpoint
+3. **Migración a Vultr** — WebSocket Polymarket real, menos restricciones de red
 
-### Media prioridad
-4. **UP trades peores que DOWN** — 65% WR en ambos ahora, pero en BTC alcista el bot genera más UP con RSI alto que falla. Monitorear si el sesgo vuelve
-5. **Fill rate GTC en madrugada** — UTC 03-05 tiene menos liquidez. Monitorear cuántos GTC se llenan vs timeout en esas horas
+### Media prioridad  
+4. **Recalibrar signal score** — scores 80-89 tienen WR bajo en live
+5. **ETH Up/Down** — segundo activo cuando BTC sea consistente
 
 ### Baja prioridad
-6. **Endpoint de descarga signals.jsonl** — para no depender de Railway Volumes UI
-7. **Alertas de balance bajo** — Discord alert cuando balance < $10
-
----
-
-## Historial de WR por período
-
-| Período | Trades | WR | Nota |
-|---|---|---|---|
-| May 25-28 | 121 | 53% | Sin filtros |
-| Jun 01-04 | 187 | 63% | Con RSI + horas |
-| Jun 04-06 | 231 | 63.6% | Con signal score |
-| Jun 06-09 | 323 | 62.6% | Discord non-blocking |
-| Jun 09-11 | 421 | 63.2% | Todos los filtros |
-| **Jun 16-18** | **652** | **72.7%** | **MAX_SCORE + MIN_SECS** |
-
+6. **Descarga automática signals.jsonl** — endpoint /download/signals
+7. **Alertas balance bajo** — Discord cuando balance < $15

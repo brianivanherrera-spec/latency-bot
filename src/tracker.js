@@ -8,6 +8,9 @@ const logger = new Logger('TRACKER');
  
 const GAMMA_API = 'https://gamma-api.polymarket.com';
  
+const fs = require('fs');
+const POSITIONS_FILE = process.env.POSITIONS_FILE || '/data/positions.json';
+
 class PnLTracker {
   constructor() {
     this.positions = [];
@@ -15,6 +18,45 @@ class PnLTracker {
     this.totalPnL = 0;
     this.wins = 0;
     this.losses = 0;
+    this._loadFromDisk();
+  }
+
+  // Cargar posiciones abiertas desde disco (sobrevive redeploys)
+  _loadFromDisk() {
+    try {
+      if (fs.existsSync(POSITIONS_FILE)) {
+        const data = JSON.parse(fs.readFileSync(POSITIONS_FILE, 'utf8'));
+        // Solo restaurar posiciones que aún no vencieron
+        const now = new Date();
+        const active = (data.positions || []).filter(p => new Date(p.endDate) > now);
+        if (active.length > 0) {
+          // Convertir endDate a Date object
+          this.positions = active.map(p => ({ ...p, endDate: new Date(p.endDate) }));
+          this.totalPnL = data.totalPnL || 0;
+          this.wins = data.wins || 0;
+          this.losses = data.losses || 0;
+          logger.info(`[TRACKER] ✅ Restauradas ${this.positions.length} posiciones desde disco`);
+        }
+      }
+    } catch (e) {
+      logger.warn(`[TRACKER] No se pudo restaurar posiciones: ${e.message}`);
+    }
+  }
+
+  // Guardar posiciones abiertas en disco
+  _saveToDisk() {
+    try {
+      const data = {
+        positions: this.positions,
+        totalPnL: this.totalPnL,
+        wins: this.wins,
+        losses: this.losses,
+        updatedAt: new Date().toISOString(),
+      };
+      fs.writeFileSync(POSITIONS_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+      // No crítico — el bot sigue operando
+    }
   }
  
   openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId }) {
@@ -32,6 +74,7 @@ class PnLTracker {
       status: 'OPEN',
     };
     this.positions.push(pos);
+    this._saveToDisk();
     logger.info(`Posicion abierta: ${pos.id} | ${side} ${size}t @ $${price} | USDC: $${pos.usdcIn}`);
     logger.info(`   Mercado: ${marketQuestion}`);
     logger.info(`   Cierre estimado: ${pos.endDate.toISOString()}`);

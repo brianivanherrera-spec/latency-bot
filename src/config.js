@@ -112,6 +112,15 @@ module.exports = {
   // 0.02 = 2 ticks → sube fill rate de ~74% a ~90% con mínimo impacto en edge
   PRICE_TOLERANCE: parseFloat(process.env.PRICE_TOLERANCE || '0.02'),
 
+  // Tipo de orden: GTC (límite con timeout) o MARKET (fill inmediato)
+  // GTC: más selectivo, fill rate 30-75% pero protege contra tendencias
+  // MARKET: fill 100% garantizado, WR real sin filtro de liquidez
+  ORDER_TYPE: process.env.ORDER_TYPE || 'GTC',
+
+  // Filtro de tendencia BTC: si BTC se movió más de N USD en 1 hora
+  // bloquea señales contra la tendencia (0 = desactivado)
+  BTC_TREND_FILTER: parseInt(process.env.BTC_TREND_FILTER || '0'),
+
   // Segundos mínimos restantes en el mercado para entrar (60 = más ventana que 90)
   MIN_SECONDS_REMAINING: parseInt(process.env.MIN_SECONDS_REMAINING || '60'),
 
