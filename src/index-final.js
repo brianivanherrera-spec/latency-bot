@@ -227,17 +227,20 @@ async function main() {
     await tracker.checkClosedPositions();
   }, 60000);
 
-  // Historial de precio BTC para filtro de tendencia (últimos 60 minutos)
-  const btcPriceHistory = [];
-  const BTC_HISTORY_MINS = 60;
+  // Historial de precio BTC con timestamp para filtro de tendencia exacto
+  const btcPriceHistory = []; // [{price, ts}]
+  const BTC_TREND_WINDOW_MS = 60 * 60 * 1000; // 1 hora en ms
 
   ws.onPrice(async (priceData) => {
-    // Guardar historial de precio BTC — Coinbase WS manda currentPrice
-    const btcPriceNow = priceData.currentPrice || priceData.price || priceData.lastPrice || 0;
-    if (btcPriceNow > 0) btcPriceHistory.push(btcPriceNow);
-    // Mantener solo los últimos 60 minutos (~3600 ticks a 1/s)
-    const maxTicks = BTC_HISTORY_MINS * 60;
-    if (btcPriceHistory.length > maxTicks) btcPriceHistory.shift();
+    const btcPriceNow = priceData.price || priceData.currentPrice || priceData.lastPrice || 0;
+    const nowMs = Date.now();
+    if (btcPriceNow > 0) {
+      btcPriceHistory.push({ price: btcPriceNow, ts: nowMs });
+      // Limpiar entradas más viejas de 1 hora
+      while (btcPriceHistory.length > 0 && nowMs - btcPriceHistory[0].ts > BTC_TREND_WINDOW_MS) {
+        btcPriceHistory.shift();
+      }
+    }
 
     const sig = signal.process(priceData);
     if (!sig || sig.direction === 'NEUTRAL') return;
@@ -254,23 +257,25 @@ async function main() {
 
     // ─── Filtro de tendencia BTC ──────────────────────────────────────
     const trendFilter = parseInt(process.env.BTC_TREND_FILTER || '0');
-    if (trendFilter > 0) {
-      const btcPriceNow = sig.currentPrice || sig.lastPrice || 0;
-      const btcMoveLastHour = btcPriceHistory.length > 10
-        ? btcPriceNow - btcPriceHistory[0]
-        : 0;
-      if (btcPriceHistory.length <= 10) {
-        // Loggear que el historial está llenándose
-        if (btcPriceHistory.length % 50 === 1) {
-          logger.info(`[TREND] Historial BTC llenándose: ${btcPriceHistory.length} ticks`);
-        }
-      } else {
+    if (trendFilter > 0 && btcPriceHistory.length > 0) {
+      const btcPriceNow = sig.currentPrice || btcPriceHistory[btcPriceHistory.length-1]?.price || 0;
+      const oldestEntry = btcPriceHistory[0];
+      const ageMinutes = (Date.now() - oldestEntry.ts) / 60000;
+      const btcMoveLastHour = btcPriceNow - oldestEntry.price;
+
+      // Loggear estado del historial cada 5 minutos
+      if (btcPriceHistory.length % 300 === 1) {
+        logger.info(`[TREND] Historial: ${ageMinutes.toFixed(0)}min | BTC move: $${btcMoveLastHour.toFixed(0)} | filtro: $${trendFilter}`);
+      }
+
+      // Solo aplicar filtro si tenemos al menos 5 minutos de historial
+      if (ageMinutes >= 5) {
         if (btcMoveLastHour > trendFilter && sig.direction === 'DOWN') {
-          logger.warn(`[SKIP] 📈 Tendencia alcista BTC +$${btcMoveLastHour.toFixed(0)} (>${trendFilter}) — bloqueando DOWN`);
+          logger.warn(`[SKIP] 📈 BTC +$${btcMoveLastHour.toFixed(0)} en ${ageMinutes.toFixed(0)}min — bloqueando DOWN`);
           return;
         }
         if (btcMoveLastHour < -trendFilter && sig.direction === 'UP') {
-          logger.warn(`[SKIP] 📉 Tendencia bajista BTC $${btcMoveLastHour.toFixed(0)} (<-${trendFilter}) — bloqueando UP`);
+          logger.warn(`[SKIP] 📉 BTC $${btcMoveLastHour.toFixed(0)} en ${ageMinutes.toFixed(0)}min — bloqueando UP`);
           return;
         }
       }
