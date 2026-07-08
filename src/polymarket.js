@@ -216,7 +216,7 @@ class PolymarketClient {
       }
 
       const orderId = result?.orderID || result?.orderId || result?.id;
-      let orderStatus = result?.status || 'unknown';
+      let orderStatus = (result?.status || 'unknown').toLowerCase(); // normalizar
       rec.status = 'PLACED'; rec.orderId = orderId;
       this._orderHistory.push(rec);
       logger.info(`[LIVE] ✅ GTC Order ID: ${orderId} | status inicial: ${orderStatus}`);
@@ -240,9 +240,10 @@ class PolymarketClient {
           await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
           try {
             const orderData = await this.clobClient.getOrder(orderId);
-            orderStatus = orderData?.status || orderStatus;
+            const rawStatus = orderData?.status || orderStatus;
+            orderStatus = rawStatus.toLowerCase(); // normalizar a minúsculas
             const sizeFilled = orderData?.size_matched || orderData?.sizeFilled || 0;
-            logger.info(`[LIVE] 🔄 Poll: status=${orderStatus} filled=${sizeFilled}/${size}`);
+            logger.info(`[LIVE] 🔄 Poll: status=${rawStatus} filled=${sizeFilled}/${size}`);
 
             if (orderStatus === 'matched') {
               const fillTimeMs = Date.now() - orderPlacedAt;

@@ -232,9 +232,9 @@ async function main() {
   const BTC_HISTORY_MINS = 60;
 
   ws.onPrice(async (priceData) => {
-    // Guardar historial de precio BTC
-    const now60 = Date.now();
-    btcPriceHistory.push(priceData.price || priceData.currentPrice || 0);
+    // Guardar historial de precio BTC — Coinbase WS manda currentPrice
+    const btcPriceNow = priceData.currentPrice || priceData.price || priceData.lastPrice || 0;
+    if (btcPriceNow > 0) btcPriceHistory.push(btcPriceNow);
     // Mantener solo los últimos 60 minutos (~3600 ticks a 1/s)
     const maxTicks = BTC_HISTORY_MINS * 60;
     if (btcPriceHistory.length > maxTicks) btcPriceHistory.shift();
@@ -253,20 +253,26 @@ async function main() {
     }
 
     // ─── Filtro de tendencia BTC ──────────────────────────────────────
-    // Si BTC se movió más de N USD en la última hora → no operar contra la tendencia
-    // Evita losses masivos cuando BTC está en tendencia fuerte alcista o bajista
     const trendFilter = parseInt(process.env.BTC_TREND_FILTER || '0');
-    if (trendFilter > 0 && sig.currentPrice) {
-      const btcMoveLastHour = btcPriceHistory.length > 0
-        ? sig.currentPrice - btcPriceHistory[0]
+    if (trendFilter > 0) {
+      const btcPriceNow = sig.currentPrice || sig.lastPrice || 0;
+      const btcMoveLastHour = btcPriceHistory.length > 10
+        ? btcPriceNow - btcPriceHistory[0]
         : 0;
-      if (btcMoveLastHour > trendFilter && sig.direction === 'DOWN') {
-        logger.warn(`[SKIP] 📈 Tendencia alcista BTC +$${btcMoveLastHour.toFixed(0)} (>${trendFilter}) — bloqueando DOWN`);
-        return;
-      }
-      if (btcMoveLastHour < -trendFilter && sig.direction === 'UP') {
-        logger.warn(`[SKIP] 📉 Tendencia bajista BTC $${btcMoveLastHour.toFixed(0)} (<-${trendFilter}) — bloqueando UP`);
-        return;
+      if (btcPriceHistory.length <= 10) {
+        // Loggear que el historial está llenándose
+        if (btcPriceHistory.length % 50 === 1) {
+          logger.info(`[TREND] Historial BTC llenándose: ${btcPriceHistory.length} ticks`);
+        }
+      } else {
+        if (btcMoveLastHour > trendFilter && sig.direction === 'DOWN') {
+          logger.warn(`[SKIP] 📈 Tendencia alcista BTC +$${btcMoveLastHour.toFixed(0)} (>${trendFilter}) — bloqueando DOWN`);
+          return;
+        }
+        if (btcMoveLastHour < -trendFilter && sig.direction === 'UP') {
+          logger.warn(`[SKIP] 📉 Tendencia bajista BTC $${btcMoveLastHour.toFixed(0)} (<-${trendFilter}) — bloqueando UP`);
+          return;
+        }
       }
     }
 
