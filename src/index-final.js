@@ -304,6 +304,17 @@ async function main() {
 
     if (activePositions.size >= 1) return; // máximo 1 posición simultánea
 
+    // Fix: bloquear doble entry en el mismo mercado (mismo conditionId)
+    // El cooldown de 3min puede expirar mientras el mercado de 5min sigue abierto
+    if (cachedMarket?.conditionId) {
+      const alreadyInThisMarket = Array.from(activePositions.values())
+        .some(p => p.marketId === cachedMarket.conditionId);
+      if (alreadyInThisMarket) {
+        logger.warn(`[SKIP] Ya hay posición abierta en este mercado — evitando doble entry`);
+        return;
+      }
+    }
+
     const exposure = config.ORDER_SIZE_USDC;
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);

@@ -83,7 +83,8 @@ class PnLTracker {
  
   async checkClosedPositions() {
     const now = new Date();
-    const toCheck = this.positions.filter(p => p.status === 'OPEN' && now > p.endDate);
+    // Chequear TODAS las posiciones abiertas — Polymarket puede resolver antes del endDate
+    const toCheck = this.positions.filter(p => p.status === 'OPEN');
  
     for (const pos of toCheck) {
       try {
@@ -187,7 +188,10 @@ class PnLTracker {
     logger.info(`   Resultado: ${winner} | PnL: ${pnl > 0 ? '+' : ''}$${pnl}`);
     logger.info(`   P&L Total acumulado: ${this.totalPnL > 0 ? '+' : ''}$${this.totalPnL.toFixed(2)} | W:${this.wins} L:${this.losses}`);
     // Registrar resultado en signal logger
-    signalLogger.logSignalClose(pos.id, won ? 'WIN' : 'LOSS', pnl);
+    // Intentar con pos.id y pos.posId (ambos formatos usados)
+    const signalId = pos.posId || pos.id;
+    signalLogger.logSignalClose(signalId, won ? 'WIN' : 'LOSS', pnl);
+    this._saveToDisk(); // persistir resultado
   }
  
   getSummary() {
