@@ -5,6 +5,8 @@
 
 const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
+const marketResearch = require('./market-research');
+const RESEARCH_MODE = process.env.RESEARCH_MODE === 'true';
 const { SignalEngine } = require('./signal');
 const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
@@ -140,6 +142,14 @@ async function main() {
           // Fix B: suscribir al nuevo mercado via WS
           polyWs.unsubscribeAll();
           polyWs.subscribe(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+          if (RESEARCH_MODE) {
+            marketResearch.startMarket({
+              marketId: cachedMarket.conditionId || cachedMarket.gammaId,
+              question: cachedMarket.question,
+              endDate: cachedMarket.endDate,
+              priceAtOpen: signal.getStats()?.lastPrice || 0,
+            });
+          }
         }
       }
       // Si no hay pre-cache, buscar normalmente
@@ -153,6 +163,14 @@ async function main() {
           // Fix B: suscribir al WS de Polymarket para precio en tiempo real
           polyWs.unsubscribeAll();
           polyWs.subscribe(m.yesTokenId, m.noTokenId);
+          if (RESEARCH_MODE) {
+            marketResearch.startMarket({
+              marketId: m.conditionId || m.gammaId,
+              question: m.question,
+              endDate: m.endDate,
+              priceAtOpen: signal.getStats()?.lastPrice || 0,
+            });
+          }
         } else {
           return;
         }
@@ -179,6 +197,12 @@ async function main() {
             logger.info(`[POLY] ${tag}`);
             lastPolyPrice = tag;
           }
+          if (RESEARCH_MODE && marketResearch.isActive()) {
+            marketResearch.recordTick({
+              btcPrice: signal.getStats()?.lastPrice,
+              polyYes: yes, polyNo: no,
+            });
+          }
           // FIX A: pre-fetchear próximo mercado cuando quedan ~60s
           const msRestantes = new Date(cachedMarket.endDate).getTime() - Date.now();
           if (msRestantes < 60000 && msRestantes > 0 && !nextMarketCache) {
@@ -186,6 +210,12 @@ async function main() {
           }
         } else {
           logger.info(`[POLY] Mercado resuelto (YES=${yes}), activando pre-cache...`);
+          if (RESEARCH_MODE && marketResearch.isActive()) {
+            marketResearch.closeMarket({
+              finalPrice: signal.getStats()?.lastPrice,
+              winner: yes >= 0.95 ? 'UP' : 'DOWN',
+            });
+          }
           cachedMarket = null;
           lastPolyPrice = '';
           preFetchScheduled = false;
