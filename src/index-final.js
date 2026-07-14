@@ -60,6 +60,19 @@ const httpServer = http.createServer((req, res) => {
     fs.createReadStream(file).pipe(res);
     return;
   }
+
+  if (url.pathname === '/research' && url.searchParams.get('key') === SECRET) {
+    const file = process.env.RESEARCH_FILE || path.join(process.env.DATA_DIR || '/data', 'market-research.jsonl');
+    if (!fs.existsSync(file)) {
+      res.writeHead(404); res.end('No research file yet — activar RESEARCH_MODE=true'); return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': 'attachment; filename=market-research.jsonl',
+    });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
   
   if (url.pathname === '/stats' && url.searchParams.get('key') === SECRET) {
     const stats = signalLogger.getStats();
