@@ -108,6 +108,12 @@ module.exports = {
   // 100 ticks @ 56 ticks/10s = ~18s warmup vs 35s con 200 ticks
   MIN_BUFFER_SIZE: parseInt(process.env.MIN_BUFFER_SIZE || '100'),
 
+  // LATE_ENTRY_MODE — modo experimental: espera confirmación de dirección
+  // en vez de anticiparse. Solo entra tarde en el período con precio ya definido.
+  LATE_ENTRY_MODE: process.env.LATE_ENTRY_MODE === 'true',
+  MAX_SECONDS_REMAINING: parseInt(process.env.MAX_SECONDS_REMAINING || '150'),
+  LATE_ENTRY_MAX_PRICE: parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30'),
+
   // Tolerancia de precio — acepta fills hasta N por encima del precio detectado
   // 0.02 = 2 ticks → sube fill rate de ~74% a ~90% con mínimo impacto en edge
   PRICE_TOLERANCE: parseFloat(process.env.PRICE_TOLERANCE || '0.02'),

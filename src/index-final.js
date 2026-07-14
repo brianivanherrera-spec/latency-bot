@@ -347,6 +347,27 @@ async function main() {
       return;
     }
 
+    // ─── Modo entrada tardía con confirmación (LATE_ENTRY_MODE) ────────
+    // Estrategia alternativa: en vez de anticiparse (latency arb clásico),
+    // esperar a que la dirección ya esté confirmada dentro del período
+    // y el precio del token ya refleje esa convicción (no cerca de 50/50).
+    const lateEntryMode = process.env.LATE_ENTRY_MODE === 'true';
+    if (lateEntryMode) {
+      const maxSecs = parseInt(process.env.MAX_SECONDS_REMAINING || '150');
+      if (segsRestantes > maxSecs) {
+        logger.info(`[SKIP] 🕐 LATE_ENTRY: ${segsRestantes}s restantes — muy pronto (máx ${maxSecs}s), esperando confirmación`);
+        return;
+      }
+      // Precio del token en la dirección elegida debe reflejar convicción
+      const tokenPrice = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
+      const minConviction = parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30');
+      if (tokenPrice > minConviction) {
+        logger.info(`[SKIP] 🕐 LATE_ENTRY: precio $${tokenPrice.toFixed(3)} > $${minConviction} — sin convicción suficiente todavía`);
+        return;
+      }
+      logger.info(`[LATE_ENTRY] ✅ Confirmado: ${segsRestantes}s restantes, precio $${tokenPrice.toFixed(3)} — alta convicción`);
+    }
+
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
     logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)} Score:${sig.signalScore}`);
 
