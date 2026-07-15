@@ -90,6 +90,8 @@ function closeMarket({ finalPrice, winner }) {
   };
 
   try {
+    const dir = require('path').dirname(RESEARCH_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.appendFileSync(RESEARCH_FILE, JSON.stringify(record) + '\n');
     logger.info(`Mercado registrado: ${record.winner} | rango $${record.range.toFixed(2)} | ${record.tickCount} ticks`);
   } catch (e) {
