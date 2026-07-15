@@ -111,6 +111,11 @@ module.exports = {
   // LATE_ENTRY_MODE — modo experimental: espera confirmación de dirección
   // en vez de anticiparse. Solo entra tarde en el período con precio ya definido.
   LATE_ENTRY_MODE: process.env.LATE_ENTRY_MODE === 'true',
+  // DUAL_ENTRY_MODE: permite operar los 2 filtros a la par —
+  // primera entrada con lógica normal (temprana) + segunda entrada
+  // en el mismo mercado solo si se confirma LATE_ENTRY después.
+  DUAL_ENTRY_MODE: process.env.DUAL_ENTRY_MODE === 'true',
+  MAX_ACTIVE_POSITIONS: parseInt(process.env.MAX_ACTIVE_POSITIONS || '1'),
   MAX_SECONDS_REMAINING: parseInt(process.env.MAX_SECONDS_REMAINING || '150'),
   LATE_ENTRY_MAX_PRICE: parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30'),
 

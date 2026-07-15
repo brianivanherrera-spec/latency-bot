@@ -59,7 +59,7 @@ class PnLTracker {
     }
   }
  
-  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId }) {
+  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType }) {
     const pos = {
       id: posId || `POS_${Date.now()}`,
       marketId,
@@ -72,6 +72,7 @@ class PnLTracker {
       endDate: new Date(endDate),
       openedAt: new Date(),
       status: 'OPEN',
+      entryType: entryType || 'early',  // 'early' o 'late' — para DUAL_ENTRY_MODE
     };
     this.positions.push(pos);
     this._saveToDisk();

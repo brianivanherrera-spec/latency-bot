@@ -350,16 +350,36 @@ async function main() {
     if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
     if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > 15) return;
 
-    if (activePositions.size >= 1) return; // máximo 1 posición simultánea
+    const maxSlots = parseInt(process.env.MAX_ACTIVE_POSITIONS || '1');
+    if (activePositions.size >= maxSlots) return; // límite de posiciones simultáneas
 
-    // Fix: bloquear doble entry en el mismo mercado (mismo conditionId)
-    // El cooldown de 3min puede expirar mientras el mercado de 5min sigue abierto
+    // DUAL_ENTRY_MODE: permite 2 entradas en el mismo mercado —
+    // una temprana (lógica normal) y una tardía (LATE_ENTRY confirmado).
+    // Sin DUAL_ENTRY_MODE, se mantiene el bloqueo clásico de 1 entrada por mercado.
+    const dualEntryMode = process.env.DUAL_ENTRY_MODE === 'true';
     if (cachedMarket?.conditionId) {
-      const alreadyInThisMarket = Array.from(activePositions.values())
-        .some(p => p.marketId === cachedMarket.conditionId);
-      if (alreadyInThisMarket) {
-        logger.warn(`[SKIP] Ya hay posición abierta en este mercado — evitando doble entry`);
-        return;
+      const entriesInThisMarket = Array.from(activePositions.values())
+        .filter(p => p.marketId === cachedMarket.conditionId);
+
+      if (dualEntryMode) {
+        // Máximo 2 entradas por mercado: 1 normal + 1 late entry
+        const maxPerMarket = 2;
+        if (entriesInThisMarket.length >= maxPerMarket) {
+          logger.warn(`[SKIP] Ya hay ${entriesInThisMarket.length} posiciones en este mercado (máx ${maxPerMarket})`);
+          return;
+        }
+        // Si ya hay 1 entrada, la segunda SOLO puede ser vía LATE_ENTRY confirmado
+        if (entriesInThisMarket.length >= 1 && entriesInThisMarket[0].entryType !== 'late') {
+          // Marcar que esta próxima entrada (si pasa) será la "late" —
+          // se valida más abajo en el bloque LATE_ENTRY_MODE
+          global.__pendingEntryType = 'late';
+        }
+      } else {
+        // Comportamiento clásico: solo 1 entrada por mercado
+        if (entriesInThisMarket.length >= 1) {
+          logger.warn(`[SKIP] Ya hay posición abierta en este mercado — evitando doble entry`);
+          return;
+        }
       }
     }
 
@@ -394,11 +414,21 @@ async function main() {
     // Estrategia alternativa: en vez de anticiparse (latency arb clásico),
     // esperar a que la dirección ya esté confirmada dentro del período
     // y el precio del token ya refleje esa convicción (no cerca de 50/50).
+    //
+    // Con DUAL_ENTRY_MODE=true, este filtro SOLO aplica a la segunda entrada
+    // del mismo mercado (global.__pendingEntryType === 'late'). La primera
+    // entrada usa la lógica normal (temprana) sin esperar confirmación.
     const lateEntryMode = process.env.LATE_ENTRY_MODE === 'true';
-    if (lateEntryMode) {
+    const dualEntryModeActive = process.env.DUAL_ENTRY_MODE === 'true';
+    const isSecondEntry = global.__pendingEntryType === 'late';
+    const applyLateEntryFilter = lateEntryMode && (!dualEntryModeActive || isSecondEntry);
+
+    let entryType = 'early';
+    if (applyLateEntryFilter) {
       const maxSecs = parseInt(process.env.MAX_SECONDS_REMAINING || '150');
       if (segsRestantes > maxSecs) {
         logger.info(`[SKIP] 🕐 LATE_ENTRY: ${segsRestantes}s restantes — muy pronto (máx ${maxSecs}s), esperando confirmación`);
+        global.__pendingEntryType = null;
         return;
       }
       // Precio del token en la dirección elegida debe reflejar convicción
@@ -406,12 +436,15 @@ async function main() {
       const minConviction = parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30');
       if (tokenPrice > minConviction) {
         logger.info(`[SKIP] 🕐 LATE_ENTRY: precio $${tokenPrice.toFixed(3)} > $${minConviction} — sin convicción suficiente todavía`);
+        global.__pendingEntryType = null;
         return;
       }
       logger.info(`[LATE_ENTRY] ✅ Confirmado: ${segsRestantes}s restantes, precio $${tokenPrice.toFixed(3)} — alta convicción`);
+      entryType = 'late';
     }
+    global.__pendingEntryType = null; // reset — se usa una sola vez por evaluación
 
-    logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar`);
+    logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar (tipo: ${entryType})`);
     logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)} Score:${sig.signalScore}`);
 
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
@@ -452,7 +485,11 @@ async function main() {
     // Cooldown siempre activo — sin excepción
     lastTradeTime = now;
     const posId = `POS_${Date.now()}`;
-    activePositions.set(posId, { exposure, openTime: now });
+    activePositions.set(posId, {
+      exposure, openTime: now,
+      marketId: cachedMarket?.conditionId,
+      entryType,  // 'early' o 'late' — usado por el gate de DUAL_ENTRY_MODE
+    });
 
     // Registrar señal en volumen persistente
     const utcHour = new Date().getUTCHours();
@@ -516,6 +553,7 @@ async function main() {
           endDate: cachedMarket.endDate,
           posId,
           mode: 'live',  // Fix 4: marcar como live
+          entryType,  // 'early' o 'late' — para DUAL_ENTRY_MODE
         });
 
         setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
@@ -549,6 +587,7 @@ async function main() {
         endDate: cachedMarket.endDate,
         posId,
         mode: 'paper',
+        entryType,  // 'early' o 'late' — para DUAL_ENTRY_MODE
       });
 
       setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
