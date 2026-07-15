@@ -92,14 +92,14 @@ const tracker = new PnLTracker();
 const activePositions = new Map();
 
 let lastTradeTime = 0;
-const COOLDOWN = 3 * 60 * 1000; // 3 MINUTOS
+const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // configurable via Railway
 
 async function main() {
   logger.info('═'.repeat(70));
   logger.info('🎯 LATENCY BOT - Versión Final');
   logger.info('═'.repeat(70));
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE 🔴'}`);
-  logger.info(`Cooldown: 3 minutos | Min edge: ${config.MIN_EDGE_PCT}%`);
+  logger.info(`Cooldown: ${COOLDOWN/1000}s | Min edge: ${config.MIN_EDGE_PCT}%`);
   logger.info('');
   alertBotStart({ dryRun: config.DRY_RUN });
 
