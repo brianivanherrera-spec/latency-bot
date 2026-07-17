@@ -219,7 +219,7 @@ class PolymarketClient {
       let orderStatus = (result?.status || 'unknown').toLowerCase(); // normalizar
       rec.status = 'PLACED'; rec.orderId = orderId;
       this._orderHistory.push(rec);
-      logger.info(`[LIVE] ✅ GTC Order ID: ${orderId} | status inicial: ${orderStatus}`);
+      logger.info(`[LIVE] ✅ ${isMarket ? 'MARKET' : 'GTC'} Order ID: ${orderId} | status inicial: ${orderStatus}`);
 
       const orderPlacedAt = Date.now(); // para calcular fill_time_ms
 
