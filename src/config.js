@@ -115,6 +115,10 @@ module.exports = {
   // primera entrada con lógica normal (temprana) + segunda entrada
   // en el mismo mercado solo si se confirma LATE_ENTRY después.
   DUAL_ENTRY_MODE: process.env.DUAL_ENTRY_MODE === 'true',
+  // MARKET_RETRY: si el intento MARKET (FOK) falla por falta de liquidez,
+  // reintenta automáticamente como GTC — mejora el fill rate sin sacrificar
+  // la velocidad del primer intento.
+  MARKET_RETRY: process.env.MARKET_RETRY === 'true',
   MAX_ACTIVE_POSITIONS: parseInt(process.env.MAX_ACTIVE_POSITIONS || '1'),
   MAX_SECONDS_REMAINING: parseInt(process.env.MAX_SECONDS_REMAINING || '150'),
   LATE_ENTRY_MAX_PRICE: parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30'),
