@@ -196,24 +196,42 @@ class PolymarketClient {
         side: side === 'BUY' ? Side.BUY : Side.SELL,
       };
 
+      let result;
+
       if (isMarket) {
-        // MARKET order — fill inmediato al mejor precio disponible
+        // MARKET_RETRY_ATTEMPTS: cuántas veces intentar FOK antes de caer a GTC.
+        // Cada intento fallido es prácticamente instantáneo (FOK no espera),
+        // así que 3 intentos rápidos cuestan poco tiempo real pero mejoran
+        // bastante la chance de encontrar liquidez en ese instante.
+        const maxAttempts = parseInt(process.env.MARKET_RETRY_ATTEMPTS || '3');
         orderParams.orderType = OrderType.FOK;
-        orderParams.price = price; // precio de referencia para FOK market
-        logger.info(`[LIVE] 📈 MARKET order (FOK) — fill inmediato al precio disponible`);
+        orderParams.price = price;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          logger.info(`[LIVE] 📈 MARKET order (FOK) intento ${attempt}/${maxAttempts}`);
+          result = await this.clobClient.createAndPostOrder(orderParams);
+          logger.info(`[LIVE] response (FOK intento ${attempt}): ${JSON.stringify(result)}`);
+
+          const gotFilled = result?.success && (result?.status || '').toLowerCase() === 'matched';
+          if (gotFilled) break; // fill instantáneo confirmado, no seguir intentando
+
+          if (attempt < maxAttempts) {
+            // Pequeña espera entre intentos para dar tiempo a que cambie el book
+            await new Promise(r => setTimeout(r, 300));
+          }
+        }
       } else {
         // GTC — orden límite con tolerancia de precio
         orderParams.orderType = OrderType.GTC;
         orderParams.price = price;
+        result = await this.clobClient.createAndPostOrder(orderParams);
+        logger.info(`[LIVE] response: ${JSON.stringify(result)}`);
       }
 
-      let result = await this.clobClient.createAndPostOrder(orderParams);
-
-      logger.info(`[LIVE] response: ${JSON.stringify(result)}`);
-
-      // MARKET_RETRY: si FOK falló (sin liquidez instantánea), reintentar como GTC
-      if (!result?.success && isMarket && marketRetryEnabled) {
-        logger.warn(`[LIVE] 🔁 FOK sin liquidez — reintentando como GTC (timeout corto)`);
+      // MARKET_RETRY: si los N intentos de FOK fallaron, caer a GTC como red de seguridad
+      const fokConfirmedMatch = result?.success && (result?.status || '').toLowerCase() === 'matched';
+      if (!fokConfirmedMatch && isMarket && marketRetryEnabled) {
+        logger.warn(`[LIVE] 🔁 FOK sin liquidez tras varios intentos — reintentando como GTC (timeout corto)`);
         const retryParams = { ...orderParams, orderType: OrderType.GTC };
         result = await this.clobClient.createAndPostOrder(retryParams);
         logger.info(`[LIVE] response (retry GTC): ${JSON.stringify(result)}`);
