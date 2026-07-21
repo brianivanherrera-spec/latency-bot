@@ -12,6 +12,30 @@ const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const config = require('./config');
+
+// DYNAMIC_SIZING: escala automática de order size según balance actual.
+// Variable de entorno: DYNAMIC_SIZE_SCALE="30:3,50:5,100:7,200:10,500:20,1000:50"
+// Formato: "balanceMinimo:orderSize" separados por coma, en orden creciente.
+// Si no está seteada o el balance no supera ningún tramo, usa ORDER_SIZE_USDC fijo.
+function getDynamicOrderSize(balance, fallbackSize) {
+  const scaleStr = process.env.DYNAMIC_SIZE_SCALE;
+  if (!scaleStr || balance === null || balance === undefined) return fallbackSize;
+
+  try {
+    const tramos = scaleStr.split(',').map(pair => {
+      const [bal, size] = pair.split(':').map(Number);
+      return { bal, size };
+    }).sort((a, b) => a.bal - b.bal);
+
+    let selected = fallbackSize;
+    for (const tramo of tramos) {
+      if (balance >= tramo.bal) selected = tramo.size;
+    }
+    return selected;
+  } catch (e) {
+    return fallbackSize;
+  }
+}
 const { alertTradeSignal, alertBotStart } = require('./alerts');
 const signalLogger = require('./signal-logger');
 
@@ -383,10 +407,18 @@ async function main() {
       }
     }
 
-    const exposure = config.ORDER_SIZE_USDC;
+    // DYNAMIC_SIZING: escala el order size automáticamente según el balance
+    // actual en Polymarket. Se define con pares "balance:size" separados por
+    // coma, por ejemplo: "30:3,50:5,100:7,200:10" — usa el tramo más alto
+    // que el balance actual ya haya superado.
+    const exposure = getDynamicOrderSize(currentBalance, config.ORDER_SIZE_USDC);
+    if (process.env.DYNAMIC_SIZE_SCALE && exposure !== config.ORDER_SIZE_USDC) {
+      logger.info(`[SIZE] 📊 Balance $${currentBalance} → order size dinámico: $${exposure}`);
+    }
+
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);
-    const maxExposure = Math.min(config.MAX_TOTAL_EXPOSURE_USDC, config.ORDER_SIZE_USDC * 2);
+    const maxExposure = Math.min(config.MAX_TOTAL_EXPOSURE_USDC, exposure * 2);
     if (totalExposure + exposure > maxExposure) return;
 
     if (!cachedMarket?.gammaId) {
