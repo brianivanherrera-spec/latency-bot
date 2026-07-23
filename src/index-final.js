@@ -411,9 +411,23 @@ async function main() {
     // actual en Polymarket. Se define con pares "balance:size" separados por
     // coma, por ejemplo: "30:3,50:5,100:7,200:10" — usa el tramo más alto
     // que el balance actual ya haya superado.
-    const exposure = getDynamicOrderSize(currentBalance, config.ORDER_SIZE_USDC);
+    //
+    // Fix: en PAPER, currentBalance venía del balance REAL de la wallet
+    // (consultado una sola vez al arrancar) y nunca reflejaba el crecimiento
+    // del capital simulado. Acá se calcula el balance simulado en vivo,
+    // en cada señal, a partir del P&L acumulado del tracker.
+    const balanceForSizing = config.DRY_RUN
+      ? parseFloat(process.env.PAPER_CAPITAL || '25') +
+        (parseFloat((tracker.getSummary().totalPnL ?? '0').replace('+', '').replace('$', '')) || 0)
+      : currentBalance;
+
+    if (!config.DRY_RUN && balanceForSizing === null) {
+      logger.warn('[SIZE] ⚠️ currentBalance es null — DYNAMIC_SIZE_SCALE no puede aplicar, usando ORDER_SIZE_USDC fijo (revisar getBalance/auth)');
+    }
+
+    const exposure = getDynamicOrderSize(balanceForSizing, config.ORDER_SIZE_USDC);
     if (process.env.DYNAMIC_SIZE_SCALE && exposure !== config.ORDER_SIZE_USDC) {
-      logger.info(`[SIZE] 📊 Balance $${currentBalance} → order size dinámico: $${exposure}`);
+      logger.info(`[SIZE] 📊 Balance $${balanceForSizing} → order size dinámico: $${exposure}`);
     }
 
     const totalExposure = Array.from(activePositions.values())
@@ -650,8 +664,15 @@ async function main() {
 
     // Actualizar balance real cada 5 minutos
     if (!config.DRY_RUN) {
-      const bal = await poly.getBalance().catch(() => null);
-      if (bal !== null) currentBalance = bal;
+      const bal = await poly.getBalance().catch((e) => {
+        logger.warn(`[BALANCE] ⚠️ getBalance() falló: ${e?.message || e}`);
+        return null;
+      });
+      if (bal !== null) {
+        currentBalance = bal;
+      } else {
+        logger.warn(`[BALANCE] ⚠️ getBalance() devolvió null — currentBalance sigue en ${currentBalance ?? 'null'}`);
+      }
     }
 
     const pnlReal = (currentBalance !== null && initialBalance !== null)
