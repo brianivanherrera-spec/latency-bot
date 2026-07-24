@@ -375,7 +375,10 @@ async function main() {
     if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > 15) return;
 
     const maxSlots = parseInt(process.env.MAX_ACTIVE_POSITIONS || '1');
-    if (activePositions.size >= maxSlots) return; // límite de posiciones simultáneas
+    if (activePositions.size >= maxSlots) {
+      logger.warn(`[SKIP] Slot ocupado (${activePositions.size}/${maxSlots}) — esperando que se libere una posición`);
+      return;
+    } // límite de posiciones simultáneas
 
     // DUAL_ENTRY_MODE: permite 2 entradas en el mismo mercado —
     // una temprana (lógica normal) y una tardía (LATE_ENTRY confirmado).
@@ -432,7 +435,10 @@ async function main() {
 
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);
-    const maxExposure = Math.min(config.MAX_TOTAL_EXPOSURE_USDC, exposure * 2);
+    // Fix: antes usaba "exposure * 2" fijo sin importar MAX_ACTIVE_POSITIONS,
+    // lo que en la práctica seguía topeando a 2 posiciones de capital aunque
+    // maxSlots estuviera en 3+ — nunca se llegaba a usar el slot extra.
+    const maxExposure = Math.min(config.MAX_TOTAL_EXPOSURE_USDC, exposure * maxSlots);
     if (totalExposure + exposure > maxExposure) return;
 
     if (!cachedMarket?.gammaId) {
