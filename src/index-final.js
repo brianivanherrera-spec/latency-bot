@@ -496,6 +496,20 @@ async function main() {
     }
     global.__pendingEntryType = null; // reset — se usa una sola vez por evaluación
 
+    // Fix: reservar el slot ACÁ, apenas se confirma que no hay otra entrada
+    // en este mercado y hay slot libre — antes esto se reservaba recién al
+    // final del bloque (abajo del todo), dejando una ventana de milisegundos
+    // donde dos señales casi simultáneas podían pasar los mismos chequeos
+    // y terminar abriendo 2 posiciones en el mismo mercado (visto en logs
+    // del 24/07: entradas duplicadas con 2-54ms de diferencia).
+    lastTradeTime = now;
+    const posId = `POS_${Date.now()}`;
+    activePositions.set(posId, {
+      exposure: 0, openTime: now,
+      marketId: cachedMarket?.conditionId,
+      entryType,
+    });
+
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar (tipo: ${entryType})`);
     logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)} Score:${sig.signalScore}`);
 
@@ -515,6 +529,7 @@ async function main() {
     // Fix 1: size check ANTES del Discord alert — no alertar órdenes que no van a ejecutarse
     if (size < 5) {
       logger.warn(`[SKIP] Size ${size} < mínimo 5 tokens de Polymarket (ORDER_SIZE_USDC=$${exposure} muy bajo)`);
+      activePositions.delete(posId); // liberar la reserva — esta entrada no va a ejecutarse
       return;
     }
 
@@ -534,9 +549,7 @@ async function main() {
     logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
     logger.info(`  Exposure: $${exposure} | Size: ${size} | Token: ${tokenId}`);
 
-    // Cooldown siempre activo — sin excepción
-    lastTradeTime = now;
-    const posId = `POS_${Date.now()}`;
+    // Completar la reserva con el exposure real (ya sabíamos marketId/entryType desde antes)
     activePositions.set(posId, {
       exposure, openTime: now,
       marketId: cachedMarket?.conditionId,
