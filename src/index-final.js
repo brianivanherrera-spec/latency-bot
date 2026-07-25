@@ -384,10 +384,23 @@ async function main() {
     // una temprana (lógica normal) y una tardía (LATE_ENTRY confirmado).
     // Sin DUAL_ENTRY_MODE, se mantiene el bloqueo clásico de 1 entrada por mercado.
     const dualEntryMode = process.env.DUAL_ENTRY_MODE === 'true';
-    if (cachedMarket?.conditionId) {
-      const entriesInThisMarket = Array.from(activePositions.values())
-        .filter(p => p.marketId === cachedMarket.conditionId);
+    // Fix: antes este bloque completo se salteaba si cachedMarket.conditionId
+    // era falsy (ej. durante la transición de un mercado a otro), dejando
+    // pasar entradas sin chequear duplicados — "fail-open". Ahora siempre
+    // se evalúa: usa gammaId como fallback, y si no hay NINGÚN id confiable
+    // de mercado, trata cualquier posición activa como conflicto potencial
+    // ("fail-safe" — ante la duda, bloquea en vez de dejar pasar).
+    const marketKey = cachedMarket?.conditionId || cachedMarket?.gammaId || null;
+    const entriesInThisMarket = marketKey
+      ? Array.from(activePositions.values()).filter(p => p.marketId === marketKey)
+      : Array.from(activePositions.values());
 
+    if (!marketKey && activePositions.size > 0) {
+      logger.warn(`[SKIP] Sin ID de mercado confiable y ya hay ${activePositions.size} posición(es) activa(s) — bloqueando por seguridad`);
+      return;
+    }
+
+    if (marketKey || activePositions.size > 0) {
       if (dualEntryMode) {
         // Máximo 2 entradas por mercado: 1 normal + 1 late entry
         const maxPerMarket = 2;
@@ -506,7 +519,7 @@ async function main() {
     const posId = `POS_${Date.now()}`;
     activePositions.set(posId, {
       exposure: 0, openTime: now,
-      marketId: cachedMarket?.conditionId,
+      marketId: marketKey,
       entryType,
     });
 
@@ -552,7 +565,7 @@ async function main() {
     // Completar la reserva con el exposure real (ya sabíamos marketId/entryType desde antes)
     activePositions.set(posId, {
       exposure, openTime: now,
-      marketId: cachedMarket?.conditionId,
+      marketId: marketKey,
       entryType,  // 'early' o 'late' — usado por el gate de DUAL_ENTRY_MODE
     });
 
