@@ -509,6 +509,18 @@ async function main() {
     }
     global.__pendingEntryType = null; // reset — se usa una sola vez por evaluación
 
+    // Fix (causa raíz de las "entradas duplicadas"): con DUAL_ENTRY_MODE=true
+    // y LATE_ENTRY_MODE=false, la segunda entrada del mismo mercado quedaba
+    // marcada como candidata 'late' pero la validación de late-entry (que
+    // vive en el bloque de LATE_ENTRY_MODE) nunca corría — así que pasaba
+    // directo como una entrada normal más, generando 2 posiciones casi
+    // simultáneas en el mismo mercado. La regla real es: la segunda entrada
+    // SOLO es válida si fue confirmada como 'late'; si no, se bloquea.
+    if (isSecondEntry && entryType !== 'late') {
+      logger.warn(`[SKIP] Segunda entrada en el mismo mercado sin confirmación LATE_ENTRY — bloqueando (DUAL_ENTRY requiere LATE_ENTRY_MODE para la 2da entrada)`);
+      return;
+    }
+
     // Fix: reservar el slot ACÁ, apenas se confirma que no hay otra entrada
     // en este mercado y hay slot libre — antes esto se reservaba recién al
     // final del bloque (abajo del todo), dejando una ventana de milisegundos
