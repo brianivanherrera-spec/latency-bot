@@ -243,6 +243,14 @@ class PolymarketClient {
       // MARKET_RETRY: si los N intentos de FOK fallaron, caer a GTC como red de seguridad
       const fokConfirmedMatch = result?.success && (result?.status || '').toLowerCase() === 'matched';
       if (!fokConfirmedMatch && isMarket && marketRetryEnabled) {
+        // Con FILL_RETRY activo, el fallback ya no es una sola orden GTC de
+        // 60s quieta — es el retry-loop completo con mejora de precio, que
+        // según los datos de NO_FILL es lo único que destraba el fill cuando
+        // el libro no tiene contraparte al precio inicial.
+        if (process.env.FILL_RETRY === 'true') {
+          logger.warn(`[LIVE] 🔁 FOK sin liquidez tras varios intentos — activando retry-loop GTC con mejora de precio`);
+          return await this._placeGtcWithRetry({ rec, tokenId, side, price, size, marketEndTs });
+        }
         logger.warn(`[LIVE] 🔁 FOK sin liquidez tras varios intentos — reintentando como GTC (timeout corto)`);
         const retryParams = { ...orderParams, orderType: OrderType.GTC };
         result = await this.clobClient.createAndPostOrder(retryParams);
