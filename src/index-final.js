@@ -612,6 +612,7 @@ async function main() {
           price,
           size,
           marketQuestion: cachedMarket.question,
+          marketEndTs: new Date(cachedMarket.endDate).getTime(), // para el presupuesto de FILL_RETRY
         });
 
         // Fix 2: GTC — verificar fill antes de abrir posición en tracker

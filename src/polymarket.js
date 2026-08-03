@@ -167,7 +167,7 @@ class PolymarketClient {
       endDate: m.endDate, yesTokenId: tokens[0]||null, noTokenId: tokens[1]||null, marketSlug: m.marketSlug };
   }
 
-  async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion }) {
+  async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs }) {
     const rec = { timestamp: new Date().toISOString(), marketId, marketQuestion,
       tokenId, side, price, size, usdcValue: (price * size).toFixed(2), status: 'PENDING' };
 
@@ -178,6 +178,18 @@ class PolymarketClient {
       return { success: true, orderId: rec.orderId, dryRun: true };
     }
     if (!tokenId) return { success: false, error: 'Token ID no disponible' };
+
+    // ─── FILL_RETRY: retry-loop con ajuste de precio ─────────────────────
+    // Evidencia (análisis de 277 NO_FILLs de julio): en el 100% de los casos
+    // el precio de Polymarket se mantuvo constante durante los 60s de espera
+    // — el problema es profundidad de libro, no velocidad. Reintentar al
+    // MISMO precio no sirve; cada reintento debe mejorar el precio un tick.
+    // Activar con FILL_RETRY=true. Solo aplica al camino GTC (no MARKET/FOK).
+    const fillRetryEnabled = process.env.FILL_RETRY === 'true';
+    const orderModePre = (config.ORDER_TYPE || 'GTC').toUpperCase();
+    if (fillRetryEnabled && orderModePre !== 'MARKET') {
+      return await this._placeGtcWithRetry({ rec, tokenId, side, price, size, marketEndTs });
+    }
 
     try {
       await this._init();
@@ -311,6 +323,151 @@ class PolymarketClient {
   }
 
   getOrderHistory() { return this._orderHistory; }
+
+  // ─── Retry-loop GTC con ajuste de precio ─────────────────────────────────
+  // Reemplaza la espera única de 60s por intentos cortos con precio cada vez
+  // un poco mejor. Config por env vars (todas con default razonable):
+  //   FILL_RETRY=true                → activa este camino
+  //   FILL_RETRY_ATTEMPT_SECONDS=15  → cuánto espera cada intento antes de
+  //                                    cancelar y reintentar con mejor precio
+  //   FILL_RETRY_PRICE_STEP=0.01     → cuánto mejora el precio por reintento
+  //   FILL_RETRY_MAX_BUMP=0.03       → tope total de mejora (protege el edge:
+  //                                    a +3 ticks el trade pierde su gracia)
+  //   FILL_RETRY_CUTOFF_SECONDS=25   → no iniciar un intento nuevo si al
+  //                                    mercado le quedan menos de esto
+  async _placeGtcWithRetry({ rec, tokenId, side, price, size, marketEndTs }) {
+    const ATTEMPT_MS  = parseInt(process.env.FILL_RETRY_ATTEMPT_SECONDS || '15') * 1000;
+    const PRICE_STEP  = parseFloat(process.env.FILL_RETRY_PRICE_STEP || '0.01');
+    const MAX_BUMP    = parseFloat(process.env.FILL_RETRY_MAX_BUMP || '0.03');
+    const CUTOFF_MS   = parseInt(process.env.FILL_RETRY_CUTOFF_SECONDS || '25') * 1000;
+    const POLL_MS     = 3000;
+
+    // Presupuesto de tiempo: hasta el cutoff del mercado si lo conocemos,
+    // si no, el GTC_TIMEOUT clásico como techo global.
+    const globalDeadline = marketEndTs
+      ? marketEndTs - CUTOFF_MS
+      : Date.now() + (config.GTC_TIMEOUT_SECONDS || 60) * 1000;
+
+    const isBuy = side === 'BUY';
+    const startedAt = Date.now();
+    let attempt = 0;
+    let currentPrice = price;
+
+    try {
+      await this._init();
+
+      while (Date.now() < globalDeadline) {
+        attempt++;
+        const remainingMs = globalDeadline - Date.now();
+        const attemptDeadline = Math.min(Date.now() + ATTEMPT_MS, globalDeadline);
+        logger.info(`[RETRY] intento ${attempt} @ $${currentPrice.toFixed(3)} | presupuesto restante: ${Math.floor(remainingMs/1000)}s`);
+
+        const orderParams = {
+          tokenID: tokenId, size,
+          side: isBuy ? Side.BUY : Side.SELL,
+          orderType: OrderType.GTC,
+          price: currentPrice,
+        };
+
+        let result;
+        try {
+          result = await this.clobClient.createAndPostOrder(orderParams);
+        } catch (e) {
+          logger.warn(`[RETRY] error al postear intento ${attempt}: ${e.message}`);
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+
+        if (!result?.success) {
+          logger.warn(`[RETRY] intento ${attempt} rechazado: ${result?.errorMsg || result?.error || 'sin detalle'}`);
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+
+        const orderId = result?.orderID || result?.orderId || result?.id;
+        let orderStatus = (result?.status || 'unknown').toLowerCase();
+
+        if (orderStatus === 'matched') {
+          const fillTimeMs = Date.now() - startedAt;
+          rec.status = 'PLACED'; rec.orderId = orderId; rec.fillAttempts = attempt;
+          rec.fillPrice = currentPrice;
+          this._orderHistory.push(rec);
+          logger.info(`[RETRY] ✅ Fill instantáneo en intento ${attempt} @ $${currentPrice.toFixed(3)} (${fillTimeMs}ms total)`);
+          return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice };
+        }
+
+        // En el book — poll corto hasta el deadline del intento
+        while (Date.now() < attemptDeadline) {
+          await new Promise(r => setTimeout(r, POLL_MS));
+          try {
+            const orderData = await this.clobClient.getOrder(orderId);
+            orderStatus = (orderData?.status || orderStatus).toLowerCase();
+            if (orderStatus === 'matched') {
+              const fillTimeMs = Date.now() - startedAt;
+              rec.status = 'PLACED'; rec.orderId = orderId; rec.fillAttempts = attempt;
+              rec.fillPrice = currentPrice;
+              this._orderHistory.push(rec);
+              logger.info(`[RETRY] ✅ Fill en intento ${attempt} @ $${currentPrice.toFixed(3)} (${fillTimeMs}ms total)`);
+              return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice };
+            }
+            if (orderStatus === 'cancelled' || orderStatus === 'canceled') break;
+          } catch (pollErr) {
+            logger.warn(`[RETRY] poll error: ${pollErr.message}`);
+          }
+        }
+
+        // No llenó en este intento — cancelar antes de reintentar (crítico:
+        // nunca dejar dos órdenes vivas al mismo tiempo)
+        if (orderStatus !== 'matched' && orderStatus !== 'cancelled' && orderStatus !== 'canceled') {
+          try {
+            await this.clobClient.cancelOrder({ orderId });
+            logger.info(`[RETRY] 🚫 intento ${attempt} cancelado (sin fill en ${ATTEMPT_MS/1000}s)`);
+          } catch (cancelErr) {
+            logger.error(`[RETRY] error cancelando intento ${attempt}: ${cancelErr.message}`);
+            // Si no pudimos confirmar la cancelación, NO reintentar con otra
+            // orden — riesgo de doble posición. Cortamos acá.
+            rec.status = 'FAILED'; rec.error = 'cancel_failed';
+            this._orderHistory.push(rec);
+            return { success: false, error: 'cancel_failed', orderId, attempts: attempt };
+          }
+          // Verificación post-cancel: si justo llenó entre el poll y el cancel,
+          // el cancel falla o el estado queda matched — chequear una vez más.
+          try {
+            const finalCheck = await this.clobClient.getOrder(orderId);
+            if ((finalCheck?.status || '').toLowerCase() === 'matched') {
+              const fillTimeMs = Date.now() - startedAt;
+              rec.status = 'PLACED'; rec.orderId = orderId; rec.fillAttempts = attempt;
+              rec.fillPrice = currentPrice;
+              this._orderHistory.push(rec);
+              logger.info(`[RETRY] ✅ Fill detectado post-cancel en intento ${attempt} @ $${currentPrice.toFixed(3)}`);
+              return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice };
+            }
+          } catch (e) { /* orden cancelada, seguir */ }
+        }
+
+        // Mejorar precio para el próximo intento, respetando el tope
+        const bumped = isBuy ? currentPrice + PRICE_STEP : currentPrice - PRICE_STEP;
+        const maxPrice = price + MAX_BUMP;
+        const minPrice = price - MAX_BUMP;
+        const capped = isBuy ? Math.min(bumped, maxPrice, 0.97) : Math.max(bumped, minPrice, 0.03);
+        if (capped === currentPrice) {
+          logger.warn(`[RETRY] tope de precio alcanzado ($${currentPrice.toFixed(3)}) — no hay más margen de mejora, esperando con este precio`);
+        }
+        currentPrice = parseFloat(capped.toFixed(3));
+      }
+
+      logger.warn(`[RETRY] ⏱️ Presupuesto agotado tras ${attempt} intento(s) — NO_FILL definitivo`);
+      rec.status = 'REJECTED'; rec.error = 'retry_budget_exhausted'; rec.fillAttempts = attempt;
+      this._orderHistory.push(rec);
+      return { success: false, error: 'gtc_timeout', attempts: attempt };
+
+    } catch (err) {
+      rec.status = 'FAILED'; rec.error = err.message;
+      this._orderHistory.push(rec);
+      logger.error(`[RETRY] Error fatal: ${err.message}`);
+      return { success: false, error: err.message };
+    }
+  }
 
   // Consultar balance USDC real de la deposit wallet en el CLOB
   async getBalance() {
