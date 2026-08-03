@@ -632,10 +632,19 @@ async function main() {
         // parcial (ej. 3 de 5 tokens) ya no se registra como si hubiera
         // llenado completo.
         const actualSize = orderResult.sizeFilled || size;
+        // FIX: usar el precio REAL al que llenó, no el precio original
+        // cotizado. Si el retry-loop tuvo que mejorar precio (ej. de $0.135
+        // a $0.155 en varios intentos), el costo real es más alto que el
+        // primer precio pedido — sin esto, el PnL registrado queda
+        // sistemáticamente más optimista que el gasto real de la wallet.
+        const actualPrice = orderResult.fillPrice || price;
+        if (actualPrice !== price) {
+          logger.warn(`[LIVE] 💲 Precio real de fill ($${actualPrice.toFixed(3)}) distinto al cotizado ($${price.toFixed(3)}) — usando el real para el tracker`);
+        }
         if (orderResult.partial) {
           logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} tokens — abriendo posición por el tamaño real, no el pedido`);
         }
-        logger.info(`[LIVE] ✅ Orden llenada (GTC): ${orderResult.orderId} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'} | size: ${actualSize}/${size}`);
+        logger.info(`[LIVE] ✅ Orden llenada (GTC): ${orderResult.orderId} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'} | size: ${actualSize}/${size} | price: $${actualPrice.toFixed(3)}`);
 
         // Guardar fill_time_ms en signal logger
         if (fillMs !== null) signalLogger.updateFillTime(posId, fillMs);
@@ -646,7 +655,7 @@ async function main() {
           gammaId: cachedMarket.gammaId,
           marketQuestion: cachedMarket.question,
           side,
-          price,
+          price: actualPrice,
           size: actualSize,
           endDate: cachedMarket.endDate,
           posId,
