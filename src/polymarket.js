@@ -251,18 +251,23 @@ class PolymarketClient {
         // exposición real). Cancelar siempre antes de seguir.
         const staleOrderId = result?.orderID || result?.orderId || result?.id;
         const staleStatus = (result?.status || '').toLowerCase();
+        let preFilledSize = 0; // FIX: si el FOK "muerto" ya llenó parcialmente, no lo perdemos
         if (staleOrderId && staleStatus !== 'matched' && staleStatus !== 'cancelled' && staleStatus !== 'canceled') {
           logger.warn(`[LIVE] ⚠️ FOK quedó con estado "${staleStatus}" (no killed) — cancelando orden ${staleOrderId} antes de reintentar`);
           try {
             await this.clobClient.cancelOrder({ orderId: staleOrderId });
-            // Verificar que no se haya llenado en el instante entre el check y el cancel
+            // Verificar que no se haya llenado (total o parcial) en el instante entre el check y el cancel
             const check = await this.clobClient.getOrder(staleOrderId).catch(() => null);
             if ((check?.status || '').toLowerCase() === 'matched') {
               logger.info(`[LIVE] ✅ La orden FOK "muerta" en realidad ya había llenado — usando ese fill, no se abre una segunda`);
               const fillTimeMs = Date.now() - (rec._placedAt || Date.now());
-              rec.status = 'PLACED'; rec.orderId = staleOrderId;
+              rec.status = 'PLACED'; rec.orderId = staleOrderId; rec.sizeFilled = size;
               this._orderHistory.push(rec);
-              return { success: true, orderId: staleOrderId, status: 'matched', fillTimeMs };
+              return { success: true, orderId: staleOrderId, status: 'matched', fillTimeMs, sizeFilled: size };
+            }
+            preFilledSize = parseFloat(check?.size_matched || check?.sizeFilled || 0) || 0;
+            if (preFilledSize > 0) {
+              logger.info(`[LIVE] 🔶 La orden FOK residual ya había llenado ${preFilledSize} tokens antes de cancelarse — se descuentan del próximo pedido`);
             }
             logger.info(`[LIVE] 🚫 Orden FOK residual ${staleOrderId} cancelada correctamente`);
           } catch (cancelErr) {
@@ -279,7 +284,16 @@ class PolymarketClient {
         // el libro no tiene contraparte al precio inicial.
         if (process.env.FILL_RETRY === 'true') {
           logger.warn(`[LIVE] 🔁 FOK sin liquidez tras varios intentos — activando retry-loop GTC con mejora de precio`);
-          return await this._placeGtcWithRetry({ rec, tokenId, side, price, size, marketEndTs });
+          const retryResult = await this._placeGtcWithRetry({
+            rec, tokenId, side, price, size: size - preFilledSize, marketEndTs,
+          });
+          // Sumar lo que ya había llenado el FOK residual al resultado del retry-loop
+          if (preFilledSize > 0 && retryResult) {
+            retryResult.sizeFilled = (retryResult.sizeFilled || 0) + preFilledSize;
+            retryResult.success = retryResult.success || preFilledSize > 0;
+            retryResult.partial = retryResult.partial || (retryResult.sizeFilled < size);
+          }
+          return retryResult;
         }
         logger.warn(`[LIVE] 🔁 FOK sin liquidez tras varios intentos — reintentando como GTC (timeout corto)`);
         const retryParams = { ...orderParams, orderType: OrderType.GTC };
@@ -390,18 +404,20 @@ class PolymarketClient {
     const startedAt = Date.now();
     let attempt = 0;
     let currentPrice = price;
+    let filledSoFar = 0;      // FIX: tokens ya confirmados llenados en intentos previos
+    let remainingSize = size; // lo que falta pedir — nunca el tamaño original completo
 
     try {
       await this._init();
 
-      while (Date.now() < globalDeadline) {
+      while (Date.now() < globalDeadline && remainingSize > 0) {
         attempt++;
         const remainingMs = globalDeadline - Date.now();
         const attemptDeadline = Math.min(Date.now() + ATTEMPT_MS, globalDeadline);
-        logger.info(`[RETRY] intento ${attempt} @ $${currentPrice.toFixed(3)} | presupuesto restante: ${Math.floor(remainingMs/1000)}s`);
+        logger.info(`[RETRY] intento ${attempt} @ $${currentPrice.toFixed(3)} | pidiendo ${remainingSize}/${size} (${filledSoFar} ya llenados) | presupuesto restante: ${Math.floor(remainingMs/1000)}s`);
 
         const orderParams = {
-          tokenID: tokenId, size,
+          tokenID: tokenId, size: remainingSize,
           side: isBuy ? Side.BUY : Side.SELL,
           orderType: OrderType.GTC,
           price: currentPrice,
@@ -426,27 +442,34 @@ class PolymarketClient {
         let orderStatus = (result?.status || 'unknown').toLowerCase();
 
         if (orderStatus === 'matched') {
+          filledSoFar += remainingSize; // esta orden llenó completa
           const fillTimeMs = Date.now() - startedAt;
           rec.status = 'PLACED'; rec.orderId = orderId; rec.fillAttempts = attempt;
-          rec.fillPrice = currentPrice;
+          rec.fillPrice = currentPrice; rec.sizeFilled = filledSoFar;
           this._orderHistory.push(rec);
-          logger.info(`[RETRY] ✅ Fill instantáneo en intento ${attempt} @ $${currentPrice.toFixed(3)} (${fillTimeMs}ms total)`);
-          return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice };
+          logger.info(`[RETRY] ✅ Fill instantáneo en intento ${attempt} @ $${currentPrice.toFixed(3)} — ${filledSoFar}/${size} (${fillTimeMs}ms total)`);
+          return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice, sizeFilled: filledSoFar };
         }
 
         // En el book — poll corto hasta el deadline del intento
+        let thisOrderFilled = 0;
         while (Date.now() < attemptDeadline) {
           await new Promise(r => setTimeout(r, POLL_MS));
           try {
             const orderData = await this.clobClient.getOrder(orderId);
             orderStatus = (orderData?.status || orderStatus).toLowerCase();
+            thisOrderFilled = parseFloat(orderData?.size_matched || orderData?.sizeFilled || 0) || 0;
+            if (thisOrderFilled > 0 && thisOrderFilled < remainingSize) {
+              logger.info(`[RETRY] 🔶 Fill parcial detectado: ${thisOrderFilled}/${remainingSize} en esta orden — se sigue esperando el resto`);
+            }
             if (orderStatus === 'matched') {
+              filledSoFar += remainingSize; // llenó el total pedido en esta orden
               const fillTimeMs = Date.now() - startedAt;
               rec.status = 'PLACED'; rec.orderId = orderId; rec.fillAttempts = attempt;
-              rec.fillPrice = currentPrice;
+              rec.fillPrice = currentPrice; rec.sizeFilled = filledSoFar;
               this._orderHistory.push(rec);
-              logger.info(`[RETRY] ✅ Fill en intento ${attempt} @ $${currentPrice.toFixed(3)} (${fillTimeMs}ms total)`);
-              return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice };
+              logger.info(`[RETRY] ✅ Fill en intento ${attempt} @ $${currentPrice.toFixed(3)} — ${filledSoFar}/${size} (${fillTimeMs}ms total)`);
+              return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice, sizeFilled: filledSoFar };
             }
             if (orderStatus === 'cancelled' || orderStatus === 'canceled') break;
           } catch (pollErr) {
@@ -454,33 +477,47 @@ class PolymarketClient {
           }
         }
 
-        // No llenó en este intento — cancelar antes de reintentar (crítico:
-        // nunca dejar dos órdenes vivas al mismo tiempo)
+        // No llenó del todo en este intento — cancelar el remanente antes de
+        // reintentar (crítico: nunca dejar dos órdenes vivas al mismo tiempo)
         if (orderStatus !== 'matched' && orderStatus !== 'cancelled' && orderStatus !== 'canceled') {
           try {
             await this.clobClient.cancelOrder({ orderId });
-            logger.info(`[RETRY] 🚫 intento ${attempt} cancelado (sin fill en ${ATTEMPT_MS/1000}s)`);
+            logger.info(`[RETRY] 🚫 intento ${attempt} cancelado (sin fill completo en ${ATTEMPT_MS/1000}s)`);
           } catch (cancelErr) {
             logger.error(`[RETRY] error cancelando intento ${attempt}: ${cancelErr.message}`);
             // Si no pudimos confirmar la cancelación, NO reintentar con otra
-            // orden — riesgo de doble posición. Cortamos acá.
-            rec.status = 'FAILED'; rec.error = 'cancel_failed';
+            // orden — riesgo de doble posición. Cortamos acá, pero si ya
+            // sabemos que hay fill parcial confirmado, lo reportamos igual.
+            rec.status = 'FAILED'; rec.error = 'cancel_failed'; rec.sizeFilled = filledSoFar + thisOrderFilled;
             this._orderHistory.push(rec);
-            return { success: false, error: 'cancel_failed', orderId, attempts: attempt };
+            return { success: filledSoFar + thisOrderFilled > 0, orderId, attempts: attempt,
+              error: 'cancel_failed', sizeFilled: filledSoFar + thisOrderFilled, partial: true };
           }
-          // Verificación post-cancel: si justo llenó entre el poll y el cancel,
-          // el cancel falla o el estado queda matched — chequear una vez más.
+          // Verificación post-cancel: si justo llenó (total o parcial) entre
+          // el poll y el cancel, leer el estado final antes de seguir.
           try {
             const finalCheck = await this.clobClient.getOrder(orderId);
-            if ((finalCheck?.status || '').toLowerCase() === 'matched') {
+            const finalStatus = (finalCheck?.status || '').toLowerCase();
+            const finalFilled = parseFloat(finalCheck?.size_matched || finalCheck?.sizeFilled || 0) || 0;
+            if (finalStatus === 'matched') {
+              filledSoFar += remainingSize;
               const fillTimeMs = Date.now() - startedAt;
               rec.status = 'PLACED'; rec.orderId = orderId; rec.fillAttempts = attempt;
-              rec.fillPrice = currentPrice;
+              rec.fillPrice = currentPrice; rec.sizeFilled = filledSoFar;
               this._orderHistory.push(rec);
-              logger.info(`[RETRY] ✅ Fill detectado post-cancel en intento ${attempt} @ $${currentPrice.toFixed(3)}`);
-              return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice };
+              logger.info(`[RETRY] ✅ Fill detectado post-cancel en intento ${attempt} @ $${currentPrice.toFixed(3)} — ${filledSoFar}/${size}`);
+              return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice, sizeFilled: filledSoFar };
             }
-          } catch (e) { /* orden cancelada, seguir */ }
+            if (finalFilled > 0) {
+              // FIX CENTRAL: la cancelación solo mata el remanente — lo ya
+              // llenado queda en la wallet. Sumarlo y descontarlo de lo que
+              // se pide en el próximo intento, para no terminar pidiendo el
+              // tamaño completo de nuevo y duplicar exposición.
+              filledSoFar += finalFilled;
+              remainingSize = parseFloat((remainingSize - finalFilled).toFixed(6));
+              logger.info(`[RETRY] 🔶 Confirmado fill parcial de ${finalFilled} antes del cancel — acumulado ${filledSoFar}/${size}, quedan ${remainingSize} por pedir`);
+            }
+          } catch (e) { /* orden ya no existe / cancelada limpia, seguir */ }
         }
 
         // Mejorar precio para el próximo intento, respetando el tope
@@ -494,6 +531,12 @@ class PolymarketClient {
         currentPrice = parseFloat(capped.toFixed(3));
       }
 
+      if (filledSoFar > 0) {
+        logger.warn(`[RETRY] ⏱️ Presupuesto agotado tras ${attempt} intento(s) — fill PARCIAL: ${filledSoFar}/${size} tokens`);
+        rec.status = 'PARTIAL'; rec.fillAttempts = attempt; rec.sizeFilled = filledSoFar;
+        this._orderHistory.push(rec);
+        return { success: true, partial: true, sizeFilled: filledSoFar, requestedSize: size, attempts: attempt };
+      }
       logger.warn(`[RETRY] ⏱️ Presupuesto agotado tras ${attempt} intento(s) — NO_FILL definitivo`);
       rec.status = 'REJECTED'; rec.error = 'retry_budget_exhausted'; rec.fillAttempts = attempt;
       this._orderHistory.push(rec);

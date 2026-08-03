@@ -628,7 +628,14 @@ async function main() {
         }
 
         const fillMs = orderResult.fillTimeMs || null;
-        logger.info(`[LIVE] ✅ Orden llenada (GTC): ${orderResult.orderId} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
+        // FIX: usar el tamaño REALMENTE llenado, no el pedido — un fill
+        // parcial (ej. 3 de 5 tokens) ya no se registra como si hubiera
+        // llenado completo.
+        const actualSize = orderResult.sizeFilled || size;
+        if (orderResult.partial) {
+          logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} tokens — abriendo posición por el tamaño real, no el pedido`);
+        }
+        logger.info(`[LIVE] ✅ Orden llenada (GTC): ${orderResult.orderId} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'} | size: ${actualSize}/${size}`);
 
         // Guardar fill_time_ms en signal logger
         if (fillMs !== null) signalLogger.updateFillTime(posId, fillMs);
@@ -640,7 +647,7 @@ async function main() {
           marketQuestion: cachedMarket.question,
           side,
           price,
-          size,
+          size: actualSize,
           endDate: cachedMarket.endDate,
           posId,
           mode: 'live',  // Fix 4: marcar como live
