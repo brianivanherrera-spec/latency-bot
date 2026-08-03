@@ -243,6 +243,36 @@ class PolymarketClient {
       // MARKET_RETRY: si los N intentos de FOK fallaron, caer a GTC como red de seguridad
       const fokConfirmedMatch = result?.success && (result?.status || '').toLowerCase() === 'matched';
       if (!fokConfirmedMatch && isMarket && marketRetryEnabled) {
+        // FIX CRÍTICO (detectado en el primer log de live, 03/08): un FOK que
+        // no llena instantáneo puede volver con status "live" — es decir,
+        // Polymarket lo dejó viva en el libro en vez de matarla. Si no la
+        // cancelamos acá, el retry-loop de abajo abre una SEGUNDA orden
+        // independiente y quedan dos órdenes vivas al mismo tiempo (doble
+        // exposición real). Cancelar siempre antes de seguir.
+        const staleOrderId = result?.orderID || result?.orderId || result?.id;
+        const staleStatus = (result?.status || '').toLowerCase();
+        if (staleOrderId && staleStatus !== 'matched' && staleStatus !== 'cancelled' && staleStatus !== 'canceled') {
+          logger.warn(`[LIVE] ⚠️ FOK quedó con estado "${staleStatus}" (no killed) — cancelando orden ${staleOrderId} antes de reintentar`);
+          try {
+            await this.clobClient.cancelOrder({ orderId: staleOrderId });
+            // Verificar que no se haya llenado en el instante entre el check y el cancel
+            const check = await this.clobClient.getOrder(staleOrderId).catch(() => null);
+            if ((check?.status || '').toLowerCase() === 'matched') {
+              logger.info(`[LIVE] ✅ La orden FOK "muerta" en realidad ya había llenado — usando ese fill, no se abre una segunda`);
+              const fillTimeMs = Date.now() - (rec._placedAt || Date.now());
+              rec.status = 'PLACED'; rec.orderId = staleOrderId;
+              this._orderHistory.push(rec);
+              return { success: true, orderId: staleOrderId, status: 'matched', fillTimeMs };
+            }
+            logger.info(`[LIVE] 🚫 Orden FOK residual ${staleOrderId} cancelada correctamente`);
+          } catch (cancelErr) {
+            logger.error(`[LIVE] ❌ No se pudo cancelar la orden FOK residual ${staleOrderId}: ${cancelErr.message} — ABORTANDO reintento para no duplicar exposición`);
+            rec.status = 'FAILED'; rec.error = 'stale_fok_cancel_failed';
+            this._orderHistory.push(rec);
+            return { success: false, error: 'stale_fok_cancel_failed', orderId: staleOrderId };
+          }
+        }
+
         // Con FILL_RETRY activo, el fallback ya no es una sola orden GTC de
         // 60s quieta — es el retry-loop completo con mejora de precio, que
         // según los datos de NO_FILL es lo único que destraba el fill cuando
