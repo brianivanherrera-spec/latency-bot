@@ -247,13 +247,27 @@ class PolymarketClient {
 
           // FAK puede devolver fill parcial: filled < size pero > 0
           if (useFak && result?.success) {
+            const rawStatusFak = (result?.status || '').toLowerCase();
+            // Si status=matched, llenó el pedido completo de este intento
+            if (rawStatusFak === 'matched') {
+              preFilledFromFak += orderParams.size;
+              break;
+            }
+            // Fix #2: no usar 'remaining' como fallback — puede contar de más.
+            // Solo confiar en size_matched / sizeFilled si vienen explícitamente.
             const fakFilled = parseFloat(result?.size_matched || result?.sizeFilled || 0) || 0;
             if (fakFilled > 0 && fakFilled < orderParams.size) {
               preFilledFromFak += fakFilled;
-              orderParams.size = parseFloat((orderParams.size - fakFilled).toFixed(6));
-              logger.info(`[LIVE] 🔶 FAK fill parcial: ${fakFilled} tokens — quedan ${orderParams.size} por llenar`);
-              if (orderParams.size < 1) break; // ya prácticamente lleno
-              continue; // reintentar por el remanente
+              const newRemaining = parseFloat((orderParams.size - fakFilled).toFixed(6));
+              logger.info(`[LIVE] 🔶 FAK fill parcial: ${fakFilled} tokens — quedan ${newRemaining} por llenar`);
+              // Fix #1: si el remanente es < mínimo de Polymarket (5 tokens),
+              // aceptar lo ya llenado y salir en vez de mandar una orden inválida
+              if (newRemaining < 5) {
+                logger.info(`[LIVE] 🔶 Remanente ${newRemaining} < 5 tokens (mínimo Polymarket) — aceptando fill parcial de ${preFilledFromFak} tokens`);
+                break;
+              }
+              orderParams.size = newRemaining;
+              continue; // reintentar por el remanente válido
             }
           }
 
@@ -318,10 +332,22 @@ class PolymarketClient {
         if (process.env.FILL_RETRY === 'true') {
           logger.warn(`[LIVE] 🔁 FAK/FOK sin liquidez suficiente — activando retry-loop GTC con mejora de precio`);
           const preFilledFromFak = result?._preFilledFromFak || 0;
-          const remainingAfterFok = size - preFilledSize - preFilledFromFak;
+          const remainingAfterFak = size - preFilledSize - preFilledFromFak;
+
+          // Fix #1: si el remanente es < 5 tokens (mínimo Polymarket), no
+          // podemos mandarlo al retry-loop — devolver success parcial con lo
+          // ya llenado en vez de reportar fallo o quedar en limbo.
+          if (remainingAfterFak > 0 && remainingAfterFak < 5 && (preFilledSize + preFilledFromFak) > 0) {
+            const totalFilled = preFilledSize + preFilledFromFak;
+            logger.info(`[LIVE] 🔶 Remanente ${remainingAfterFak} < 5 tokens — devolviendo fill parcial de ${totalFilled}/${size}`);
+            rec.status = 'PARTIAL'; rec.sizeFilled = totalFilled;
+            this._orderHistory.push(rec);
+            return { success: true, partial: true, sizeFilled: totalFilled, requestedSize: size };
+          }
+
           const retryResult = process.env.ORDER_SPLIT === 'true'
-            ? await this._placeSplitOrders({ rec, tokenId, side, price, size: remainingAfterFok, marketEndTs })
-            : await this._placeGtcWithRetry({ rec, tokenId, side, price, size: remainingAfterFok, marketEndTs });
+            ? await this._placeSplitOrders({ rec, tokenId, side, price, size: remainingAfterFak, marketEndTs })
+            : await this._placeGtcWithRetry({ rec, tokenId, side, price, size: remainingAfterFak, marketEndTs });
           // Sumar lo ya llenado (FOK/FAK residual + fill parcial FAK) al resultado
           const totalPreFilled = preFilledSize + preFilledFromFak;
           if (totalPreFilled > 0 && retryResult) {
