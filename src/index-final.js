@@ -712,10 +712,25 @@ async function main() {
     // Cubre el movimiento de precio entre detección y ejecución (HTTP polling 0-2s)
     // Default 0.02 = 2 ticks — sube fill rate de ~74% a ~90% con mínimo impacto en edge
     const priceTolerance = parseFloat(process.env.PRICE_TOLERANCE || '0.02');
-    const price = Math.min(0.97, parseFloat((priceRaw + priceTolerance).toFixed(3)));
+
+    // EDGE_BOOST: cuando el edge calculado supera un umbral, arrancar el primer
+    // intento con 1-2 ticks adicionales de agresividad. La lógica: una señal
+    // con edge ≥ 2% tiene tanta convicción que vale sacrificar un centavo más
+    // para asegurar el fill en vez de perder la oportunidad por falta de liquidez.
+    // Basado en evidencia: los fills que tardan >90s pierden sistemáticamente
+    // (04/08) — arrancar más agresivo en señales fuertes evita esos llenados tardíos.
+    //   EDGE_BOOST_THRESHOLD=2.0   → edge en % desde donde se activa
+    //   EDGE_BOOST_TICKS=0.01      → cuánto extra se suma al precio (1 tick = $0.01)
+    const edgeBoostThreshold = parseFloat(process.env.EDGE_BOOST_THRESHOLD || '0');
+    const edgeBoostTicks = parseFloat(process.env.EDGE_BOOST_TICKS || '0.01');
+    const edgePct = sig.edge?.edgePct || 0;
+    const edgeBoost = (edgeBoostThreshold > 0 && edgePct >= edgeBoostThreshold) ? edgeBoostTicks : 0;
+    if (edgeBoost > 0) logger.info(`[PRICE] Edge ${edgePct.toFixed(2)}% ≥ ${edgeBoostThreshold}% → boost de +$${edgeBoost} al precio inicial`);
+
+    const price = Math.min(0.97, parseFloat((priceRaw + priceTolerance + edgeBoost).toFixed(3)));
     const size = Math.floor(exposure / price);
 
-    logger.info(`[PRICE] Raw: $${priceRaw.toFixed(3)} + tolerance: $${priceTolerance} → orden: $${price.toFixed(3)}`);
+    logger.info(`[PRICE] Raw: $${priceRaw.toFixed(3)} + tolerance: $${priceTolerance}${edgeBoost > 0 ? ` + boost: $${edgeBoost}` : ''} → orden: $${price.toFixed(3)}`);
 
     // Fix 1: size check ANTES del Discord alert — no alertar órdenes que no van a ejecutarse
     if (size < 5) {
