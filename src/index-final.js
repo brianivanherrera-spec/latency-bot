@@ -825,8 +825,9 @@ async function main() {
           size: actualSize,
           endDate: cachedMarket.endDate,
           posId,
-          mode: 'live',  // Fix 4: marcar como live
-          entryType,  // 'early' o 'late' — para DUAL_ENTRY_MODE
+          tokenId,    // necesario para el position monitor
+          mode: 'live',
+          entryType,
         });
 
         setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);

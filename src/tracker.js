@@ -59,20 +59,21 @@ class PnLTracker {
     }
   }
  
-  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType }) {
+  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType, tokenId }) {
     const pos = {
       id: posId || `POS_${Date.now()}`,
       marketId,
       gammaId,
       marketQuestion,
       side,
+      tokenId,        // necesario para el position monitor (SL/TP/lock-in)
       entryPrice: price,
       size,
       usdcIn: parseFloat((price * size).toFixed(2)),
       endDate: new Date(endDate),
       openedAt: new Date(),
       status: 'OPEN',
-      entryType: entryType || 'early',  // 'early' o 'late' — para DUAL_ENTRY_MODE
+      entryType: entryType || 'early',
     };
     this.positions.push(pos);
     this._saveToDisk();
