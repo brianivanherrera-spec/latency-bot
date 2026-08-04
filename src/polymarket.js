@@ -218,26 +218,52 @@ class PolymarketClient {
       let result;
 
       if (isMarket) {
-        // MARKET_RETRY_ATTEMPTS: cuántas veces intentar FOK antes de caer a GTC.
-        // Cada intento fallido es prácticamente instantáneo (FOK no espera),
-        // así que 3 intentos rápidos cuestan poco tiempo real pero mejoran
-        // bastante la chance de encontrar liquidez en ese instante.
+        // FAK (Fill And Kill) en vez de FOK (Fill Or Kill):
+        // FOK = todo o nada → si no hay suficiente liquidez para el size completo,
+        //       la orden muere entera aunque haya 3 de 5 tokens disponibles.
+        // FAK = llena lo que haya y cancela el resto → con el tracker de fills
+        //       parciales que ya tenemos, 3 de 5 tokens llenados es útil: el
+        //       retry-loop pide los 2 restantes. Mismo comportamiento desde
+        //       la API pero con más fills aprovechables en libros delgados.
+        // Confirmado disponible en clob-client-v2 v1.0.6: OrderType.FAK
+        //
+        // USE_FAK=true  → activa FAK (default: false para no cambiar comportamiento
+        //                  sin validación explícita; activar en Railway cuando listo)
+        const useFak = process.env.USE_FAK === 'true';
+        const firstOrderType = useFak ? OrderType.FAK : OrderType.FOK;
         const maxAttempts = parseInt(process.env.MARKET_RETRY_ATTEMPTS || '3');
-        orderParams.orderType = OrderType.FOK;
+        orderParams.orderType = firstOrderType;
         orderParams.price = price;
 
+        let preFilledFromFak = 0;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          logger.info(`[LIVE] 📈 MARKET order (FOK) intento ${attempt}/${maxAttempts}`);
+          const orderLabel = useFak ? 'FAK' : 'FOK';
+          logger.info(`[LIVE] 📈 MARKET order (${orderLabel}) intento ${attempt}/${maxAttempts}`);
           result = await this.clobClient.createAndPostOrder(orderParams);
-          logger.info(`[LIVE] response (FOK intento ${attempt}): ${JSON.stringify(result)}`);
+          logger.info(`[LIVE] response (${orderLabel} intento ${attempt}): ${JSON.stringify(result)}`);
 
-          const gotFilled = result?.success && (result?.status || '').toLowerCase() === 'matched';
-          if (gotFilled) break; // fill instantáneo confirmado, no seguir intentando
+          const rawStatus = (result?.status || '').toLowerCase();
+          const gotFilled = result?.success && rawStatus === 'matched';
 
-          if (attempt < maxAttempts) {
-            // Pequeña espera entre intentos para dar tiempo a que cambie el book
-            await new Promise(r => setTimeout(r, 300));
+          // FAK puede devolver fill parcial: filled < size pero > 0
+          if (useFak && result?.success) {
+            const fakFilled = parseFloat(result?.size_matched || result?.sizeFilled || 0) || 0;
+            if (fakFilled > 0 && fakFilled < orderParams.size) {
+              preFilledFromFak += fakFilled;
+              orderParams.size = parseFloat((orderParams.size - fakFilled).toFixed(6));
+              logger.info(`[LIVE] 🔶 FAK fill parcial: ${fakFilled} tokens — quedan ${orderParams.size} por llenar`);
+              if (orderParams.size < 1) break; // ya prácticamente lleno
+              continue; // reintentar por el remanente
+            }
           }
+
+          if (gotFilled) break;
+          if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 300));
+        }
+
+        // Si FAK llenó algo parcialmente, guardar para sumarlo al resultado final
+        if (preFilledFromFak > 0 && result) {
+          result._preFilledFromFak = preFilledFromFak;
         }
       } else {
         // GTC — orden límite con tolerancia de precio
@@ -290,15 +316,17 @@ class PolymarketClient {
         // según los datos de NO_FILL es lo único que destraba el fill cuando
         // el libro no tiene contraparte al precio inicial.
         if (process.env.FILL_RETRY === 'true') {
-          logger.warn(`[LIVE] 🔁 FOK sin liquidez tras varios intentos — activando retry-loop GTC con mejora de precio`);
-          const remainingAfterFok = size - preFilledSize;
+          logger.warn(`[LIVE] 🔁 FAK/FOK sin liquidez suficiente — activando retry-loop GTC con mejora de precio`);
+          const preFilledFromFak = result?._preFilledFromFak || 0;
+          const remainingAfterFok = size - preFilledSize - preFilledFromFak;
           const retryResult = process.env.ORDER_SPLIT === 'true'
             ? await this._placeSplitOrders({ rec, tokenId, side, price, size: remainingAfterFok, marketEndTs })
             : await this._placeGtcWithRetry({ rec, tokenId, side, price, size: remainingAfterFok, marketEndTs });
-          // Sumar lo que ya había llenado el FOK residual al resultado del retry-loop
-          if (preFilledSize > 0 && retryResult) {
-            retryResult.sizeFilled = (retryResult.sizeFilled || 0) + preFilledSize;
-            retryResult.success = retryResult.success || preFilledSize > 0;
+          // Sumar lo ya llenado (FOK/FAK residual + fill parcial FAK) al resultado
+          const totalPreFilled = preFilledSize + preFilledFromFak;
+          if (totalPreFilled > 0 && retryResult) {
+            retryResult.sizeFilled = (retryResult.sizeFilled || 0) + totalPreFilled;
+            retryResult.success = retryResult.success || totalPreFilled > 0;
             retryResult.partial = retryResult.partial || (retryResult.sizeFilled < size);
           }
           return retryResult;
