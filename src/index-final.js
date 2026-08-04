@@ -295,8 +295,16 @@ async function main() {
   }, 60000);
 
   // Historial de precio BTC con timestamp para filtro de tendencia exacto
-  const btcPriceHistory = []; // [{price, ts}]
+  const btcPriceHistory = []; // [{price, ts}] — ventana de 1 hora (filtro rápido)
   const BTC_TREND_WINDOW_MS = 60 * 60 * 1000; // 1 hora en ms
+
+  // Segundo historial para el filtro de ventana larga — detecta derivas lentas
+  // y sostenidas que el filtro de 1 hora no puede ver (ej: BTC +$1800 en 38hs
+  // a ~$60/hora, nunca supera $500/hora pero acumula una tendencia real).
+  // Controlado por BTC_TREND_FILTER_LONG y BTC_TREND_WINDOW_HOURS_LONG.
+  const btcPriceHistoryLong = []; // [{price, ts}]
+  const BTC_TREND_WINDOW_HOURS_LONG = parseFloat(process.env.BTC_TREND_WINDOW_HOURS_LONG || '4');
+  const BTC_TREND_WINDOW_MS_LONG = BTC_TREND_WINDOW_HOURS_LONG * 60 * 60 * 1000;
 
   ws.onPrice(async (priceData) => {
     const btcPriceNow = priceData.price || priceData.currentPrice || priceData.lastPrice || 0;
@@ -306,6 +314,11 @@ async function main() {
       // Limpiar entradas más viejas de 1 hora
       while (btcPriceHistory.length > 0 && nowMs - btcPriceHistory[0].ts > BTC_TREND_WINDOW_MS) {
         btcPriceHistory.shift();
+      }
+      // Historial largo — mantiene hasta BTC_TREND_WINDOW_HOURS_LONG horas
+      btcPriceHistoryLong.push({ price: btcPriceNow, ts: nowMs });
+      while (btcPriceHistoryLong.length > 0 && nowMs - btcPriceHistoryLong[0].ts > BTC_TREND_WINDOW_MS_LONG) {
+        btcPriceHistoryLong.shift();
       }
     }
 
@@ -343,6 +356,32 @@ async function main() {
         }
         if (btcMoveLastHour < -trendFilter && sig.direction === 'UP') {
           logger.warn(`[SKIP] 📉 BTC $${btcMoveLastHour.toFixed(0)} en ${ageMinutes.toFixed(0)}min — bloqueando UP`);
+          return;
+        }
+      }
+    }
+
+    // ─── Filtro de tendencia BTC — ventana larga ──────────────────────────
+    // Detecta derivas lentas y sostenidas (ej: BTC +$1800 en 38hs a ~$60/hora)
+    // que el filtro de 1 hora no puede ver porque nunca superan el umbral puntual
+    // aunque acumulen una tendencia real. Requiere BTC_TREND_FILTER_LONG > 0.
+    //   BTC_TREND_FILTER_LONG=500      → umbral en $ para la ventana larga
+    //   BTC_TREND_WINDOW_HOURS_LONG=4  → cuántas horas mira atrás (default 4)
+    const trendFilterLong = parseInt(process.env.BTC_TREND_FILTER_LONG || '0');
+    if (trendFilterLong > 0 && btcPriceHistoryLong.length > 0) {
+      const btcPriceNow = sig.currentPrice || btcPriceHistoryLong[btcPriceHistoryLong.length-1]?.price || 0;
+      const oldestLong = btcPriceHistoryLong[0];
+      const ageHoursLong = (Date.now() - oldestLong.ts) / 3600000;
+      const btcMoveLong = btcPriceNow - oldestLong.price;
+
+      // Solo aplicar si tenemos al menos el 50% de la ventana configurada
+      if (ageHoursLong >= BTC_TREND_WINDOW_HOURS_LONG * 0.5) {
+        if (btcMoveLong > trendFilterLong && sig.direction === 'DOWN') {
+          logger.warn(`[SKIP] 📈 TREND-LARGO: BTC +$${btcMoveLong.toFixed(0)} en ${(ageHoursLong).toFixed(1)}hs — bloqueando DOWN`);
+          return;
+        }
+        if (btcMoveLong < -trendFilterLong && sig.direction === 'UP') {
+          logger.warn(`[SKIP] 📉 TREND-LARGO: BTC $${btcMoveLong.toFixed(0)} en ${(ageHoursLong).toFixed(1)}hs — bloqueando UP`);
           return;
         }
       }
