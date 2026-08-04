@@ -194,7 +194,33 @@ class PnLTracker {
     signalLogger.logSignalClose(signalId, won ? 'WIN' : 'LOSS', pnl);
     this._saveToDisk(); // persistir resultado
   }
- 
+
+  // Para el position monitor: devuelve las posiciones actualmente abiertas
+  getOpenPositions() {
+    return this.positions.filter(p => p.status === 'OPEN');
+  }
+
+  // Cierre forzado por SL/TP — registra el PnL real de la venta anticipada
+  forceClosePosition(posId, pnl, reason) {
+    const pos = this.positions.find(p => p.id === posId);
+    if (!pos) return;
+    pos.status = 'CLOSED';
+    pos.pnl = pnl;
+    pos.closedAt = new Date();
+    pos.closeReason = reason;
+    this.totalPnL += pnl;
+    if (pnl >= 0) this.wins++; else this.losses++;
+    this.closed.push(pos);
+    this.positions = this.positions.filter(p => p.id !== posId);
+    const emoji = pnl >= 0 ? 'WIN' : 'LOSS';
+    logger.info(`[${emoji}] [POSITION-MONITOR] Posicion cerrada anticipadamente: ${posId}`);
+    logger.info(`   Razón: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl}`);
+    logger.info(`   P&L Total acumulado: ${this.totalPnL > 0 ? '+' : ''}$${this.totalPnL.toFixed(2)} | W:${this.wins} L:${this.losses}`);
+    const signalId = pos.posId || pos.id;
+    signalLogger.logSignalClose(signalId, pnl >= 0 ? 'WIN' : 'LOSS', pnl);
+    this._saveToDisk();
+  }
+
   getSummary() {
     const total = this.wins + this.losses;
     const winRate = total > 0 ? ((this.wins / total) * 100).toFixed(1) : '0.0';

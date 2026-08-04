@@ -294,6 +294,87 @@ async function main() {
     await tracker.checkClosedPositions();
   }, 60000);
 
+  // ─── Position Monitor: SL / TP / Lock-in ─────────────────────────────────
+  // Revisa cada 3 segundos todas las posiciones abiertas. Si el precio actual
+  // del token supera el umbral de take-profit (lock-in) o cae por debajo del
+  // stop-loss, cierra la posición activamente vendiendo al mercado.
+  //
+  // Por qué importa: sin esto, una posición perdedora quema el 100% del stake
+  // hasta la resolución. Con SL al 50%, rescatamos ~la mitad en pérdidas claras.
+  // Con lock-in al 0.90+, aseguramos la ganancia cuando el edge ya se expresó
+  // y el riesgo de reversión pesa más que lo que queda por ganar.
+  //
+  //   POSITION_MONITOR=true           → activa el monitor (default: false)
+  //   LOCK_IN_THRESHOLD=0.92          → cierra si el token llega a $0.92+ (ganancia)
+  //   STOP_LOSS_PCT=0.5               → cierra si perdiste >50% del stake (pérdida)
+  //   POSITION_MONITOR_INTERVAL_MS=3000 → frecuencia de chequeo
+  const monitorEnabled = process.env.POSITION_MONITOR === 'true';
+  if (monitorEnabled && !config.DRY_RUN) {
+    const LOCK_IN = parseFloat(process.env.LOCK_IN_THRESHOLD || '0.92');
+    const SL_PCT  = parseFloat(process.env.STOP_LOSS_PCT || '0.5');
+    const MONITOR_INTERVAL = parseInt(process.env.POSITION_MONITOR_INTERVAL_MS || '3000');
+    const closingPositions = new Set(); // evitar doble-cierre
+
+    setInterval(async () => {
+      const openPositions = tracker.getOpenPositions();
+      if (!openPositions.length) return;
+
+      for (const pos of openPositions) {
+        if (closingPositions.has(pos.id)) continue;
+        if (!pos.tokenId) continue; // posición sin tokenId no se puede monitorear
+
+        let midPrice;
+        try {
+          midPrice = await poly.getTokenMidPrice(pos.tokenId);
+        } catch (e) { continue; }
+        if (midPrice === null) continue;
+
+        // Para un BUY (compramos YES/NO esperando que suba a $1):
+        //   - lock-in si midPrice >= LOCK_IN (ya casi ganó, asegurar)
+        //   - SL si midPrice <= entryPrice * (1 - SL_PCT) (perdió >SL_PCT del stake)
+        // Para un SELL (vendemos NO esperando que baje a $0):
+        //   - lock-in si el precio del token cayó a <= (1 - LOCK_IN) — espejo
+        //   - SL si el precio subió demasiado contra nosotros
+        const isBuy = pos.side === 'BUY';
+        const tokenCurrentPrice = midPrice;
+        const slThreshold = isBuy
+          ? pos.entryPrice * (1 - SL_PCT)
+          : pos.entryPrice + (pos.entryPrice * SL_PCT);
+
+        const hitLockIn = isBuy
+          ? tokenCurrentPrice >= LOCK_IN
+          : tokenCurrentPrice <= (1 - LOCK_IN);
+        const hitSL = isBuy
+          ? tokenCurrentPrice <= slThreshold
+          : tokenCurrentPrice >= slThreshold;
+
+        if (!hitLockIn && !hitSL) continue;
+
+        const reason = hitLockIn ? `LOCK-IN (precio $${tokenCurrentPrice.toFixed(3)} >= $${LOCK_IN})` : `STOP-LOSS (precio $${tokenCurrentPrice.toFixed(3)} <= $${slThreshold.toFixed(3)})`;
+        logger.warn(`[POSITION-MONITOR] 🚨 ${reason} en ${pos.id} — cerrando`);
+        closingPositions.add(pos.id);
+
+        const exitResult = await poly.sellPosition({
+          tokenId: pos.tokenId,
+          size: pos.size,
+          side: pos.side,
+          posId: pos.id,
+        });
+
+        if (exitResult.success) {
+          // Calcular PnL real de la salida anticipada
+          const exitPrice = exitResult.price;
+          const pnl = isBuy
+            ? parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2))
+            : parseFloat(((pos.entryPrice - exitPrice) * pos.size).toFixed(2));
+          tracker.forceClosePosition(pos.id, pnl, reason);
+        }
+        closingPositions.delete(pos.id);
+      }
+    }, MONITOR_INTERVAL);
+    logger.info(`[POSITION-MONITOR] ✅ Activo — lock-in: $${LOCK_IN} | SL: ${SL_PCT*100}% del stake | intervalo: ${MONITOR_INTERVAL}ms`);
+  }
+
   // Historial de precio BTC con timestamp para filtro de tendencia exacto
   const btcPriceHistory = []; // [{price, ts}] — ventana de 1 hora (filtro rápido)
   const BTC_TREND_WINDOW_MS = 60 * 60 * 1000; // 1 hora en ms
@@ -305,6 +386,12 @@ async function main() {
   const btcPriceHistoryLong = []; // [{price, ts}]
   const BTC_TREND_WINDOW_HOURS_LONG = parseFloat(process.env.BTC_TREND_WINDOW_HOURS_LONG || '4');
   const BTC_TREND_WINDOW_MS_LONG = BTC_TREND_WINDOW_HOURS_LONG * 60 * 60 * 1000;
+
+  // Tercer historial: ventana de 10 minutos para detectar movimientos bruscos
+  // rápidos. Complementa al de 1h (sacudidas) y al de 4h (derivas lentas).
+  // Controlado por BTC_TREND_FILTER_10M (umbral en $, default 0 = desactivado).
+  const btcPriceHistory10m = []; // [{price, ts}]
+  const BTC_TREND_WINDOW_10M_MS = 10 * 60 * 1000; // 10 minutos
 
   ws.onPrice(async (priceData) => {
     const btcPriceNow = priceData.price || priceData.currentPrice || priceData.lastPrice || 0;
@@ -319,6 +406,11 @@ async function main() {
       btcPriceHistoryLong.push({ price: btcPriceNow, ts: nowMs });
       while (btcPriceHistoryLong.length > 0 && nowMs - btcPriceHistoryLong[0].ts > BTC_TREND_WINDOW_MS_LONG) {
         btcPriceHistoryLong.shift();
+      }
+      // Historial de 10 minutos para trend filter rápido
+      btcPriceHistory10m.push({ price: btcPriceNow, ts: nowMs });
+      while (btcPriceHistory10m.length > 0 && nowMs - btcPriceHistory10m[0].ts > BTC_TREND_WINDOW_10M_MS) {
+        btcPriceHistory10m.shift();
       }
     }
 
@@ -384,6 +476,41 @@ async function main() {
           logger.warn(`[SKIP] 📉 TREND-LARGO: BTC $${btcMoveLong.toFixed(0)} en ${(ageHoursLong).toFixed(1)}hs — bloqueando UP`);
           return;
         }
+      }
+    }
+
+    // ─── Filtro de tendencia BTC — 10 minutos ─────────────────────────────
+    // Detecta movimientos bruscos en ventana corta. Complementa al de 1h y 4h.
+    // Un $150 en 10 min = $900/hora equivalente — señal fuerte y accionable.
+    //   BTC_TREND_FILTER_10M=150  → umbral razonable (0 = desactivado)
+    const trendFilter10m = parseInt(process.env.BTC_TREND_FILTER_10M || '0');
+    if (trendFilter10m > 0 && btcPriceHistory10m.length > 0) {
+      const btcPriceNow10m = sig.currentPrice || btcPriceHistory10m[btcPriceHistory10m.length-1]?.price || 0;
+      const oldest10m = btcPriceHistory10m[0];
+      const age10mMin = (Date.now() - oldest10m.ts) / 60000;
+      const btcMove10m = btcPriceNow10m - oldest10m.price;
+      if (age10mMin >= 2) {
+        if (btcMove10m > trendFilter10m && sig.direction === 'DOWN') {
+          logger.warn(`[SKIP] 📈 TREND-10M: BTC +$${btcMove10m.toFixed(0)} en ${age10mMin.toFixed(0)}min — bloqueando DOWN`);
+          return;
+        }
+        if (btcMove10m < -trendFilter10m && sig.direction === 'UP') {
+          logger.warn(`[SKIP] 📉 TREND-10M: BTC $${btcMove10m.toFixed(0)} en ${age10mMin.toFixed(0)}min — bloqueando UP`);
+          return;
+        }
+      }
+    }
+
+    // ─── Filtro "Polymarket ya se movió" ──────────────────────────────────
+    // Si Polymarket ya absorbió el lag (precio lejos de 0.50), nuestro edge
+    // ya es menor. Inspirado en tochiugo v3: max_poly_move_after_signal=0.03.
+    //   MAX_POLY_MOVE=0.03  → si mid ya está en 0.53+/0.47-, skip
+    const maxPolyMove = parseFloat(process.env.MAX_POLY_MOVE || '0');
+    if (maxPolyMove > 0) {
+      const polyMid = sig.direction === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
+      if (polyMid !== undefined && Math.abs(polyMid - 0.5) > maxPolyMove) {
+        logger.warn(`[SKIP] 📊 POLY-MOVIDO: mid $${polyMid?.toFixed(3)} ya absorbió el lag (umbral: ${maxPolyMove})`);
+        return;
       }
     }
 

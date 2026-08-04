@@ -384,6 +384,65 @@ class PolymarketClient {
 
   getOrderHistory() { return this._orderHistory; }
 
+  // Consulta el precio mid actual de un token específico en el book de Polymarket.
+  // Usado por el position monitor para saber en qué precio cerrar una posición.
+  // Devuelve null si no puede obtener el precio.
+  async getTokenMidPrice(tokenId) {
+    try {
+      await this._init();
+      const book = await this.clobClient.getOrderBook(tokenId);
+      if (!book) return null;
+      const bestBid = parseFloat(book.bids?.[0]?.price || 0);
+      const bestAsk = parseFloat(book.asks?.[0]?.price || 1);
+      if (!bestBid && !bestAsk) return null;
+      // mid price — si no hay bid, usar ask; si no hay ask, usar bid
+      if (!bestBid) return bestAsk;
+      if (!bestAsk) return bestBid;
+      return parseFloat(((bestBid + bestAsk) / 2).toFixed(4));
+    } catch (e) {
+      logger.warn(`[POLY] getTokenMidPrice error para ${tokenId?.slice(0,16)}...: ${e.message}`);
+      return null;
+    }
+  }
+
+  // Vende tokens de vuelta al mercado (para el SL/TP del position monitor).
+  // Para una posición BUY de YES tokens: vendemos YES al mejor bid disponible.
+  // Para una posición SELL de NO tokens: recompramos NO al mejor ask disponible.
+  async sellPosition({ tokenId, size, side, posId }) {
+    try {
+      await this._init();
+      const exitSide = side === 'BUY' ? 'SELL' : 'BUY';
+      const book = await this.clobClient.getOrderBook(tokenId);
+      let exitPrice;
+      if (exitSide === 'SELL') {
+        exitPrice = parseFloat(book?.bids?.[0]?.price || 0);
+      } else {
+        exitPrice = parseFloat(book?.asks?.[0]?.price || 1);
+      }
+      if (!exitPrice) return { success: false, error: 'sin liquidez para salir' };
+
+      logger.info(`[POSITION-MONITOR] 🚪 Cerrando ${posId} — ${exitSide} ${size}t @ $${exitPrice.toFixed(3)}`);
+      const orderParams = {
+        tokenID: tokenId,
+        size,
+        side: exitSide === 'BUY' ? Side.BUY : Side.SELL,
+        orderType: OrderType.FOK,
+        price: exitPrice,
+      };
+      const result = await this.clobClient.createAndPostOrder(orderParams);
+      const ok = result?.success && (result?.status || '').toLowerCase() === 'matched';
+      if (ok) {
+        logger.info(`[POSITION-MONITOR] ✅ Posición ${posId} cerrada @ $${exitPrice.toFixed(3)}`);
+      } else {
+        logger.warn(`[POSITION-MONITOR] ⚠️ No se pudo cerrar ${posId}: ${result?.errorMsg || 'sin fill'}`);
+      }
+      return { success: ok, price: exitPrice, result };
+    } catch (e) {
+      logger.error(`[POSITION-MONITOR] Error cerrando ${posId}: ${e.message}`);
+      return { success: false, error: e.message };
+    }
+  }
+
   // ─── Retry-loop GTC con ajuste de precio ─────────────────────────────────
   // Reemplaza la espera única de 60s por intentos cortos con precio cada vez
   // un poco mejor. Config por env vars (todas con default razonable):
