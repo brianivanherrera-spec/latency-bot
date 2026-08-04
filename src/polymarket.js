@@ -188,6 +188,13 @@ class PolymarketClient {
     const fillRetryEnabled = process.env.FILL_RETRY === 'true';
     const orderModePre = (config.ORDER_TYPE || 'GTC').toUpperCase();
     if (fillRetryEnabled && orderModePre !== 'MARKET') {
+      // ORDER_SPLIT: partir en pedazos más chicos en vez de un solo pedido
+      // grande — muchas veces el libro absorbe cantidades chicas aunque no
+      // alcance para el total de una. Si el tamaño no alcanza para respetar
+      // el mínimo de Polymarket (5 tokens) por pedazo, cae solo a una orden.
+      if (process.env.ORDER_SPLIT === 'true') {
+        return await this._placeSplitOrders({ rec, tokenId, side, price, size, marketEndTs });
+      }
       return await this._placeGtcWithRetry({ rec, tokenId, side, price, size, marketEndTs });
     }
 
@@ -284,9 +291,10 @@ class PolymarketClient {
         // el libro no tiene contraparte al precio inicial.
         if (process.env.FILL_RETRY === 'true') {
           logger.warn(`[LIVE] 🔁 FOK sin liquidez tras varios intentos — activando retry-loop GTC con mejora de precio`);
-          const retryResult = await this._placeGtcWithRetry({
-            rec, tokenId, side, price, size: size - preFilledSize, marketEndTs,
-          });
+          const remainingAfterFok = size - preFilledSize;
+          const retryResult = process.env.ORDER_SPLIT === 'true'
+            ? await this._placeSplitOrders({ rec, tokenId, side, price, size: remainingAfterFok, marketEndTs })
+            : await this._placeGtcWithRetry({ rec, tokenId, side, price, size: remainingAfterFok, marketEndTs });
           // Sumar lo que ya había llenado el FOK residual al resultado del retry-loop
           if (preFilledSize > 0 && retryResult) {
             retryResult.sizeFilled = (retryResult.sizeFilled || 0) + preFilledSize;
@@ -387,21 +395,83 @@ class PolymarketClient {
   //                                    a +3 ticks el trade pierde su gracia)
   //   FILL_RETRY_CUTOFF_SECONDS=25   → no iniciar un intento nuevo si al
   //                                    mercado le quedan menos de esto
+  //   FILL_RETRY_MAX_TOTAL_SECONDS=60 → tope ABSOLUTO de tiempo total de
+  //                                    reintento, sin importar cuánto falte
+  //                                    para el cierre. Evidencia (04/08):
+  //                                    los 4 fills que tardaron 90-199s
+  //                                    perdieron los 4 — entrar así de tarde
+  //                                    con precio ya movido pierde plata de
+  //                                    forma sistemática, no es solo peor
+  //                                    precio, es una señal efectivamente
+  //                                    vencida.
+  // ─── Partir la orden en pedazos más chicos ───────────────────────────────
+  // En vez de una sola orden grande, manda ORDER_SPLIT_PIECES pedazos en
+  // paralelo (cada uno con su propio retry-loop de mejora de precio). La
+  // idea: el libro a veces tiene profundidad para absorber pedidos chicos
+  // aunque no alcance para uno grande de una sola vez.
+  //   ORDER_SPLIT=true              → activa esto (además de FILL_RETRY=true)
+  //   ORDER_SPLIT_PIECES=2          → en cuántos pedazos partir
+  // Respeta el mínimo de Polymarket (5 tokens por orden): si el tamaño total
+  // no alcanza para partir sin violarlo, cae a una sola orden entera.
+  async _placeSplitOrders({ rec, tokenId, side, price, size, marketEndTs }) {
+    const MIN_ORDER_SIZE = 5; // mínimo de Polymarket
+    const pieces = Math.max(2, parseInt(process.env.ORDER_SPLIT_PIECES || '2'));
+
+    if (size < MIN_ORDER_SIZE * pieces) {
+      logger.info(`[SPLIT] Tamaño ${size} no alcanza para ${pieces} pedazos de ${MIN_ORDER_SIZE}+ — mandando entera`);
+      return await this._placeGtcWithRetry({ rec, tokenId, side, price, size, marketEndTs });
+    }
+
+    const base = Math.floor(size / pieces);
+    const sizes = Array(pieces).fill(base);
+    sizes[pieces - 1] += parseFloat((size - base * pieces).toFixed(6)); // resto al último pedazo
+
+    logger.info(`[SPLIT] Partiendo orden de ${size} en ${pieces} pedazos: ${sizes.join(' + ')}`);
+
+    const results = await Promise.all(
+      sizes.map(s => this._placeGtcWithRetry({ rec: { ...rec }, tokenId, side, price, size: s, marketEndTs }))
+    );
+
+    let totalFilled = 0, weightedPriceSum = 0;
+    for (const r of results) {
+      const filled = r.sizeFilled || 0;
+      totalFilled += filled;
+      weightedPriceSum += filled * (r.fillPrice || price);
+    }
+    const avgPrice = totalFilled > 0 ? weightedPriceSum / totalFilled : price;
+    const anyFilled = totalFilled > 0;
+
+    logger.info(`[SPLIT] Resultado: ${totalFilled}/${size} llenados (precio promedio $${avgPrice.toFixed(3)})`);
+
+    return {
+      success: anyFilled,
+      partial: anyFilled && totalFilled < size,
+      sizeFilled: totalFilled,
+      fillPrice: avgPrice,
+      attempts: Math.max(...results.map(r => r.attempts || 0)),
+    };
+  }
+
   async _placeGtcWithRetry({ rec, tokenId, side, price, size, marketEndTs }) {
     const ATTEMPT_MS  = parseInt(process.env.FILL_RETRY_ATTEMPT_SECONDS || '15') * 1000;
     const PRICE_STEP  = parseFloat(process.env.FILL_RETRY_PRICE_STEP || '0.01');
     const MAX_BUMP    = parseFloat(process.env.FILL_RETRY_MAX_BUMP || '0.03');
     const CUTOFF_MS   = parseInt(process.env.FILL_RETRY_CUTOFF_SECONDS || '25') * 1000;
+    const MAX_TOTAL_MS = parseInt(process.env.FILL_RETRY_MAX_TOTAL_SECONDS || '60') * 1000;
     const POLL_MS     = 3000;
 
-    // Presupuesto de tiempo: hasta el cutoff del mercado si lo conocemos,
-    // si no, el GTC_TIMEOUT clásico como techo global.
-    const globalDeadline = marketEndTs
+    const startedAt = Date.now();
+
+    // Presupuesto de tiempo: el menor entre (a) el cutoff del mercado, y
+    // (b) el tope absoluto desde que arrancó este intento de entrada —
+    // lo que se cumpla primero corta el retry-loop.
+    const marketDeadline = marketEndTs
       ? marketEndTs - CUTOFF_MS
-      : Date.now() + (config.GTC_TIMEOUT_SECONDS || 60) * 1000;
+      : startedAt + (config.GTC_TIMEOUT_SECONDS || 60) * 1000;
+    const absoluteDeadline = startedAt + MAX_TOTAL_MS;
+    const globalDeadline = Math.min(marketDeadline, absoluteDeadline);
 
     const isBuy = side === 'BUY';
-    const startedAt = Date.now();
     let attempt = 0;
     let currentPrice = price;
     let filledSoFar = 0;      // FIX: tokens ya confirmados llenados en intentos previos
