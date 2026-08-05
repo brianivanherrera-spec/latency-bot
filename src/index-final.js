@@ -399,8 +399,8 @@ const httpServer = http.createServer((req, res) => {
   
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    const sigStats = signal?.getStats() || {};
-    const trackerStats = tracker?.getStats() || {};
+    const sigStats = (typeof signal !== 'undefined' && signal?.getStats) ? signal.getStats() : {};
+    const trackerStats = (typeof tracker !== 'undefined' && tracker?.getStats) ? tracker.getStats() : {};
     res.end(JSON.stringify({
       status: 'ok',
       mode: process.env.DRY_RUN === 'true' ? 'paper' : 'live',
