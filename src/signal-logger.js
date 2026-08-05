@@ -262,6 +262,68 @@ function getStats() {
   } catch { return null; }
 }
 
+// Resumen del día calculado desde signals.jsonl — para el endpoint /stats
+// Permite monitorear sin bajar el log completo de Railway.
+// daysBack: cuántos días hacia atrás incluir (default 1 = últimas 24hs)
+function getDailySummary(daysBack = 1) {
+  try {
+    if (!fs.existsSync(SIGNALS_FILE)) return { error: 'no signals file' };
+    const cutoff = new Date(Date.now() - daysBack * 24 * 3600 * 1000).toISOString();
+    const lines = fs.readFileSync(SIGNALS_FILE, 'utf8').split('\n').filter(Boolean);
+
+    const trades = [];
+    for (const line of lines) {
+      try {
+        const r = JSON.parse(line);
+        if (r.timestamp >= cutoff) trades.push(r);
+      } catch {}
+    }
+
+    const resolved = trades.filter(t => t.result === 'WIN' || t.result === 'LOSS');
+    const wins = resolved.filter(t => t.result === 'WIN');
+    const nofills = trades.filter(t => t.result === 'NO_FILL');
+    const pnl = resolved.reduce((s, t) => s + (t.pnl || 0), 0);
+
+    // WR por bucket de Z-score (para seguir validando el patrón Z 3-4)
+    const zBuckets = {};
+    for (const [lo, hi] of [[0,2],[2,3],[3,4],[4,99]]) {
+      const sub = resolved.filter(t => Math.abs(t.zscore || 0) >= lo && Math.abs(t.zscore || 0) < hi);
+      if (sub.length) {
+        const w = sub.filter(t => t.result === 'WIN').length;
+        zBuckets[`z_${lo}_${hi}`] = { n: sub.length, wr: +(100*w/sub.length).toFixed(1), pnl: +sub.reduce((s,t)=>s+(t.pnl||0),0).toFixed(2) };
+      }
+    }
+
+    // Dirección
+    const dir = {};
+    for (const d of ['UP','DOWN']) {
+      const sub = resolved.filter(t => t.direction === d);
+      if (sub.length) {
+        const w = sub.filter(t => t.result === 'WIN').length;
+        dir[d] = { n: sub.length, wr: +(100*w/sub.length).toFixed(1) };
+      }
+    }
+
+    return {
+      period_days: daysBack,
+      mode: process.env.DRY_RUN === 'true' ? 'paper' : 'live',
+      trades: resolved.length,
+      wins: wins.length,
+      losses: resolved.length - wins.length,
+      wr: resolved.length ? +(100*wins.length/resolved.length).toFixed(1) : null,
+      pnl: +pnl.toFixed(2),
+      nofills: nofills.length,
+      fill_rate: (resolved.length + nofills.length) ? +(100*resolved.length/(resolved.length+nofills.length)).toFixed(1) : null,
+      by_direction: dir,
+      by_zscore: zBuckets,
+      open_positions: trades.filter(t => !t.result).length,
+      last_trade: resolved.length ? resolved[resolved.length-1].timestamp : null,
+    };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
 function getConsecutiveLosses() { return consecutiveLosses; }
 
 function updateFillTime(posId, fillTimeMs) {
@@ -285,4 +347,4 @@ function updateFillTime(posId, fillTimeMs) {
   }
 }
 
-module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot30s, getStats, getConsecutiveLosses, updateFillTime };
+module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot30s, getStats, getDailySummary, getConsecutiveLosses, updateFillTime };

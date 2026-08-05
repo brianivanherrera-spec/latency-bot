@@ -99,9 +99,11 @@ const httpServer = http.createServer((req, res) => {
   }
   
   if (url.pathname === '/stats' && url.searchParams.get('key') === SECRET) {
-    const stats = signalLogger.getStats();
+    // Resumen liviano sin bajar el log completo: /stats?key=X&days=1
+    const days = parseInt(url.searchParams.get('days') || '1');
+    const summary = signalLogger.getDailySummary(days);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(stats || { message: 'No stats yet' }, null, 2));
+    res.end(JSON.stringify(summary, null, 2));
     return;
   }
   
