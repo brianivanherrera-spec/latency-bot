@@ -268,8 +268,16 @@ async function main() {
   }
 
   // Fix B: callback del WS de Polymarket — precio en tiempo real (<50ms)
+  // Guardamos el último precio en variables locales para que el signal-logger
+  // pueda leerlas dinámicamente en los snapshots t0/t1/t2/t5 — antes leía
+  // del objeto de señal que quedaba estático desde el momento de la señal.
+  let livePolyYes = null;
+  let livePolyNo  = null;
+
   polyWs.onPrice((yes, no) => {
     signal.updatePolyPrice(yes, no);
+    livePolyYes = yes;
+    livePolyNo  = no;
     const tag = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
     if (tag !== lastPolyPrice) {
       logger.info(`[POLY-WS] ${tag}`);
@@ -778,8 +786,18 @@ async function main() {
       sig,
       utcHour,
       btcPrice: btcPriceAtSignal,
-      // getPolyPrice: usa los precios de la señal (ya disponibles)
-      getPolyPrice: (dir) => dir === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo,
+      // getPolyPrice: lee el precio ACTUAL del WS en tiempo real para que
+      // los snapshots t0/t1/t2/t5 reflejen el movimiento real de Polymarket
+      // post-entrada. Antes leía sig.edge?.polyYes que era el precio al
+      // momento de la señal y nunca cambiaba — todos los snapshots eran iguales.
+      // Con livePolyYes/No actualizados por el WS en cada tick, ahora t5 puede
+      // mostrar el precio real 5 segundos después de entrar.
+      getPolyPrice: (dir) => {
+        // Preferir precio del WS (tiempo real); fallback al precio de la señal
+        const wsPrice = dir === 'UP' ? livePolyYes : livePolyNo;
+        if (wsPrice !== null) return wsPrice;
+        return dir === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
+      },
     });
 
     // BTC snapshot 30s después
