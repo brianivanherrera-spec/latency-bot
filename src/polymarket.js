@@ -167,7 +167,30 @@ class PolymarketClient {
       endDate: m.endDate, yesTokenId: tokens[0]||null, noTokenId: tokens[1]||null, marketSlug: m.marketSlug };
   }
 
+  /**
+   * Best ask del book (para cruzar spread en MARKET/FAK).
+   * Devuelve null si no hay book.
+   */
+  async _getBestAsk(tokenId) {
+    try {
+      const book = await this.clobClient.getOrderBook(tokenId);
+      const asks = book?.asks || [];
+      if (!asks.length) return null;
+      // Polymarket book: asks suelen venir ordenados; tomar el más bajo
+      let best = Infinity;
+      for (const a of asks) {
+        const px = parseFloat(a.price);
+        if (!isNaN(px) && px > 0 && px < best) best = px;
+      }
+      return best === Infinity ? null : best;
+    } catch (e) {
+      logger.warn(`[BOOK] getOrderBook falló: ${e.message}`);
+      return null;
+    }
+  }
+
   async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs }) {
+
     const rec = { timestamp: new Date().toISOString(), marketId, marketQuestion,
       tokenId, side, price, size, usdcValue: (price * size).toFixed(2), status: 'PENDING' };
 
@@ -233,12 +256,33 @@ class PolymarketClient {
         const firstOrderType = useFak ? OrderType.FAK : OrderType.FOK;
         const maxAttempts = parseInt(process.env.MARKET_RETRY_ATTEMPTS || '3');
         orderParams.orderType = firstOrderType;
-        orderParams.price = price;
+
+        // Cruzar el spread: precio = max(precio señal, bestAsk + 1 tick),
+        // topeado por MAX_BUMP para no regalar el edge.
+        const maxBump = parseFloat(process.env.FILL_RETRY_MAX_BUMP || process.env.PRICE_TOLERANCE || '0.05');
+        const tick = 0.01;
+        const crossBook = async (basePrice) => {
+          const ask = await this._getBestAsk(tokenId);
+          if (ask == null) return basePrice;
+          const cross = parseFloat((ask + tick).toFixed(3));
+          const capped = parseFloat(Math.min(basePrice + maxBump, Math.max(basePrice, cross)).toFixed(3));
+          // Nunca pagar > 0.99 en token binario
+          const finalPx = Math.min(0.99, capped);
+          if (finalPx !== basePrice) {
+            logger.info(`[LIVE] 📊 Book ask=$${ask.toFixed(3)} → precio cruzado $${finalPx.toFixed(3)} (base $${basePrice.toFixed(3)}, bump max $${maxBump})`);
+          }
+          return finalPx;
+        };
+        orderParams.price = await crossBook(price);
 
         let preFilledFromFak = 0;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           const orderLabel = useFak ? 'FAK' : 'FOK';
-          logger.info(`[LIVE] 📈 MARKET order (${orderLabel}) intento ${attempt}/${maxAttempts}`);
+          // En reintentos, refrescar book (el ask puede haber subido)
+          if (attempt > 1) {
+            orderParams.price = await crossBook(price);
+          }
+          logger.info(`[LIVE] 📈 MARKET order (${orderLabel}) intento ${attempt}/${maxAttempts} @ $${orderParams.price}`);
           result = await this.clobClient.createAndPostOrder(orderParams);
           logger.info(`[LIVE] response (${orderLabel} intento ${attempt}): ${JSON.stringify(result)}`);
 

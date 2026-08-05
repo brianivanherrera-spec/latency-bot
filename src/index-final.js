@@ -214,6 +214,7 @@ async function main() {
       }
     }
 
+    if (!cachedMarket?.gammaId) return;
     try {
       const res = await fetch(`https://gamma-api.polymarket.com/markets/${cachedMarket.gammaId}`);
       if (!res.ok) {
@@ -241,6 +242,7 @@ async function main() {
             });
           }
           // FIX A: pre-fetchear próximo mercado cuando quedan ~60s
+          if (!cachedMarket?.endDate) return;
           const msRestantes = new Date(cachedMarket.endDate).getTime() - Date.now();
           if (msRestantes < 60000 && msRestantes > 0 && !nextMarketCache) {
             preFetchNextMarket();
@@ -274,11 +276,11 @@ async function main() {
   });
 
   polyWs.onResolved((winner) => {
-    logger.info(`[POLY-WS] Mercado resuelto (${winner}), preparando transición...`);
-    cachedMarket = null;
-    lastPolyPrice = '';
-    preFetchScheduled = false;
-    polyWs.unsubscribeAll();
+    // Solo log — NO nullificar cachedMarket acá.
+    // El poll Gamma / transición de mercado ya maneja el cambio de ventana.
+    // Nullificar + unsubscribe generaba loop: resuelto → null → refetch →
+    // resubscribe → best_bid_ask extremo → "resuelto" otra vez.
+    logger.info(`[POLY-WS] Mercado resuelto (${winner}) — esperando transición natural`);
   });
 
   // Conectar WS de Polymarket en paralelo
