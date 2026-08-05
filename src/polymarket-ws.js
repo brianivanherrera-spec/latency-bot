@@ -67,16 +67,21 @@ class PolymarketWS {
       });
 
       this.ws.on('message', (data) => {
-        // Fix 4a: ignorar PONG raw (respuesta al heartbeat)
-        if (data.toString() === 'PONG') return;
+        // Ignorar PONG y mensajes de texto no-JSON conocidos
+        const raw = data.toString();
+        if (raw === 'PONG') return;
+        if (raw === 'INVALID OPERATION') return; // Polymarket manda esto cuando el token ya no existe
         try {
-          const msgs = JSON.parse(data);
+          const msgs = JSON.parse(raw);
           const events = Array.isArray(msgs) ? msgs : [msgs];
           for (const msg of events) {
             this._handleMessage(msg);
           }
         } catch (e) {
-          logger.warn(`Parse error: ${e.message} | raw: ${data.toString().slice(0,100)}`);
+          // Solo loguear si no es un texto plano conocido
+          if (!raw.startsWith('INVALID') && !raw.startsWith('PONG')) {
+            logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0,100)}`);
+          }
         }
       });
 
@@ -166,9 +171,19 @@ class PolymarketWS {
     if (tokens.length < 2) return;
     const [yesTokenId, noTokenId] = tokens;
 
-    // Fix 4: parsear book y price_change correctamente
+    // Fix: Polymarket manda best_bid_ask como tipo principal de update de precio
+    // (no price_change como indicaban las docs antiguas)
+    if (type === 'best_bid_ask') {
+      const tokenId = msg.asset_id || msg.market;
+      const bid = parseFloat(msg.best_bid || 0);
+      const ask = parseFloat(msg.best_ask || 0);
+      const mid = (bid && ask) ? (bid + ask) / 2
+                : parseFloat(msg.price || ask || bid || 0);
+      if (mid && tokenId) this._updatePrice(tokenId, mid, yesTokenId, noTokenId);
+      return;
+    }
+
     // book: snapshot inicial con bids[]/asks[] por token
-    // price_change: { price_changes: [ { asset_id, price, best_bid, best_ask } ] }
     if (type === 'book') {
       const tokenId = msg.asset_id || msg.market;
       const bestAsk = parseFloat(msg.asks?.[0]?.price || msg.price || 0);
@@ -201,6 +216,11 @@ class PolymarketWS {
 
   _updatePrice(tokenId, mid, yesTokenId, noTokenId) {
     if (isNaN(mid) || mid <= 0) return;
+
+    // Ignorar updates de tokens que ya no son el mercado activo
+    // (pueden llegar durante la transición entre mercados)
+    if (tokenId !== yesTokenId && tokenId !== noTokenId) return;
+
     let yesPrice = null, noPrice = null;
 
     if (tokenId === yesTokenId) yesPrice = mid;
