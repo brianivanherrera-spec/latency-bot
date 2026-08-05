@@ -1,25 +1,22 @@
 /**
  * Polymarket CLOB WebSocket — precios YES/NO en tiempo real
  * Reemplaza el polling HTTP cada 2s por stream de <50ms
- * 
- * Endpoint: wss://ws-subscriptions-clob.polymarket.com/ws/
- * Canal: price_change — emite cambios de precio por token ID
- * Sin auth requerida para datos de mercado
+ *
+ * Fix 2026-08-05:
+ *   1) URL corregida a /ws/market (antes /ws/ daba 404 siempre)
+ *   2) Payload de subscribe corregido: assets_ids + type:'market'
+ *   3) Heartbeat corregido: texto "PING" cada 10s (antes ws.ping() que Polymarket ignora)
+ *   4) Parser price_change: leer best_bid/best_ask del item, no asks[0]
  */
 
 const WebSocket = require('ws');
 const { Logger } = require('./logger');
 
 const logger = new Logger('POLY-WS');
-// Polymarket CLOB WebSocket — endpoint oficial
-// Docs: https://docs.polymarket.com/#websocket-api
-// Polymarket CLOB WebSocket — intentar ambos endpoints
-const WS_URLS = [
-  'wss://ws-subscriptions-clob.polymarket.com/ws/',
-  'wss://ws-subscriptions-clob.polymarket.com/ws/market',
-];
-let _wsUrlIdx = 0;
-const WS_URL = WS_URLS[0];
+
+// URL correcta confirmada con pruebas en vivo (05/08/2026)
+// /ws/ siempre devuelve 404; /ws/market es el endpoint real del CLOB
+const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 
 class PolymarketWS {
   constructor() {
@@ -29,9 +26,11 @@ class PolymarketWS {
     this._reconnectDelay = 1000;
     this._maxReconnectDelay = 30000;
     this._subscribedTokens = new Set();
-    this._priceCallback = null;  // (yes, no) => void
-    this._resolvedCallback = null; // (winner) => void
+    this._priceCallback = null;
+    this._resolvedCallback = null;
     this._pingInterval = null;
+    this._fastCloseCount = 0;
+    this._connectedAt = null;
   }
 
   onPrice(cb) { this._priceCallback = cb; }
@@ -48,8 +47,19 @@ class PolymarketWS {
         this._connected = true;
         this._connectedAt = Date.now();
         this._reconnectDelay = 1000;
+        this._fastCloseCount = 0;
         logger.info('✅ Polymarket WS conectado');
-        // Re-suscribir tokens si había suscripciones previas
+
+        // Fix 3: heartbeat texto "PING" cada 10s — Polymarket responde "PONG"
+        // El ws.ping() anterior era un frame ping del protocolo WS que Polymarket ignora
+        if (this._pingInterval) clearInterval(this._pingInterval);
+        this._pingInterval = setInterval(() => {
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send('PING');
+          }
+        }, 10000);
+
+        // Re-suscribir tokens si había suscripciones previas (reconexión)
         if (this._subscribedTokens.size > 0) {
           this._sendSubscribe([...this._subscribedTokens]);
         }
@@ -57,6 +67,8 @@ class PolymarketWS {
       });
 
       this.ws.on('message', (data) => {
+        // Fix 4a: ignorar PONG raw (respuesta al heartbeat)
+        if (data.toString() === 'PONG') return;
         try {
           const msgs = JSON.parse(data);
           const events = Array.isArray(msgs) ? msgs : [msgs];
@@ -64,37 +76,31 @@ class PolymarketWS {
             this._handleMessage(msg);
           }
         } catch (e) {
-          logger.warn(`Parse error: ${e.message}`);
+          logger.warn(`Parse error: ${e.message} | raw: ${data.toString().slice(0,100)}`);
         }
       });
 
       this.ws.on('error', (err) => {
         this._connected = false;
-        // Si es 404, probar URL alternativa antes de rendirse
-        if (err.message.includes('404')) {
-          this._try404Fallback = true;
-        }
         logger.error(`WS error: ${err.message}`);
         reject(err);
       });
 
       this.ws.on('close', (code) => {
         this._connected = false;
-        if (!this._intentionalClose) {
-          this._closeCount = (this._closeCount || 0) + 1;
+        if (this._pingInterval) clearInterval(this._pingInterval);
 
-          // Si se desconecta en los primeros 200ms = el servidor rechaza la conexión
+        if (!this._intentionalClose) {
           const connDuration = Date.now() - (this._connectedAt || Date.now());
           if (connDuration < 200) {
-            this._fastCloseCount = (this._fastCloseCount || 0) + 1;
+            this._fastCloseCount++;
           }
 
-          // Después de 5 cierres rápidos → desactivar WS, usar HTTP fallback silenciosamente
           if (this._fastCloseCount >= 5) {
             if (this._fastCloseCount === 5) {
               logger.warn(`WS no disponible (${this._fastCloseCount} cierres rápidos) — usando HTTP polling como fallback`);
             }
-            return; // No reconectar más
+            return;
           }
 
           logger.warn(`Desconectado (${code}). Reconectando en ${this._reconnectDelay}ms...`);
@@ -102,28 +108,19 @@ class PolymarketWS {
           this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
         }
       });
-
-      // Ping cada 30s para mantener la conexión viva
-      this._pingInterval = setInterval(() => {
-        if (this.ws?.readyState === WebSocket.OPEN) {
-          this.ws.ping();
-        }
-      }, 30000);
     });
   }
 
-  // Suscribirse a un par de tokens YES/NO
   subscribe(yesTokenId, noTokenId) {
     const tokens = [yesTokenId, noTokenId].filter(Boolean);
     if (!tokens.length) return;
     tokens.forEach(t => this._subscribedTokens.add(t));
     if (this._connected) {
       this._sendSubscribe(tokens);
-      logger.info(`[POLY-WS] Suscrito a ${tokens.length} tokens`);
+      logger.info(`Suscrito a ${tokens.length} tokens`);
     }
   }
 
-  // Desuscribirse de tokens anteriores (al cambiar de mercado)
   unsubscribeAll() {
     if (this._connected && this._subscribedTokens.size > 0) {
       this._sendUnsubscribe([...this._subscribedTokens]);
@@ -131,22 +128,21 @@ class PolymarketWS {
     this._subscribedTokens.clear();
   }
 
+  // Fix 2: payload correcto confirmado con pruebas en vivo
+  // El formato anterior { auth:{}, markets:[], type:'subscribe' } devolvía 1008
   _sendSubscribe(tokenIds) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
-    // Polymarket CLOB v2 WebSocket subscribe format
-    // Canal "market" con markets array
     this.ws.send(JSON.stringify({
-      auth: {},
-      markets: tokenIds,
-      type: 'subscribe',
+      assets_ids: tokenIds,
+      type: 'market',
+      custom_feature_enabled: true,
     }));
   }
 
   _sendUnsubscribe(tokenIds) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
     this.ws.send(JSON.stringify({
-      auth: {},
-      markets: tokenIds,
+      assets_ids: tokenIds,
       type: 'unsubscribe',
     }));
   }
@@ -154,56 +150,79 @@ class PolymarketWS {
   _handleMessage(msg) {
     if (!msg) return;
     const type = msg.event_type || msg.type || '';
-    if (type === 'heartbeat' || type === 'subscribed') return;
+
+    // Ignorar heartbeats y confirmaciones de suscripción
+    if (type === 'heartbeat' || type === 'subscribed' || type === 'last_trade_price') {
+      if (type === 'last_trade_price') {
+        const price = parseFloat(msg.price);
+        if (!isNaN(price) && price >= 0.99) {
+          if (this._resolvedCallback) this._resolvedCallback(price >= 0.99 ? 'YES' : 'NO');
+        }
+      }
+      return;
+    }
 
     const tokens = [...this._subscribedTokens];
     if (tokens.length < 2) return;
     const [yesTokenId, noTokenId] = tokens;
 
-    // Formato book: { event_type: "book", asset_id: tokenId, bids: [], asks: [] }
-    if (type === 'book' || type === 'price_change') {
+    // Fix 4: parsear book y price_change correctamente
+    // book: snapshot inicial con bids[]/asks[] por token
+    // price_change: { price_changes: [ { asset_id, price, best_bid, best_ask } ] }
+    if (type === 'book') {
       const tokenId = msg.asset_id || msg.market;
-      // Mejor precio disponible: mejor ask para comprar
-      const bestAsk = msg.asks?.[0]?.price || msg.price;
-      if (!bestAsk || !tokenId) return;
-      const price = parseFloat(bestAsk);
-      if (isNaN(price) || price <= 0) return;
+      const bestAsk = parseFloat(msg.asks?.[0]?.price || msg.price || 0);
+      const bestBid = parseFloat(msg.bids?.[0]?.price || 0);
+      const mid = (bestBid && bestAsk) ? (bestBid + bestAsk) / 2 : (bestAsk || bestBid);
+      if (!mid || !tokenId) return;
+      this._updatePrice(tokenId, mid, yesTokenId, noTokenId);
+    }
 
-      let yesPrice = null, noPrice = null;
-      if (tokenId === yesTokenId) yesPrice = price;
-      if (tokenId === noTokenId) noPrice = price;
-
-      // Completar el par con el complemento si solo tenemos uno
-      if (yesPrice !== null && noPrice === null) noPrice = parseFloat((1 - yesPrice).toFixed(3));
-      if (noPrice !== null && yesPrice === null) yesPrice = parseFloat((1 - noPrice).toFixed(3));
-
-      if (yesPrice !== null && noPrice !== null && this._priceCallback) {
-        if (yesPrice >= 0.99 || noPrice >= 0.99) {
-          const winner = yesPrice >= 0.99 ? 'YES' : 'NO';
-          logger.info(`[POLY-WS] Mercado resuelto: ${winner}`);
-          if (this._resolvedCallback) this._resolvedCallback(winner);
-          return;
-        }
-        if (yesPrice >= 0.05 && yesPrice <= 0.95) {
-          logger.info(`[POLY-WS] 💰 YES=${yesPrice.toFixed(3)} NO=${noPrice.toFixed(3)}`);
-          this._priceCallback(yesPrice, noPrice);
-        }
+    if (type === 'price_change') {
+      // price_changes puede ser array de cambios en este mensaje
+      const changes = msg.price_changes || (msg.asset_id ? [msg] : []);
+      for (const ch of changes) {
+        const tokenId = ch.asset_id || ch.market;
+        const bid = parseFloat(ch.best_bid || 0);
+        const ask = parseFloat(ch.best_ask || 0);
+        // mid del best bid/ask; fallback al price directo
+        const mid = (bid && ask) ? (bid + ask) / 2
+                  : parseFloat(ch.price || ch.best_ask || ch.best_bid || 0);
+        if (!mid || !tokenId) continue;
+        this._updatePrice(tokenId, mid, yesTokenId, noTokenId);
       }
     }
 
-    // last_trade_price: { event_type: "last_trade_price", price: "0.99", ... }
-    if (type === 'last_trade_price') {
-      const price = parseFloat(msg.price);
-      if (!isNaN(price) && price >= 0.99) {
-        logger.info(`[POLY-WS] Último trade indica resolución: $${price}`);
-        if (this._resolvedCallback) this._resolvedCallback(price >= 0.99 ? 'YES' : 'NO');
-      }
+    // Log tipos desconocidos para debugging futuro
+    if (type && !['book','price_change','heartbeat','subscribed','last_trade_price'].includes(type)) {
+      logger.info(`RAW tipo=${type}: ${JSON.stringify(msg).slice(0, 200)}`);
+    }
+  }
+
+  _updatePrice(tokenId, mid, yesTokenId, noTokenId) {
+    if (isNaN(mid) || mid <= 0) return;
+    let yesPrice = null, noPrice = null;
+
+    if (tokenId === yesTokenId) yesPrice = mid;
+    else if (tokenId === noTokenId) noPrice = mid;
+    else return; // token no reconocido
+
+    // Completar el par con el complemento
+    if (yesPrice !== null && noPrice === null) noPrice = parseFloat((1 - yesPrice).toFixed(4));
+    if (noPrice !== null && yesPrice === null) yesPrice = parseFloat((1 - noPrice).toFixed(4));
+
+    if (yesPrice === null || noPrice === null) return;
+
+    // Detectar resolución
+    if (yesPrice >= 0.99 || noPrice >= 0.99) {
+      const winner = yesPrice >= 0.99 ? 'YES' : 'NO';
+      logger.info(`Mercado resuelto via WS: ${winner}`);
+      if (this._resolvedCallback) this._resolvedCallback(winner);
       return;
     }
 
-    // Log cualquier otro tipo para ver el formato real que manda Polymarket
-    if (type && type !== 'heartbeat') {
-      logger.info(`[POLY-WS] RAW tipo=${type}: ${JSON.stringify(msg).slice(0, 150)}`);
+    if (yesPrice >= 0.05 && yesPrice <= 0.95 && this._priceCallback) {
+      this._priceCallback(yesPrice, noPrice);
     }
   }
 
