@@ -48,6 +48,352 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.DOWNLOAD_SECRET || 'latency2026';
 
+// ─── Dashboard HTML ────────────────────────────────────────────────────────────
+function getDashboardHTML(key) {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Latency Bot</title>
+<style>
+  :root {
+    --bg:      #0a0c0f;
+    --surface: #111318;
+    --border:  #1e222a;
+    --muted:   #3a3f4b;
+    --text:    #c8cdd8;
+    --dim:     #6b7280;
+    --green:   #22c55e;
+    --red:     #ef4444;
+    --yellow:  #f59e0b;
+    --blue:    #3b82f6;
+    --mono:    'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans:    system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .logo { font-family: var(--mono); font-size: 13px; letter-spacing: 0.08em; color: var(--dim); }
+  .logo span { color: var(--green); }
+  .badge {
+    font-family: var(--mono); font-size: 11px; padding: 3px 10px;
+    border-radius: 3px; letter-spacing: 0.05em;
+  }
+  .badge.live   { background: rgba(239,68,68,.15);  color: var(--red);    border: 1px solid rgba(239,68,68,.3); }
+  .badge.paper  { background: rgba(59,130,246,.15); color: var(--blue);   border: 1px solid rgba(59,130,246,.3); }
+  .badge.ok     { background: rgba(34,197,94,.1);   color: var(--green);  border: 1px solid rgba(34,197,94,.25); }
+  #last-update  { font-size: 11px; color: var(--dim); font-family: var(--mono); }
+
+  main { padding: 20px 24px; display: grid; gap: 16px; max-width: 1200px; margin: 0 auto; }
+
+  /* Fila de stats grandes */
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px 18px;
+  }
+  .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim); margin-bottom: 8px; }
+  .kpi-value { font-family: var(--mono); font-size: 26px; font-weight: 600; line-height: 1; }
+  .kpi-sub   { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 4px; }
+  .pos { color: var(--green); } .neg { color: var(--red); } .neu { color: var(--text); }
+
+  /* Fila secundaria */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 680px) { .two-col { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+  }
+  .card-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--dim); padding: 12px 16px; border-bottom: 1px solid var(--border);
+  }
+
+  /* Tabla de trades */
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
+       padding: 8px 12px; text-align: left; font-weight: 500; }
+  td { font-family: var(--mono); font-size: 12px; padding: 7px 12px;
+       border-top: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .win  { color: var(--green); } .loss { color: var(--red); }
+  .dir-up { color: #60a5fa; } .dir-dn { color: #c084fc; }
+
+  /* Live status */
+  .status-grid { padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .status-row { display: flex; justify-content: space-between; align-items: center; }
+  .status-label { font-size: 11px; color: var(--dim); }
+  .status-val   { font-family: var(--mono); font-size: 12px; }
+
+  /* Mini bar WR */
+  .wr-bar-wrap { padding: 14px 16px; }
+  .wr-bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-bottom: 6px; }
+  .wr-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .wr-bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+
+  /* Balance sparkline placeholder */
+  .spark { padding: 14px 16px; }
+  #spark-canvas { width: 100%; height: 60px; display: block; }
+
+  /* Posición abierta */
+  .open-pos { padding: 14px 16px; }
+  .open-pos-none { font-size: 12px; color: var(--dim); font-family: var(--mono); }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.red   { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+  .dot.dim   { background: var(--muted); }
+
+  .pill {
+    display: inline-block; font-size: 10px; font-family: var(--mono);
+    padding: 2px 8px; border-radius: 3px; letter-spacing: 0.04em;
+  }
+  .pill.win  { background: rgba(34,197,94,.12);  color: var(--green); }
+  .pill.loss { background: rgba(239,68,68,.12);  color: var(--red); }
+
+  footer { padding: 14px 24px; text-align: center; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); }
+  #refresh-bar { height: 2px; background: var(--green); width: 100%; transform-origin: left; transition: transform 30s linear; }
+</style>
+</head>
+<body>
+<div id="refresh-bar"></div>
+<header>
+  <div class="logo">⚡ <span>latency</span>-bot</div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span id="mode-badge" class="badge">—</span>
+    <span class="badge ok" id="ws-badge">WS</span>
+    <span id="last-update">cargando...</span>
+  </div>
+</header>
+
+<main>
+  <div class="kpi-row" id="kpi-row">
+    <div class="kpi"><div class="kpi-label">Balance</div><div class="kpi-value neu" id="k-balance">—</div><div class="kpi-sub" id="k-mode">—</div></div>
+    <div class="kpi"><div class="kpi-label">PnL hoy</div><div class="kpi-value" id="k-pnl">—</div><div class="kpi-sub" id="k-pnl-sub">—</div></div>
+    <div class="kpi"><div class="kpi-label">Win Rate</div><div class="kpi-value" id="k-wr">—</div><div class="kpi-sub" id="k-wr-sub">—</div></div>
+    <div class="kpi"><div class="kpi-label">Fill Rate</div><div class="kpi-value" id="k-fill">—</div><div class="kpi-sub" id="k-fill-sub">—</div></div>
+    <div class="kpi"><div class="kpi-label">BTC</div><div class="kpi-value neu" id="k-btc">—</div><div class="kpi-sub" id="k-poly">—</div></div>
+  </div>
+
+  <div class="two-col">
+    <!-- Posición abierta + estado -->
+    <div class="card">
+      <div class="card-title">Estado en vivo</div>
+      <div class="status-grid" id="live-status">
+        <div class="status-row"><span class="status-label">Señales</span><span class="status-val" id="s-signals">—</span></div>
+        <div class="status-row"><span class="status-label">Uptime</span><span class="status-val" id="s-uptime">—</span></div>
+        <div class="status-row"><span class="status-label">Poly YES</span><span class="status-val" id="s-polyes">—</span></div>
+        <div class="status-row"><span class="status-label">Slots activos</span><span class="status-val" id="s-slots">—</span></div>
+      </div>
+      <div style="padding: 0 16px 14px">
+        <div class="card-title" style="padding:0;border:0;margin-bottom:10px">Posición abierta</div>
+        <div class="open-pos-none" id="open-pos-text">Sin posición abierta</div>
+      </div>
+    </div>
+
+    <!-- Win Rate visual -->
+    <div class="card">
+      <div class="card-title">Rendimiento hoy</div>
+      <div class="wr-bar-wrap" id="wr-bars">
+        <div class="wr-bar-label"><span>UP</span><span id="wr-up-pct">—</span></div>
+        <div class="wr-bar"><div class="wr-bar-fill pos" id="wr-up-bar" style="width:0%"></div></div>
+        <div style="height:10px"></div>
+        <div class="wr-bar-label"><span>DOWN</span><span id="wr-dn-pct">—</span></div>
+        <div class="wr-bar"><div class="wr-bar-fill" id="wr-dn-bar" style="width:0%;background:var(--blue)"></div></div>
+      </div>
+      <div style="padding: 0 16px 14px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center;">
+        <div><div class="kpi-label">Z 0-2</div><div class="kpi-value" style="font-size:16px" id="z-low">—</div></div>
+        <div><div class="kpi-label">Z 2-3</div><div class="kpi-value" style="font-size:16px" id="z-mid">—</div></div>
+        <div><div class="kpi-label">Z 3+</div><div class="kpi-value" style="font-size:16px" id="z-hi">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Últimos trades -->
+  <div class="card">
+    <div class="card-title">Últimos trades</div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Hora</th><th>Dir</th><th>Z</th><th>Score</th><th>Precio</th><th>PnL</th><th>Resultado</th>
+        </tr></thead>
+        <tbody id="trades-body">
+          <tr><td colspan="7" style="color:var(--dim);text-align:center;padding:20px">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>Actualiza cada 30s · <a href="/?key=${key}&refresh=1" style="color:var(--dim)">forzar</a></footer>
+
+<script>
+const KEY = '${key}';
+let balanceHistory = [];
+
+function fmt(n, dec=2) { return n == null ? '—' : Number(n).toFixed(dec); }
+function fmtUSD(n) {
+  if (n == null) return '—';
+  const s = Math.abs(n).toFixed(2);
+  return (n >= 0 ? '+$' : '-$') + s;
+}
+function fmtUptime(s) {
+  if (!s) return '—';
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  return h + 'h ' + m + 'm';
+}
+function fmtTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+async function loadHealth() {
+  try {
+    const r = await fetch('/health');
+    const d = await r.json();
+    document.getElementById('k-btc').textContent = d.btcPrice ? '$' + Number(d.btcPrice).toLocaleString('en',{maximumFractionDigits:0}) : '—';
+    document.getElementById('s-polyes').textContent = d.polyYes ? d.polyYes.toFixed(3) : '—';
+    document.getElementById('s-signals').textContent = d.signals ?? '—';
+    document.getElementById('s-uptime').textContent = fmtUptime(d.uptime);
+    document.getElementById('s-slots').textContent = d.openPositions ?? '—';
+    const modeBadge = document.getElementById('mode-badge');
+    modeBadge.textContent = d.mode === 'live' ? '🔴 LIVE' : '✓ PAPER';
+    modeBadge.className = 'badge ' + (d.mode === 'live' ? 'live' : 'paper');
+    document.getElementById('k-mode').textContent = d.mode === 'live' ? 'capital real' : 'paper trading';
+  } catch(e) {}
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch('/stats?key=' + KEY + '&days=1');
+    const d = await r.json();
+    if (d.error) return;
+
+    // KPIs
+    const pnlEl = document.getElementById('k-pnl');
+    pnlEl.textContent = fmtUSD(d.pnl);
+    pnlEl.className = 'kpi-value ' + (d.pnl > 0 ? 'pos' : d.pnl < 0 ? 'neg' : 'neu');
+    document.getElementById('k-pnl-sub').textContent = (d.trades ?? 0) + ' trades hoy';
+
+    const wrEl = document.getElementById('k-wr');
+    wrEl.textContent = d.wr != null ? d.wr + '%' : '—';
+    wrEl.className = 'kpi-value ' + (d.wr >= 55 ? 'pos' : d.wr >= 45 ? 'neu' : 'neg');
+    document.getElementById('k-wr-sub').textContent = (d.wins??0) + 'W / ' + (d.losses??0) + 'L';
+
+    const fillEl = document.getElementById('k-fill');
+    fillEl.textContent = d.fill_rate != null ? d.fill_rate + '%' : '—';
+    fillEl.className = 'kpi-value ' + (d.fill_rate >= 65 ? 'pos' : d.fill_rate >= 50 ? 'neu' : 'neg');
+    document.getElementById('k-fill-sub').textContent = (d.nofills??0) + ' NO_FILLs';
+
+    // Poly
+    document.getElementById('k-poly').textContent = 'Poly YES: ' + (document.getElementById('s-polyes').textContent);
+
+    // Barras WR por dirección
+    const up = d.by_direction?.UP;
+    const dn = d.by_direction?.DOWN;
+    if (up) {
+      document.getElementById('wr-up-pct').textContent = up.wr + '% (' + up.n + ' trades)';
+      document.getElementById('wr-up-bar').style.width = up.wr + '%';
+    }
+    if (dn) {
+      document.getElementById('wr-dn-pct').textContent = dn.wr + '% (' + dn.n + ' trades)';
+      document.getElementById('wr-dn-bar').style.width = dn.wr + '%';
+      document.getElementById('wr-dn-bar').style.background = dn.wr >= 55 ? 'var(--green)' : dn.wr >= 45 ? 'var(--yellow)' : 'var(--red)';
+    }
+
+    // Z-score buckets
+    const zBuckets = d.by_zscore || {};
+    const z0 = zBuckets['z_0_2']; const z1 = zBuckets['z_2_3']; const z2 = zBuckets['z_3_4'] || zBuckets['z_3_99'] || zBuckets['z_4_99'];
+    document.getElementById('z-low').textContent = z0 ? z0.wr + '%' : '—';
+    document.getElementById('z-low').className = 'kpi-value ' + (!z0 ? 'neu' : z0.wr >= 55 ? 'pos' : z0.wr >= 45 ? 'neu' : 'neg');
+    document.getElementById('z-mid').textContent = z1 ? z1.wr + '%' : '—';
+    document.getElementById('z-mid').className = 'kpi-value ' + (!z1 ? 'neu' : z1.wr >= 55 ? 'pos' : z1.wr >= 45 ? 'neu' : 'neg');
+    document.getElementById('z-hi').textContent = z2 ? z2.wr + '%' : '—';
+    document.getElementById('z-hi').className = 'kpi-value ' + (!z2 ? 'neu' : z2.wr >= 55 ? 'pos' : z2.wr >= 45 ? 'neu' : 'neg');
+
+  } catch(e) {}
+}
+
+async function loadTrades() {
+  try {
+    const r = await fetch('/signals?key=' + KEY);
+    const text = await r.text();
+    const lines = text.trim().split('\\n').filter(Boolean);
+    const all = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const recent = all
+      .filter(t => t.result === 'WIN' || t.result === 'LOSS')
+      .filter(t => new Date(t.timestamp) >= today)
+      .slice(-15).reverse();
+
+    const tbody = document.getElementById('trades-body');
+    if (!recent.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="color:var(--dim);text-align:center;padding:20px">Sin trades hoy</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = recent.map(t => {
+      const pnlSign = t.pnl >= 0 ? 'pos' : 'neg';
+      const dirClass = t.direction === 'UP' ? 'dir-up' : 'dir-dn';
+      const dirArrow = t.direction === 'UP' ? '▲ UP' : '▼ DN';
+      const hora = fmtTime(t.timestamp);
+      const precio = t.filled_price ? '$' + Number(t.filled_price).toFixed(3) : '—';
+      return \`<tr>
+        <td>\${hora}</td>
+        <td class="\${dirClass}">\${dirArrow}</td>
+        <td>\${t.zscore != null ? Number(t.zscore).toFixed(1) : '—'}</td>
+        <td>\${t.signalScore ?? '—'}</td>
+        <td>\${precio}</td>
+        <td class="\${pnlSign}">\${fmtUSD(t.pnl)}</td>
+        <td><span class="pill \${t.result === 'WIN' ? 'win' : 'loss'}">\${t.result}</span></td>
+      </tr>\`;
+    }).join('');
+
+    // Balance actual estimado
+    const totalPnl = all.filter(t => (t.result==='WIN'||t.result==='LOSS') && new Date(t.timestamp)>=today)
+      .reduce((s,t) => s+(t.pnl||0), 0);
+    document.getElementById('k-balance').textContent = '~$' + (30 + totalPnl).toFixed(2);
+
+    // Posición abierta
+    const open = all.filter(t => !t.result || t.result === null).slice(-1)[0];
+    const posEl = document.getElementById('open-pos-text');
+    if (open) {
+      posEl.innerHTML = \`<span class="dot green"></span><span style="color:var(--text)">\${open.direction} @ \${open.filled_price ? '$'+Number(open.filled_price).toFixed(3) : '?'}</span><span style="color:var(--dim);margin-left:8px">\${open.market?.split(' - ')[1] || ''}</span>\`;
+    } else {
+      posEl.innerHTML = '<span class="dot dim"></span><span style="color:var(--dim)">Sin posición abierta</span>';
+    }
+
+  } catch(e) {}
+}
+
+async function refresh() {
+  document.getElementById('last-update').textContent = 'actualizando...';
+  await Promise.all([loadHealth(), loadStats(), loadTrades()]);
+  document.getElementById('last-update').textContent = 'actualizado ' + fmtTime(new Date().toISOString());
+  // Reiniciar barra de progreso
+  const bar = document.getElementById('refresh-bar');
+  bar.style.transition = 'none';
+  bar.style.transform = 'scaleX(1)';
+  setTimeout(() => {
+    bar.style.transition = 'transform 30s linear';
+    bar.style.transform = 'scaleX(0)';
+  }, 50);
+}
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>`;
+}
+
 const httpServer = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   
@@ -104,6 +450,12 @@ const httpServer = http.createServer((req, res) => {
     const summary = signalLogger.getDailySummary(days);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(summary, null, 2));
+    return;
+  }
+
+  if (url.pathname === '/' && url.searchParams.get('key') === SECRET) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(getDashboardHTML(SECRET));
     return;
   }
   
