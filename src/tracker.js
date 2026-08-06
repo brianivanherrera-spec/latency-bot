@@ -59,14 +59,14 @@ class PnLTracker {
     }
   }
  
-  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType, tokenId }) {
+  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType, tokenId, onClose }) {
     const pos = {
       id: posId || `POS_${Date.now()}`,
       marketId,
       gammaId,
       marketQuestion,
       side,
-      tokenId,        // necesario para el position monitor (SL/TP/lock-in)
+      tokenId,
       entryPrice: price,
       size,
       usdcIn: parseFloat((price * size).toFixed(2)),
@@ -74,6 +74,7 @@ class PnLTracker {
       openedAt: new Date(),
       status: 'OPEN',
       entryType: entryType || 'early',
+      _onClose: onClose || null,  // callback para liberar slot en index-final
     };
     this.positions.push(pos);
     this._saveToDisk();
@@ -193,7 +194,8 @@ class PnLTracker {
     // Intentar con pos.id y pos.posId (ambos formatos usados)
     const signalId = pos.posId || pos.id;
     signalLogger.logSignalClose(signalId, won ? 'WIN' : 'LOSS', pnl);
-    this._saveToDisk(); // persistir resultado
+    if (typeof pos._onClose === 'function') pos._onClose();
+    this._saveToDisk();
   }
 
   // Para el position monitor: devuelve las posiciones actualmente abiertas
@@ -219,6 +221,7 @@ class PnLTracker {
     logger.info(`   P&L Total acumulado: ${this.totalPnL > 0 ? '+' : ''}$${this.totalPnL.toFixed(2)} | W:${this.wins} L:${this.losses}`);
     const signalId = pos.posId || pos.id;
     signalLogger.logSignalClose(signalId, pnl >= 0 ? 'WIN' : 'LOSS', pnl);
+    if (typeof pos._onClose === 'function') pos._onClose();
     this._saveToDisk();
   }
 

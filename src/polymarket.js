@@ -524,7 +524,10 @@ class PolymarketClient {
         tokenID: tokenId,
         size,
         side: exitSide === 'BUY' ? Side.BUY : Side.SELL,
-        orderType: OrderType.FOK,
+        // FAK (Fill And Kill) en vez de FOK: llena lo que haya en el book
+        // y cancela el resto. Con FOK si no hay tamaño exacto la orden muere
+        // y la posición queda abierta hasta resolución — peor que un cierre parcial.
+        orderType: OrderType.FAK,
         price: exitPrice,
       };
       const result = await this.clobClient.createAndPostOrder(orderParams);

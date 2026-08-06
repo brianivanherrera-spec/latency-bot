@@ -875,7 +875,7 @@ async function main() {
     // ─── Filtro "Polymarket ya se movió" ──────────────────────────────────
     // Si Polymarket ya absorbió el lag (precio lejos de 0.50), nuestro edge
     // ya es menor. Inspirado en tochiugo v3: max_poly_move_after_signal=0.03.
-    //   MAX_POLY_MOVE=0.03  → si mid ya está en 0.53+/0.47-, skip
+    //   MAX_POLY_MOVE=0.15  → si mid ya está en 0.65+/0.35-, skip
     const maxPolyMove = parseFloat(process.env.MAX_POLY_MOVE || '0');
     if (maxPolyMove > 0) {
       const polyMid = sig.direction === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
@@ -883,6 +883,18 @@ async function main() {
         logger.warn(`[SKIP] 📊 POLY-MOVIDO: mid $${polyMid?.toFixed(3)} ya absorbió el lag (umbral: ${maxPolyMove})`);
         return;
       }
+    }
+
+    // ─── Hard-gate: precio extremo de Polymarket ──────────────────────────
+    // Aunque MAX_POLY_MOVE esté desactivado, nunca entrar si el token que
+    // compramos está en zona extrema (<0.15 o >0.85). En esos rangos el
+    // mercado ya resolvió casi todo el lag — el edge calculado es falso.
+    // También protege contra precios stale de mercados ya cerrados que
+    // quedaron pegados en el feed durante la transición entre mercados.
+    const tokenMid = sig.direction === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
+    if (tokenMid !== undefined && (tokenMid < 0.15 || tokenMid > 0.85)) {
+      logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid?.toFixed(3)} — sin edge real en zona extrema`);
+      return;
     }
 
     const now = Date.now();
@@ -1224,9 +1236,17 @@ async function main() {
           tokenId,    // necesario para el position monitor
           mode: 'live',
           entryType,
+          // Callback para liberar el slot cuando el tracker cierre la posición,
+          // en vez de un timeout fijo de 8 minutos que puede desincronizarse:
+          // si el mercado resuelve en 5 min, el slot se libera en 5 min;
+          // si tarda más, el slot no se libera prematuramente.
+          onClose: () => activePositions.delete(posId),
         });
 
-        setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
+        // Fallback de seguridad: si el tracker no llama onClose en 10 minutos
+        // (ej. error de red al verificar resolución), liberar el slot igual
+        // para no bloquear el bot indefinidamente.
+        setTimeout(() => activePositions.delete(posId), 10 * 60 * 1000);
 
       } catch (err) {
         logger.error(`[LIVE] ❌ Error: ${err.message}`);
