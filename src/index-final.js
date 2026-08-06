@@ -886,15 +886,17 @@ async function main() {
     }
 
     // ─── Hard-gate: precio extremo de Polymarket ──────────────────────────
-    // Aunque MAX_POLY_MOVE esté desactivado, nunca entrar si el token que
-    // compramos está en zona extrema (<0.15 o >0.85). En esos rangos el
-    // mercado ya resolvió casi todo el lag — el edge calculado es falso.
-    // También protege contra precios stale de mercados ya cerrados que
-    // quedaron pegados en el feed durante la transición entre mercados.
-    const tokenMid = sig.direction === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
-    if (tokenMid !== undefined && (tokenMid < 0.15 || tokenMid > 0.85)) {
-      logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid?.toFixed(3)} — sin edge real en zona extrema`);
-      return;
+    // Nunca entrar si el token que compramos está en zona extrema (<0.15 o >0.85).
+    // Para UP: compramos YES → usar polyYes directamente
+    // Para DOWN: compramos NO → usar 1 - polyYes (polyNo puede ser undefined)
+    // Usamos polyYes como base siempre porque siempre está disponible en sig.edge.
+    const polyYesNow = sig.edge?.polyYes ?? livePolyYes;
+    if (polyYesNow !== null && polyYesNow !== undefined) {
+      const tokenMid = sig.direction === 'UP' ? polyYesNow : (1 - polyYesNow);
+      if (tokenMid < 0.15 || tokenMid > 0.85) {
+        logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real`);
+        return;
+      }
     }
 
     const now = Date.now();

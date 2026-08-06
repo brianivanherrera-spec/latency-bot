@@ -366,7 +366,6 @@ class PolymarketWS {
     if (!tokenId) return;
     const bid = parseFloat(msg.best_bid);
     const ask = parseFloat(msg.best_ask);
-    // Book vacío / resuelto: best_bid=0 best_ask=0.001 etc — no usar como mid de trading
     if (isNaN(bid) || isNaN(ask)) return;
     if (bid <= 0 && ask >= 0.99) {
       this._lastPriceByToken.set(tokenId, ask >= 0.99 ? 0.999 : ask);
@@ -376,6 +375,18 @@ class PolymarketWS {
     if (bid <= 0 || ask <= 0 || ask > 1) return;
     const mid = (bid + ask) / 2;
     this._lastPriceByToken.set(tokenId, mid);
+
+    // Actualizar el book con los mejores bid/ask — no tenemos profundidad completa
+    // pero sí el nivel top, que es suficiente para el imbalance básico.
+    // Preservar la profundidad del snapshot si ya la tenemos.
+    const existing = this._bookByToken.get(tokenId) || {};
+    this._bookByToken.set(tokenId, {
+      ...existing,
+      bestBid: bid,
+      bestAsk: ask,
+      updatedAt: Date.now(),
+    });
+
     this._emitPair();
   }
 
