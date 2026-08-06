@@ -625,15 +625,18 @@ async function main() {
   // del objeto de señal que quedaba estático desde el momento de la señal.
   let livePolyYes = null;
   let livePolyNo  = null;
+  let lastLoggedPolyYes = null;
 
   polyWs.onPrice((yes, no) => {
     signal.updatePolyPrice(yes, no);
     livePolyYes = yes;
     livePolyNo  = no;
-    const tag = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
-    if (tag !== lastPolyPrice) {
-      logger.info(`[POLY-WS] ${tag}`);
-      lastPolyPrice = tag;
+    // Solo loguear si el precio cambió más de 0.005 desde el último log
+    // para evitar spam — el WS manda decenas de ticks por minuto
+    if (lastLoggedPolyYes === null || Math.abs(yes - lastLoggedPolyYes) >= 0.005) {
+      logger.info(`[POLY-WS] YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`);
+      lastLoggedPolyYes = yes;
+      lastPolyPrice = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
     }
   });
 
