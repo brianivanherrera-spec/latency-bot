@@ -37,6 +37,12 @@ class PolymarketWS {
     this._subscribedTokens = new Set();
     this._lastPriceByToken = new Map();
 
+    // ─── Book depth state ─────────────────────────────────────────────────
+    // Guardamos bid/ask depth por token para análisis de order flow.
+    // Se actualiza con cada evento 'book' (snapshot) del WS.
+    // Estructura: { bid: totalTokens, ask: totalTokens, bids: [{price,size}], asks: [{price,size}] }
+    this._bookByToken = new Map();
+
     this._priceCallback = null;
     this._resolvedCallback = null;
     this._lastResolvedAt = 0; // debounce
@@ -47,6 +53,34 @@ class PolymarketWS {
   onPrice(cb) { this._priceCallback = cb; }
   onResolved(cb) { this._resolvedCallback = cb; }
   isConnected() { return this._connected; }
+
+  // Devuelve el estado actual del book para un par YES/NO
+  // Usado por signal-logger para grabar profundidad al momento de cada señal
+  getBookSnapshot() {
+    const yesBook = this._bookByToken.get(this._yesTokenId) || null;
+    const noBook  = this._bookByToken.get(this._noTokenId)  || null;
+    if (!yesBook && !noBook) return null;
+
+    const yesBidDepth = yesBook?.bid ?? 0;
+    const yesAskDepth = yesBook?.ask ?? 0;
+    const noBidDepth  = noBook?.bid  ?? 0;
+    const noAskDepth  = noBook?.ask  ?? 0;
+
+    // Imbalance de volumen: (YES_bid - NO_bid) / (YES_bid + NO_bid)
+    // Positivo = más gente comprando YES, negativo = más gente comprando NO
+    const totalBid = yesBidDepth + noBidDepth;
+    const volImbalance = totalBid > 0
+      ? parseFloat(((yesBidDepth - noBidDepth) / totalBid).toFixed(3))
+      : 0;
+
+    return {
+      yes_bid_depth: yesBidDepth,
+      yes_ask_depth: yesAskDepth,
+      no_bid_depth:  noBidDepth,
+      no_ask_depth:  noAskDepth,
+      vol_imbalance: volImbalance,  // -1 = todo en NO, +1 = todo en YES
+    };
+  }
 
   async connect() {
     return new Promise((resolve, reject) => {
@@ -189,7 +223,7 @@ class PolymarketWS {
     this._noTokenId = noTokenId || null;
     this._subscribedTokens.clear();
     [yesTokenId, noTokenId].filter(Boolean).forEach(t => this._subscribedTokens.add(t));
-    if (!same) this._lastPriceByToken.clear();
+    if (!same) this._lastPriceByToken.clear(); this._bookByToken.clear();
 
     if (this._connected && yesTokenId && noTokenId) {
       this._sendSubscribe([yesTokenId, noTokenId]);
@@ -206,6 +240,7 @@ class PolymarketWS {
     this._noTokenId = null;
     this._subscribedTokens.clear();
     this._lastPriceByToken.clear();
+    this._bookByToken.clear();
   }
 
   _sendSubscribe(tokenIds) {
@@ -291,6 +326,19 @@ class PolymarketWS {
     else if (!isNaN(bestBid)) mid = bestBid;
     if (mid == null || mid <= 0) return;
     this._lastPriceByToken.set(tokenId, mid);
+
+    // Calcular profundidad total del book (suma de tokens en todos los niveles)
+    // Bids = compradores (quieren comprar YES/NO), Asks = vendedores
+    const bidDepth = (msg.bids || []).reduce((s, l) => s + parseFloat(l.size || 0), 0);
+    const askDepth = (msg.asks || []).reduce((s, l) => s + parseFloat(l.size || 0), 0);
+    this._bookByToken.set(tokenId, {
+      bid: parseFloat(bidDepth.toFixed(2)),
+      ask: parseFloat(askDepth.toFixed(2)),
+      bids: (msg.bids || []).slice(0, 5),  // top 5 niveles
+      asks: (msg.asks || []).slice(0, 5),
+      updatedAt: Date.now(),
+    });
+
     this._emitPair();
   }
 

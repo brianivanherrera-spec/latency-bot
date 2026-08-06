@@ -1157,18 +1157,15 @@ async function main() {
       sig,
       utcHour,
       btcPrice: btcPriceAtSignal,
-      // getPolyPrice: lee el precio ACTUAL del WS en tiempo real para que
-      // los snapshots t0/t1/t2/t5 reflejen el movimiento real de Polymarket
-      // post-entrada. Antes leía sig.edge?.polyYes que era el precio al
-      // momento de la señal y nunca cambiaba — todos los snapshots eran iguales.
-      // Con livePolyYes/No actualizados por el WS en cada tick, ahora t5 puede
-      // mostrar el precio real 5 segundos después de entrar.
       getPolyPrice: (dir) => {
-        // Preferir precio del WS (tiempo real); fallback al precio de la señal
         const wsPrice = dir === 'UP' ? livePolyYes : livePolyNo;
         if (wsPrice !== null) return wsPrice;
         return dir === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
       },
+      // getBookSnapshot: captura la profundidad del book al momento exacto
+      // de la señal — yes_bid_depth, yes_ask_depth, no_bid_depth, no_ask_depth,
+      // vol_imbalance — para analizar si el order flow confirma la dirección.
+      getBookSnapshot: () => polyWs.getBookSnapshot(),
     });
 
     // BTC snapshot 30s después

@@ -21,8 +21,11 @@ let consecutiveLosses = 0;
 const pendingSnapshots = new Map();
 
 // ─── Abrir trade ─────────────────────────────────────────────────────────────
-function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice }) {
+function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot }) {
   ensureDir();
+
+  // Capturar snapshot del book al momento exacto de la señal
+  const bookSnap = getBookSnapshot ? getBookSnapshot() : null;
 
   const record = {
     posId,
@@ -36,18 +39,26 @@ function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, bt
     market:           market?.question?.slice(-30) || '',
     // Indicadores de señal
     zscore:           parseFloat(sig?.zScore?.toFixed(3) || 0),
-    mode:             process.env.DRY_RUN === 'true' ? 'paper' : 'live',
     movePct:          parseFloat(sig?.movePct?.toFixed(4) || 0),
     imbalance:        parseFloat(sig?.imbalance?.toFixed(3) || 0),
     spreadRatio:      parseFloat(sig?.spreadRatio?.toFixed(3) || 1),
     tickFreq:         sig?.tickFreq || 0,
     rsi:              parseFloat(sig?.rsi?.toFixed(1) || 50),
     signalScore:      sig?.signalScore || null,
-    fill_time_ms:     null,  // se actualiza después del fill GTC
+    fill_time_ms:     null,
     bufferSize:       sig?.bufferSize || 0,
     // Estado del bot al momento de la señal
     consecutive_losses: consecutiveLosses,
     btc_price_entry:  btcPrice || null,
+    // ─── Order flow / book depth ──────────────────────────────────────────
+    // Profundidad del book de Polymarket al momento de la señal.
+    // Permite analizar si hay más compradores de YES o NO en ese instante.
+    // vol_imbalance: -1 = todo el volumen en NO, +1 = todo en YES
+    book_yes_bid:     bookSnap?.yes_bid_depth ?? null,
+    book_yes_ask:     bookSnap?.yes_ask_depth ?? null,
+    book_no_bid:      bookSnap?.no_bid_depth  ?? null,
+    book_no_ask:      bookSnap?.no_ask_depth  ?? null,
+    book_vol_imbalance: bookSnap?.vol_imbalance ?? null,
     // Edge decay — se completan con snapshots
     poly_price_t0:    null,
     poly_price_t1:    null,
