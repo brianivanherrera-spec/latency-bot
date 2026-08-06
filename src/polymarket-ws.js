@@ -352,6 +352,15 @@ class PolymarketWS {
     yes = parseFloat(Number(yes).toFixed(3));
     no = parseFloat(Number(no).toFixed(3));
 
+    // Validar coherencia: YES + NO deben sumar ~1
+    // Si no suman, hay un precio stale de un mercado anterior mezclado — descartar
+    const sum = yes + no;
+    if (sum < 0.88 || sum > 1.12) {
+      // Intentar recalcular: si tenemos ambos precios individuales, uno puede ser stale
+      // Usar el más reciente (el que acaba de llegar) y calcular el complemento
+      return;
+    }
+
     // Rango de trading normal
     if (yes >= 0.05 && yes <= 0.95) {
       this._priceCallback(yes, no);
