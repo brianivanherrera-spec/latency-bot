@@ -247,10 +247,17 @@ class PolymarketWS {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     if (!tokenIds?.length) return;
     try {
+      // Canal "market": recibe best_bid_ask y price_change en tiempo real
       this.ws.send(JSON.stringify({
         assets_ids: tokenIds,
         type: 'market',
         custom_feature_enabled: true,
+      }));
+      // Canal "book": recibe snapshot completo con bids[]/asks[] y su profundidad
+      // Necesario para grabar book_yes_bid, book_no_bid, book_vol_imbalance
+      this.ws.send(JSON.stringify({
+        assets_ids: tokenIds,
+        type: 'book',
       }));
     } catch (e) {
       logger.error(`Error subscribe: ${e.message}`);
@@ -318,8 +325,10 @@ class PolymarketWS {
   _onBook(msg) {
     const tokenId = msg.asset_id;
     if (!tokenId) return;
-    const bestBid = parseFloat(msg.bids?.[0]?.price);
-    const bestAsk = parseFloat(msg.asks?.[0]?.price);
+    const bids = msg.bids || [];
+    const asks = msg.asks || [];
+    const bestBid = parseFloat(bids[0]?.price);
+    const bestAsk = parseFloat(asks[0]?.price);
     let mid = null;
     if (!isNaN(bestBid) && !isNaN(bestAsk)) mid = (bestBid + bestAsk) / 2;
     else if (!isNaN(bestAsk)) mid = bestAsk;
@@ -328,16 +337,25 @@ class PolymarketWS {
     this._lastPriceByToken.set(tokenId, mid);
 
     // Calcular profundidad total del book (suma de tokens en todos los niveles)
-    // Bids = compradores (quieren comprar YES/NO), Asks = vendedores
-    const bidDepth = (msg.bids || []).reduce((s, l) => s + parseFloat(l.size || 0), 0);
-    const askDepth = (msg.asks || []).reduce((s, l) => s + parseFloat(l.size || 0), 0);
+    // Polymarket puede mandar size como string o número
+    const parseSize = (s) => parseFloat(s?.size ?? s?.amount ?? 0) || 0;
+    const bidDepth = bids.reduce((s, l) => s + parseSize(l), 0);
+    const askDepth = asks.reduce((s, l) => s + parseSize(l), 0);
+
+    const hadDepth = this._bookByToken.has(tokenId);
     this._bookByToken.set(tokenId, {
       bid: parseFloat(bidDepth.toFixed(2)),
       ask: parseFloat(askDepth.toFixed(2)),
-      bids: (msg.bids || []).slice(0, 5),  // top 5 niveles
-      asks: (msg.asks || []).slice(0, 5),
+      bids: bids.slice(0, 5),
+      asks: asks.slice(0, 5),
       updatedAt: Date.now(),
     });
+
+    // Loguear solo la primera vez que recibimos depth real para este token
+    if (!hadDepth && (bidDepth > 0 || askDepth > 0)) {
+      const isYes = tokenId === this._yesTokenId;
+      logger.info(`[POLY-WS] 📊 Book depth ${isYes ? 'YES' : 'NO'}: bid=${bidDepth.toFixed(0)} ask=${askDepth.toFixed(0)} tokens`);
+    }
 
     this._emitPair();
   }
