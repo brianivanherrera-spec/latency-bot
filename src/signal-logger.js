@@ -21,11 +21,12 @@ let consecutiveLosses = 0;
 const pendingSnapshots = new Map();
 
 // ─── Abrir trade ─────────────────────────────────────────────────────────────
-function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot }) {
+async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot }) {
   ensureDir();
 
   // Capturar snapshot del book al momento exacto de la señal
-  const bookSnap = getBookSnapshot ? getBookSnapshot() : null;
+  // getBookSnapshot puede ser async (fallback HTTP) o sync (WS)
+  const bookSnap = getBookSnapshot ? (await getBookSnapshot()) : null;
 
   // Precio de Polymarket al momento exacto de la señal:
   // Usar sig.edge?.polyYes (el precio que usó el bot para calcular el edge)

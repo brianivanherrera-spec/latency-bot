@@ -1150,7 +1150,7 @@ async function main() {
     // Registrar señal en volumen persistente
     const utcHour = new Date().getUTCHours();
     const btcPriceAtSignal = sig.currentPrice;
-    signalLogger.logSignalOpen({
+    await signalLogger.logSignalOpen({
       posId,
       direction: sig.direction,
       price,
@@ -1167,10 +1167,26 @@ async function main() {
       // getBookSnapshot: captura la profundidad del book al momento exacto
       // de la señal — yes_bid_depth, yes_ask_depth, no_bid_depth, no_ask_depth,
       // vol_imbalance — para analizar si el order flow confirma la dirección.
-      getBookSnapshot: () => {
-        polyWs.debugBookState();
-        const snap = polyWs.getBookSnapshot();
-        logger.info(`[BOOK-DEBUG] snapshot=${JSON.stringify(snap)} yesToken=${cachedMarket?.yesToken?.slice(0,8)} noToken=${cachedMarket?.noToken?.slice(0,8)}`);
+      getBookSnapshot: async () => {
+        let snap = polyWs.getBookSnapshot();
+        if (!snap && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
+          // WS no tiene el book todavía — pedir via HTTP como fallback
+          const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+          if (depth) {
+            const totalBid = depth.yesBid + depth.noBid;
+            snap = {
+              yes_bid_depth: depth.yesBid,
+              yes_ask_depth: depth.yesAsk,
+              no_bid_depth:  depth.noBid,
+              no_ask_depth:  depth.noAsk,
+              vol_imbalance: totalBid > 0
+                ? parseFloat(((depth.yesBid - depth.noBid) / totalBid).toFixed(3))
+                : 0,
+              source: 'http',
+            };
+            logger.info(`[BOOK] Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid} imb=${snap.vol_imbalance}`);
+          }
+        }
         return snap;
       },
     });

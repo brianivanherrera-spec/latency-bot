@@ -168,6 +168,30 @@ class PolymarketClient {
   }
 
   /**
+   * Obtiene la profundidad completa del book via HTTP para un par YES/NO.
+   * Usado como fallback cuando el WS no tiene el snapshot todavía.
+   */
+  async fetchBookDepth(yesTokenId, noTokenId) {
+    try {
+      await this._init();
+      const [yesBook, noBook] = await Promise.all([
+        this.clobClient.getOrderBook(yesTokenId).catch(() => null),
+        this.clobClient.getOrderBook(noTokenId).catch(() => null),
+      ]);
+      const parseSize = (l) => parseFloat(l?.size ?? l?.amount ?? 0) || 0;
+      const yesBid = (yesBook?.bids || []).reduce((s,l) => s+parseSize(l), 0);
+      const yesAsk = (yesBook?.asks || []).reduce((s,l) => s+parseSize(l), 0);
+      const noBid  = (noBook?.bids  || []).reduce((s,l) => s+parseSize(l), 0);
+      const noAsk  = (noBook?.asks  || []).reduce((s,l) => s+parseSize(l), 0);
+      return { yesBid: parseFloat(yesBid.toFixed(2)), yesAsk: parseFloat(yesAsk.toFixed(2)),
+               noBid: parseFloat(noBid.toFixed(2)),   noAsk: parseFloat(noAsk.toFixed(2)) };
+    } catch (e) {
+      logger.warn(`[BOOK] fetchBookDepth falló: ${e.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Best ask del book (para cruzar spread en MARKET/FAK).
    * Devuelve null si no hay book.
    */
