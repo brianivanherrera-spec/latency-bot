@@ -173,18 +173,30 @@ class PolymarketClient {
    */
   async fetchBookDepth(yesTokenId, noTokenId) {
     try {
-      await this._init();
-      const [yesBook, noBook] = await Promise.all([
-        this.clobClient.getOrderBook(yesTokenId).catch(() => null),
-        this.clobClient.getOrderBook(noTokenId).catch(() => null),
+      // Usar la API pública REST de Polymarket — no requiere autenticación,
+      // funciona tanto en paper como en live.
+      const BASE = 'https://clob.polymarket.com';
+      const headers = { 'Content-Type': 'application/json' };
+      const [yesRes, noRes] = await Promise.all([
+        fetch(`${BASE}/book?token_id=${yesTokenId}`, { headers }).catch(() => null),
+        fetch(`${BASE}/book?token_id=${noTokenId}`,  { headers }).catch(() => null),
       ]);
+      const yesBook = yesRes?.ok ? await yesRes.json().catch(() => null) : null;
+      const noBook  = noRes?.ok  ? await noRes.json().catch(() => null)  : null;
+
       const parseSize = (l) => parseFloat(l?.size ?? l?.amount ?? 0) || 0;
       const yesBid = (yesBook?.bids || []).reduce((s,l) => s+parseSize(l), 0);
       const yesAsk = (yesBook?.asks || []).reduce((s,l) => s+parseSize(l), 0);
       const noBid  = (noBook?.bids  || []).reduce((s,l) => s+parseSize(l), 0);
       const noAsk  = (noBook?.asks  || []).reduce((s,l) => s+parseSize(l), 0);
-      return { yesBid: parseFloat(yesBid.toFixed(2)), yesAsk: parseFloat(yesAsk.toFixed(2)),
-               noBid: parseFloat(noBid.toFixed(2)),   noAsk: parseFloat(noAsk.toFixed(2)) };
+
+      if (yesBid === 0 && yesAsk === 0 && noBid === 0 && noAsk === 0) return null;
+      return {
+        yesBid: parseFloat(yesBid.toFixed(2)),
+        yesAsk: parseFloat(yesAsk.toFixed(2)),
+        noBid:  parseFloat(noBid.toFixed(2)),
+        noAsk:  parseFloat(noAsk.toFixed(2)),
+      };
     } catch (e) {
       logger.warn(`[BOOK] fetchBookDepth falló: ${e.message}`);
       return null;
