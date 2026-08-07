@@ -27,6 +27,15 @@ function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, bt
   // Capturar snapshot del book al momento exacto de la señal
   const bookSnap = getBookSnapshot ? getBookSnapshot() : null;
 
+  // Precio de Polymarket al momento exacto de la señal:
+  // Usar sig.edge?.polyYes (el precio que usó el bot para calcular el edge)
+  // en vez de getPolyPrice() que puede tener el precio del mercado anterior
+  // si el WS todavía no actualizó livePolyYes con el nuevo mercado.
+  const polyYesAtSignal = sig?.edge?.polyYes ?? null;
+  const polyT0 = polyYesAtSignal !== null
+    ? parseFloat(polyYesAtSignal.toFixed(3))
+    : (getPolyPrice ? (() => { try { return getPolyPrice(direction); } catch(e) { return null; } })() : null);
+
   const record = {
     posId,
     mode:             process.env.DRY_RUN === 'true' ? 'paper' : 'live',
@@ -79,11 +88,11 @@ function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, bt
   try { fs.appendFileSync(SIGNAL_FILE, JSON.stringify(record) + '\n'); } catch(e) {}
 
   // Programar snapshots de precio Polymarket si tenemos la función
-  if (getPolyPrice) {
+  if (getPolyPrice || polyT0 !== null) {
     pendingSnapshots.set(posId, { record, getPolyPrice });
 
-    // T+0 inmediato
-    try { record.poly_price_t0 = getPolyPrice(direction); } catch(e) {}
+    // T+0: precio al momento exacto de la señal (del edge, no del WS live)
+    record.poly_price_t0 = polyT0;
 
     // T+1s
     setTimeout(() => {
