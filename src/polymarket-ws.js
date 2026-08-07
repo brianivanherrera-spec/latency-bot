@@ -223,7 +223,12 @@ class PolymarketWS {
     this._noTokenId = noTokenId || null;
     this._subscribedTokens.clear();
     [yesTokenId, noTokenId].filter(Boolean).forEach(t => this._subscribedTokens.add(t));
-    if (!same) this._lastPriceByToken.clear(); this._bookByToken.clear();
+    // Solo limpiar precios y book cuando cambia el mercado (nuevos tokenIds)
+    // No limpiar en reconexiones al mismo mercado — el book sigue siendo válido
+    if (!same) {
+      this._lastPriceByToken.clear();
+      this._bookByToken.clear();
+    }
 
     if (this._connected && yesTokenId && noTokenId) {
       this._sendSubscribe([yesTokenId, noTokenId]);
@@ -232,15 +237,16 @@ class PolymarketWS {
   }
 
   /**
-   * Solo limpia estado local. NO manda unsubscribe al server
-   * (el payload viejo provocaba "INVALID OPERATION" en loop).
+   * Solo limpia estado local de tokens. NO limpia el book — puede haber
+   * una reconexión inminente al mismo mercado y los datos siguen siendo válidos.
    */
   unsubscribeAll() {
     this._yesTokenId = null;
     this._noTokenId = null;
     this._subscribedTokens.clear();
     this._lastPriceByToken.clear();
-    this._bookByToken.clear();
+    // NO limpiar _bookByToken acá — se limpia solo cuando subscribe() recibe
+    // tokenIds distintos (nuevo mercado). En reconexiones, el book sobrevive.
   }
 
   _sendSubscribe(tokenIds) {
