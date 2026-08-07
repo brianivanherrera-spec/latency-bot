@@ -56,6 +56,17 @@ class PolymarketWS {
 
   // Devuelve el estado actual del book para un par YES/NO
   // Usado por signal-logger para grabar profundidad al momento de cada señal
+  // Debug: ver estado interno del book
+  debugBookState() {
+    const keys = [...this._bookByToken.keys()];
+    logger.info(`[BOOK-DEBUG] _bookByToken tiene ${keys.length} tokens: ${keys.map(k=>k.slice(0,8)).join(', ')}`);
+    logger.info(`[BOOK-DEBUG] _yesTokenId=${this._yesTokenId?.slice(0,8)} _noTokenId=${this._noTokenId?.slice(0,8)}`);
+    keys.forEach(k => {
+      const b = this._bookByToken.get(k);
+      logger.info(`[BOOK-DEBUG] token ${k.slice(0,8)}: bid=${b?.bid} ask=${b?.ask} updatedAt=${b?.updatedAt ? new Date(b.updatedAt).toISOString() : 'n/a'}`);
+    });
+  }
+
   getBookSnapshot() {
     const yesBook = this._bookByToken.get(this._yesTokenId) || null;
     const noBook  = this._bookByToken.get(this._noTokenId)  || null;

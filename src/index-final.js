@@ -1167,7 +1167,12 @@ async function main() {
       // getBookSnapshot: captura la profundidad del book al momento exacto
       // de la señal — yes_bid_depth, yes_ask_depth, no_bid_depth, no_ask_depth,
       // vol_imbalance — para analizar si el order flow confirma la dirección.
-      getBookSnapshot: () => polyWs.getBookSnapshot(),
+      getBookSnapshot: () => {
+        polyWs.debugBookState();
+        const snap = polyWs.getBookSnapshot();
+        logger.info(`[BOOK-DEBUG] snapshot=${JSON.stringify(snap)} yesToken=${cachedMarket?.yesToken?.slice(0,8)} noToken=${cachedMarket?.noToken?.slice(0,8)}`);
+        return snap;
+      },
     });
 
     // BTC snapshot 30s después
