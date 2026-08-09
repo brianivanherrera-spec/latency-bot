@@ -1148,6 +1148,12 @@ async function main() {
       entryType,  // 'early' o 'late' — usado por el gate de DUAL_ENTRY_MODE
     });
 
+    // Capturar tokenIds AHORA en variables locales inmutables
+    // antes de pasarlos al closure — cachedMarket es una referencia
+    // que puede cambiar al siguiente mercado antes de que corran t1/t2/t5
+    const snapshotYesTokenId = cachedMarket?.yesTokenId ?? null;
+    const snapshotNoTokenId  = cachedMarket?.noTokenId  ?? null;
+
     // Registrar señal en volumen persistente
     const utcHour = new Date().getUTCHours();
     const btcPriceAtSignal = sig.currentPrice;
@@ -1161,6 +1167,14 @@ async function main() {
       utcHour,
       btcPrice: btcPriceAtSignal,
       getPolyPrice: (dir) => {
+        // Usar tokenIds capturados al momento de apertura — no cachedMarket
+        // que puede ya apuntar al siguiente mercado cuando corran t1/t2/t5
+        const tokenId = dir === 'UP' ? snapshotYesTokenId : snapshotNoTokenId;
+        if (tokenId) {
+          const wsPrice = polyWs.getPriceForToken(tokenId);
+          if (wsPrice !== null && wsPrice !== undefined) return wsPrice;
+        }
+        // Fallback a variable global
         const wsPrice = dir === 'UP' ? livePolyYes : livePolyNo;
         if (wsPrice !== null) return wsPrice;
         return dir === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;

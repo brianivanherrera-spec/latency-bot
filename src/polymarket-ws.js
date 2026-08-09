@@ -67,6 +67,14 @@ class PolymarketWS {
     });
   }
 
+  // Retorna el último precio conocido para un tokenId específico
+  // Usado por getPolyPrice para capturar snapshots t1/t2/t5 del token
+  // correcto aunque el mercado haya resuelto y el WS cambiado
+  getPriceForToken(tokenId) {
+    if (!tokenId) return null;
+    return this._lastPriceByToken.get(tokenId) ?? null;
+  }
+
   getBookSnapshot() {
     const yesBook = this._bookByToken.get(this._yesTokenId) || null;
     const noBook  = this._bookByToken.get(this._noTokenId)  || null;
