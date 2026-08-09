@@ -171,10 +171,20 @@ class SignalEngine {
     const tickFreq = this._tickFrequency();
     const rsi = this._rsi(14);
 
-    // ─── Filtro RSI (125 trades reales) ──────────────────────────────────
-    // RSI 40-80: 17-43% WR → no entrar
-    // RSI <40 o >80: 52-83% WR → señales confiables
-    if (rsi >= 40 && rsi <= 80) return null;
+    // ─── Filtro RSI configurable ──────────────────────────────────────────
+    // RSI_FILTER_ENABLED=false → desactiva el filtro completamente
+    // RSI_FILTER_MIN=30        → límite inferior (default: 30)
+    // RSI_FILTER_MAX=80        → límite superior (default: 80)
+    // Bloquea si RSI está DENTRO del rango [MIN, MAX]
+    // Solo pasan señales en extremos: RSI < MIN o RSI > MAX
+    // Para más señales: bajar MIN (ej: 20) o subir MAX (ej: 85)
+    // Para desactivar: RSI_FILTER_ENABLED=false
+    const rsiFilterEnabled = process.env.RSI_FILTER_ENABLED !== 'false';
+    if (rsiFilterEnabled) {
+      const rsiMin = parseFloat(process.env.RSI_FILTER_MIN || '30');
+      const rsiMax = parseFloat(process.env.RSI_FILTER_MAX || '80');
+      if (rsi >= rsiMin && rsi <= rsiMax) return null;
+    }
 
     if (direction === 'NEUTRAL') {
       this._totalSignals++;
