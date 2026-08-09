@@ -109,13 +109,18 @@ class SignalEngine {
 
   // ─── Tendencia macro: precio hace N ticks vs ahora ─────────────────
   // Retorna 'UP', 'DOWN' o 'FLAT' según la dirección dominante
-  _macroTrend(currentPrice, windowTicks = 150) {
+  // Configurable via:
+  //   MACRO_TREND_WINDOW=150     → ticks hacia atrás (default 150 ≈ 2-3 min)
+  //   MACRO_TREND_THRESHOLD=0.04 → % de movimiento para considerar tendencia
+  _macroTrend(currentPrice) {
+    const windowTicks = parseInt(process.env.MACRO_TREND_WINDOW || '150');
+    const threshold   = parseFloat(process.env.MACRO_TREND_THRESHOLD || '0.04');
     const n = this.prices.length;
     if (n < windowTicks) return 'FLAT';
     const priceThen = this.prices[n - windowTicks];
     const changePct = ((currentPrice - priceThen) / priceThen) * 100;
-    if (changePct > 0.04) return 'UP';
-    if (changePct < -0.04) return 'DOWN';
+    if (changePct > threshold) return 'UP';
+    if (changePct < -threshold) return 'DOWN';
     return 'FLAT';
   }
 
@@ -156,7 +161,10 @@ class SignalEngine {
     }
 
     // ─── Filtro de tendencia macro ────────────────────────────────────
-    if (direction !== 'NEUTRAL') {
+    // MACRO_TREND_ENABLED=false → desactiva completamente
+    // MACRO_TREND_WINDOW=150    → ventana en ticks (default ≈ 2-3 min)
+    // MACRO_TREND_THRESHOLD=0.04 → % de movimiento para considerar tendencia
+    if (direction !== 'NEUTRAL' && process.env.MACRO_TREND_ENABLED !== 'false') {
       const macro = this._macroTrend(currentPrice);
       if (macro === 'UP' && direction === 'DOWN') return null;
       if (macro === 'DOWN' && direction === 'UP') return null;

@@ -923,7 +923,8 @@ async function main() {
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
 
     if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
-    if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > 15) return;
+    const maxEdgePct = parseFloat(process.env.MAX_EDGE_PCT || '15');
+    if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > maxEdgePct) return;
 
     const maxSlots = parseInt(process.env.MAX_ACTIVE_POSITIONS || '1');
     if (activePositions.size >= maxSlots) {
