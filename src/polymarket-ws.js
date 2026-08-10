@@ -35,7 +35,10 @@ class PolymarketWS {
     this._yesTokenId = null;
     this._noTokenId = null;
     this._subscribedTokens = new Set();
-    this._lastPriceByToken = new Map();
+    this._lastPriceByToken = new Map();   // precio combinado (para emitPair)
+    this._marketPriceByToken = new Map(); // precio SOLO del canal market/best_bid_ask
+                                          // usado por getPriceForToken para snapshots t1/t2/t5
+                                          // NO sobreescrito por el canal book
 
     // ─── Book depth state ─────────────────────────────────────────────────
     // Guardamos bid/ask depth por token para análisis de order flow.
@@ -67,12 +70,12 @@ class PolymarketWS {
     });
   }
 
-  // Retorna el último precio conocido para un tokenId específico
-  // Usado por getPolyPrice para capturar snapshots t1/t2/t5 del token
-  // correcto aunque el mercado haya resuelto y el WS cambiado
+  // Retorna el último precio REAL de transacción para un tokenId
+  // Usa _marketPriceByToken (canal market/best_bid_ask) que NO se sobreescribe
+  // con el mid del book — así los snapshots t1/t2/t5 son precios reales
   getPriceForToken(tokenId) {
     if (!tokenId) return null;
-    return this._lastPriceByToken.get(tokenId) ?? null;
+    return this._marketPriceByToken.get(tokenId) ?? null;
   }
 
   getBookSnapshot() {
@@ -246,6 +249,7 @@ class PolymarketWS {
     // No limpiar en reconexiones al mismo mercado — el book sigue siendo válido
     if (!same) {
       this._lastPriceByToken.clear();
+      this._marketPriceByToken.clear();
       this._bookByToken.clear();
     }
 
@@ -264,6 +268,7 @@ class PolymarketWS {
     this._noTokenId = null;
     this._subscribedTokens.clear();
     this._lastPriceByToken.clear();
+    this._marketPriceByToken.clear();
     // NO limpiar _bookByToken acá — se limpia solo cuando subscribe() recibe
     // tokenIds distintos (nuevo mercado). En reconexiones, el book sobrevive.
   }
@@ -359,6 +364,10 @@ class PolymarketWS {
     else if (!isNaN(bestAsk)) mid = bestAsk;
     else if (!isNaN(bestBid)) mid = bestBid;
     if (mid == null || mid <= 0) return;
+    // El canal book actualiza _lastPriceByToken (para emitPair/display)
+    // pero NO _marketPriceByToken — los snapshots t1/t2/t5 solo usan precios
+    // reales de transacciones del canal market, no el mid calculado del book
+    // que puede alternar entre 0.50 y 0.90+ causando lecturas falsas
     this._lastPriceByToken.set(tokenId, mid);
 
     // Calcular profundidad total del book (suma de tokens en todos los niveles)
@@ -399,7 +408,12 @@ class PolymarketWS {
         const p = parseFloat(ch.price);
         if (!isNaN(p) && p > 0) mid = p;
       }
-      if (mid != null) this._lastPriceByToken.set(tokenId, mid);
+      if (mid != null) {
+        this._lastPriceByToken.set(tokenId, mid);
+        // También actualizar el precio de mercado real (canal market)
+        // Este es el precio que usan los snapshots t1/t2/t5
+        this._marketPriceByToken.set(tokenId, mid);
+      }
     }
     this._emitPair();
   }
@@ -411,13 +425,17 @@ class PolymarketWS {
     const ask = parseFloat(msg.best_ask);
     if (isNaN(bid) || isNaN(ask)) return;
     if (bid <= 0 && ask >= 0.99) {
-      this._lastPriceByToken.set(tokenId, ask >= 0.99 ? 0.999 : ask);
+      const price = ask >= 0.99 ? 0.999 : ask;
+      this._lastPriceByToken.set(tokenId, price);
+      this._marketPriceByToken.set(tokenId, price);
       this._emitPair({ allowExtreme: true });
       return;
     }
     if (bid <= 0 || ask <= 0 || ask > 1) return;
     const mid = (bid + ask) / 2;
     this._lastPriceByToken.set(tokenId, mid);
+    // Precio real de transacción — actualizar _marketPriceByToken
+    this._marketPriceByToken.set(tokenId, mid);
 
     // Actualizar el book con los mejores bid/ask — no tenemos profundidad completa
     // pero sí el nivel top, que es suficiente para el imbalance básico.
