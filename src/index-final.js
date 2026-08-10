@@ -1090,6 +1090,34 @@ async function main() {
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar (tipo: ${entryType})`);
     logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)} Score:${sig.signalScore}`);
 
+    // ─── Filtro de Book Imbalance de Polymarket ───────────────────────────
+    // BOOK_FILTER_ENABLED=true  → activa el filtro (default: false)
+    // BOOK_FILTER_MIN_IMBALANCE=0.30 → umbral mínimo de confirmación
+    // Lógica: si el book contradice la dirección del bot con fuerza
+    // (imbalance opuesto > umbral), no entrar — el mercado ya sabe hacia
+    // dónde va y no hay lag real para explotar.
+    // Evidencia: 0/8 WIN cuando contradice >0.30, 80%+ WIN cuando confirma.
+    if (process.env.BOOK_FILTER_ENABLED === 'true') {
+      const bookSnap = polyWs.getBookSnapshot();
+      const bookMinImb = parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30');
+      if (bookSnap) {
+        const yesBid = bookSnap.yes_bid_depth || 0;
+        const noBid  = bookSnap.no_bid_depth  || 0;
+        const total  = yesBid + noBid;
+        if (total > 0) {
+          const bookImb = (yesBid - noBid) / total;
+          const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
+                             (sig.direction === 'UP'   && bookImb < -bookMinImb);
+          if (contradice) {
+            logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} contradice ${sig.direction} (umbral: ±${bookMinImb}) — mercado ya absorbió el movimiento`);
+            activePositions.delete(posId);
+            return;
+          }
+          logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} OK para ${sig.direction}`);
+        }
+      }
+    }
+
     const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
     const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
