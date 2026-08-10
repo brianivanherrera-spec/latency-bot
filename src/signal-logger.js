@@ -96,35 +96,35 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     record.poly_price_t0 = polyT0;
 
     // T+1s
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const snap = pendingSnapshots.get(posId);
         if (snap) {
-          const price = getPolyPrice(direction);
+          const price = await getPolyPrice(direction);
           snap.record.poly_price_t1 = price;
           logger.info(`[SNAP] ${posId} t1=${price} dir=${direction}`);
         }
-      } catch(e) {}
+      } catch(e) { logger.warn(`[SNAP] t1 error: ${e.message}`); }
     }, 1000);
 
     // T+2s
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const snap = pendingSnapshots.get(posId);
         if (snap) {
-          const price = getPolyPrice(direction);
+          const price = await getPolyPrice(direction);
           snap.record.poly_price_t2 = price;
           logger.info(`[SNAP] ${posId} t2=${price} dir=${direction}`);
         }
-      } catch(e) {}
+      } catch(e) { logger.warn(`[SNAP] t2 error: ${e.message}`); }
     }, 2000);
 
     // T+5s
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         const snap = pendingSnapshots.get(posId);
         if (snap) {
-          const price = getPolyPrice(direction);
+          const price = await getPolyPrice(direction);
           snap.record.poly_price_t5 = price;
           logger.info(`[SNAP] ${posId} t5=${price} dir=${direction}`);
           // Actualizar el archivo con los snapshots
@@ -135,7 +135,7 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
             poly_price_t5: snap?.record.poly_price_t5,
           });
         }
-      } catch(e) {}
+      } catch(e) { logger.warn(`[SNAP] t5 error: ${e.message}`); }
     }, 5000);
   }
 
