@@ -99,7 +99,11 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     setTimeout(() => {
       try {
         const snap = pendingSnapshots.get(posId);
-        if (snap) snap.record.poly_price_t1 = getPolyPrice(direction);
+        if (snap) {
+          const price = getPolyPrice(direction);
+          snap.record.poly_price_t1 = price;
+          logger.info(`[SNAP] ${posId} t1=${price} dir=${direction}`);
+        }
       } catch(e) {}
     }, 1000);
 
@@ -107,7 +111,11 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     setTimeout(() => {
       try {
         const snap = pendingSnapshots.get(posId);
-        if (snap) snap.record.poly_price_t2 = getPolyPrice(direction);
+        if (snap) {
+          const price = getPolyPrice(direction);
+          snap.record.poly_price_t2 = price;
+          logger.info(`[SNAP] ${posId} t2=${price} dir=${direction}`);
+        }
       } catch(e) {}
     }, 2000);
 
@@ -115,14 +123,18 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     setTimeout(() => {
       try {
         const snap = pendingSnapshots.get(posId);
-        if (snap) snap.record.poly_price_t5 = getPolyPrice(direction);
-        // Actualizar el archivo con los snapshots
-        updateRecord(posId, {
-          poly_price_t0: snap?.record.poly_price_t0,
-          poly_price_t1: snap?.record.poly_price_t1,
-          poly_price_t2: snap?.record.poly_price_t2,
-          poly_price_t5: snap?.record.poly_price_t5,
-        });
+        if (snap) {
+          const price = getPolyPrice(direction);
+          snap.record.poly_price_t5 = price;
+          logger.info(`[SNAP] ${posId} t5=${price} dir=${direction}`);
+          // Actualizar el archivo con los snapshots
+          updateRecord(posId, {
+            poly_price_t0: snap?.record.poly_price_t0,
+            poly_price_t1: snap?.record.poly_price_t1,
+            poly_price_t2: snap?.record.poly_price_t2,
+            poly_price_t5: snap?.record.poly_price_t5,
+          });
+        }
       } catch(e) {}
     }, 5000);
   }
