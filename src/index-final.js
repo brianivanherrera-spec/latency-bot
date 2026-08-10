@@ -680,7 +680,7 @@ async function main() {
   //   STOP_LOSS_PCT=0.5               → cierra si perdiste >50% del stake (pérdida)
   //   POSITION_MONITOR_INTERVAL_MS=3000 → frecuencia de chequeo
   const monitorEnabled = process.env.POSITION_MONITOR === 'true';
-  if (monitorEnabled && !config.DRY_RUN) {
+  if (monitorEnabled) {
     const LOCK_IN = parseFloat(process.env.LOCK_IN_THRESHOLD || '0.92');
     const SL_PCT  = parseFloat(process.env.STOP_LOSS_PCT || '0.5');
     const MONITOR_INTERVAL = parseInt(process.env.POSITION_MONITOR_INTERVAL_MS || '3000');
@@ -692,20 +692,20 @@ async function main() {
 
       for (const pos of openPositions) {
         if (closingPositions.has(pos.id)) continue;
-        if (!pos.tokenId) continue; // posición sin tokenId no se puede monitorear
+        if (!pos.tokenId) continue;
 
+        // En paper: usar el precio del WS en vez de getTokenMidPrice (requiere auth)
         let midPrice;
-        try {
-          midPrice = await poly.getTokenMidPrice(pos.tokenId);
-        } catch (e) { continue; }
-        if (midPrice === null) continue;
+        if (config.DRY_RUN) {
+          midPrice = polyWs.getPriceForToken(pos.tokenId);
+          if (midPrice === null || midPrice === undefined) continue;
+        } else {
+          try {
+            midPrice = await poly.getTokenMidPrice(pos.tokenId);
+          } catch (e) { continue; }
+          if (midPrice === null) continue;
+        }
 
-        // Para un BUY (compramos YES/NO esperando que suba a $1):
-        //   - lock-in si midPrice >= LOCK_IN (ya casi ganó, asegurar)
-        //   - SL si midPrice <= entryPrice * (1 - SL_PCT) (perdió >SL_PCT del stake)
-        // Para un SELL (vendemos NO esperando que baje a $0):
-        //   - lock-in si el precio del token cayó a <= (1 - LOCK_IN) — espejo
-        //   - SL si el precio subió demasiado contra nosotros
         const isBuy = pos.side === 'BUY';
         const tokenCurrentPrice = midPrice;
         const slThreshold = isBuy
@@ -721,29 +721,39 @@ async function main() {
 
         if (!hitLockIn && !hitSL) continue;
 
-        const reason = hitLockIn ? `LOCK-IN (precio $${tokenCurrentPrice.toFixed(3)} >= $${LOCK_IN})` : `STOP-LOSS (precio $${tokenCurrentPrice.toFixed(3)} <= $${slThreshold.toFixed(3)})`;
+        const reason = hitLockIn
+          ? `LOCK-IN (precio $${tokenCurrentPrice.toFixed(3)} >= $${LOCK_IN})`
+          : `STOP-LOSS (precio $${tokenCurrentPrice.toFixed(3)} <= $${slThreshold.toFixed(3)})`;
         logger.warn(`[POSITION-MONITOR] 🚨 ${reason} en ${pos.id} — cerrando`);
         closingPositions.add(pos.id);
 
-        const exitResult = await poly.sellPosition({
-          tokenId: pos.tokenId,
-          size: pos.size,
-          side: pos.side,
-          posId: pos.id,
-        });
-
-        if (exitResult.success) {
-          // Calcular PnL real de la salida anticipada
-          const exitPrice = exitResult.price;
+        if (config.DRY_RUN) {
+          // Paper: simular cierre con el precio actual del WS
+          const exitPrice = tokenCurrentPrice;
           const pnl = isBuy
             ? parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2))
             : parseFloat(((pos.entryPrice - exitPrice) * pos.size).toFixed(2));
+          logger.info(`[POSITION-MONITOR] 📋 PAPER — cerrando ${pos.id} @ $${exitPrice.toFixed(3)} | PnL simulado: $${pnl.toFixed(2)}`);
           tracker.forceClosePosition(pos.id, pnl, reason);
+        } else {
+          const exitResult = await poly.sellPosition({
+            tokenId: pos.tokenId,
+            size: pos.size,
+            side: pos.side,
+            posId: pos.id,
+          });
+          if (exitResult.success) {
+            const exitPrice = exitResult.price;
+            const pnl = isBuy
+              ? parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2))
+              : parseFloat(((pos.entryPrice - exitPrice) * pos.size).toFixed(2));
+            tracker.forceClosePosition(pos.id, pnl, reason);
+          }
         }
         closingPositions.delete(pos.id);
       }
     }, MONITOR_INTERVAL);
-    logger.info(`[POSITION-MONITOR] ✅ Activo — lock-in: $${LOCK_IN} | SL: ${SL_PCT*100}% del stake | intervalo: ${MONITOR_INTERVAL}ms`);
+    logger.info(`[POSITION-MONITOR] ✅ Activo (${config.DRY_RUN ? 'PAPER' : 'LIVE'}) — lock-in: $${LOCK_IN} | SL: ${SL_PCT*100}% | intervalo: ${MONITOR_INTERVAL}ms`);
   }
 
   // Historial de precio BTC con timestamp para filtro de tendencia exacto
