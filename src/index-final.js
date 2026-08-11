@@ -932,9 +932,37 @@ async function main() {
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
 
-    if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
-    const maxEdgePct = parseFloat(process.env.MAX_EDGE_PCT || '15');
-    if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > maxEdgePct) return;
+    // ─── BOOK_ENTRY_MODE — segunda vía de entrada ─────────────────────────
+    // Cuando el book de Polymarket está muy desbalanceado (>= umbral),
+    // entra en la dirección del book aunque el Z-score sea bajo o el edge
+    // no sea suficiente. Evidencia: Z<2.5 + book>0.50 = 90% WR (9/10 trades).
+    //   BOOK_ENTRY_MODE=true           → activa la segunda vía
+    //   BOOK_ENTRY_MIN_IMBALANCE=0.60  → umbral de imbalance para entrar
+    let bookEntryOverride = false;
+    if (process.env.BOOK_ENTRY_MODE === 'true') {
+      const bookEntryMinImb = parseFloat(process.env.BOOK_ENTRY_MIN_IMBALANCE || '0.60');
+      const bookSnap = polyWs.getBookSnapshot();
+      if (bookSnap) {
+        const yesBid = bookSnap.yes_bid_depth || 0;
+        const noBid  = bookSnap.no_bid_depth  || 0;
+        const total  = yesBid + noBid;
+        if (total > 0) {
+          const bookImb = (yesBid - noBid) / total;
+          // El book entry sigue la dirección del book, no del bot
+          const bookDirection = bookImb < -bookEntryMinImb ? 'DOWN' : bookImb > bookEntryMinImb ? 'UP' : null;
+          if (bookDirection && bookDirection === sig.direction) {
+            bookEntryOverride = true;
+            logger.info(`[BOOK-ENTRY] 🎯 imb=${bookImb.toFixed(3)} → override de edge para ${bookDirection}`);
+          }
+        }
+      }
+    }
+
+    if (!bookEntryOverride) {
+      if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
+      const maxEdgePct = parseFloat(process.env.MAX_EDGE_PCT || '15');
+      if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > maxEdgePct) return;
+    }
 
     const maxSlots = parseInt(process.env.MAX_ACTIVE_POSITIONS || '1');
     if (activePositions.size >= maxSlots) {
