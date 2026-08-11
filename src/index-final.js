@@ -1106,10 +1106,26 @@ async function main() {
     // Lógica: si el book contradice la dirección del bot con fuerza
     // (imbalance opuesto > umbral), no entrar — el mercado ya sabe hacia
     // dónde va y no hay lag real para explotar.
-    // Evidencia: 0/8 WIN cuando contradice >0.30, 80%+ WIN cuando confirma.
+    // Evidencia: 0/11 WIN cuando contradice >0.30, 100% WIN cuando confirma.
+    // Fallback HTTP: si el WS no tiene el book, lo pide via REST para no
+    // saltear el filtro silenciosamente cuando no hay datos en el WS.
     if (process.env.BOOK_FILTER_ENABLED === 'true') {
-      const bookSnap = polyWs.getBookSnapshot();
       const bookMinImb = parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30');
+      let bookSnap = polyWs.getBookSnapshot();
+
+      // Fallback HTTP si el WS no tiene el book todavía
+      if (!bookSnap && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
+        const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+        if (depth) {
+          const total = depth.yesBid + depth.noBid;
+          bookSnap = total > 0 ? {
+            yes_bid_depth: depth.yesBid,
+            no_bid_depth:  depth.noBid,
+          } : null;
+          if (bookSnap) logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid}`);
+        }
+      }
+
       if (bookSnap) {
         const yesBid = bookSnap.yes_bid_depth || 0;
         const noBid  = bookSnap.no_bid_depth  || 0;
@@ -1125,6 +1141,10 @@ async function main() {
           }
           logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} OK para ${sig.direction}`);
         }
+      } else {
+        // Sin datos de book de ninguna fuente — loguear pero dejar pasar
+        // (no bloquear por falta de datos, solo avisar)
+        logger.warn(`[BOOK-FILTER] ⚠️ Sin datos de book (WS ni HTTP) — entrando sin filtro`);
       }
     }
 
