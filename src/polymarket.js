@@ -545,14 +545,16 @@ class PolymarketClient {
   async sellPosition({ tokenId, size, side, posId }) {
     try {
       await this._init();
-      const exitSide = side === 'BUY' ? 'SELL' : 'BUY';
+      // El bot SIEMPRE COMPRA tokens: NO para DOWN, YES para UP.
+      // El campo side de la posición es la dirección de la apuesta,
+      // NO el lado de la orden. Para cerrar cualquier posición hay que
+      // VENDER los tokens que tenemos en mano — siempre SELL.
+      // (Bug anterior: side='SELL' en posiciones DOWN hacía exitSide='BUY',
+      //  comprando MÁS tokens a $0.99 en vez de vender los existentes.)
+      const exitSide = 'SELL';
       const book = await this.clobClient.getOrderBook(tokenId);
-      let exitPrice;
-      if (exitSide === 'SELL') {
-        exitPrice = parseFloat(book?.bids?.[0]?.price || 0);
-      } else {
-        exitPrice = parseFloat(book?.asks?.[0]?.price || 1);
-      }
+      // Vendemos al best bid (el mejor precio que alguien paga por nuestro token)
+      const exitPrice = parseFloat(book?.bids?.[0]?.price || 0);
       if (!exitPrice) return { success: false, error: 'sin liquidez para salir' };
 
       logger.info(`[POSITION-MONITOR] 🚪 Cerrando ${posId} — ${exitSide} ${size}t @ $${exitPrice.toFixed(3)}`);
