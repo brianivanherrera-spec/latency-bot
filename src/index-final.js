@@ -708,16 +708,24 @@ async function main() {
 
         const isBuy = pos.side === 'BUY';
         const tokenCurrentPrice = midPrice;
-        const slThreshold = isBuy
-          ? pos.entryPrice * (1 - SL_PCT)
-          : pos.entryPrice + (pos.entryPrice * SL_PCT);
 
-        const hitLockIn = isBuy
-          ? tokenCurrentPrice >= LOCK_IN
-          : tokenCurrentPrice <= (1 - LOCK_IN);
-        const hitSL = isBuy
-          ? tokenCurrentPrice <= slThreshold
-          : tokenCurrentPrice >= slThreshold;
+        // Para DOWN: vendemos NO (side=SELL) pero compramos el token NO.
+        // El precio que monitoreamos es el del token NO:
+        //   - Si sube → estamos ganando (el mercado va DOWN)
+        //   - Si baja → estamos perdiendo (el mercado va UP)
+        // Para UP: compramos YES (side=BUY):
+        //   - Si sube → ganando
+        //   - Si baja → perdiendo
+        // En ambos casos el token monitoreado es el que tenemos en mano.
+        // entryPrice es el precio que pagamos por ese token.
+
+        // LOCK-IN: el token que tenemos subió al umbral de ganancia
+        const hitLockIn = tokenCurrentPrice >= LOCK_IN;
+
+        // STOP-LOSS: el token que tenemos bajó al umbral de pérdida
+        // Si entramos a $0.545 con SL=40%, cortamos si baja a $0.545 × (1-0.40) = $0.327
+        const slThreshold = pos.entryPrice * (1 - SL_PCT);
+        const hitSL = tokenCurrentPrice <= slThreshold;
 
         if (!hitLockIn && !hitSL) continue;
 
@@ -730,9 +738,9 @@ async function main() {
         if (config.DRY_RUN) {
           // Paper: simular cierre con el precio actual del WS
           const exitPrice = tokenCurrentPrice;
-          const pnl = isBuy
-            ? parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2))
-            : parseFloat(((pos.entryPrice - exitPrice) * pos.size).toFixed(2));
+          // PnL = (precioSalida - precioEntrada) × size — igual para BUY y SELL
+          // porque siempre monitoreamos el token que tenemos en mano
+          const pnl = parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2));
           logger.info(`[POSITION-MONITOR] 📋 PAPER — cerrando ${pos.id} @ $${exitPrice.toFixed(3)} | PnL simulado: $${pnl.toFixed(2)}`);
           tracker.forceClosePosition(pos.id, pnl, reason);
         } else {
@@ -744,9 +752,7 @@ async function main() {
           });
           if (exitResult.success) {
             const exitPrice = exitResult.price;
-            const pnl = isBuy
-              ? parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2))
-              : parseFloat(((pos.entryPrice - exitPrice) * pos.size).toFixed(2));
+            const pnl = parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2));
             tracker.forceClosePosition(pos.id, pnl, reason);
           }
         }
