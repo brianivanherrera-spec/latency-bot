@@ -735,28 +735,36 @@ async function main() {
         logger.warn(`[POSITION-MONITOR] 🚨 ${reason} en ${pos.id} — cerrando`);
         closingPositions.add(pos.id);
 
-        if (config.DRY_RUN) {
-          // Paper: simular cierre con el precio actual del WS
-          const exitPrice = tokenCurrentPrice;
-          // PnL = (precioSalida - precioEntrada) × size — igual para BUY y SELL
-          // porque siempre monitoreamos el token que tenemos en mano
-          const pnl = parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2));
-          logger.info(`[POSITION-MONITOR] 📋 PAPER — cerrando ${pos.id} @ $${exitPrice.toFixed(3)} | PnL simulado: $${pnl.toFixed(2)}`);
-          tracker.forceClosePosition(pos.id, pnl, reason);
-        } else {
-          const exitResult = await poly.sellPosition({
-            tokenId: pos.tokenId,
-            size: pos.size,
-            side: pos.side,
-            posId: pos.id,
-          });
-          if (exitResult.success) {
-            const exitPrice = exitResult.price;
+        try {
+          if (config.DRY_RUN) {
+            const exitPrice = tokenCurrentPrice;
             const pnl = parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2));
+            logger.info(`[POSITION-MONITOR] 📋 PAPER — cerrando ${pos.id} @ $${exitPrice.toFixed(3)} | PnL simulado: $${pnl.toFixed(2)}`);
             tracker.forceClosePosition(pos.id, pnl, reason);
+            closingPositions.delete(pos.id);
+          } else {
+            const exitResult = await poly.sellPosition({
+              tokenId: pos.tokenId,
+              size: pos.size,
+              side: pos.side,
+              posId: pos.id,
+            });
+            if (exitResult.success) {
+              const exitPrice = exitResult.price;
+              const pnl = parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2));
+              tracker.forceClosePosition(pos.id, pnl, reason);
+              closingPositions.delete(pos.id);
+            } else {
+              // Venta falló — dejar en closingPositions para evitar loop
+              // pero reintentar en 10 segundos
+              logger.warn(`[POSITION-MONITOR] ⚠️ Venta fallida para ${pos.id} — reintentando en 10s`);
+              setTimeout(() => closingPositions.delete(pos.id), 10000);
+            }
           }
+        } catch(e) {
+          logger.error(`[POSITION-MONITOR] Error cerrando ${pos.id}: ${e.message}`);
+          setTimeout(() => closingPositions.delete(pos.id), 10000);
         }
-        closingPositions.delete(pos.id);
       }
     }, MONITOR_INTERVAL);
     logger.info(`[POSITION-MONITOR] ✅ Activo (${config.DRY_RUN ? 'PAPER' : 'LIVE'}) — lock-in: $${LOCK_IN} | SL: ${SL_PCT*100}% | intervalo: ${MONITOR_INTERVAL}ms`);
