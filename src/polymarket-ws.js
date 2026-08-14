@@ -37,8 +37,7 @@ class PolymarketWS {
     this._subscribedTokens = new Set();
     this._lastPriceByToken = new Map();   // precio combinado (para emitPair)
     this._marketPriceByToken = new Map(); // precio SOLO del canal market/best_bid_ask
-                                          // usado por getPriceForToken para snapshots t1/t2/t5
-                                          // NO sobreescrito por el canal book
+    this._lastTradeByToken = new Map();   // último trade ejecutado por token (price, size, timestamp)
 
     // ─── Book depth state ─────────────────────────────────────────────────
     // Guardamos bid/ask depth por token para análisis de order flow.
@@ -76,6 +75,44 @@ class PolymarketWS {
   getPriceForToken(tokenId) {
     if (!tokenId) return null;
     return this._marketPriceByToken.get(tokenId) ?? null;
+  }
+
+  // Retorna el último trade ejecutado para el par YES/NO
+  // Incluye precio, tamaño y timestamp — indica convicción real del mercado
+  // (distinto al book que solo muestra órdenes pendientes)
+  getLastTradeSnapshot() {
+    const yesId = this._yesTokenId;
+    const noId  = this._noTokenId;
+    if (!yesId && !noId) return null;
+
+    const yesTrade = yesId ? this._lastTradeByToken.get(yesId) : null;
+    const noTrade  = noId  ? this._lastTradeByToken.get(noId)  : null;
+
+    if (!yesTrade && !noTrade) return null;
+
+    // El trade más reciente gana
+    const latest = (!yesTrade) ? { ...noTrade, side: 'NO' } :
+                   (!noTrade)  ? { ...yesTrade, side: 'YES' } :
+                   yesTrade.timestamp >= noTrade.timestamp
+                     ? { ...yesTrade, side: 'YES' }
+                     : { ...noTrade, side: 'NO' };
+
+    // El trade más grande en la ventana de 30s
+    const yesSize = yesTrade?.size || 0;
+    const noSize  = noTrade?.size  || 0;
+    const totalSize = yesSize + noSize;
+    const sideImbalance = totalSize > 0 ? (yesSize - noSize) / totalSize : 0;
+
+    return {
+      latest_side:       latest.side,
+      latest_price:      parseFloat(latest.price.toFixed(4)),
+      latest_size:       parseFloat(latest.size.toFixed(2)),
+      latest_age_ms:     Date.now() - latest.timestamp,
+      yes_trade_size:    parseFloat(yesSize.toFixed(2)),
+      no_trade_size:     parseFloat(noSize.toFixed(2)),
+      // Positivo = más tokens YES ejecutados, negativo = más NO ejecutados
+      trade_imbalance:   parseFloat(sideImbalance.toFixed(3)),
+    };
   }
 
   getBookSnapshot() {
@@ -251,6 +288,7 @@ class PolymarketWS {
       this._lastPriceByToken.clear();
       this._marketPriceByToken.clear();
       this._bookByToken.clear();
+      this._lastTradeByToken.clear();
     }
 
     if (this._connected && yesTokenId && noTokenId) {
@@ -269,6 +307,7 @@ class PolymarketWS {
     this._subscribedTokens.clear();
     this._lastPriceByToken.clear();
     this._marketPriceByToken.clear();
+    this._lastTradeByToken.clear();
     // NO limpiar _bookByToken acá — se limpia solo cuando subscribe() recibe
     // tokenIds distintos (nuevo mercado). En reconexiones, el book sobrevive.
   }
@@ -322,15 +361,35 @@ class PolymarketWS {
       return;
     }
     if (type === 'last_trade_price') {
-      // Solo resolución si el trade es exactamente al extremo Y tenemos contexto
       const price = parseFloat(msg.price);
-      if (!isNaN(price) && (price >= 0.995 || price <= 0.005)) {
-        // No emitir resolved por last_trade solo — genera falsos positivos en 5m
-        // Actualizar precio sí
-        const tokenId = msg.asset_id;
-        if (tokenId && price > 0) {
-          this._lastPriceByToken.set(tokenId, price);
+      const size  = parseFloat(msg.size || msg.amount || 0);
+      const tokenId = msg.asset_id;
+
+      if (!isNaN(price) && price > 0 && tokenId) {
+        // Actualizar precio con el último trade ejecutado
+        this._lastPriceByToken.set(tokenId, price);
+        this._marketPriceByToken.set(tokenId, price);
+
+        // Guardar el último trade grande para análisis de order flow
+        // Un trade ejecutado de tamaño significativo indica convicción real
+        // (distinto al book que solo muestra intención)
+        if (!isNaN(size) && size > 0) {
+          const existing = this._lastTradeByToken.get(tokenId);
+          // Siempre guardar el más reciente, y también el más grande de los últimos 30s
+          const now = Date.now();
+          if (!existing || existing.timestamp < now - 30000 || size > existing.size) {
+            this._lastTradeByToken.set(tokenId, {
+              price,
+              size,
+              timestamp: now,
+            });
+          }
+        }
+
+        if (price >= 0.995 || price <= 0.005) {
           this._emitPair({ allowExtreme: true });
+        } else {
+          this._emitPair();
         }
       }
       return;

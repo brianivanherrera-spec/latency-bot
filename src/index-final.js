@@ -1282,8 +1282,7 @@ async function main() {
       // getBookSnapshot: captura la profundidad del book al momento exacto
       // de la señal — yes_bid_depth, yes_ask_depth, no_bid_depth, no_ask_depth,
       // vol_imbalance — para analizar si el order flow confirma la dirección.
-      getBookSnapshot: async () => {
-        let snap = polyWs.getBookSnapshot();
+      getBookSnapshot: async () => {        let snap = polyWs.getBookSnapshot();
         if (!snap && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
           // WS no tiene el book todavía — pedir via HTTP como fallback
           const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
@@ -1304,6 +1303,10 @@ async function main() {
         }
         return snap;
       },
+      // getLastTradeSnapshot: captura el último trade ejecutado en Polymarket
+      // al momento de la señal — tamaño, precio y dirección del trade real
+      // (distinto al book que solo muestra órdenes pendientes)
+      getLastTradeSnapshot: () => polyWs.getLastTradeSnapshot(),
     });
 
     // BTC snapshot 30s después

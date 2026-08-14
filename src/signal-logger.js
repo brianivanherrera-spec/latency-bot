@@ -21,12 +21,13 @@ let consecutiveLosses = 0;
 const pendingSnapshots = new Map();
 
 // ─── Abrir trade ─────────────────────────────────────────────────────────────
-async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot }) {
+async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot, getLastTradeSnapshot }) {
   ensureDir();
 
   // Capturar snapshot del book al momento exacto de la señal
   // getBookSnapshot puede ser async (fallback HTTP) o sync (WS)
   const bookSnap = getBookSnapshot ? (await getBookSnapshot()) : null;
+  const tradeSnap = getLastTradeSnapshot ? getLastTradeSnapshot() : null;
 
   // Precio de Polymarket al momento exacto de la señal:
   // Usar sig.edge?.polyYes (el precio que usó el bot para calcular el edge)
@@ -69,6 +70,12 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     book_no_bid:      bookSnap?.no_bid_depth  ?? null,
     book_no_ask:      bookSnap?.no_ask_depth  ?? null,
     book_vol_imbalance: bookSnap?.vol_imbalance ?? null,
+    // Último trade ejecutado en Polymarket al momento de la señal
+    poly_last_trade_side:      tradeSnap?.latest_side      ?? null,
+    poly_last_trade_price:     tradeSnap?.latest_price     ?? null,
+    poly_last_trade_size:      tradeSnap?.latest_size      ?? null,
+    poly_last_trade_age_ms:    tradeSnap?.latest_age_ms    ?? null,
+    poly_trade_imbalance:      tradeSnap?.trade_imbalance  ?? null,
     // Edge decay — se completan con snapshots
     poly_price_t0:    null,
     poly_price_t1:    null,
