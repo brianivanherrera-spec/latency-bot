@@ -291,7 +291,9 @@ class PolymarketWS {
       this._lastPriceByToken.clear();
       this._marketPriceByToken.clear();
       this._bookByToken.clear();
-      this._lastTradeByToken.clear();
+      // NO limpiar _lastTradeByToken — los trades del mercado anterior
+      // expiran solos (ventana de 30s). Limpiarlos aquí deja en null las
+      // primeras señales del mercado nuevo, que son las más valiosas.
     }
 
     if (this._connected && yesTokenId && noTokenId) {
