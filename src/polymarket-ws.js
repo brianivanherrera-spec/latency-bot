@@ -93,24 +93,24 @@ class PolymarketWS {
       return null;
     }
 
-    // El trade más reciente gana
-    const latest = (!yesTrade) ? { ...noTrade, side: 'NO' } :
-                   (!noTrade)  ? { ...yesTrade, side: 'YES' } :
-                   yesTrade.timestamp >= noTrade.timestamp
-                     ? { ...yesTrade, side: 'YES' }
-                     : { ...noTrade, side: 'NO' };
+    // El trade más reciente entre YES y NO
+    const isYesLatest = !noTrade || (yesTrade && yesTrade.timestamp >= noTrade.timestamp);
+    const latestTrade = isYesLatest ? yesTrade : noTrade;
+    const latestToken = isYesLatest ? 'YES' : 'NO';
 
-    // El trade más grande en la ventana de 30s
+    // El trade más grande en la ventana de 30s (para imbalance)
     const yesSize = yesTrade?.size || 0;
     const noSize  = noTrade?.size  || 0;
     const totalSize = yesSize + noSize;
+    // Positivo = más volumen en YES, negativo = más volumen en NO
     const sideImbalance = totalSize > 0 ? (yesSize - noSize) / totalSize : 0;
 
     return {
-      latest_side:       latest.side,
-      latest_price:      parseFloat(latest.price.toFixed(4)),
-      latest_size:       parseFloat(latest.size.toFixed(2)),
-      latest_age_ms:     Date.now() - latest.timestamp,
+      latest_token:      latestToken,                                    // YES o NO (qué token se tradeó)
+      latest_trade_side: latestTrade.trade_side || null,                 // BUY o SELL (agressor del WS)
+      latest_price:      parseFloat(latestTrade.price.toFixed(4)),
+      latest_size:       parseFloat(latestTrade.size.toFixed(2)),
+      latest_age_ms:     Date.now() - latestTrade.timestamp,
       yes_trade_size:    parseFloat(yesSize.toFixed(2)),
       no_trade_size:     parseFloat(noSize.toFixed(2)),
       // Positivo = más tokens YES ejecutados, negativo = más NO ejecutados
@@ -394,7 +394,7 @@ class PolymarketWS {
             this._lastTradeByToken.set(tokenId, {
               price,
               size,
-              side: msg.side || null,
+              trade_side: msg.side || null,   // BUY/SELL — agressor del mercado
               timestamp: now,
             });
             if (isYes || isNo) {
