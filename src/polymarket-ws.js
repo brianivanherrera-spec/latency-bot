@@ -88,7 +88,10 @@ class PolymarketWS {
     const yesTrade = yesId ? this._lastTradeByToken.get(yesId) : null;
     const noTrade  = noId  ? this._lastTradeByToken.get(noId)  : null;
 
-    if (!yesTrade && !noTrade) return null;
+    if (!yesTrade && !noTrade) {
+      logger.info(`[POLY-WS] [TRADE SNAP] null — map vacío (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)} mapSize=${this._lastTradeByToken.size})`);
+      return null;
+    }
 
     // El trade más reciente gana
     const latest = (!yesTrade) ? { ...noTrade, side: 'NO' } :
