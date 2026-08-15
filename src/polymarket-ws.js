@@ -385,12 +385,23 @@ class PolymarketWS {
           const existing = this._lastTradeByToken.get(tokenId);
           // Siempre guardar el más reciente, y también el más grande de los últimos 30s
           const now = Date.now();
+          const isYes = tokenId === this._yesTokenId;
+          const isNo  = tokenId === this._noTokenId;
           if (!existing || existing.timestamp < now - 30000 || size > existing.size) {
             this._lastTradeByToken.set(tokenId, {
               price,
               size,
+              side: msg.side || null,
               timestamp: now,
             });
+            if (isYes || isNo) {
+              logger.info(`[POLY-WS] [TRADE SAVED] ${isYes ? 'YES' : 'NO'} side=${msg.side} price=${price} size=${size}`);
+            }
+          }
+        } else {
+          // size llegó como 0 o NaN — loggear para detectar si hay eventos sin size
+          if (this._rawTradeLogCount <= 10) {
+            logger.info(`[POLY-WS] [TRADE NO-SIZE] asset=${tokenId?.slice(0,8)} price=${msg.price} size_raw=${msg.size}`);
           }
         }
 
