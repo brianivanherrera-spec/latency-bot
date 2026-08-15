@@ -1174,6 +1174,8 @@ async function main() {
         const total  = yesBid + noBid;
         if (total > 0) {
           const bookImb = (yesBid - noBid) / total;
+
+          // 1) Bloquear si el book contradice activamente la dirección
           const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
                              (sig.direction === 'UP'   && bookImb < -bookMinImb);
           if (contradice) {
@@ -1181,7 +1183,19 @@ async function main() {
             activePositions.delete(posId);
             return;
           }
-          logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} OK para ${sig.direction}`);
+
+          // 2) Bloquear si el book es neutro — no confirma la dirección
+          // Datos: trades neutros (|imb| < 0.20) = 50.5% WR, -$25 PnL (101 trades)
+          // Solo entramos si el book confirma activamente: imb alineado con dirección >= umbral
+          const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
+                           (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
+          if (!confirma) {
+            logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} no confirma ${sig.direction} (necesito ${sig.direction === 'UP' ? '>=' : '<='} ${sig.direction === 'UP' ? '' : '-'}${bookMinImb}) — book neutro`);
+            activePositions.delete(posId);
+            return;
+          }
+
+          logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
         }
       } else {
         // Sin datos de book de ninguna fuente — loguear pero dejar pasar
