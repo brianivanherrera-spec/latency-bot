@@ -361,6 +361,14 @@ class PolymarketWS {
       return;
     }
     if (type === 'last_trade_price') {
+      // RAW LOG — diagnóstico temporal para ver qué campos manda Polymarket
+      // Remover cuando se confirmen los campos correctos
+      if (this._rawTradeLogCount === undefined) this._rawTradeLogCount = 0;
+      if (this._rawTradeLogCount < 10) {
+        logger.info(`[POLY-WS] [RAW last_trade_price] ${JSON.stringify(msg)}`);
+        this._rawTradeLogCount++;
+      }
+
       const price = parseFloat(msg.price);
       const size  = parseFloat(msg.size || msg.amount || 0);
       const tokenId = msg.asset_id;
