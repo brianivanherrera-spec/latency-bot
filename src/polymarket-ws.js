@@ -312,9 +312,10 @@ class PolymarketWS {
     this._subscribedTokens.clear();
     this._lastPriceByToken.clear();
     this._marketPriceByToken.clear();
-    this._lastTradeByToken.clear();
-    // NO limpiar _bookByToken acá — se limpia solo cuando subscribe() recibe
-    // tokenIds distintos (nuevo mercado). En reconexiones, el book sobrevive.
+    this._bookByToken.clear();
+    // NO limpiar _lastTradeByToken — igual que en subscribe(),
+    // los trades expiran solos en 30s. Limpiarlos acá deja en null
+    // las señales del mercado siguiente.
   }
 
   _sendSubscribe(tokenIds) {
@@ -388,20 +389,26 @@ class PolymarketWS {
         // (distinto al book que solo muestra intención)
         if (!isNaN(size) && size > 0) {
           const existing = this._lastTradeByToken.get(tokenId);
-          // Siempre guardar el más reciente, y también el más grande de los últimos 30s
           const now = Date.now();
           const isYes = tokenId === this._yesTokenId;
           const isNo  = tokenId === this._noTokenId;
-          if (!existing || existing.timestamp < now - 30000 || size > existing.size) {
-            this._lastTradeByToken.set(tokenId, {
-              price,
-              size,
-              trade_side: msg.side || null,   // BUY/SELL — agressor del mercado
-              timestamp: now,
-            });
-            if (isYes || isNo) {
-              logger.info(`[POLY-WS] [TRADE SAVED] ${isYes ? 'YES' : 'NO'} side=${msg.side} price=${price} size=${size}`);
-            }
+
+          // Siempre guardar el trade más reciente.
+          // También actualizar el peak size si este trade es más grande dentro de los últimos 30s.
+          const peakSize = (existing && existing.timestamp >= now - 30000)
+            ? Math.max(existing.peak_size || existing.size, size)
+            : size;
+
+          this._lastTradeByToken.set(tokenId, {
+            price,
+            size,
+            peak_size:  peakSize,
+            trade_side: msg.side || null,
+            timestamp:  now,
+          });
+
+          if (isYes || isNo) {
+            logger.info(`[POLY-WS] [TRADE SAVED] ${isYes ? 'YES' : 'NO'} side=${msg.side} price=${price} size=${size} peak=${peakSize}`);
           }
         } else {
           // size llegó como 0 o NaN — loggear para detectar si hay eventos sin size
