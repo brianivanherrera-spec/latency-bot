@@ -85,11 +85,41 @@ class PolymarketWS {
     const noId  = this._noTokenId;
     if (!yesId && !noId) return null;
 
-    const yesTrade = yesId ? this._lastTradeByToken.get(yesId) : null;
-    const noTrade  = noId  ? this._lastTradeByToken.get(noId)  : null;
+    let yesTrade = yesId ? this._lastTradeByToken.get(yesId) : null;
+    let noTrade  = noId  ? this._lastTradeByToken.get(noId)  : null;
+
+    // Fallback: si el mercado acaba de cambiar y todavía no llegaron trades
+    // con los nuevos tokenIds, usar los trades más recientes del Map
+    // (son del mercado anterior, expirarán en 30s pero son señal de actividad reciente)
+    if (!yesTrade && !noTrade && this._lastTradeByToken.size > 0) {
+      const now = Date.now();
+      let latestEntry = null;
+      for (const [, trade] of this._lastTradeByToken) {
+        if (!latestEntry || trade.timestamp > latestEntry.timestamp) {
+          latestEntry = trade;
+        }
+      }
+      // Solo usar si tiene menos de 30s de antigüedad
+      if (latestEntry && (now - latestEntry.timestamp) < 30000) {
+        logger.info(`[POLY-WS] [TRADE SNAP] usando trade de mercado anterior (age=${now - latestEntry.timestamp}ms)`);
+        // No sabemos si era YES o NO del mercado actual — lo marcamos como unknown
+        return {
+          latest_token:      'PREV',
+          latest_trade_side: latestEntry.trade_side || null,
+          latest_price:      parseFloat(latestEntry.price.toFixed(4)),
+          latest_size:       parseFloat(latestEntry.size.toFixed(2)),
+          latest_age_ms:     now - latestEntry.timestamp,
+          yes_trade_size:    0,
+          no_trade_size:     0,
+          trade_imbalance:   null,
+        };
+      }
+      logger.info(`[POLY-WS] [TRADE SNAP] null — map vacío (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)} mapSize=${this._lastTradeByToken.size})`);
+      return null;
+    }
 
     if (!yesTrade && !noTrade) {
-      logger.info(`[POLY-WS] [TRADE SNAP] null — map vacío (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)} mapSize=${this._lastTradeByToken.size})`);
+      logger.info(`[POLY-WS] [TRADE SNAP] null — sin trades (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)})`);
       return null;
     }
 
