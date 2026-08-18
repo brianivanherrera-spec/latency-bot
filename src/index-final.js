@@ -2,7 +2,7 @@
  * LATENCY BOT - VERSIÓN FINAL
  * ✅ SignalEngine + PnLTracker + Cooldown + Live orders + Diagnóstico
  */
-// BUILD: b7650ad — fix poly_trade_imbalance fallback
+// BUILD: f545bee — fix poly_trade_imbalance fallback + calcular imbalance en PREV
 
 const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
@@ -476,7 +476,7 @@ const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // conf
 async function main() {
   logger.info('═'.repeat(70));
   logger.info('🎯 LATENCY BOT - Versión Final');
-  logger.info('📦 BUILD: b7650ad — fix poly_trade_imbalance fallback');
+  logger.info('📦 BUILD: f545bee — poly_trade_imbalance fix completo v2.1.0');
   logger.info('═'.repeat(70));
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE 🔴'}`);
   logger.info(`Cooldown: ${COOLDOWN/1000}s | Min edge: ${config.MIN_EDGE_PCT}%`);
