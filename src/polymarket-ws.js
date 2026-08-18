@@ -102,16 +102,26 @@ class PolymarketWS {
       // Solo usar si tiene menos de 30s de antigüedad
       if (latestEntry && (now - latestEntry.timestamp) < 30000) {
         logger.info(`[POLY-WS] [TRADE SNAP] usando trade de mercado anterior (age=${now - latestEntry.timestamp}ms)`);
-        // No sabemos si era YES o NO del mercado actual — lo marcamos como unknown
+        // Calcular imbalance con todos los trades del Map (mercado anterior)
+        let prevYesSize = 0, prevNoSize = 0;
+        for (const [, trade] of this._lastTradeByToken) {
+          if (now - trade.timestamp < 30000) {
+            // No sabemos cuál es YES/NO del mercado actual — acumulamos todo
+            if (trade.trade_side === 'BUY') prevYesSize += trade.size;
+            else prevNoSize += trade.size;
+          }
+        }
+        const prevTotal = prevYesSize + prevNoSize;
+        const prevImbalance = prevTotal > 0 ? parseFloat(((prevYesSize - prevNoSize) / prevTotal).toFixed(3)) : null;
         return {
           latest_token:      'PREV',
           latest_trade_side: latestEntry.trade_side || null,
           latest_price:      parseFloat(latestEntry.price.toFixed(4)),
           latest_size:       parseFloat(latestEntry.size.toFixed(2)),
           latest_age_ms:     now - latestEntry.timestamp,
-          yes_trade_size:    0,
-          no_trade_size:     0,
-          trade_imbalance:   null,
+          yes_trade_size:    parseFloat(prevYesSize.toFixed(2)),
+          no_trade_size:     parseFloat(prevNoSize.toFixed(2)),
+          trade_imbalance:   prevImbalance,
         };
       }
       logger.info(`[POLY-WS] [TRADE SNAP] null — map vacío (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)} mapSize=${this._lastTradeByToken.size})`);
