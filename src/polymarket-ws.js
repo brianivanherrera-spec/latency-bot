@@ -14,6 +14,8 @@
  */
 
 const WebSocket = require('ws');
+const fs   = require('fs');
+const path = require('path');
 const { Logger } = require('./logger');
 
 const logger = new Logger('POLY-WS');
@@ -21,6 +23,41 @@ const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
 const PING_MS = 10_000;
 const RECONNECT_MIN = 1_000;
 const RECONNECT_MAX = 30_000;
+const TRADE_MAP_FILE = path.join(process.env.DATA_DIR || '/data', 'last-trades.json');
+
+// Cargar trade map persistido (sobrevive reinicios)
+function loadTradeMap() {
+  try {
+    if (fs.existsSync(TRADE_MAP_FILE)) {
+      const data = JSON.parse(fs.readFileSync(TRADE_MAP_FILE, 'utf8'));
+      const now = Date.now();
+      const map = new Map();
+      // Solo cargar trades de los últimos 5 minutos — más viejos no son útiles
+      for (const [tokenId, trade] of Object.entries(data)) {
+        if (now - trade.timestamp < 5 * 60 * 1000) {
+          map.set(tokenId, trade);
+        }
+      }
+      logger.info(`[TRADE-MAP] Cargado desde disco: ${map.size} trades recientes`);
+      return map;
+    }
+  } catch (e) {
+    logger.warn(`[TRADE-MAP] Error al cargar: ${e.message}`);
+  }
+  return new Map();
+}
+
+// Guardar trade map en disco (llamar después de cada update)
+function saveTradeMap(map) {
+  try {
+    const obj = {};
+    for (const [k, v] of map) obj[k] = v;
+    fs.writeFileSync(TRADE_MAP_FILE, JSON.stringify(obj));
+  } catch (e) {
+    // No crítico — solo logging
+    logger.warn(`[TRADE-MAP] Error al guardar: ${e.message}`);
+  }
+}
 
 class PolymarketWS {
   constructor() {
@@ -37,7 +74,7 @@ class PolymarketWS {
     this._subscribedTokens = new Set();
     this._lastPriceByToken = new Map();   // precio combinado (para emitPair)
     this._marketPriceByToken = new Map(); // precio SOLO del canal market/best_bid_ask
-    this._lastTradeByToken = new Map();   // último trade ejecutado por token (price, size, timestamp)
+    this._lastTradeByToken = loadTradeMap(); // último trade ejecutado por token — persiste reinicios
 
     // ─── Book depth state ─────────────────────────────────────────────────
     // Guardamos bid/ask depth por token para análisis de order flow.
@@ -446,6 +483,7 @@ class PolymarketWS {
             trade_side: msg.side || null,
             timestamp:  now,
           });
+          saveTradeMap(this._lastTradeByToken);
 
           if (isYes || isNo) {
             logger.info(`[POLY-WS] [TRADE SAVED] ${isYes ? 'YES' : 'NO'} side=${msg.side} price=${price} size=${size} peak=${peakSize}`);
