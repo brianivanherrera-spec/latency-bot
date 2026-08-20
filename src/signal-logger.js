@@ -21,7 +21,7 @@ let consecutiveLosses = 0;
 const pendingSnapshots = new Map();
 
 // ─── Abrir trade ─────────────────────────────────────────────────────────────
-async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot, getLastTradeSnapshot }) {
+async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot, getLastTradeSnapshot, btcBuyerMakerRatio }) {
   ensureDir();
 
   // Capturar snapshot del book al momento exacto de la señal
@@ -79,6 +79,9 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     poly_yes_trade_size:       tradeSnap?.yes_trade_size    ?? null,
     poly_no_trade_size:        tradeSnap?.no_trade_size     ?? null,
     poly_trade_imbalance:      tradeSnap?.trade_imbalance   ?? null,
+    // BTC order flow — ratio de ticks con agressor comprador (últimos 20 ticks de Coinbase)
+    // > 0.7 = momentum UP fuerte, < 0.3 = momentum DOWN fuerte, null = sin datos
+    btc_buyer_maker_ratio:     btcBuyerMakerRatio ?? null,
     // Edge decay — se completan con snapshots
     poly_price_t0:    null,
     poly_price_t1:    null,

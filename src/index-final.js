@@ -790,11 +790,24 @@ async function main() {
   const btcPriceHistory10m = []; // [{price, ts}]
   const BTC_TREND_WINDOW_10M_MS = 10 * 60 * 1000; // 10 minutos
 
+  // Ventana deslizante de isBuyerMaker — últimos 20 ticks de Coinbase
+  // Ratio > 0.7 = compradores agresivos (momentum UP), < 0.3 = vendedores (momentum DOWN)
+  const btcBuyerMakerWindow = []; // [true/false] — true = tick iniciado por comprador
+  const BTC_BUYER_MAKER_WINDOW = 20; // últimos N ticks
+
   ws.onPrice(async (priceData) => {
     const btcPriceNow = priceData.price || priceData.currentPrice || priceData.lastPrice || 0;
     const nowMs = Date.now();
     if (btcPriceNow > 0) {
       btcPriceHistory.push({ price: btcPriceNow, ts: nowMs });
+
+      // Ventana de isBuyerMaker — mantener últimos N ticks
+      if (priceData.isBuyerMaker !== undefined) {
+        btcBuyerMakerWindow.push(priceData.isBuyerMaker);
+        if (btcBuyerMakerWindow.length > BTC_BUYER_MAKER_WINDOW) {
+          btcBuyerMakerWindow.shift();
+        }
+      }
       // Limpiar entradas más viejas de 1 hora
       while (btcPriceHistory.length > 0 && nowMs - btcPriceHistory[0].ts > BTC_TREND_WINDOW_MS) {
         btcPriceHistory.shift();
@@ -1323,6 +1336,11 @@ async function main() {
       // al momento de la señal — tamaño, precio y dirección del trade real
       // (distinto al book que solo muestra órdenes pendientes)
       getLastTradeSnapshot: () => polyWs.getLastTradeSnapshot(),
+      // btcBuyerMakerRatio: ratio de ticks donde el agressor fue comprador
+      // en los últimos N ticks de Coinbase — > 0.7 = momentum UP, < 0.3 = DOWN
+      btcBuyerMakerRatio: btcBuyerMakerWindow.length >= 5
+        ? parseFloat((btcBuyerMakerWindow.filter(Boolean).length / btcBuyerMakerWindow.length).toFixed(3))
+        : null,
     });
 
     // BTC snapshot 30s después
