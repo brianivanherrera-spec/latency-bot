@@ -136,13 +136,13 @@ class PolymarketWS {
           latestEntry = trade;
         }
       }
-      // Solo usar si tiene menos de 30s de antigüedad
-      if (latestEntry && (now - latestEntry.timestamp) < 30000) {
+      // Solo usar si tiene menos de 5 minutos de antigüedad (ventana amplia para el fallback entre mercados)
+      if (latestEntry && (now - latestEntry.timestamp) < 5 * 60 * 1000) {
         logger.info(`[POLY-WS] [TRADE SNAP] usando trade de mercado anterior (age=${now - latestEntry.timestamp}ms)`);
         // Calcular imbalance con todos los trades del Map (mercado anterior)
         let prevYesSize = 0, prevNoSize = 0;
         for (const [, trade] of this._lastTradeByToken) {
-          if (now - trade.timestamp < 30000) {
+          if (now - trade.timestamp < 5 * 60 * 1000) {
             // No sabemos cuál es YES/NO del mercado actual — acumulamos todo
             if (trade.trade_side === 'BUY') prevYesSize += trade.size;
             else prevNoSize += trade.size;
