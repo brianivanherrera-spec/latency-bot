@@ -46,7 +46,24 @@ class PolymarketClient {
 
   async _init() {
     if (this._initialized) return;
-    if (config.DRY_RUN) { logger.info('DRY RUN'); this._initialized = true; return; }
+    if (config.DRY_RUN) {
+      logger.info('DRY RUN');
+      // Crear cliente de solo lectura para DRY_RUN — permite getSpread, getTrades, etc.
+      // sin necesitar credenciales de trading
+      if (HAS_CLOB_V2 && !this.clobClient) {
+        try {
+          this.clobClient = new ClobClient({
+            host:  CLOB_API_BASE,
+            chain: Chain?.POLYGON ?? 137,
+          });
+          logger.info('[DRY_RUN] CLOB client de solo lectura inicializado');
+        } catch (e) {
+          logger.warn(`[DRY_RUN] CLOB client no disponible: ${e.message}`);
+        }
+      }
+      this._initialized = true;
+      return;
+    }
 
     if (!config.POLY_PRIVATE_KEY) throw new Error('POLY_PRIVATE_KEY no configurada');
     if (!HAS_CLOB_V2) throw new Error('clob-client-v2 no instalado');

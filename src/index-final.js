@@ -1365,19 +1365,31 @@ async function main() {
             poly.clobClient.getTrades({ token_id: tokenId, limit: 20 }),
           ]);
           const spread = spreadRes.status === 'fulfilled' ? parseFloat(spreadRes.value?.spread || 0) : null;
+          if (spreadRes.status === 'rejected') logger.warn(`[CLOB-SNAP] getSpread error: ${spreadRes.reason?.message}`);
+          if (tradesRes.status === 'rejected') logger.warn(`[CLOB-SNAP] getTrades error: ${tradesRes.reason?.message}`);
+          // Log raw la primera vez para verificar formato
+          if (tradesRes.status === 'fulfilled' && tradesRes.value && !global._clobTradeFormatLogged) {
+            global._clobTradeFormatLogged = true;
+            const sample = Array.isArray(tradesRes.value) ? tradesRes.value[0] : tradesRes.value;
+            logger.info(`[CLOB-SNAP] Formato trades: ${JSON.stringify(sample).slice(0, 200)}`);
+          }
 
           let vol60s_yes = 0, vol60s_no = 0, trades60s_count = 0;
           if (tradesRes.status === 'fulfilled') {
             const now60 = Date.now();
             const cutoff = now60 - 60000;
-            const recentTrades = (tradesRes.value || []).filter(t => {
-              const ts = new Date(t.timestamp || t.created_at || 0).getTime();
+            const tradesList = Array.isArray(tradesRes.value)
+              ? tradesRes.value
+              : tradesRes.value?.data || tradesRes.value?.trades || [];
+            const recentTrades = tradesList.filter(t => {
+              const ts = new Date(t.timestamp || t.created_at || t.matched_at || 0).getTime();
               return ts >= cutoff;
             });
             trades60s_count = recentTrades.length;
             for (const t of recentTrades) {
-              const size = parseFloat(t.size || 0);
-              if (t.outcome === 'Yes') vol60s_yes += size;
+              const size = parseFloat(t.size || t.amount || 0);
+              const outcome = (t.outcome || t.side || '').toLowerCase();
+              if (outcome === 'yes' || outcome === 'buy') vol60s_yes += size;
               else vol60s_no += size;
             }
           }
