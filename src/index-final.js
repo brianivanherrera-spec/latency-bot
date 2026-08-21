@@ -1211,6 +1211,33 @@ async function main() {
           }
 
           logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
+
+          // 3) BTC_CONFIRM_WEAK_BOOK — cuando el book es débil, exigir que BTC confirme
+          // Datos: book débil (<0.50) + BTC contra = 9W/9L = 50% WR, -$16 PnL (18 trades)
+          //        book débil (<0.50) + BTC alineado = 14W/1L = 93% WR, +$115 PnL (15 trades)
+          // → Si el book es débil Y BTC va contra la dirección → BLOQUEAR
+          if (process.env.BTC_CONFIRM_WEAK_BOOK === 'true') {
+            const weakBookThreshold = parseFloat(process.env.BTC_WEAK_BOOK_THRESHOLD || '0.50');
+            const isWeakBook = Math.abs(bookImb) < weakBookThreshold;
+            if (isWeakBook && btcPriceHistory.length >= 2) {
+              const btcNow = btcPriceHistory[btcPriceHistory.length - 1].price;
+              // Buscar precio de hace ~30s en el historial
+              const nowMs = Date.now();
+              const ref30 = btcPriceHistory.find(e => nowMs - e.ts <= 35000 && nowMs - e.ts >= 25000)
+                         || btcPriceHistory[0];
+              if (ref30 && ref30.price > 0) {
+                const btcChg30s = (btcNow - ref30.price) / ref30.price;
+                const btcContra = (sig.direction === 'UP'   && btcChg30s < 0) ||
+                                  (sig.direction === 'DOWN' && btcChg30s > 0);
+                if (btcContra) {
+                  logger.warn(`[SKIP] 📖 BTC-CONFIRM: book débil (${bookImb.toFixed(3)}) + BTC contra (${(btcChg30s*100).toFixed(3)}%) — 50% WR histórico, bloqueando`);
+                  activePositions.delete(posId);
+                  return;
+                }
+                logger.info(`[BTC-CONFIRM] ✅ book débil pero BTC confirma (${(btcChg30s*100).toFixed(3)}%)`);
+              }
+            }
+          }
         }
       } else {
         // Sin datos de book de ninguna fuente — loguear pero dejar pasar
