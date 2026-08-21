@@ -1355,6 +1355,51 @@ async function main() {
       btcBuyerMakerRatio: btcBuyerMakerWindow.length >= 5
         ? parseFloat((btcBuyerMakerWindow.filter(Boolean).length / btcBuyerMakerWindow.length).toFixed(3))
         : null,
+      // Datos del CLOB al momento de la señal — para análisis posterior
+      getClobSnapshot: async () => {
+        const tokenId = sig.direction === 'UP' ? cachedMarket?.yesTokenId : cachedMarket?.noTokenId;
+        if (!tokenId || !poly.clobClient) return null;
+        try {
+          const [spreadRes, tradesRes] = await Promise.allSettled([
+            poly.clobClient.getSpread(tokenId),
+            poly.clobClient.getTrades({ token_id: tokenId, limit: 20 }),
+          ]);
+          const spread = spreadRes.status === 'fulfilled' ? parseFloat(spreadRes.value?.spread || 0) : null;
+
+          let vol60s_yes = 0, vol60s_no = 0, trades60s_count = 0;
+          if (tradesRes.status === 'fulfilled') {
+            const now60 = Date.now();
+            const cutoff = now60 - 60000;
+            const recentTrades = (tradesRes.value || []).filter(t => {
+              const ts = new Date(t.timestamp || t.created_at || 0).getTime();
+              return ts >= cutoff;
+            });
+            trades60s_count = recentTrades.length;
+            for (const t of recentTrades) {
+              const size = parseFloat(t.size || 0);
+              if (t.outcome === 'Yes') vol60s_yes += size;
+              else vol60s_no += size;
+            }
+          }
+
+          const vol60s_total = vol60s_yes + vol60s_no;
+          const vol60s_imbalance = vol60s_total > 0
+            ? parseFloat(((vol60s_yes - vol60s_no) / vol60s_total).toFixed(3))
+            : null;
+
+          return {
+            spread:            spread,              // spread actual del book
+            vol60s_yes:        parseFloat(vol60s_yes.toFixed(2)),   // volumen YES en últimos 60s
+            vol60s_no:         parseFloat(vol60s_no.toFixed(2)),    // volumen NO en últimos 60s
+            vol60s_total:      parseFloat(vol60s_total.toFixed(2)), // volumen total
+            vol60s_imbalance:  vol60s_imbalance,   // (yes-no)/total — positivo = más YES ejecutado
+            trades60s_count:   trades60s_count,    // cantidad de trades en últimos 60s
+          };
+        } catch (e) {
+          logger.warn(`[CLOB-SNAP] Error: ${e.message}`);
+          return null;
+        }
+      },
     });
 
     // BTC snapshot 30s después

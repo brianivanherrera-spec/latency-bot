@@ -21,13 +21,14 @@ let consecutiveLosses = 0;
 const pendingSnapshots = new Map();
 
 // ─── Abrir trade ─────────────────────────────────────────────────────────────
-async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot, getLastTradeSnapshot, btcBuyerMakerRatio }) {
+async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot, getLastTradeSnapshot, btcBuyerMakerRatio, getClobSnapshot }) {
   ensureDir();
 
   // Capturar snapshot del book al momento exacto de la señal
   // getBookSnapshot puede ser async (fallback HTTP) o sync (WS)
   const bookSnap = getBookSnapshot ? (await getBookSnapshot()) : null;
   const tradeSnap = getLastTradeSnapshot ? getLastTradeSnapshot() : null;
+  const clobSnap  = getClobSnapshot ? await getClobSnapshot() : null;
 
   // Precio de Polymarket al momento exacto de la señal:
   // Usar sig.edge?.polyYes (el precio que usó el bot para calcular el edge)
@@ -82,6 +83,13 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     // BTC order flow — ratio de ticks con agressor comprador (últimos 20 ticks de Coinbase)
     // > 0.7 = momentum UP fuerte, < 0.3 = momentum DOWN fuerte, null = sin datos
     btc_buyer_maker_ratio:     btcBuyerMakerRatio ?? null,
+    // CLOB snapshot al momento de la señal
+    clob_spread:               clobSnap?.spread          ?? null, // spread actual del book
+    clob_vol60s_yes:           clobSnap?.vol60s_yes      ?? null, // volumen YES ejecutado en 60s
+    clob_vol60s_no:            clobSnap?.vol60s_no       ?? null, // volumen NO ejecutado en 60s
+    clob_vol60s_total:         clobSnap?.vol60s_total    ?? null, // volumen total ejecutado en 60s
+    clob_vol60s_imbalance:     clobSnap?.vol60s_imbalance ?? null, // (yes-no)/total — positivo = más YES
+    clob_trades60s_count:      clobSnap?.trades60s_count ?? null, // cantidad de trades en 60s
     // Edge decay — se completan con snapshots
     poly_price_t0:    null,
     poly_price_t1:    null,
