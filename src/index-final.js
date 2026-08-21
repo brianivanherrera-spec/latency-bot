@@ -837,80 +837,6 @@ async function main() {
       }
     }
 
-    // ─── Filtro de tendencia BTC ──────────────────────────────────────
-    const trendFilter = parseInt(process.env.BTC_TREND_FILTER || '0');
-    if (trendFilter > 0 && btcPriceHistory.length > 0) {
-      const btcPriceNow = sig.currentPrice || btcPriceHistory[btcPriceHistory.length-1]?.price || 0;
-      const oldestEntry = btcPriceHistory[0];
-      const ageMinutes = (Date.now() - oldestEntry.ts) / 60000;
-      const btcMoveLastHour = btcPriceNow - oldestEntry.price;
-
-      // Loggear estado del historial cada 5 minutos
-      if (btcPriceHistory.length % 300 === 1) {
-        logger.info(`[TREND] Historial: ${ageMinutes.toFixed(0)}min | BTC move: $${btcMoveLastHour.toFixed(0)} | filtro: $${trendFilter}`);
-      }
-
-      // Solo aplicar filtro si tenemos al menos 5 minutos de historial
-      if (ageMinutes >= 5) {
-        if (btcMoveLastHour > trendFilter && sig.direction === 'DOWN') {
-          logger.warn(`[SKIP] 📈 BTC +$${btcMoveLastHour.toFixed(0)} en ${ageMinutes.toFixed(0)}min — bloqueando DOWN`);
-          return;
-        }
-        if (btcMoveLastHour < -trendFilter && sig.direction === 'UP') {
-          logger.warn(`[SKIP] 📉 BTC $${btcMoveLastHour.toFixed(0)} en ${ageMinutes.toFixed(0)}min — bloqueando UP`);
-          return;
-        }
-      }
-    }
-
-    // ─── Filtro de tendencia BTC — ventana larga ──────────────────────────
-    // Detecta derivas lentas y sostenidas (ej: BTC +$1800 en 38hs a ~$60/hora)
-    // que el filtro de 1 hora no puede ver porque nunca superan el umbral puntual
-    // aunque acumulen una tendencia real. Requiere BTC_TREND_FILTER_LONG > 0.
-    //   BTC_TREND_FILTER_LONG=500      → umbral en $ para la ventana larga
-    //   BTC_TREND_WINDOW_HOURS_LONG=4  → cuántas horas mira atrás (default 4)
-    const trendFilterLong = parseInt(process.env.BTC_TREND_FILTER_LONG || '0');
-    if (trendFilterLong > 0 && btcPriceHistoryLong.length > 0) {
-      const btcPriceNow = sig.currentPrice || btcPriceHistoryLong[btcPriceHistoryLong.length-1]?.price || 0;
-      const oldestLong = btcPriceHistoryLong[0];
-      const ageHoursLong = (Date.now() - oldestLong.ts) / 3600000;
-      const btcMoveLong = btcPriceNow - oldestLong.price;
-
-      // Solo aplicar si tenemos al menos el 50% de la ventana configurada
-      if (ageHoursLong >= BTC_TREND_WINDOW_HOURS_LONG * 0.5) {
-        if (btcMoveLong > trendFilterLong && sig.direction === 'DOWN') {
-          logger.warn(`[SKIP] 📈 TREND-LARGO: BTC +$${btcMoveLong.toFixed(0)} en ${(ageHoursLong).toFixed(1)}hs — bloqueando DOWN`);
-          return;
-        }
-        if (btcMoveLong < -trendFilterLong && sig.direction === 'UP') {
-          logger.warn(`[SKIP] 📉 TREND-LARGO: BTC $${btcMoveLong.toFixed(0)} en ${(ageHoursLong).toFixed(1)}hs — bloqueando UP`);
-          return;
-        }
-      }
-    }
-
-    // ─── Filtro de tendencia BTC — 10 minutos ─────────────────────────────
-    // Detecta movimientos bruscos en ventana corta. Complementa al de 1h y 4h.
-    // Un $150 en 10 min = $900/hora equivalente — señal fuerte y accionable.
-    //   BTC_TREND_FILTER_10M=150  → umbral razonable (0 = desactivado)
-    const trendFilter10m = parseInt(process.env.BTC_TREND_FILTER_10M || '0');
-    if (trendFilter10m > 0 && btcPriceHistory10m.length > 0) {
-      const btcPriceNow10m = sig.currentPrice || btcPriceHistory10m[btcPriceHistory10m.length-1]?.price || 0;
-      const oldest10m = btcPriceHistory10m[0];
-      const age10mMin = (Date.now() - oldest10m.ts) / 60000;
-      const btcMove10m = btcPriceNow10m - oldest10m.price;
-      if (age10mMin >= 2) {
-        if (btcMove10m > trendFilter10m && sig.direction === 'DOWN') {
-          logger.warn(`[SKIP] 📈 TREND-10M: BTC +$${btcMove10m.toFixed(0)} en ${age10mMin.toFixed(0)}min — bloqueando DOWN`);
-          return;
-        }
-        if (btcMove10m < -trendFilter10m && sig.direction === 'UP') {
-          logger.warn(`[SKIP] 📉 TREND-10M: BTC $${btcMove10m.toFixed(0)} en ${age10mMin.toFixed(0)}min — bloqueando UP`);
-          return;
-        }
-      }
-    }
-
     // ─── Filtro "Polymarket ya se movió" ──────────────────────────────────
     // Si Polymarket ya absorbió el lag (precio lejos de 0.50), nuestro edge
     // ya es menor. Inspirado en tochiugo v3: max_poly_move_after_signal=0.03.
@@ -926,9 +852,6 @@ async function main() {
 
     // ─── Hard-gate: precio extremo de Polymarket ──────────────────────────
     // Nunca entrar si el token que compramos está en zona extrema (<0.15 o >0.85).
-    // Para UP: compramos YES → usar polyYes directamente
-    // Para DOWN: compramos NO → usar 1 - polyYes (polyNo puede ser undefined)
-    // Usamos polyYes como base siempre porque siempre está disponible en sig.edge.
     const polyYesNow = sig.edge?.polyYes ?? livePolyYes;
     if (polyYesNow !== null && polyYesNow !== undefined) {
       const tokenMid = sig.direction === 'UP' ? polyYesNow : (1 - polyYesNow);
@@ -943,7 +866,6 @@ async function main() {
     if (now - lastTradeTime < COOLDOWN) return;
 
     // ─── Circuit Breaker ──────────────────────────────────────────────────
-    // 3 losses consecutivos → pausa 30 minutos para evitar rachas malas
     const CIRCUIT_BREAKER_LOSSES = parseInt(process.env.CIRCUIT_BREAKER_LOSSES || '3');
     const CIRCUIT_BREAKER_PAUSE_MS = parseInt(process.env.CIRCUIT_BREAKER_PAUSE_MIN || '30') * 60 * 1000;
     const consecLosses = signalLogger.getConsecutiveLosses();
@@ -961,12 +883,11 @@ async function main() {
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
 
-    // ─── BOOK_ENTRY_MODE — segunda vía de entrada ─────────────────────────
-    // Cuando el book de Polymarket está muy desbalanceado (>= umbral),
-    // entra en la dirección del book aunque el Z-score sea bajo o el edge
-    // no sea suficiente. Evidencia: Z<2.5 + book>0.50 = 90% WR (9/10 trades).
-    //   BOOK_ENTRY_MODE=true           → activa la segunda vía
-    //   BOOK_ENTRY_MIN_IMBALANCE=0.60  → umbral de imbalance para entrar
+    // ─── BOOK_ENTRY_MODE — chequear book ANTES de BTC trend filters ──────
+    // Si el book es muy fuerte (≥ umbral), entrar directo salteando filtros BTC.
+    // Evidencia: book ≥0.70 = 100% WR históricamente sin importar BTC trend.
+    //   BOOK_ENTRY_MODE=true           → activa la segunda vía de entrada
+    //   BOOK_ENTRY_MIN_IMBALANCE=0.60  → umbral de imbalance para override
     let bookEntryOverride = false;
     if (process.env.BOOK_ENTRY_MODE === 'true') {
       const bookEntryMinImb = parseFloat(process.env.BOOK_ENTRY_MIN_IMBALANCE || '0.60');
@@ -977,15 +898,81 @@ async function main() {
         const total  = yesBid + noBid;
         if (total > 0) {
           const bookImb = (yesBid - noBid) / total;
-          // El book entry sigue la dirección del book, no del bot
           const bookDirection = bookImb < -bookEntryMinImb ? 'DOWN' : bookImb > bookEntryMinImb ? 'UP' : null;
           if (bookDirection && bookDirection === sig.direction) {
             bookEntryOverride = true;
-            logger.info(`[BOOK-ENTRY] 🎯 imb=${bookImb.toFixed(3)} → override de edge para ${bookDirection}`);
+            logger.info(`[BOOK-ENTRY] 🎯 imb=${bookImb.toFixed(3)} → override de edge para ${bookDirection} — salteando filtros BTC`);
           }
         }
       }
     }
+
+    // ─── Filtros de tendencia BTC ─────────────────────────────────────────
+    // Se saltan si bookEntryOverride=true — un book muy fuerte gana 100% WR
+    // sin importar la tendencia de BTC. Solo aplican con book débil.
+    if (!bookEntryOverride) {
+
+      // Ventana 1 hora
+      const trendFilter = parseInt(process.env.BTC_TREND_FILTER || '0');
+      if (trendFilter > 0 && btcPriceHistory.length > 0) {
+        const btcPriceNow = sig.currentPrice || btcPriceHistory[btcPriceHistory.length-1]?.price || 0;
+        const oldestEntry = btcPriceHistory[0];
+        const ageMinutes = (Date.now() - oldestEntry.ts) / 60000;
+        const btcMoveLastHour = btcPriceNow - oldestEntry.price;
+        if (btcPriceHistory.length % 300 === 1) {
+          logger.info(`[TREND] Historial: ${ageMinutes.toFixed(0)}min | BTC move: $${btcMoveLastHour.toFixed(0)} | filtro: $${trendFilter}`);
+        }
+        if (ageMinutes >= 5) {
+          if (btcMoveLastHour > trendFilter && sig.direction === 'DOWN') {
+            logger.warn(`[SKIP] 📈 BTC +$${btcMoveLastHour.toFixed(0)} en ${ageMinutes.toFixed(0)}min — bloqueando DOWN`);
+            return;
+          }
+          if (btcMoveLastHour < -trendFilter && sig.direction === 'UP') {
+            logger.warn(`[SKIP] 📉 BTC $${btcMoveLastHour.toFixed(0)} en ${ageMinutes.toFixed(0)}min — bloqueando UP`);
+            return;
+          }
+        }
+      }
+
+      // Ventana larga
+      const trendFilterLong = parseInt(process.env.BTC_TREND_FILTER_LONG || '0');
+      if (trendFilterLong > 0 && btcPriceHistoryLong.length > 0) {
+        const btcPriceNow = sig.currentPrice || btcPriceHistoryLong[btcPriceHistoryLong.length-1]?.price || 0;
+        const oldestLong = btcPriceHistoryLong[0];
+        const ageHoursLong = (Date.now() - oldestLong.ts) / 3600000;
+        const btcMoveLong = btcPriceNow - oldestLong.price;
+        if (ageHoursLong >= BTC_TREND_WINDOW_HOURS_LONG * 0.5) {
+          if (btcMoveLong > trendFilterLong && sig.direction === 'DOWN') {
+            logger.warn(`[SKIP] 📈 TREND-LARGO: BTC +$${btcMoveLong.toFixed(0)} en ${(ageHoursLong).toFixed(1)}hs — bloqueando DOWN`);
+            return;
+          }
+          if (btcMoveLong < -trendFilterLong && sig.direction === 'UP') {
+            logger.warn(`[SKIP] 📉 TREND-LARGO: BTC $${btcMoveLong.toFixed(0)} en ${(ageHoursLong).toFixed(1)}hs — bloqueando UP`);
+            return;
+          }
+        }
+      }
+
+      // Ventana 10 minutos
+      const trendFilter10m = parseInt(process.env.BTC_TREND_FILTER_10M || '0');
+      if (trendFilter10m > 0 && btcPriceHistory10m.length > 0) {
+        const btcPriceNow10m = sig.currentPrice || btcPriceHistory10m[btcPriceHistory10m.length-1]?.price || 0;
+        const oldest10m = btcPriceHistory10m[0];
+        const age10mMin = (Date.now() - oldest10m.ts) / 60000;
+        const btcMove10m = btcPriceNow10m - oldest10m.price;
+        if (age10mMin >= 2) {
+          if (btcMove10m > trendFilter10m && sig.direction === 'DOWN') {
+            logger.warn(`[SKIP] 📈 TREND-10M: BTC +$${btcMove10m.toFixed(0)} en ${age10mMin.toFixed(0)}min — bloqueando DOWN`);
+            return;
+          }
+          if (btcMove10m < -trendFilter10m && sig.direction === 'UP') {
+            logger.warn(`[SKIP] 📉 TREND-10M: BTC $${btcMove10m.toFixed(0)} en ${age10mMin.toFixed(0)}min — bloqueando UP`);
+            return;
+          }
+        }
+      }
+
+    } // fin !bookEntryOverride
 
     if (!bookEntryOverride) {
       if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
