@@ -317,12 +317,13 @@ class PolymarketClient {
         const crossBook = async (basePrice) => {
           const ask = await this._getBestAsk(tokenId);
           if (ask == null) return basePrice;
-          const cross = parseFloat((ask + tick).toFixed(3));
-          const capped = parseFloat(Math.min(basePrice + maxBump, Math.max(basePrice, cross)).toFixed(3));
+          const cross = parseFloat((ask + tick).toFixed(2));
+          const capped = parseFloat(Math.min(basePrice + maxBump, Math.max(basePrice, cross)).toFixed(2));
           // Nunca pagar > 0.99 en token binario
-          const finalPx = Math.min(0.99, capped);
+          // Polymarket tick = 0.01 → redondear siempre a 2 decimales
+          const finalPx = parseFloat(Math.min(0.99, Math.round(capped * 100) / 100).toFixed(2));
           if (finalPx !== basePrice) {
-            logger.info(`[LIVE] 📊 Book ask=$${ask.toFixed(3)} → precio cruzado $${finalPx.toFixed(3)} (base $${basePrice.toFixed(3)}, bump max $${maxBump})`);
+            logger.info(`[LIVE] 📊 Book ask=$${ask.toFixed(2)} → precio cruzado $${finalPx.toFixed(2)} (base $${basePrice.toFixed(2)}, bump max $${maxBump})`);
           }
           return finalPx;
         };
@@ -339,12 +340,12 @@ class PolymarketClient {
           result = await this.clobClient.createAndPostOrder(orderParams);
           logger.info(`[LIVE] response (${orderLabel} intento ${attempt}): ${JSON.stringify(result)}`);
 
-          const rawStatus = (result?.status || '').toLowerCase();
+          const rawStatus = (String(result?.status || '')).toLowerCase();
           const gotFilled = result?.success && rawStatus === 'matched';
 
           // FAK puede devolver fill parcial: filled < size pero > 0
           if (useFak && result?.success) {
-            const rawStatusFak = (result?.status || '').toLowerCase();
+            const rawStatusFak = (String(result?.status || '')).toLowerCase();
             // Si status=matched, llenó el pedido completo de este intento
             if (rawStatusFak === 'matched') {
               preFilledFromFak += orderParams.size;
@@ -385,7 +386,7 @@ class PolymarketClient {
       }
 
       // MARKET_RETRY: si los N intentos de FOK fallaron, caer a GTC como red de seguridad
-      const fokConfirmedMatch = result?.success && (result?.status || '').toLowerCase() === 'matched';
+      const fokConfirmedMatch = result?.success && (String(result?.status || '')).toLowerCase() === 'matched';
       if (!fokConfirmedMatch && isMarket && marketRetryEnabled) {
         // FIX CRÍTICO (detectado en el primer log de live, 03/08): un FOK que
         // no llena instantáneo puede volver con status "live" — es decir,
@@ -394,7 +395,7 @@ class PolymarketClient {
         // independiente y quedan dos órdenes vivas al mismo tiempo (doble
         // exposición real). Cancelar siempre antes de seguir.
         const staleOrderId = result?.orderID || result?.orderId || result?.id;
-        const staleStatus = (result?.status || '').toLowerCase();
+        const staleStatus = (String(result?.status || '')).toLowerCase();
         let preFilledSize = 0; // FIX: si el FOK "muerto" ya llenó parcialmente, no lo perdemos
         if (staleOrderId && staleStatus !== 'matched' && staleStatus !== 'cancelled' && staleStatus !== 'canceled') {
           logger.warn(`[LIVE] ⚠️ FOK quedó con estado "${staleStatus}" (no killed) — cancelando orden ${staleOrderId} antes de reintentar`);
@@ -402,7 +403,7 @@ class PolymarketClient {
             await this.clobClient.cancelOrder({ orderId: staleOrderId });
             // Verificar que no se haya llenado (total o parcial) en el instante entre el check y el cancel
             const check = await this.clobClient.getOrder(staleOrderId).catch(() => null);
-            if ((check?.status || '').toLowerCase() === 'matched') {
+            if ((String(check?.status || '')).toLowerCase() === 'matched') {
               logger.info(`[LIVE] ✅ La orden FOK "muerta" en realidad ya había llenado — usando ese fill, no se abre una segunda`);
               const fillTimeMs = Date.now() - (rec._placedAt || Date.now());
               rec.status = 'PLACED'; rec.orderId = staleOrderId; rec.sizeFilled = size;
@@ -469,7 +470,7 @@ class PolymarketClient {
       }
 
       const orderId = result?.orderID || result?.orderId || result?.id;
-      let orderStatus = (result?.status || 'unknown').toLowerCase(); // normalizar
+      let orderStatus = (String(result?.status || 'unknown')).toLowerCase(); // normalizar
       rec.status = 'PLACED'; rec.orderId = orderId;
       this._orderHistory.push(rec);
       logger.info(`[LIVE] ✅ ${isMarket ? 'MARKET' : 'GTC'} Order ID: ${orderId} | status inicial: ${orderStatus}`);
@@ -494,7 +495,7 @@ class PolymarketClient {
           try {
             const orderData = await this.clobClient.getOrder(orderId);
             const rawStatus = orderData?.status || orderStatus;
-            orderStatus = rawStatus.toLowerCase(); // normalizar a minúsculas
+            orderStatus = String(rawStatus).toLowerCase(); // normalizar a minúsculas
             const sizeFilled = orderData?.size_matched || orderData?.sizeFilled || 0;
             logger.info(`[LIVE] 🔄 Poll: status=${rawStatus} filled=${sizeFilled}/${size}`);
 
@@ -586,7 +587,7 @@ class PolymarketClient {
         price: exitPrice,
       };
       const result = await this.clobClient.createAndPostOrder(orderParams);
-      const ok = result?.success && (result?.status || '').toLowerCase() === 'matched';
+      const ok = result?.success && (String(result?.status || '')).toLowerCase() === 'matched';
       if (ok) {
         logger.info(`[POSITION-MONITOR] ✅ Posición ${posId} cerrada @ $${exitPrice.toFixed(3)}`);
       } else {
@@ -724,7 +725,7 @@ class PolymarketClient {
         }
 
         const orderId = result?.orderID || result?.orderId || result?.id;
-        let orderStatus = (result?.status || 'unknown').toLowerCase();
+        let orderStatus = (String(result?.status || 'unknown')).toLowerCase();
 
         if (orderStatus === 'matched') {
           filledSoFar += remainingSize; // esta orden llenó completa
@@ -742,7 +743,7 @@ class PolymarketClient {
           await new Promise(r => setTimeout(r, POLL_MS));
           try {
             const orderData = await this.clobClient.getOrder(orderId);
-            orderStatus = (orderData?.status || orderStatus).toLowerCase();
+            orderStatus = (String(orderData?.status || orderStatus)).toLowerCase();
             thisOrderFilled = parseFloat(orderData?.size_matched || orderData?.sizeFilled || 0) || 0;
             if (thisOrderFilled > 0 && thisOrderFilled < remainingSize) {
               logger.info(`[RETRY] 🔶 Fill parcial detectado: ${thisOrderFilled}/${remainingSize} en esta orden — se sigue esperando el resto`);
@@ -782,7 +783,7 @@ class PolymarketClient {
           // el poll y el cancel, leer el estado final antes de seguir.
           try {
             const finalCheck = await this.clobClient.getOrder(orderId);
-            const finalStatus = (finalCheck?.status || '').toLowerCase();
+            const finalStatus = (String(finalCheck?.status || '')).toLowerCase();
             const finalFilled = parseFloat(finalCheck?.size_matched || finalCheck?.sizeFilled || 0) || 0;
             if (finalStatus === 'matched') {
               filledSoFar += remainingSize;
