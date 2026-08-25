@@ -1362,9 +1362,9 @@ async function main() {
         try {
           const [spreadRes, tradesRes] = await Promise.allSettled([
             poly.clobClient.getSpread(tokenId),
-            fetch(`https://clob.polymarket.com/trades?token_id=${tokenId}&limit=20`)
+            fetch(`https://data-api.polymarket.com/activity?asset_id=${tokenId}&limit=50&offset=0`)
               .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-              .then(data => data?.data || data || []),
+              .then(data => Array.isArray(data) ? data : data?.data || []),
           ]);
           const spread = spreadRes.status === 'fulfilled' ? parseFloat(spreadRes.value?.spread || 0) : null;
           if (spreadRes.status === 'rejected') logger.warn(`[CLOB-SNAP] getSpread error: ${spreadRes.reason?.message}`);
