@@ -1384,7 +1384,9 @@ async function main() {
               ? tradesRes.value
               : tradesRes.value?.data || tradesRes.value?.trades || [];
             const recentTrades = tradesList.filter(t => {
-              const ts = new Date(t.timestamp || t.created_at || t.matched_at || 0).getTime();
+              const raw = t.timestamp || t.created_at || t.matched_at || 0;
+              // Polymarket usa segundos Unix — convertir a ms si es necesario
+              const ts = raw > 1e12 ? raw : raw * 1000;
               return ts >= cutoff;
             });
             trades60s_count = recentTrades.length;
