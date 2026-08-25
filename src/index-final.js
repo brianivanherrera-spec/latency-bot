@@ -2,7 +2,7 @@
  * LATENCY BOT - VERSIÓN FINAL
  * ✅ SignalEngine + PnLTracker + Cooldown + Live orders + Diagnóstico
  */
-// BUILD: f545bee — fix poly_trade_imbalance fallback + calcular imbalance en PREV
+// BUILD: 842d615 — fix tick size 2 decimales + toLowerCase status numérico
 
 const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
@@ -476,7 +476,7 @@ const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // conf
 async function main() {
   logger.info('═'.repeat(70));
   logger.info('🎯 LATENCY BOT - Versión Final');
-  logger.info('📦 BUILD: f545bee — poly_trade_imbalance fix completo v2.1.0');
+  logger.info('📦 BUILD: 842d615 — fix tick size precio 2 decimales (CRITICO LIVE)');
   logger.info('═'.repeat(70));
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE 🔴'}`);
   logger.info(`Cooldown: ${COOLDOWN/1000}s | Min edge: ${config.MIN_EDGE_PCT}%`);
@@ -1256,10 +1256,10 @@ async function main() {
     const edgeBoost = (edgeBoostThreshold > 0 && edgePct >= edgeBoostThreshold) ? edgeBoostTicks : 0;
     if (edgeBoost > 0) logger.info(`[PRICE] Edge ${edgePct.toFixed(2)}% ≥ ${edgeBoostThreshold}% → boost de +$${edgeBoost} al precio inicial`);
 
-    const price = Math.min(0.97, parseFloat((priceRaw + priceTolerance + edgeBoost).toFixed(3)));
+    const price = Math.min(0.97, parseFloat((Math.round((priceRaw + priceTolerance + edgeBoost) * 100) / 100).toFixed(2)));
     const size = Math.floor(exposure / price);
 
-    logger.info(`[PRICE] Raw: $${priceRaw.toFixed(3)} + tolerance: $${priceTolerance}${edgeBoost > 0 ? ` + boost: $${edgeBoost}` : ''} → orden: $${price.toFixed(3)}`);
+    logger.info(`[PRICE] Raw: $${priceRaw.toFixed(2)} + tolerance: $${priceTolerance}${edgeBoost > 0 ? ` + boost: $${edgeBoost}` : ''} → orden: $${price.toFixed(2)}`);
 
     // Fix 1: size check ANTES del Discord alert — no alertar órdenes que no van a ejecutarse
     if (size < 5) {
