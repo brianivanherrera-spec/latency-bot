@@ -1261,6 +1261,17 @@ async function main() {
 
     logger.info(`[PRICE] Raw: $${priceRaw.toFixed(2)} + tolerance: $${priceTolerance}${edgeBoost > 0 ? ` + boost: $${edgeBoost}` : ''} → orden: $${price.toFixed(2)}`);
 
+    // MAX_ENTRY_PRICE — bloquear cuando el precio raw ya se movió demasiado
+    // Si priceRaw > umbral, el ask real ya está en $0.90+ y no hay liquidez razonable
+    // Evidencia: todos los NO_FILL en live tenían ask=$0.95-$0.98 con priceRaw=$0.76-$0.81
+    // Default: 0.65 — solo entrar cuando Polymarket todavía está cerca de $0.50
+    const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
+    if (maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
+      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} > máximo $${maxEntryPrice} — mercado ya se movió, sin liquidez real`);
+      activePositions.delete(posId);
+      return;
+    }
+
     // Fix 1: size check ANTES del Discord alert — no alertar órdenes que no van a ejecutarse
     if (size < 5) {
       logger.warn(`[SKIP] Size ${size} < mínimo 5 tokens de Polymarket (ORDER_SIZE_USDC=$${exposure} muy bajo)`);
