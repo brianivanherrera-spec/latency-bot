@@ -308,7 +308,6 @@ class PolymarketClient {
         const useFak = process.env.USE_FAK === 'true';
         const firstOrderType = useFak ? OrderType.FAK : OrderType.FOK;
         const maxAttempts = parseInt(process.env.MARKET_RETRY_ATTEMPTS || '3');
-        orderParams.orderType = firstOrderType;
 
         // Cruzar el spread: precio = max(precio señal, bestAsk + 1 tick),
         // topeado por MAX_BUMP para no regalar el edge.
@@ -319,53 +318,91 @@ class PolymarketClient {
           if (ask == null) return basePrice;
           const cross = parseFloat((ask + tick).toFixed(2));
           const capped = parseFloat(Math.min(basePrice + maxBump, Math.max(basePrice, cross)).toFixed(2));
-          // Nunca pagar > 0.99 en token binario
-          // Polymarket tick = 0.01 → redondear siempre a 2 decimales
           const finalPx = parseFloat(Math.min(0.99, Math.round(capped * 100) / 100).toFixed(2));
-          if (finalPx !== basePrice) {
-            logger.info(`[LIVE] 📊 Book ask=$${ask.toFixed(2)} → precio cruzado $${finalPx.toFixed(2)} (base $${basePrice.toFixed(2)}, bump max $${maxBump})`);
-          }
+          logger.info(`[LIVE] 📊 bestAsk=$${ask != null ? ask.toFixed(2) : 'N/A'} bestBid=N/A orderType=${useFak ? 'FAK' : 'FOK'} precio_final=$${finalPx.toFixed(2)} (base $${basePrice.toFixed(2)}, bump_max $${maxBump})`);
           return finalPx;
         };
         orderParams.price = await crossBook(price);
 
         let preFilledFromFak = 0;
+
+        // Verificar si createAndPostMarketOrder está disponible (clob-client-v2 reciente)
+        const hasMarketOrderMethod = typeof this.clobClient?.createAndPostMarketOrder === 'function';
+
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           const orderLabel = useFak ? 'FAK' : 'FOK';
-          // En reintentos, refrescar book (el ask puede haber subido)
           if (attempt > 1) {
             orderParams.price = await crossBook(price);
           }
-          logger.info(`[LIVE] 📈 MARKET order (${orderLabel}) intento ${attempt}/${maxAttempts} @ $${orderParams.price}`);
-          result = await this.clobClient.createAndPostOrder(orderParams);
+          logger.info(`[LIVE] 📈 MARKET order (${orderLabel}) intento ${attempt}/${maxAttempts} @ $${orderParams.price} size=${orderParams.size}`);
+
+          if (hasMarketOrderMethod) {
+            // Cambio 1 CRÍTICO: usar el path correcto createAndPostMarketOrder
+            // amount = size * price para BUY (USDC gastado), size para SELL (shares)
+            const marketAmt = side === 'BUY'
+              ? parseFloat((orderParams.size * orderParams.price).toFixed(2))
+              : orderParams.size;
+            result = await this.clobClient.createAndPostMarketOrder(
+              {
+                tokenID: tokenId,
+                side: side === 'BUY' ? Side.BUY : Side.SELL,
+                amount: marketAmt,
+                price: orderParams.price,
+                orderType: firstOrderType,
+              },
+              { tickSize: '0.01', negRisk: false },
+              firstOrderType
+            );
+          } else {
+            // Fallback al método anterior si la versión del cliente no tiene createAndPostMarketOrder
+            result = await this.clobClient.createAndPostOrder({ ...orderParams, orderType: firstOrderType });
+          }
           logger.info(`[LIVE] response (${orderLabel} intento ${attempt}): ${JSON.stringify(result)}`);
 
           const rawStatus = (String(result?.status || '')).toLowerCase();
           const gotFilled = result?.success && rawStatus === 'matched';
 
-          // FAK puede devolver fill parcial: filled < size pero > 0
+          // Cambio 2: status "live" o "delayed" = taker delay de ~250ms en crypto markets
+          // NO cancelar inmediatamente — esperar 450ms y reconsultar
+          if (result?.success && (rawStatus === 'live' || rawStatus === 'delayed')) {
+            const delayedOrderId = result?.orderID || result?.orderId || result?.id;
+            logger.info(`[LIVE] ⏳ ${orderLabel} status="${rawStatus}" — esperando 450ms por taker delay antes de cancelar (orderId=${delayedOrderId})`);
+            await new Promise(r => setTimeout(r, 450));
+            if (delayedOrderId) {
+              try {
+                const recheck = await this.clobClient.getOrder(delayedOrderId).catch(() => null);
+                const recheckStatus = (String(recheck?.status || '')).toLowerCase();
+                if (recheckStatus === 'matched') {
+                  logger.info(`[LIVE] ✅ ${orderLabel} llenó durante el taker delay (450ms) — usando ese fill`);
+                  const fillTimeMs = Date.now() - (rec._placedAt || Date.now());
+                  rec.status = 'PLACED'; rec.orderId = delayedOrderId; rec.sizeFilled = orderParams.size;
+                  this._orderHistory.push(rec);
+                  return { success: true, orderId: delayedOrderId, status: 'matched', fillTimeMs, sizeFilled: orderParams.size };
+                }
+                logger.info(`[LIVE] ${orderLabel} sigue sin fill tras 450ms (status=${recheckStatus}) — procediendo a cancelar`);
+              } catch (recheckErr) {
+                logger.warn(`[LIVE] recheck error tras delay: ${recheckErr.message}`);
+              }
+            }
+          }
+
+          // FAK puede devolver fill parcial
           if (useFak && result?.success) {
-            const rawStatusFak = (String(result?.status || '')).toLowerCase();
-            // Si status=matched, llenó el pedido completo de este intento
-            if (rawStatusFak === 'matched') {
+            if (rawStatus === 'matched') {
               preFilledFromFak += orderParams.size;
               break;
             }
-            // Fix #2: no usar 'remaining' como fallback — puede contar de más.
-            // Solo confiar en size_matched / sizeFilled si vienen explícitamente.
             const fakFilled = parseFloat(result?.size_matched || result?.sizeFilled || 0) || 0;
             if (fakFilled > 0 && fakFilled < orderParams.size) {
               preFilledFromFak += fakFilled;
               const newRemaining = parseFloat((orderParams.size - fakFilled).toFixed(6));
               logger.info(`[LIVE] 🔶 FAK fill parcial: ${fakFilled} tokens — quedan ${newRemaining} por llenar`);
-              // Fix #1: si el remanente es < mínimo de Polymarket (5 tokens),
-              // aceptar lo ya llenado y salir en vez de mandar una orden inválida
               if (newRemaining < 5) {
                 logger.info(`[LIVE] 🔶 Remanente ${newRemaining} < 5 tokens (mínimo Polymarket) — aceptando fill parcial de ${preFilledFromFak} tokens`);
                 break;
               }
               orderParams.size = newRemaining;
-              continue; // reintentar por el remanente válido
+              continue;
             }
           }
 
@@ -671,27 +708,39 @@ class PolymarketClient {
   async _placeGtcWithRetry({ rec, tokenId, side, price, size, marketEndTs }) {
     const ATTEMPT_MS  = parseInt(process.env.FILL_RETRY_ATTEMPT_SECONDS || '15') * 1000;
     const PRICE_STEP  = parseFloat(process.env.FILL_RETRY_PRICE_STEP || '0.01');
-    const MAX_BUMP    = parseFloat(process.env.FILL_RETRY_MAX_BUMP || '0.03');
+    // Cambio 3: MAX_BUMP unificado a 0.05 (antes había inconsistencia 0.03 vs 0.05)
+    const MAX_BUMP    = parseFloat(process.env.FILL_RETRY_MAX_BUMP || '0.05');
     const CUTOFF_MS   = parseInt(process.env.FILL_RETRY_CUTOFF_SECONDS || '25') * 1000;
     const MAX_TOTAL_MS = parseInt(process.env.FILL_RETRY_MAX_TOTAL_SECONDS || '60') * 1000;
+    // Cambio 3: presupuesto mínimo garantizado de 30s aunque el mercado esté por cerrar
+    const MIN_BUDGET_MS = 30000;
     const POLL_MS     = 3000;
 
     const startedAt = Date.now();
 
-    // Presupuesto de tiempo: el menor entre (a) el cutoff del mercado, y
-    // (b) el tope absoluto desde que arrancó este intento de entrada —
-    // lo que se cumpla primero corta el retry-loop.
     const marketDeadline = marketEndTs
       ? marketEndTs - CUTOFF_MS
       : startedAt + (config.GTC_TIMEOUT_SECONDS || 60) * 1000;
     const absoluteDeadline = startedAt + MAX_TOTAL_MS;
-    const globalDeadline = Math.min(marketDeadline, absoluteDeadline);
+    // Cambio 3: nunca bajar del presupuesto mínimo garantizado
+    const globalDeadline = Math.max(
+      Math.min(marketDeadline, absoluteDeadline),
+      startedAt + MIN_BUDGET_MS
+    );
 
     const isBuy = side === 'BUY';
     let attempt = 0;
-    let currentPrice = price;
-    let filledSoFar = 0;      // FIX: tokens ya confirmados llenados en intentos previos
-    let remainingSize = size; // lo que falta pedir — nunca el tamaño original completo
+    // Cambio 3: arrancar currentPrice más agresivo (base + 0.02, topeado por MAX_BUMP)
+    const initialOffset = Math.min(0.02, MAX_BUMP);
+    const rawInitial = isBuy ? price + initialOffset : price - initialOffset;
+    let currentPrice = parseFloat(
+      (isBuy
+        ? Math.min(rawInitial, price + MAX_BUMP, 0.97)
+        : Math.max(rawInitial, price - MAX_BUMP, 0.03)
+      ).toFixed(2)
+    );
+    let filledSoFar = 0;
+    let remainingSize = size;
 
     try {
       await this._init();
