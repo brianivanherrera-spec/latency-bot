@@ -1233,7 +1233,10 @@ async function main() {
       }
     }
 
-    const side = sig.direction === 'UP' ? 'BUY' : 'SELL';
+    // Para UP:   BUY YES tokens  (comprar YES esperando que suba a $1)
+    // Para DOWN: BUY NO tokens   (comprar NO esperando que suba a $1 cuando BTC baja)
+    // NUNCA SELL — el bot no tiene tokens previos para vender
+    const side = 'BUY';
     const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
 
@@ -1491,13 +1494,10 @@ async function main() {
           size: actualSize,
           endDate: cachedMarket.endDate,
           posId,
-          tokenId,    // necesario para el position monitor
+          tokenId,
+          tokenOutcome: sig.direction === 'UP' ? 'YES' : 'NO',
           mode: 'live',
           entryType,
-          // Callback para liberar el slot cuando el tracker cierre la posición,
-          // en vez de un timeout fijo de 8 minutos que puede desincronizarse:
-          // si el mercado resuelve en 5 min, el slot se libera en 5 min;
-          // si tarda más, el slot no se libera prematuramente.
           onClose: () => activePositions.delete(posId),
         });
 
@@ -1534,8 +1534,9 @@ async function main() {
         size,
         endDate: cachedMarket.endDate,
         posId,
+        tokenOutcome: sig.direction === 'UP' ? 'YES' : 'NO',
         mode: 'paper',
-        entryType,  // 'early' o 'late' — para DUAL_ENTRY_MODE
+        entryType,
       });
 
       setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);

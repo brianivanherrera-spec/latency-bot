@@ -59,7 +59,7 @@ class PnLTracker {
     }
   }
  
-  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType, tokenId, onClose }) {
+  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType, tokenId, tokenOutcome, onClose }) {
     const pos = {
       id: posId || `POS_${Date.now()}`,
       marketId,
@@ -73,6 +73,7 @@ class PnLTracker {
       endDate: new Date(endDate),
       openedAt: new Date(),
       status: 'OPEN',
+      tokenOutcome: tokenOutcome || 'YES',
       entryType: entryType || 'early',
       _onClose: onClose || null,  // callback para liberar slot en index-final
     };
@@ -165,8 +166,12 @@ class PnLTracker {
   }
  
   _closePosition(pos, winner) {
-    const won = (pos.side === 'BUY' && winner === 'YES') ||
-                (pos.side === 'SELL' && winner === 'NO');
+    // side siempre es BUY — el bot compra YES (para UP) o NO (para DOWN)
+    // Ganás si el token que compraste es el ganador del mercado
+    // UP  → compró YES → gana si winner=YES
+    // DOWN → compró NO → gana si winner=NO
+    // Para determinar qué token compró, usamos pos.tokenOutcome que se guarda al abrir
+    const won = pos.tokenOutcome === winner;
  
     let pnl;
     if (won) {
