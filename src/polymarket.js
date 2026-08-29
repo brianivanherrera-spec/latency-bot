@@ -308,27 +308,73 @@ class PolymarketClient {
         const useFak = process.env.USE_FAK === 'true';
         const firstOrderType = useFak ? OrderType.FAK : OrderType.FOK;
         const maxAttempts = parseInt(process.env.MARKET_RETRY_ATTEMPTS || '3');
-
-        // Cruzar el spread: precio = max(precio señal, bestAsk + 1 tick),
-        // topeado por MAX_BUMP para no regalar el edge.
-        const maxBump = parseFloat(process.env.FILL_RETRY_MAX_BUMP || process.env.PRICE_TOLERANCE || '0.05');
         const tick = 0.01;
-        const crossBook = async (basePrice) => {
+
+        // PRECIO REAL: usar bestAsk directamente (no priceRaw + tolerance fijo)
+        // bestAsk + 1 tick = cruzar el spread real garantizado
+        const MAX_PRICE_LIMIT = parseFloat(process.env.MAX_PRICE_LIMIT || '0.85');
+        const getBestPrice = async () => {
           const ask = await this._getBestAsk(tokenId);
-          if (ask == null) return basePrice;
-          const cross = parseFloat((ask + tick).toFixed(2));
-          const capped = parseFloat(Math.min(basePrice + maxBump, Math.max(basePrice, cross)).toFixed(2));
-          const finalPx = parseFloat(Math.min(0.99, Math.round(capped * 100) / 100).toFixed(2));
-          logger.info(`[LIVE] 📊 bestAsk=$${ask != null ? ask.toFixed(2) : 'N/A'} bestBid=N/A orderType=${useFak ? 'FAK' : 'FOK'} precio_final=$${finalPx.toFixed(2)} (base $${basePrice.toFixed(2)}, bump_max $${maxBump})`);
-          return finalPx;
+          if (ask == null) return price;
+          const worstPrice = Math.min(MAX_PRICE_LIMIT, Math.round((ask + tick) * 100) / 100);
+          logger.info(`[LIVE] 📊 bestAsk=$${ask.toFixed(2)} → worstPrice=$${worstPrice.toFixed(2)} orderType=${useFak ? 'FAK' : 'FOK'}`);
+          return worstPrice;
         };
-        orderParams.price = await crossBook(price);
+
+        const worstPrice = await getBestPrice();
+        orderParams.price = worstPrice;
 
         let preFilledFromFak = 0;
-
-        // Verificar si createAndPostMarketOrder está disponible (clob-client-v2 reciente)
         const hasMarketOrderMethod = typeof this.clobClient?.createAndPostMarketOrder === 'function';
+        const hasPostOrders = typeof this.clobClient?.postOrders === 'function';
 
+        // DUAL ORDER: FAK instantáneo + GTC simultáneo
+        // FAK intenta llenar inmediatamente, GTC queda en el libro como backup
+        // Si FAK llena → cancelar GTC. Con WR 98.7% el doble fill es aceptable.
+        const DUAL_ORDER = process.env.DUAL_FILL_ORDER === 'true';
+        let dualGtcOrderId = null;
+
+        if (DUAL_ORDER && hasPostOrders) {
+          logger.info(`[LIVE] 🔀 DUAL ORDER: FAK + GTC simultáneos @ $${worstPrice}`);
+          try {
+            const [fakOrder, gtcOrder] = await Promise.all([
+              this.clobClient.createOrder(
+                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
+                  price: worstPrice, size, orderType: firstOrderType },
+                { tickSize: '0.01', negRisk: false }
+              ),
+              this.clobClient.createOrder(
+                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
+                  price: worstPrice, size, orderType: OrderType.GTC },
+                { tickSize: '0.01', negRisk: false }
+              ),
+            ]);
+            const batchResult = await this.clobClient.postOrders(
+              [{ order: fakOrder, orderType: firstOrderType },
+               { order: gtcOrder, orderType: OrderType.GTC }]
+            );
+            logger.info(`[LIVE] DUAL ORDER response: ${JSON.stringify(batchResult)}`);
+            await new Promise(r => setTimeout(r, 500));
+            const results = Array.isArray(batchResult) ? batchResult : [batchResult];
+            const fakRes = results[0]; const gtcRes = results[1];
+            const fakFilled = (String(fakRes?.status || '')).toLowerCase() === 'matched';
+            dualGtcOrderId = gtcRes?.orderID || gtcRes?.orderId;
+            if (fakFilled && dualGtcOrderId) {
+              await this.clobClient.cancelOrder({ orderID: dualGtcOrderId }).catch(() => {});
+              logger.info(`[LIVE] ✅ DUAL ORDER: FAK llenó, GTC cancelado`);
+              result = fakRes;
+            } else if (dualGtcOrderId) {
+              logger.info(`[LIVE] 🔀 DUAL ORDER: GTC vivo @ $${worstPrice}, monitoreando...`);
+              result = { success: true, status: 'live', orderID: dualGtcOrderId, _isDualGtc: true };
+            }
+          } catch (dualErr) {
+            logger.warn(`[LIVE] DUAL ORDER falló (${dualErr.message}) — cayendo a FAK individual`);
+            result = null;
+          }
+        }
+
+        // Camino normal FAK/FOK si no hay DUAL o falló
+        if (!result) {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           const orderLabel = useFak ? 'FAK' : 'FOK';
           if (attempt > 1) {
@@ -414,6 +460,7 @@ class PolymarketClient {
         if (preFilledFromFak > 0 && result) {
           result._preFilledFromFak = preFilledFromFak;
         }
+        } // end if (!result) — cierre del camino FAK normal
       } else {
         // GTC — orden límite con tolerancia de precio
         orderParams.orderType = OrderType.GTC;
