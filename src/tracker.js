@@ -124,8 +124,8 @@ class PnLTracker {
           const prices = typeof market.outcomePrices === 'string'
             ? JSON.parse(market.outcomePrices)
             : market.outcomePrices;
-          if (parseFloat(prices[0]) >= 0.99) return 'YES';
-          if (parseFloat(prices[1]) >= 0.99) return 'NO';
+          if (parseFloat(prices[0]) >= 0.95) return 'YES';
+          if (parseFloat(prices[1]) >= 0.95) return 'NO';
         } catch (_) {}
       }
 
@@ -152,8 +152,8 @@ class PnLTracker {
       if (market.tokens && Array.isArray(market.tokens)) {
         const yesToken = market.tokens.find(t => t.outcome === 'Yes' || t.outcome === 'YES');
         const noToken  = market.tokens.find(t => t.outcome === 'No'  || t.outcome === 'NO');
-        if (yesToken && parseFloat(yesToken.price || yesToken.lastTradePrice) >= 0.99) return 'YES';
-        if (noToken  && parseFloat(noToken.price  || noToken.lastTradePrice)  >= 0.99) return 'NO';
+        if (yesToken && parseFloat(yesToken.price || yesToken.lastTradePrice) >= 0.95) return 'YES';
+        if (noToken  && parseFloat(noToken.price  || noToken.lastTradePrice)  >= 0.95) return 'NO';
       }
 
       logger.warn(`Mercado ${id} resuelto pero no se pudo determinar ganador. JSON: ${JSON.stringify(market)}`);
