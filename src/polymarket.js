@@ -328,16 +328,18 @@ class PolymarketClient {
         const hasMarketOrderMethod = typeof this.clobClient?.createAndPostMarketOrder === 'function';
         const hasPostOrders = typeof this.clobClient?.postOrders === 'function';
 
-        // DUAL ORDER: FAK instantáneo + GTC simultáneo
-        // FAK intenta llenar inmediatamente, GTC queda en el libro como backup
-        // Si FAK llena → cancelar GTC. Con WR 98.7% el doble fill es aceptable.
+        // TRIPLE ORDER: FAK instantáneo + GTC permanente + GTD hasta cierre del mercado
         const DUAL_ORDER = process.env.DUAL_FILL_ORDER === 'true';
         let dualGtcOrderId = null;
+        let tripleGtdOrderId = null;
 
         if (DUAL_ORDER && hasPostOrders) {
-          logger.info(`[LIVE] 🔀 DUAL ORDER: FAK + GTC simultáneos @ $${worstPrice}`);
+          const gtdExpiry = marketEndTs
+            ? Math.floor(marketEndTs / 1000)
+            : Math.floor((Date.now() + 5 * 60 * 1000) / 1000);
+          logger.info(`[LIVE] 🔀 TRIPLE ORDER: FAK + GTC + GTD @ $${worstPrice}`);
           try {
-            const [fakOrder, gtcOrder] = await Promise.all([
+            const [fakOrder, gtcOrder, gtdOrder] = await Promise.all([
               this.clobClient.createOrder(
                 { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
                   price: worstPrice, size, orderType: firstOrderType },
@@ -348,27 +350,36 @@ class PolymarketClient {
                   price: worstPrice, size, orderType: OrderType.GTC },
                 { tickSize: '0.01', negRisk: false }
               ),
+              this.clobClient.createOrder(
+                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
+                  price: worstPrice, size, orderType: OrderType.GTD,
+                  expiration: gtdExpiry },
+                { tickSize: '0.01', negRisk: false }
+              ),
             ]);
             const batchResult = await this.clobClient.postOrders(
               [{ order: fakOrder, orderType: firstOrderType },
-               { order: gtcOrder, orderType: OrderType.GTC }]
+               { order: gtcOrder, orderType: OrderType.GTC },
+               { order: gtdOrder, orderType: OrderType.GTD }]
             );
-            logger.info(`[LIVE] DUAL ORDER response: ${JSON.stringify(batchResult)}`);
+            logger.info(`[LIVE] TRIPLE ORDER response: ${JSON.stringify(batchResult)}`);
             await new Promise(r => setTimeout(r, 500));
             const results = Array.isArray(batchResult) ? batchResult : [batchResult];
-            const fakRes = results[0]; const gtcRes = results[1];
+            const fakRes = results[0]; const gtcRes = results[1]; const gtdRes = results[2];
             const fakFilled = (String(fakRes?.status || '')).toLowerCase() === 'matched';
             dualGtcOrderId = gtcRes?.orderID || gtcRes?.orderId;
-            if (fakFilled && dualGtcOrderId) {
-              await this.clobClient.cancelOrder({ orderID: dualGtcOrderId }).catch(() => {});
-              logger.info(`[LIVE] ✅ DUAL ORDER: FAK llenó, GTC cancelado`);
+            tripleGtdOrderId = gtdRes?.orderID || gtdRes?.orderId;
+            if (fakFilled) {
+              if (dualGtcOrderId) await this.clobClient.cancelOrder({ orderID: dualGtcOrderId }).catch(() => {});
+              if (tripleGtdOrderId) await this.clobClient.cancelOrder({ orderID: tripleGtdOrderId }).catch(() => {});
+              logger.info(`[LIVE] ✅ TRIPLE ORDER: FAK llenó, GTC+GTD cancelados`);
               result = fakRes;
-            } else if (dualGtcOrderId) {
-              logger.info(`[LIVE] 🔀 DUAL ORDER: GTC vivo @ $${worstPrice}, monitoreando...`);
-              result = { success: true, status: 'live', orderID: dualGtcOrderId, _isDualGtc: true };
+            } else if (dualGtcOrderId || tripleGtdOrderId) {
+              logger.info(`[LIVE] 🔀 TRIPLE ORDER: GTC+GTD vivos @ $${worstPrice}, esperando fill...`);
+              result = { success: true, status: 'live', orderID: dualGtcOrderId || tripleGtdOrderId, _isDualGtc: true };
             }
           } catch (dualErr) {
-            logger.warn(`[LIVE] DUAL ORDER falló (${dualErr.message}) — cayendo a FAK individual`);
+            logger.warn(`[LIVE] TRIPLE ORDER falló (${dualErr.message}) — cayendo a FAK individual`);
             result = null;
           }
         }
