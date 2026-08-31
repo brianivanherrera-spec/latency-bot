@@ -2,7 +2,7 @@
  * LATENCY BOT - VERSIÓN FINAL
  * ✅ SignalEngine + PnLTracker + Cooldown + Live orders + Diagnóstico
  */
-// BUILD: 842d615 — fix tick size 2 decimales + toLowerCase status numérico
+// BUILD: 9d84463 — GTC retry desde bestAsk real
 
 const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
@@ -476,7 +476,13 @@ const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // conf
 async function main() {
   logger.info('═'.repeat(70));
   logger.info('🎯 LATENCY BOT - Versión Final');
-  logger.info('📦 BUILD: 842d615 — fix tick size precio 2 decimales (CRITICO LIVE)');
+  logger.info('📦 BUILD: 9d84463 — GTC retry desde bestAsk real');
+  try {
+    const { execSync } = require('child_process');
+    const gitCommit = execSync('git rev-parse --short HEAD 2>/dev/null || echo "unknown"').toString().trim();
+    const gitMsg = execSync('git log -1 --pretty=format:"%s" 2>/dev/null || echo ""').toString().trim().slice(0, 60);
+    logger.info(`🔖 GIT: ${gitCommit} — ${gitMsg}`);
+  } catch (e) { /* sin git disponible */ }
   logger.info('═'.repeat(70));
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE 🔴'}`);
   logger.info(`Cooldown: ${COOLDOWN/1000}s | Min edge: ${config.MIN_EDGE_PCT}%`);
