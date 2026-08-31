@@ -857,11 +857,14 @@ async function main() {
     }
 
     // ─── Hard-gate: precio extremo de Polymarket ──────────────────────────
-    // Nunca entrar si el token que compramos está en zona extrema (<0.15 o >0.85).
+    // Nunca entrar si el token que compramos está en zona extrema.
+    // Default: 0.95 — permite señales élite hasta $0.95 (antes era 0.85, bloqueaba demasiado)
+    // Configurable via POLY_EXTREME_THRESHOLD en Railway
     const polyYesNow = sig.edge?.polyYes ?? livePolyYes;
     if (polyYesNow !== null && polyYesNow !== undefined) {
       const tokenMid = sig.direction === 'UP' ? polyYesNow : (1 - polyYesNow);
-      if (tokenMid < 0.15 || tokenMid > 0.85) {
+      const extremeThreshold = parseFloat(process.env.POLY_EXTREME_THRESHOLD || '0.95');
+      if (tokenMid < (1 - extremeThreshold) || tokenMid > extremeThreshold) {
         logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real`);
         return;
       }
