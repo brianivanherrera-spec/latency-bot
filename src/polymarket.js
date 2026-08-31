@@ -776,16 +776,21 @@ class PolymarketClient {
     );
 
     const isBuy = side === 'BUY';
+    // Arrancar desde bestAsk real si está disponible — no desde priceRaw + offset
+    // El GTC antes arrancaba en $0.57 cuando el ask real era $0.89 → nunca llenaba
+    let startPrice = price;
+    try {
+      const bestAsk = await this._getBestAsk(tokenId);
+      if (bestAsk != null) {
+        const MAX_PRICE_LIMIT_GTC = parseFloat(process.env.MAX_PRICE_LIMIT || '0.85');
+        startPrice = Math.min(MAX_PRICE_LIMIT_GTC, Math.round((bestAsk + 0.01) * 100) / 100);
+        logger.info(`[RETRY] bestAsk=$${bestAsk.toFixed(2)} → GTC arranca @ $${startPrice.toFixed(2)} (en vez de $${price.toFixed(2)})`);
+      }
+    } catch (e) {
+      logger.warn(`[RETRY] no pudo obtener bestAsk: ${e.message} — usando precio base $${price.toFixed(2)}`);
+    }
+    let currentPrice = parseFloat(startPrice.toFixed(2));
     let attempt = 0;
-    // Cambio 3: arrancar currentPrice más agresivo (base + 0.02, topeado por MAX_BUMP)
-    const initialOffset = Math.min(0.02, MAX_BUMP);
-    const rawInitial = isBuy ? price + initialOffset : price - initialOffset;
-    let currentPrice = parseFloat(
-      (isBuy
-        ? Math.min(rawInitial, price + MAX_BUMP, 0.97)
-        : Math.max(rawInitial, price - MAX_BUMP, 0.03)
-      ).toFixed(2)
-    );
     let filledSoFar = 0;
     let remainingSize = size;
 
