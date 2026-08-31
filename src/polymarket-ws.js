@@ -38,7 +38,7 @@ function loadTradeMap() {
           map.set(tokenId, trade);
         }
       }
-      logger.info(`[TRADE-MAP] Cargado desde disco: ${map.size} trades recientes`);
+      logger.debug(`[TRADE-MAP] Cargado desde disco: ${map.size} trades recientes`);
       return map;
     }
   } catch (e) {
@@ -138,7 +138,7 @@ class PolymarketWS {
       }
       // Solo usar si tiene menos de 5 minutos de antigüedad (ventana amplia para el fallback entre mercados)
       if (latestEntry && (now - latestEntry.timestamp) < 5 * 60 * 1000) {
-        logger.info(`[POLY-WS] [TRADE SNAP] usando trade de mercado anterior (age=${now - latestEntry.timestamp}ms)`);
+        logger.debug(`[POLY-WS] [TRADE SNAP] usando trade de mercado anterior (age=${now - latestEntry.timestamp}ms)`);
         // Calcular imbalance con todos los trades del Map (mercado anterior)
         let prevYesSize = 0, prevNoSize = 0;
         for (const [, trade] of this._lastTradeByToken) {
@@ -161,12 +161,12 @@ class PolymarketWS {
           trade_imbalance:   prevImbalance,
         };
       }
-      logger.info(`[POLY-WS] [TRADE SNAP] null — map vacío (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)} mapSize=${this._lastTradeByToken.size})`);
+      logger.debug(`[POLY-WS] [TRADE SNAP] null — map vacío (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)} mapSize=${this._lastTradeByToken.size})`);
       return null;
     }
 
     if (!yesTrade && !noTrade) {
-      logger.info(`[POLY-WS] [TRADE SNAP] null — sin trades (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)})`);
+      logger.debug(`[POLY-WS] [TRADE SNAP] null — sin trades (yesId=${yesId?.slice(0,8)} noId=${noId?.slice(0,8)})`);
       return null;
     }
 
@@ -448,7 +448,7 @@ class PolymarketWS {
       // Remover cuando se confirmen los campos correctos
       if (this._rawTradeLogCount === undefined) this._rawTradeLogCount = 0;
       if (this._rawTradeLogCount < 10) {
-        logger.info(`[POLY-WS] [RAW last_trade_price] ${JSON.stringify(msg)}`);
+        logger.debug(`[POLY-WS] [RAW last_trade_price] ${JSON.stringify(msg)}`);
         this._rawTradeLogCount++;
       }
 
@@ -486,7 +486,7 @@ class PolymarketWS {
           saveTradeMap(this._lastTradeByToken);
 
           if (isYes || isNo) {
-            logger.info(`[POLY-WS] [TRADE SAVED] ${isYes ? 'YES' : 'NO'} side=${msg.side} price=${price} size=${size} peak=${peakSize}`);
+            logger.debug(`[POLY-WS] [TRADE SAVED] ${isYes ? 'YES' : 'NO'} side=${msg.side} price=${price} size=${size} peak=${peakSize}`);
           }
         } else {
           // size llegó como 0 o NaN — loggear para detectar si hay eventos sin size
