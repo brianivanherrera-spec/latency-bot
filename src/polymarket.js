@@ -378,7 +378,7 @@ class PolymarketClient {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           const orderLabel = useFak ? 'FAK' : 'FOK';
           if (attempt > 1) {
-            orderParams.price = await crossBook(price);
+            orderParams.price = await getBestPrice();
           }
           logger.info(`[LIVE] 📈 MARKET order (${orderLabel}) intento ${attempt}/${maxAttempts} @ $${orderParams.price} size=${orderParams.size}`);
 
