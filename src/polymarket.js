@@ -926,7 +926,7 @@ class PolymarketClient {
         if (capped === currentPrice) {
           logger.warn(`[RETRY] tope de precio alcanzado ($${currentPrice.toFixed(3)}) — no hay más margen de mejora, esperando con este precio`);
         }
-        currentPrice = parseFloat(capped.toFixed(3));
+        currentPrice = parseFloat(capped.toFixed(2));
       }
 
       if (filledSoFar > 0) {
