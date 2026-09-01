@@ -1017,8 +1017,9 @@ async function main() {
 
     if (marketKey || activePositions.size > 0) {
       if (dualEntryMode) {
-        // Máximo 2 entradas por mercado: 1 normal + 1 late entry
-        const maxPerMarket = 2;
+        // Máximo de entradas por mercado — configurable via MAX_ENTRIES_PER_MARKET
+        // Default: 2 (1 normal + 1 late entry). Con TRIPLE ORDER activo podés subir a 3-4.
+        const maxPerMarket = parseInt(process.env.MAX_ENTRIES_PER_MARKET || '2');
         if (entriesInThisMarket.length >= maxPerMarket) {
           logger.warn(`[SKIP] Ya hay ${entriesInThisMarket.length} posiciones en este mercado (máx ${maxPerMarket})`);
           return;
