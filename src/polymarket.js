@@ -419,6 +419,16 @@ class PolymarketClient {
           }
           logger.info(`[LIVE] response (${orderLabel} intento ${attempt}): ${JSON.stringify(result)}`);
 
+          // Auto-refresh allowance si detecta balance insuficiente
+          const errMsgFak = result?.error || result?.errorMsg || '';
+          if (errMsgFak.toLowerCase().includes('not enough balance') || errMsgFak.toLowerCase().includes('allowance')) {
+            logger.warn(`[LIVE] ⚡ Balance insuficiente detectado — refrescando allowance...`);
+            try {
+              await this.clobClient.updateBalanceAllowance({ assetType: 'COLLATERAL', signatureType: 3 });
+              logger.info(`[LIVE] ✅ Allowance actualizado`);
+            } catch (e) { logger.warn(`[LIVE] Error actualizando allowance: ${e.message}`); }
+          }
+
           const rawStatus = (String(result?.status || '')).toLowerCase();
           const gotFilled = result?.success && rawStatus === 'matched';
 
@@ -836,7 +846,18 @@ class PolymarketClient {
         }
 
         if (!result?.success) {
-          logger.warn(`[RETRY] intento ${attempt} rechazado: ${result?.errorMsg || result?.error || 'sin detalle'}`);
+          const errMsg = result?.errorMsg || result?.error || '';
+          logger.warn(`[RETRY] intento ${attempt} rechazado: ${errMsg || 'sin detalle'}`);
+          // Auto-refresh allowance si el error es de balance insuficiente
+          if (errMsg.toLowerCase().includes('not enough balance') || errMsg.toLowerCase().includes('allowance')) {
+            logger.warn(`[RETRY] ⚡ Detectado error de allowance — refrescando balance cache...`);
+            try {
+              await this.clobClient.updateBalanceAllowance({ assetType: 'COLLATERAL', signatureType: 3 });
+              logger.info(`[RETRY] ✅ Balance allowance actualizado — reintentando`);
+            } catch (updateErr) {
+              logger.warn(`[RETRY] Error al actualizar allowance: ${updateErr.message}`);
+            }
+          }
           await new Promise(r => setTimeout(r, 1500));
           continue;
         }
