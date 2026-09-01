@@ -379,7 +379,14 @@ class PolymarketClient {
               result = fakRes;
             } else if (dualGtcOrderId || tripleGtdOrderId) {
               logger.info(`[LIVE] 🔀 TRIPLE ORDER: GTC+GTD vivos @ $${worstPrice}, esperando fill...`);
-              result = { success: true, status: 'live', orderID: dualGtcOrderId || tripleGtdOrderId, _isDualGtc: true };
+              // Pasar los IDs para que el GTC timeout los cancele si no llenan
+              result = {
+                success: true, status: 'live',
+                orderID: dualGtcOrderId || tripleGtdOrderId,
+                _isDualGtc: true,
+                _tripleGtcId: dualGtcOrderId,
+                _tripleGtdId: tripleGtdOrderId,
+              };
             }
           } catch (dualErr) {
             logger.warn(`[LIVE] TRIPLE ORDER falló (${dualErr.message}) — cayendo a FAK individual`);
@@ -628,6 +635,13 @@ class PolymarketClient {
           logger.info(`[LIVE] 🚫 Orden GTC cancelada por timeout`);
         } catch (cancelErr) {
           logger.error(`[LIVE] Error cancelando orden: ${cancelErr.message}`);
+        }
+        // Cancelar también el GTC del TRIPLE ORDER si estaba vivo
+        if (rec._tripleGtcId && rec._tripleGtcId !== orderId) {
+          try {
+            await this.clobClient.cancelOrder({ orderID: rec._tripleGtcId }).catch(() => {});
+            logger.info(`[LIVE] 🚫 GTC del TRIPLE ORDER cancelado por timeout`);
+          } catch (e) {}
         }
         return { success: false, error: 'gtc_timeout', orderId };
       }
