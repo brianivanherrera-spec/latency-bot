@@ -372,21 +372,33 @@ class PolymarketClient {
             const fakFilled = (String(fakRes?.status || '')).toLowerCase() === 'matched';
             dualGtcOrderId = gtcRes?.orderID || gtcRes?.orderId;
             tripleGtdOrderId = gtdRes?.orderID || gtdRes?.orderId;
-            if (fakFilled) {
-              if (dualGtcOrderId) await this.clobClient.cancelOrder({ orderID: dualGtcOrderId }).catch(() => {});
-              if (tripleGtdOrderId) await this.clobClient.cancelOrder({ orderID: tripleGtdOrderId }).catch(() => {});
-              // Calcular fillPrice real desde takingAmount (USDC gastado) / makingAmount (tokens recibidos)
-              const takingAmt = parseFloat(fakRes?.takingAmount || 0);
-              const makingAmt = parseFloat(fakRes?.makingAmount || 0);
+            const gtcFilled = (String(gtcRes?.status || '')).toLowerCase() === 'matched';
+            const gtdFilled = (String(gtdRes?.status || '')).toLowerCase() === 'matched';
+
+            if (fakFilled || gtcFilled || gtdFilled) {
+              // Calcular fillPrice real desde takingAmount/makingAmount
+              const takingAmt = parseFloat(fakRes?.takingAmount || gtcRes?.takingAmount || 0);
+              const makingAmt = parseFloat(fakRes?.makingAmount || gtcRes?.makingAmount || 0);
               const realFillPrice = (takingAmt > 0 && makingAmt > 0)
                 ? parseFloat((takingAmt / makingAmt).toFixed(4))
                 : worstPrice;
               const realSizeFilled = makingAmt > 0 ? Math.round(makingAmt) : size;
-              logger.info(`[LIVE] ✅ TRIPLE ORDER: FAK llenó @ $${realFillPrice.toFixed(4)} (taking=${takingAmt}, making=${makingAmt}), GTC+GTD cancelados`);
-              result = { ...fakRes, fillPrice: realFillPrice, sizeFilled: realSizeFilled, success: true };
+
+              // NO cancelar GTC/GTD — dejarlos vivos para capturar más tokens
+              // Si GTC o GTD también llenan, son tokens extra ganados
+              const filledOrders = [fakFilled?'FAK':null, gtcFilled?'GTC':null, gtdFilled?'GTD':null].filter(Boolean);
+              const liveOrders = [!gtcFilled&&dualGtcOrderId?'GTC':null, !gtdFilled&&tripleGtdOrderId?'GTD':null].filter(Boolean);
+              logger.info(`[LIVE] ✅ TRIPLE ORDER: ${filledOrders.join('+')} llenó @ $${realFillPrice.toFixed(4)} | ${liveOrders.length > 0 ? liveOrders.join('+') + ' vivos en libro' : 'todo llenó'}`);
+              result = {
+                ...fakRes,
+                fillPrice: realFillPrice,
+                sizeFilled: realSizeFilled,
+                success: true,
+                _tripleGtcId: !gtcFilled ? dualGtcOrderId : null,
+                _tripleGtdId: !gtdFilled ? tripleGtdOrderId : null,
+              };
             } else if (dualGtcOrderId || tripleGtdOrderId) {
-              logger.info(`[LIVE] 🔀 TRIPLE ORDER: GTC+GTD vivos @ $${worstPrice}, esperando fill...`);
-              // Pasar los IDs para que el GTC timeout los cancele si no llenan
+              logger.info(`[LIVE] 🔀 TRIPLE ORDER: FAK sin liquidez → GTC+GTD vivos @ $${worstPrice}`);
               result = {
                 success: true, status: 'live',
                 orderID: dualGtcOrderId || tripleGtdOrderId,
@@ -448,8 +460,12 @@ class PolymarketClient {
 
           // Cambio 2: status "live" o "delayed" = taker delay de ~250ms en crypto markets
           // NO cancelar inmediatamente — esperar 450ms y reconsultar
-          if (result?.success && (rawStatus === 'live' || rawStatus === 'delayed')) {
-            const delayedOrderId = result?.orderID || result?.orderId || result?.id;
+          // IMPORTANTE: no cancelar si es un ID del TRIPLE ORDER (GTC/GTD que deben quedar vivos)
+          const delayedOrderId = result?.orderID || result?.orderId || result?.id;
+          const isTripleOrderId = delayedOrderId && (
+            delayedOrderId === rec._tripleGtcId || delayedOrderId === rec._tripleGtdId
+          );
+          if (result?.success && (rawStatus === 'live' || rawStatus === 'delayed') && !isTripleOrderId) {
             logger.info(`[LIVE] ⏳ ${orderLabel} status="${rawStatus}" — esperando 450ms por taker delay antes de cancelar (orderId=${delayedOrderId})`);
             await new Promise(r => setTimeout(r, 450));
             if (delayedOrderId) {
@@ -468,6 +484,8 @@ class PolymarketClient {
                 logger.warn(`[LIVE] recheck error tras delay: ${recheckErr.message}`);
               }
             }
+          } else if (isTripleOrderId && (rawStatus === 'live' || rawStatus === 'delayed')) {
+            logger.info(`[LIVE] 🔀 ${orderLabel} ID=${delayedOrderId?.slice(0,10)} es del TRIPLE ORDER — dejando vivo en el libro`);
           }
 
           // FAK puede devolver fill parcial
