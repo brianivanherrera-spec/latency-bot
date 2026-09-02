@@ -375,8 +375,15 @@ class PolymarketClient {
             if (fakFilled) {
               if (dualGtcOrderId) await this.clobClient.cancelOrder({ orderID: dualGtcOrderId }).catch(() => {});
               if (tripleGtdOrderId) await this.clobClient.cancelOrder({ orderID: tripleGtdOrderId }).catch(() => {});
-              logger.info(`[LIVE] ✅ TRIPLE ORDER: FAK llenó, GTC+GTD cancelados`);
-              result = fakRes;
+              // Calcular fillPrice real desde takingAmount (USDC gastado) / makingAmount (tokens recibidos)
+              const takingAmt = parseFloat(fakRes?.takingAmount || 0);
+              const makingAmt = parseFloat(fakRes?.makingAmount || 0);
+              const realFillPrice = (takingAmt > 0 && makingAmt > 0)
+                ? parseFloat((takingAmt / makingAmt).toFixed(4))
+                : worstPrice;
+              const realSizeFilled = makingAmt > 0 ? Math.round(makingAmt) : size;
+              logger.info(`[LIVE] ✅ TRIPLE ORDER: FAK llenó @ $${realFillPrice.toFixed(4)} (taking=${takingAmt}, making=${makingAmt}), GTC+GTD cancelados`);
+              result = { ...fakRes, fillPrice: realFillPrice, sizeFilled: realSizeFilled, success: true };
             } else if (dualGtcOrderId || tripleGtdOrderId) {
               logger.info(`[LIVE] 🔀 TRIPLE ORDER: GTC+GTD vivos @ $${worstPrice}, esperando fill...`);
               // Pasar los IDs para que el GTC timeout los cancele si no llenan
