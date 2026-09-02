@@ -821,6 +821,15 @@ class PolymarketClient {
       logger.info(`[RETRY] _getBestAsk resultado: ${bestAsk != null ? '$'+bestAsk.toFixed(2) : 'null/undefined'} para token ${tokenId?.slice(0,12)}`);
       if (bestAsk != null) {
         const MAX_PRICE_LIMIT_GTC = parseFloat(process.env.MAX_PRICE_LIMIT || '0.97');
+        // MAX_GTC_ENTRY_ASK: si el bestAsk supera este umbral, el GTC retry
+        // arrancaría tan caro que la ganancia sería mínima y el riesgo alto.
+        // Por ejemplo: bestAsk=$0.97 → ganancia máxima=$0.03/token vs riesgo=$0.97/token
+        // Default: 0.85 — si el ask ya está en $0.85+ no vale la pena entrar por GTC
+        const MAX_GTC_ENTRY_ASK = parseFloat(process.env.MAX_GTC_ENTRY_ASK || '0.85');
+        if (bestAsk > MAX_GTC_ENTRY_ASK) {
+          logger.warn(`[RETRY] ❌ bestAsk=$${bestAsk.toFixed(2)} > MAX_GTC_ENTRY_ASK=$${MAX_GTC_ENTRY_ASK} — ratio riesgo/recompensa malo, cancelando GTC retry → NO_FILL`);
+          return { success: false, error: 'ask_too_high', bestAsk, noFill: true };
+        }
         startPrice = Math.min(MAX_PRICE_LIMIT_GTC, Math.round((bestAsk + 0.01) * 100) / 100);
         logger.info(`[RETRY] bestAsk=$${bestAsk.toFixed(2)} → GTC arranca @ $${startPrice.toFixed(2)} (MAX_PRICE_LIMIT=${MAX_PRICE_LIMIT_GTC}, precio base=$${price.toFixed(2)})`);
       } else {
