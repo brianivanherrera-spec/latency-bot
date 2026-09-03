@@ -479,7 +479,15 @@ class PolymarketClient {
                { order: gtdOrder, orderType: OrderType.GTD }]
             );
             logger.info(`[LIVE] TRIPLE ORDER response: ${JSON.stringify(batchResult)}`);
-            await new Promise(r => setTimeout(r, 500));
+
+            // Detectar "trading is disabled" — cancelar todo y NO_FILL inmediato
+            const batchError = batchResult?.error || (Array.isArray(batchResult) && batchResult[0]?.error) || '';
+            const tradingDisabled = batchError.toLowerCase().includes('trading is disabled') ||
+              (Array.isArray(batchResult) && batchResult.some(r => (r?.error || '').includes('trading is disabled')));
+            if (tradingDisabled) {
+              logger.warn(`[LIVE] ⛔ TRIPLE ORDER: "trading is disabled" — Polymarket en mantenimiento → NO_FILL inmediato (no reintentar)`);
+              return { success: false, error: 'trading_disabled', noFill: true };
+            }
             const results = Array.isArray(batchResult) ? batchResult : [batchResult];
             const fakRes = results[0]; const gtcRes = results[1]; const gtdRes = results[2];
             const fakFilled = (String(fakRes?.status || '')).toLowerCase() === 'matched';
@@ -558,8 +566,14 @@ class PolymarketClient {
           }
           logger.info(`[LIVE] response (${orderLabel} intento ${attempt}): ${JSON.stringify(result)}`);
 
-          // Auto-refresh allowance si detecta balance insuficiente
+          // Si Polymarket está en mantenimiento → NO_FILL inmediato
           const errMsgFak = result?.error || result?.errorMsg || '';
+          if (errMsgFak.toLowerCase().includes('trading is disabled') || result?.status === 503) {
+            logger.warn(`[LIVE] ⛔ "trading is disabled" — NO_FILL inmediato, no reintentar`);
+            return { success: false, error: 'trading_disabled', noFill: true };
+          }
+
+          // Auto-refresh allowance si detecta balance insuficiente
           if (errMsgFak.toLowerCase().includes('not enough balance') || errMsgFak.toLowerCase().includes('allowance')) {
             logger.warn(`[LIVE] ⚡ Balance insuficiente detectado — refrescando allowance...`);
             try {
@@ -1009,6 +1023,12 @@ class PolymarketClient {
         if (!result?.success) {
           const errMsg = result?.errorMsg || result?.error || '';
           logger.warn(`[RETRY] intento ${attempt} rechazado: ${errMsg || 'sin detalle'}`);
+
+          // Si Polymarket está en mantenimiento → NO_FILL inmediato, no reintentar
+          if (errMsg.toLowerCase().includes('trading is disabled') || result?.status === 503) {
+            logger.warn(`[RETRY] ⛔ "trading is disabled" — Polymarket en mantenimiento → NO_FILL inmediato`);
+            return { success: false, error: 'trading_disabled', noFill: true };
+          }
           // Auto-refresh allowance si el error es de balance insuficiente
           if (errMsg.toLowerCase().includes('not enough balance') || errMsg.toLowerCase().includes('allowance')) {
             logger.warn(`[RETRY] ⚡ Detectado error de allowance — refrescando balance cache...`);
