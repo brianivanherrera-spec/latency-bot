@@ -1062,26 +1062,26 @@ async function main() {
 
     if (marketKey || activePositions.size > 0) {
       if (dualEntryMode) {
-        // Máximo de entradas por mercado — configurable via MAX_ENTRIES_PER_MARKET
-        // Default: 2 (1 normal + 1 late entry). Con TRIPLE ORDER activo podés subir a 3-4.
         const maxPerMarket = parseInt(process.env.MAX_ENTRIES_PER_MARKET || '2');
         if (entriesInThisMarket.length >= maxPerMarket) {
           logger.warn(`[SKIP] Ya hay ${entriesInThisMarket.length} posiciones en este mercado (máx ${maxPerMarket})`);
           return;
         }
-        // Si ya hay 1 entrada, la segunda SOLO puede ser vía LATE_ENTRY confirmado
         if (entriesInThisMarket.length >= 1 && entriesInThisMarket[0].entryType !== 'late') {
-          // Marcar que esta próxima entrada (si pasa) será la "late" —
-          // se valida más abajo en el bloque LATE_ENTRY_MODE
           global.__pendingEntryType = 'late';
+        } else if (entriesInThisMarket.length === 0) {
+          // No hay entradas en este mercado — limpiar el flag para no contaminar
+          global.__pendingEntryType = null;
         }
       } else {
-        // Comportamiento clásico: solo 1 entrada por mercado
         if (entriesInThisMarket.length >= 1) {
           logger.warn(`[SKIP] Ya hay posición abierta en este mercado — evitando doble entry`);
           return;
         }
       }
+    } else {
+      // Sin posiciones activas — limpiar el flag de entrada tardía
+      global.__pendingEntryType = null;
     }
 
     // DYNAMIC_SIZING: escala el order size automáticamente según el balance
