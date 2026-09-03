@@ -367,6 +367,66 @@ class PolymarketClient {
         const hasMarketOrderMethod = typeof this.clobClient?.createAndPostMarketOrder === 'function';
         const hasPostOrders = typeof this.clobClient?.postOrders === 'function';
 
+        // FAK AGRESIVO: reintenta subiendo el precio de a $0.01 hasta MAX_GTC_ENTRY_ASK
+        // Objetivo: maximizar ganancia real — solo entrar cuando el token cuesta ≤ MAX_GTC_ENTRY_ASK
+        // Con $3 de inversión y token a $0.60 → ganancia $0.40 × 5 tokens = $2
+        // Con $3 de inversión y token a $0.55 → ganancia $0.45 × 5 tokens = $2.25 ✅
+        const MAX_FAK_PRICE = parseFloat(process.env.MAX_GTC_ENTRY_ASK || '0.85');
+        const FAK_RETRY_MS = parseInt(process.env.FAK_RETRY_MS || '1500');
+        const FAK_MAX_ATTEMPTS = parseInt(process.env.FAK_MAX_ATTEMPTS || '10');
+
+        if (!process.env.DUAL_FILL_ORDER || process.env.DUAL_FILL_ORDER !== 'true') {
+          // Camino FAK agresivo con reintentos
+          let fakPrice = worstPrice;
+          let fakFilled = false;
+          let fakResult = null;
+
+          for (let fakAttempt = 1; fakAttempt <= FAK_MAX_ATTEMPTS; fakAttempt++) {
+            if (fakPrice > MAX_FAK_PRICE) {
+              logger.warn(`[LIVE] ❌ FAK precio $${fakPrice.toFixed(2)} > MAX_GTC_ENTRY_ASK=$${MAX_FAK_PRICE} — ganancia insuficiente → NO_FILL`);
+              return { success: false, error: 'ask_too_high', noFill: true };
+            }
+
+            logger.info(`[LIVE] ⚡ FAK intento ${fakAttempt}/${FAK_MAX_ATTEMPTS} @ $${fakPrice.toFixed(2)}`);
+            try {
+              const fakRes = hasMarketOrderMethod
+                ? await this.clobClient.createAndPostMarketOrder(
+                    { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
+                      amount: parseFloat((size * fakPrice).toFixed(2)), price: fakPrice, orderType: OrderType.FAK },
+                    { tickSize: '0.01', negRisk: false }, OrderType.FAK, true
+                  )
+                : await this.clobClient.createAndPostOrder({ ...orderParams, price: fakPrice, orderType: OrderType.FAK });
+
+              const fakStatus = (String(fakRes?.status || '')).toLowerCase();
+              if (fakStatus === 'matched') {
+                const taking = parseFloat(fakRes?.takingAmount || 0);
+                const making = parseFloat(fakRes?.makingAmount || 0);
+                const realFillPrice = taking > 0 && making > 0 ? parseFloat((taking/making).toFixed(4)) : fakPrice;
+                const realSize = making > 0 ? Math.round(making) : size;
+                const ganancia = (1 - realFillPrice) * realSize;
+                logger.info(`[LIVE] ✅ FAK llenó @ $${realFillPrice.toFixed(4)} | ${realSize} tokens | ganancia estimada: $${ganancia.toFixed(2)}`);
+                return { success: true, fillPrice: realFillPrice, sizeFilled: realSize, status: 'matched' };
+              }
+
+              // Esperar y refrescar el bestAsk para el siguiente intento
+              await new Promise(r => setTimeout(r, FAK_RETRY_MS));
+              const newAsk = await this._getBestAsk(tokenId);
+              if (newAsk != null) {
+                fakPrice = Math.min(MAX_FAK_PRICE, Math.round((newAsk + 0.01) * 100) / 100);
+                logger.info(`[LIVE] 🔄 FAK reintento: bestAsk=$${newAsk.toFixed(2)} → nuevo precio $${fakPrice.toFixed(2)}`);
+              } else {
+                fakPrice = parseFloat(Math.min(MAX_FAK_PRICE, fakPrice + 0.01).toFixed(2));
+              }
+            } catch (fakErr) {
+              logger.warn(`[LIVE] FAK intento ${fakAttempt} error: ${fakErr.message}`);
+              await new Promise(r => setTimeout(r, FAK_RETRY_MS));
+            }
+          }
+
+          logger.warn(`[LIVE] FAK agresivo agotó ${FAK_MAX_ATTEMPTS} intentos → NO_FILL`);
+          return { success: false, error: 'fak_exhausted', noFill: true };
+        }
+
         // TRIPLE ORDER: FAK instantáneo + GTC permanente + GTD hasta cierre del mercado
         const DUAL_ORDER = process.env.DUAL_FILL_ORDER === 'true';
         let dualGtcOrderId = null;
