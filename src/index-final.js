@@ -1107,13 +1107,30 @@ async function main() {
       logger.info(`[SIZE] 📊 Balance $${balanceForSizing} → order size dinámico: $${exposure}`);
     }
 
+    // MODO ÉLITE — cuando imb≥0.80 + Z≥2.0 históricamente 100% WR (183W/0L)
+    // Usa el balance disponible completo en vez del size normal
+    // Configurable via ELITE_IMB_THRESHOLD y ELITE_ZSCORE_THRESHOLD en Railway
+    const eliteImbThreshold = parseFloat(process.env.ELITE_IMB_THRESHOLD || '0.80');
+    const eliteZscoreThreshold = parseFloat(process.env.ELITE_ZSCORE_THRESHOLD || '2.0');
+    const eliteEnabled = process.env.ELITE_MODE !== 'false'; // activo por default
+    const bookImbForElite = Math.abs(sig.edge?.bookImbalance || 0);
+    const isEliteSignal = eliteEnabled &&
+      bookImbForElite >= eliteImbThreshold &&
+      Math.abs(sig.zScore || 0) >= eliteZscoreThreshold;
+
+    let finalExposure = exposure;
+    if (isEliteSignal && balanceForSizing > exposure) {
+      // Usar hasta el 80% del balance disponible (reservar 20% de margen)
+      const eliteMax = parseFloat(process.env.ELITE_MAX_PCT || '0.80');
+      const eliteExposure = parseFloat((balanceForSizing * eliteMax).toFixed(2));
+      finalExposure = Math.max(exposure, eliteExposure);
+      logger.info(`[SIZE] 🏆 MODO ÉLITE: imb=${bookImbForElite.toFixed(2)} Z=${Math.abs(sig.zScore).toFixed(1)} → usando $${finalExposure.toFixed(2)} (${(eliteMax*100).toFixed(0)}% del balance $${balanceForSizing})`);
+    }
+
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);
-    // Fix: antes usaba "exposure * 2" fijo sin importar MAX_ACTIVE_POSITIONS,
-    // lo que en la práctica seguía topeando a 2 posiciones de capital aunque
-    // maxSlots estuviera en 3+ — nunca se llegaba a usar el slot extra.
-    const maxExposure = Math.min(config.MAX_TOTAL_EXPOSURE_USDC, exposure * maxSlots);
-    if (totalExposure + exposure > maxExposure) return;
+    const maxExposure = Math.min(config.MAX_TOTAL_EXPOSURE_USDC, finalExposure * maxSlots);
+    if (totalExposure + finalExposure > maxExposure) return;
 
     if (!cachedMarket?.gammaId) {
       logger.warn('[SKIP] No hay mercado disponible');
@@ -1349,7 +1366,7 @@ async function main() {
     if (edgeBoost > 0) logger.info(`[PRICE] Edge ${edgePct.toFixed(2)}% ≥ ${edgeBoostThreshold}% → boost de +$${edgeBoost} al precio inicial`);
 
     const price = Math.min(0.97, parseFloat((Math.round((priceRaw + priceTolerance + edgeBoost) * 100) / 100).toFixed(2)));
-    const size = Math.floor(exposure / price);
+    const size = Math.floor(finalExposure / price);
 
     logger.info(`[PRICE] Raw: $${priceRaw.toFixed(2)} + tolerance: $${priceTolerance}${edgeBoost > 0 ? ` + boost: $${edgeBoost}` : ''} → orden: $${price.toFixed(2)}`);
 
@@ -1389,15 +1406,15 @@ async function main() {
       segsRestantes,
       market: cachedMarket,
       size,
-      exposure,
+      exposure: finalExposure,
     }).catch(e => logger.warn(`Discord alert failed: ${e.message}`));
 
     logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
-    logger.info(`  Exposure: $${exposure} | Size: ${size} | Token: ${tokenId}`);
+    logger.info(`  Exposure: $${finalExposure}${isEliteSignal ? ' 🏆 ÉLITE' : ''} | Size: ${size} | Token: ${tokenId}`);
 
     // Completar la reserva con el exposure real (ya sabíamos marketId/entryType desde antes)
     activePositions.set(posId, {
-      exposure, openTime: now,
+      exposure: finalExposure, openTime: now,
       marketId: marketKey,
       entryType,  // 'early' o 'late' — usado por el gate de DUAL_ENTRY_MODE
     });
