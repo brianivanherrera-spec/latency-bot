@@ -1484,12 +1484,23 @@ async function main() {
         });
 
         // Fix 2: GTC — verificar fill antes de abrir posición en tracker
-        if (!orderResult.success) {
+        // success=true + status='live' = orden en el libro pero SIN fill todavía
+        // success=true + status='matched' = fill real confirmado
+        const orderStatus = (String(orderResult?.status || '')).toLowerCase();
+        const reallyFilled = orderResult.success && 
+          (orderStatus === 'matched' || orderResult.fillPrice || orderResult.sizeFilled);
+        
+        if (!orderResult.success || !reallyFilled) {
           const reason = orderResult.error === 'gtc_timeout'
             ? `timeout ${config.GTC_TIMEOUT_SECONDS || 60}s sin fill`
+            : orderResult.error === 'ask_too_high'
+            ? `bestAsk demasiado alto — ganancia insuficiente`
+            : orderResult.error === 'fak_exhausted'
+            ? `FAK agotó ${process.env.FAK_MAX_ATTEMPTS || 10} intentos`
+            : orderStatus === 'live'
+            ? `orden en libro pero sin fill confirmado (status=live)`
             : (orderResult.error || 'sin liquidez');
           logger.warn(`[LIVE] ⚠️ Orden no llenada — ${reason}`);
-          // Marcar señal como NO ejecutada en signal logger
           signalLogger.logSignalClose(posId, 'NO_FILL', 0);
           activePositions.delete(posId);
           return;
