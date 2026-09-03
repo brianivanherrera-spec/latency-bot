@@ -493,6 +493,7 @@ async function main() {
   const poly = new PolymarketClient();
   const ws = new BinanceWS();
   const polyWs = new PolymarketWS(); // Fix B: WebSocket en tiempo real
+  poly.setPolyWs(polyWs); // usar bestAsk del WS en tiempo real sin REST call
 
   let cachedMarket = null;
   let nextMarketCache = null;   // FIX A: mercado pre-fetcheado

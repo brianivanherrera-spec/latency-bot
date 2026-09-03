@@ -74,6 +74,7 @@ class PolymarketWS {
     this._subscribedTokens = new Set();
     this._lastPriceByToken = new Map();   // precio combinado (para emitPair)
     this._marketPriceByToken = new Map(); // precio SOLO del canal market/best_bid_ask
+    this._bestAskByToken = new Map();     // best_ask en tiempo real por tokenId — sin REST
     this._lastTradeByToken = loadTradeMap(); // último trade ejecutado por token — persiste reinicios
 
     // ─── Book depth state ─────────────────────────────────────────────────
@@ -104,6 +105,13 @@ class PolymarketWS {
       const b = this._bookByToken.get(k);
       logger.info(`[BOOK-DEBUG] token ${k.slice(0,8)}: bid=${b?.bid} ask=${b?.ask} updatedAt=${b?.updatedAt ? new Date(b.updatedAt).toISOString() : 'n/a'}`);
     });
+  }
+
+  // Retorna el best_ask en tiempo real desde el WS — sin REST call, latencia ~0ms
+  // Se actualiza con cada evento best_bid_ask del canal market
+  getBestAskForToken(tokenId) {
+    if (!tokenId) return null;
+    return this._bestAskByToken.get(tokenId) ?? null;
   }
 
   // Retorna el último precio REAL de transacción para un tokenId
@@ -602,6 +610,8 @@ class PolymarketWS {
     if (bid <= 0 || ask <= 0 || ask > 1) return;
     const mid = (bid + ask) / 2;
     this._lastPriceByToken.set(tokenId, mid);
+    // Guardar best_ask real para uso directo sin REST call
+    this._bestAskByToken.set(tokenId, ask);
     // Precio real de transacción — actualizar _marketPriceByToken
     this._marketPriceByToken.set(tokenId, mid);
 

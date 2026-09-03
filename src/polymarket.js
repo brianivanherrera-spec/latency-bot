@@ -42,6 +42,13 @@ class PolymarketClient {
     this._initialized = false;
     this._orderHistory = [];
     this._depositWalletAddress = null;
+    this._polyWs = null; // referencia al WS para obtener bestAsk en tiempo real
+  }
+
+  // Conectar el WS para obtener bestAsk sin REST call (~0ms latencia)
+  setPolyWs(polyWs) {
+    this._polyWs = polyWs;
+    logger.info('[POLYMARKET] ✅ WS conectado para bestAsk en tiempo real');
   }
 
   async _init() {
@@ -225,11 +232,18 @@ class PolymarketClient {
    * Devuelve null si no hay book.
    */
   async _getBestAsk(tokenId) {
+    // PRIMERO: intentar desde el WS (latencia ~0ms, actualizado en tiempo real)
+    if (this._polyWs && typeof this._polyWs.getBestAskForToken === 'function') {
+      const wsAsk = this._polyWs.getBestAskForToken(tokenId);
+      if (wsAsk != null && wsAsk > 0) {
+        return wsAsk;
+      }
+    }
+    // FALLBACK: REST call si el WS no tiene el precio todavía (~185ms)
     try {
       const book = await this.clobClient.getOrderBook(tokenId);
       const asks = book?.asks || [];
       if (!asks.length) return null;
-      // Polymarket book: asks suelen venir ordenados; tomar el más bajo
       let best = Infinity;
       for (const a of asks) {
         const px = parseFloat(a.price);
