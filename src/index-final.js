@@ -654,12 +654,52 @@ async function main() {
   });
 
   polyWs.onResolved((winner) => {
-    // Solo log — NO nullificar cachedMarket acá.
-    // El poll Gamma / transición de mercado ya maneja el cambio de ventana.
-    // Nullificar + unsubscribe generaba loop: resuelto → null → refetch →
-    // resubscribe → best_bid_ask extremo → "resuelto" otra vez.
     logger.info(`[POLY-WS] Mercado resuelto (${winner}) — esperando transición natural`);
   });
+
+  // MARKET RESOLUTION TRACKER — guarda señales del mercado y muestra resolución al cerrar
+  // Permite saber si el bot tenía razón aunque no haya entrado
+  const marketSignalLog = []; // señales del mercado actual
+  let marketStartTs = null;
+
+  // Guardar señal en el log del mercado actual
+  const logMarketSignal = (sig, skipReason, bookImb) => {
+    marketSignalLog.push({
+      ts: Date.now(),
+      direction: sig.direction,
+      zscore: sig.zScore?.toFixed(2),
+      score: sig.signalScore,
+      bookImb: bookImb?.toFixed(3),
+      skipReason: skipReason || null,
+    });
+  };
+
+  // Mostrar resumen al cerrar el mercado
+  const logMarketResolution = (winner) => {
+    if (marketSignalLog.length === 0) return;
+    const upSignals = marketSignalLog.filter(s => s.direction === 'UP').length;
+    const downSignals = marketSignalLog.filter(s => s.direction === 'DOWN').length;
+    const correctSignals = marketSignalLog.filter(s => s.direction === winner).length;
+    const skippedCorrect = marketSignalLog.filter(s => s.direction === winner && s.skipReason).length;
+    logger.info(`[MARKET-RESOLUTION] ✅ Mercado cerró: ${winner}`);
+    logger.info(`[MARKET-RESOLUTION] Señales UP: ${upSignals} | DOWN: ${downSignals} | Correctas: ${correctSignals}/${marketSignalLog.length}`);
+    if (skippedCorrect > 0) {
+      logger.warn(`[MARKET-RESOLUTION] ⚠️ ${skippedCorrect} señales correctas bloqueadas:`);
+      marketSignalLog.filter(s => s.direction === winner && s.skipReason).forEach(s => {
+        logger.warn(`[MARKET-RESOLUTION]   ${s.direction} Z:${s.zscore} book:${s.bookImb || '-'} → SKIP: ${s.skipReason}`);
+      });
+    }
+    // Limpiar para el próximo mercado
+    marketSignalLog.length = 0;
+  };
+
+  polyWs.onResolved((winner) => {
+    logger.info(`[POLY-WS] Mercado resuelto (${winner}) — esperando transición natural`);
+    if (polyWs.onResolved2) polyWs.onResolved2(winner);
+  });
+
+  // Hook al resolver — mostrar resolución
+  polyWs.onResolved2 = logMarketResolution;
 
   // Conectar WS de Polymarket en paralelo
   polyWs.connect().catch(err => logger.warn(`Polymarket WS no disponible: ${err.message} — usando HTTP polling`));
@@ -1188,31 +1228,51 @@ async function main() {
       if (bookSnap) {
         const yesBid = bookSnap.yes_bid_depth || 0;
         const noBid  = bookSnap.no_bid_depth  || 0;
-        const total  = yesBid + noBid;
-        if (total > 0) {
-          const bookImb = (yesBid - noBid) / total;
+        const yesAsk = bookSnap.yes_ask_depth || 0;
+        const noAsk  = bookSnap.no_ask_depth  || 0;
 
-          // 1) Bloquear si el book contradice activamente la dirección
-          const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
-                             (sig.direction === 'UP'   && bookImb < -bookMinImb);
-          if (contradice) {
-            logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} contradice ${sig.direction} (umbral: ±${bookMinImb}) — mercado ya absorbió el movimiento`);
-            activePositions.delete(posId);
-            return;
-          }
+        // Imbalance mejorado — usa los 4 componentes del book
+        // Presión neta: compradores - vendedores de cada lado
+        // yesPres > 0 = más compradores de YES que vendedores → mercado yendo UP
+        // noPres  > 0 = más compradores de NO que vendedores → mercado yendo DOWN
+        const yesPres = yesBid - yesAsk;
+        const noPres  = noBid  - noAsk;
+        const total   = Math.abs(yesPres) + Math.abs(noPres);
+        // Fallback al método anterior si no hay datos de ask
+        const bookImb = total > 0
+          ? (yesPres - noPres) / (Math.abs(yesPres) + Math.abs(noPres))
+          : (yesBid + noBid > 0 ? (yesBid - noBid) / (yesBid + noBid) : 0);
 
-          // 2) Bloquear si el book es neutro — no confirma la dirección
-          // Datos: trades neutros (|imb| < 0.20) = 50.5% WR, -$25 PnL (101 trades)
-          // Solo entramos si el book confirma activamente: imb alineado con dirección >= umbral
-          const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
-                           (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
-          if (!confirma) {
-            logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} no confirma ${sig.direction} (necesito ${sig.direction === 'UP' ? '>=' : '<='} ${sig.direction === 'UP' ? '' : '-'}${bookMinImb}) — book neutro`);
-            activePositions.delete(posId);
-            return;
-          }
+        logger.debug(`[BOOK-FILTER] yesBid=${yesBid.toFixed(0)} yesAsk=${yesAsk.toFixed(0)} noBid=${noBid.toFixed(0)} noAsk=${noAsk.toFixed(0)} → imb=${bookImb.toFixed(3)}`);
 
-          logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
+        if (total === 0 && yesBid + noBid === 0) {
+          logger.warn(`[SKIP] 📖 BOOK-FILTER: sin datos de book`);
+          activePositions.delete(posId);
+          return;
+        }
+
+        // 1) Bloquear si el book contradice activamente la dirección
+        const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
+                           (sig.direction === 'UP'   && bookImb < -bookMinImb);
+        if (contradice) {
+          logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} contradice ${sig.direction} (umbral: ±${bookMinImb}) — mercado ya absorbió el movimiento`);
+          logMarketSignal(sig, `BOOK contradice (imb=${bookImb.toFixed(3)})`, bookImb);
+          activePositions.delete(posId);
+          return;
+        }
+
+        // 2) Bloquear si el book es neutro — no confirma la dirección
+        const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
+                         (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
+        if (!confirma) {
+          logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} no confirma ${sig.direction} (necesito ${sig.direction === 'UP' ? '>=' : '<='} ${sig.direction === 'UP' ? '' : '-'}${bookMinImb}) — book neutro`);
+          logMarketSignal(sig, `BOOK neutro (imb=${bookImb.toFixed(3)})`, bookImb);
+          activePositions.delete(posId);
+          return;
+        }
+
+        logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction} (yesPres=${yesPres.toFixed(0)} noPres=${noPres.toFixed(0)})`);
+        logMarketSignal(sig, null, bookImb); // señal que pasó el filtro
 
           // 3) BTC_CONFIRM_WEAK_BOOK — cuando el book es débil, exigir que BTC confirme
           // Datos: book débil (<0.50) + BTC contra = 9W/9L = 50% WR, -$16 PnL (18 trades)
@@ -1240,7 +1300,6 @@ async function main() {
               }
             }
           }
-        }
       } else {
         // Sin datos de book de ninguna fuente — loguear pero dejar pasar
         // (no bloquear por falta de datos, solo avisar)
