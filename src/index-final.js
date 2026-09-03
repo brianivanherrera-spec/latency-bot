@@ -1286,7 +1286,7 @@ async function main() {
           return;
         }
 
-        logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction} (yesPres=${yesPres.toFixed(0)} noPres=${noPres.toFixed(0)})`);
+        logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
         logMarketSignal(sig, null, bookImb); // señal que pasó el filtro
 
           // 3) BTC_CONFIRM_WEAK_BOOK — cuando el book es débil, exigir que BTC confirme
