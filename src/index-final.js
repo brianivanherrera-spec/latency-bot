@@ -864,8 +864,12 @@ async function main() {
     if (polyYesNow !== null && polyYesNow !== undefined) {
       const tokenMid = sig.direction === 'UP' ? polyYesNow : (1 - polyYesNow);
       const extremeThreshold = parseFloat(process.env.POLY_EXTREME_THRESHOLD || '0.95');
+      // Bloquear cuando el token que compramos vale demasiado poco (< 5%) o demasiado (> 95%)
+      // tokenMid < 0.05 = token casi sin valor, ganancia mínima con riesgo máximo
+      // tokenMid > 0.95 = token casi en $1, ídem
+      // El umbral bajo es SIMÉTRICO: (1 - extremeThreshold)
       if (tokenMid < (1 - extremeThreshold) || tokenMid > extremeThreshold) {
-        logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real`);
+        logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real (umbral: ${(1-extremeThreshold).toFixed(2)}-${extremeThreshold})`);
         return;
       }
     }
@@ -1274,13 +1278,21 @@ async function main() {
 
     logger.info(`[PRICE] Raw: $${priceRaw.toFixed(2)} + tolerance: $${priceTolerance}${edgeBoost > 0 ? ` + boost: $${edgeBoost}` : ''} → orden: $${price.toFixed(2)}`);
 
-    // MAX_ENTRY_PRICE — bloquear cuando el precio raw ya se movió demasiado
-    // Si priceRaw > umbral, el ask real ya está en $0.90+ y no hay liquidez razonable
-    // Evidencia: todos los NO_FILL en live tenían ask=$0.95-$0.98 con priceRaw=$0.76-$0.81
-    // Default: 0.65 — solo entrar cuando Polymarket todavía está cerca de $0.50
+    // MAX_ENTRY_PRICE — bloquear cuando el precio raw ya se movió demasiado (token caro)
     const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
     if (maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
       logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} > máximo $${maxEntryPrice} — mercado ya se movió, sin liquidez real`);
+      activePositions.delete(posId);
+      return;
+    }
+
+    // MIN_ENTRY_PRICE — bloquear cuando el token que compramos vale muy poco
+    // Ej: UP con YES=$0.14 → comprar YES a $0.14 con pérdida potencial $0.14, ganancia máxima $0.86
+    // pero si el mercado ya fue DOWN, el YES no vale nada — ratio riesgo/recompensa muy malo
+    // Default: 0.20 — no entrar cuando el token ya vale menos de $0.20
+    const minEntryPrice = parseFloat(process.env.MIN_ENTRY_PRICE || '0.20');
+    if (priceRaw < minEntryPrice) {
+      logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} < mínimo $${minEntryPrice} — token casi sin valor, mercado ya decidió en contra`);
       activePositions.delete(posId);
       return;
     }
