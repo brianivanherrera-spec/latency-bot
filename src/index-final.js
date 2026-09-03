@@ -1462,6 +1462,15 @@ async function main() {
     // ✅ Ejecutar orden real (solo en LIVE)
     if (!config.DRY_RUN) {
       try {
+        // Determinar tipo de orden según el número de entrada en este mercado
+        // Entrada 0 (primera) → FAK (instantáneo)
+        // Entrada 1 (segunda) → GTC (queda en el libro)  
+        // Entrada 2+ (tercera+) → GTD (expira al cierre del mercado)
+        const entryIndex = entriesInThisMarket.length;
+        const entryOrderTypes = ['FAK', 'GTC', 'GTD'];
+        const forcedOrderType = entryOrderTypes[Math.min(entryIndex, entryOrderTypes.length - 1)];
+        logger.info(`[LIVE] 📋 Entrada #${entryIndex + 1} → tipo: ${forcedOrderType}`);
+
         const orderResult = await poly.placeLimitOrder({
           marketId: cachedMarket.conditionId,
           tokenId,
@@ -1469,7 +1478,8 @@ async function main() {
           price,
           size,
           marketQuestion: cachedMarket.question,
-          marketEndTs: new Date(cachedMarket.endDate).getTime(), // para el presupuesto de FILL_RETRY
+          marketEndTs: new Date(cachedMarket.endDate).getTime(),
+          forcedOrderType, // nuevo parámetro para forzar el tipo de orden
         });
 
         // Fix 2: GTC — verificar fill antes de abrir posición en tracker

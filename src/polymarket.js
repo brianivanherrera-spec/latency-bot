@@ -242,7 +242,7 @@ class PolymarketClient {
     }
   }
 
-  async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs }) {
+  async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs, forcedOrderType }) {
 
     const rec = { timestamp: new Date().toISOString(), marketId, marketQuestion,
       tokenId, side, price, size, usdcValue: (price * size).toFixed(2), status: 'PENDING' };
@@ -294,21 +294,60 @@ class PolymarketClient {
       let result;
 
       if (isMarket) {
-        // FAK (Fill And Kill) en vez de FOK (Fill Or Kill):
-        // FOK = todo o nada → si no hay suficiente liquidez para el size completo,
-        //       la orden muere entera aunque haya 3 de 5 tokens disponibles.
-        // FAK = llena lo que haya y cancela el resto → con el tracker de fills
-        //       parciales que ya tenemos, 3 de 5 tokens llenados es útil: el
-        //       retry-loop pide los 2 restantes. Mismo comportamiento desde
-        //       la API pero con más fills aprovechables en libros delgados.
-        // Confirmado disponible en clob-client-v2 v1.0.6: OrderType.FAK
-        //
-        // USE_FAK=true  → activa FAK (default: false para no cambiar comportamiento
-        //                  sin validación explícita; activar en Railway cuando listo)
         const useFak = process.env.USE_FAK === 'true';
         const firstOrderType = useFak ? OrderType.FAK : OrderType.FOK;
         const maxAttempts = parseInt(process.env.MARKET_RETRY_ATTEMPTS || '3');
         const tick = 0.01;
+
+        // Si viene forcedOrderType (FAK/GTC/GTD), ir directo a ese camino
+        // sin mandar TRIPLE ORDER — cada entrada usa un tipo diferente
+        if (forcedOrderType && forcedOrderType !== 'FAK') {
+          const worstPriceForced = await (async () => {
+            const ask = await this._getBestAsk(tokenId);
+            if (ask == null) return price;
+            const MAX_PRICE_LIMIT_F = parseFloat(process.env.MAX_PRICE_LIMIT || '0.97');
+            const MAX_GTC_ENTRY_ASK_F = parseFloat(process.env.MAX_GTC_ENTRY_ASK || '0.85');
+            if (ask > MAX_GTC_ENTRY_ASK_F) {
+              logger.warn(`[LIVE] ❌ ${forcedOrderType}: bestAsk=$${ask.toFixed(2)} > MAX_GTC_ENTRY_ASK=$${MAX_GTC_ENTRY_ASK_F} — NO_FILL`);
+              return null;
+            }
+            return Math.min(MAX_PRICE_LIMIT_F, Math.round((ask + tick) * 100) / 100);
+          })();
+
+          if (worstPriceForced === null) return { success: false, error: 'ask_too_high', noFill: true };
+
+          if (forcedOrderType === 'GTC') {
+            logger.info(`[LIVE] 📋 Entrada GTC directa @ $${worstPriceForced.toFixed(2)}`);
+            return await this._placeGtcWithRetry({ rec, tokenId, side, price: worstPriceForced, size, marketEndTs });
+          }
+
+          if (forcedOrderType === 'GTD') {
+            const minExpiry = Math.floor((Date.now() + 181 * 1000) / 1000);
+            const marketExpiry = marketEndTs ? Math.floor(marketEndTs / 1000) : minExpiry;
+            const gtdExpiry = Math.max(minExpiry, marketExpiry);
+            logger.info(`[LIVE] 📋 Entrada GTD directa @ $${worstPriceForced.toFixed(2)} (exp=${gtdExpiry})`);
+            try {
+              const gtdOrder = await this.clobClient.createAndPostOrder(
+                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
+                  price: worstPriceForced, size, orderType: OrderType.GTD, expiration: gtdExpiry },
+                { tickSize: '0.01', negRisk: false }
+              );
+              const gtdStatus = (String(gtdOrder?.status || '')).toLowerCase();
+              const gtdFilled = gtdStatus === 'matched';
+              logger.info(`[LIVE] GTD response: status=${gtdStatus} filled=${gtdFilled}`);
+              if (gtdFilled) {
+                const taking = parseFloat(gtdOrder?.takingAmount || 0);
+                const making = parseFloat(gtdOrder?.makingAmount || 0);
+                const fillPrice = taking > 0 && making > 0 ? parseFloat((taking/making).toFixed(4)) : worstPriceForced;
+                return { success: true, fillPrice, sizeFilled: making > 0 ? Math.round(making) : size, status: 'matched' };
+              }
+              return { success: true, status: 'live', orderID: gtdOrder?.orderID, noFill: false };
+            } catch (gtdErr) {
+              logger.warn(`[LIVE] GTD error: ${gtdErr.message}`);
+              return { success: false, error: gtdErr.message };
+            }
+          }
+        }
 
         // PRECIO REAL: usar bestAsk directamente (no priceRaw + tolerance fijo)
         // bestAsk + 1 tick = cruzar el spread real garantizado
