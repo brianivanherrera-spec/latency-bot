@@ -1250,6 +1250,12 @@ async function main() {
         if (bookSnap._instantImb != null) {
           bookImb = bookSnap._instantImb;
         } else {
+          // Verificar que hay datos antes de calcular
+          if (yesBid + noBid === 0 && yesAsk + noAsk === 0) {
+            logger.warn(`[SKIP] 📖 BOOK-FILTER: sin datos de book`);
+            activePositions.delete(posId);
+            return;
+          }
           // Imbalance mejorado con 4 componentes del snapshot
           const yesPres = yesBid - yesAsk;
           const noPres  = noBid  - noAsk;
@@ -1258,12 +1264,6 @@ async function main() {
             ? (yesPres - noPres) / (Math.abs(yesPres) + Math.abs(noPres))
             : (yesBid + noBid > 0 ? (yesBid - noBid) / (yesBid + noBid) : 0);
           logger.debug(`[BOOK-FILTER] yesBid=${yesBid.toFixed(0)} yesAsk=${yesAsk.toFixed(0)} noBid=${noBid.toFixed(0)} noAsk=${noAsk.toFixed(0)} → imb=${bookImb.toFixed(3)}`);
-        }
-
-        if (total === 0 && yesBid + noBid === 0) {
-          logger.warn(`[SKIP] 📖 BOOK-FILTER: sin datos de book`);
-          activePositions.delete(posId);
-          return;
         }
 
         // 1) Bloquear si el book contradice activamente la dirección
