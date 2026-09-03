@@ -208,13 +208,21 @@ class PolymarketWS {
     const noBook  = this._bookByToken.get(this._noTokenId)  || null;
     if (!yesBook && !noBook) return null;
 
-    const yesBidDepth = yesBook?.bid ?? 0;
-    const yesAskDepth = yesBook?.ask ?? 0;
-    const noBidDepth  = noBook?.bid  ?? 0;
-    const noAskDepth  = noBook?.ask  ?? 0;
+    // Usar profundidad del snapshot si existe, sino usar bestBid/bestAsk del best_bid_ask
+    // best_bid_ask llega en tiempo real (<100ms) vs snapshot que llega cada 2-5s
+    const yesBidDepth = yesBook?.bid ?? yesBook?.bestBid ?? 0;
+    const yesAskDepth = yesBook?.ask ?? yesBook?.bestAsk ?? 0;
+    const noBidDepth  = noBook?.bid  ?? noBook?.bestBid  ?? 0;
+    const noAskDepth  = noBook?.ask  ?? noBook?.bestAsk  ?? 0;
 
-    // Imbalance de volumen: (YES_bid - NO_bid) / (YES_bid + NO_bid)
-    // Positivo = más gente comprando YES, negativo = más gente comprando NO
+    // Indicar si viene de snapshot real (profundidad) o de best_bid_ask (tiempo real)
+    const hasDepth = (yesBook?.bid != null) || (noBook?.bid != null);
+    if (!hasDepth) {
+      // Imbalance desde best_bid_ask: YES_bid vs NO_bid
+      // Con solo bid/ask top, usar bid como proxy de profundidad
+      // Un bestBid alto en YES = más compradores de YES = imbalance positivo
+    }
+
     const totalBid = yesBidDepth + noBidDepth;
     const volImbalance = totalBid > 0
       ? parseFloat(((yesBidDepth - noBidDepth) / totalBid).toFixed(3))
@@ -225,8 +233,29 @@ class PolymarketWS {
       yes_ask_depth: yesAskDepth,
       no_bid_depth:  noBidDepth,
       no_ask_depth:  noAskDepth,
-      vol_imbalance: volImbalance,  // -1 = todo en NO, +1 = todo en YES
+      vol_imbalance: volImbalance,
+      from_best_bid_ask: !hasDepth, // flag para saber la fuente
     };
+  }
+
+  // Imbalance instantáneo desde best_bid_ask — latencia <100ms vs snapshot 2-5s
+  // Usa el precio del mejor bid de YES/NO como proxy del sentimiento del mercado
+  // YES_bid alto = más compradores de YES = mercado yendo UP
+  // Menos preciso que la profundidad pero MUCHO más rápido
+  getInstantImbalance() {
+    const yesBook = this._bookByToken.get(this._yesTokenId);
+    const noBook  = this._bookByToken.get(this._noTokenId);
+    if (!yesBook?.bestBid && !noBook?.bestBid) return null;
+
+    const yesBid = yesBook?.bestBid ?? 0.50;
+    const noBid  = noBook?.bestBid  ?? 0.50;
+
+    // Con mercado binario: YES + NO = 1 siempre
+    // Si YES_bid = 0.70, implícitamente NO_bid ≈ 0.30
+    // Imbalance = (YES_bid - NO_bid) / (YES_bid + NO_bid)
+    const total = yesBid + noBid;
+    if (total <= 0) return null;
+    return parseFloat(((yesBid - noBid) / total).toFixed(3));
   }
 
   async connect() {

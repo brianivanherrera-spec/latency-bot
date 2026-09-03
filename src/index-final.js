@@ -1214,14 +1214,28 @@ async function main() {
 
       // Fallback HTTP si el WS no tiene el book todavía
       if (!bookSnap && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
-        const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
-        if (depth) {
-          const total = depth.yesBid + depth.noBid;
-          bookSnap = total > 0 ? {
-            yes_bid_depth: depth.yesBid,
-            no_bid_depth:  depth.noBid,
-          } : null;
-          if (bookSnap) logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid}`);
+        // Primero intentar el imbalance instantáneo del WS (best_bid_ask, <100ms)
+        const instantImb = polyWs.getInstantImbalance?.();
+        if (instantImb != null) {
+          logger.info(`[BOOK-FILTER] ⚡ Imbalance instantáneo (best_bid_ask): ${instantImb.toFixed(3)}`);
+          bookSnap = {
+            yes_bid_depth: 1, no_bid_depth: 1, // valores proxy
+            yes_ask_depth: 0, no_ask_depth: 0,
+            _instantImb: instantImb, // pasar el imbalance ya calculado
+          };
+        } else {
+          // Último recurso: REST call (~185ms)
+          const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+          if (depth) {
+            const total = depth.yesBid + depth.noBid;
+            bookSnap = total > 0 ? {
+              yes_bid_depth: depth.yesBid,
+              no_bid_depth:  depth.noBid,
+              yes_ask_depth: 0,
+              no_ask_depth: 0,
+            } : null;
+            if (bookSnap) logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid}`);
+          }
         }
       }
 
@@ -1231,19 +1245,20 @@ async function main() {
         const yesAsk = bookSnap.yes_ask_depth || 0;
         const noAsk  = bookSnap.no_ask_depth  || 0;
 
-        // Imbalance mejorado — usa los 4 componentes del book
-        // Presión neta: compradores - vendedores de cada lado
-        // yesPres > 0 = más compradores de YES que vendedores → mercado yendo UP
-        // noPres  > 0 = más compradores de NO que vendedores → mercado yendo DOWN
-        const yesPres = yesBid - yesAsk;
-        const noPres  = noBid  - noAsk;
-        const total   = Math.abs(yesPres) + Math.abs(noPres);
-        // Fallback al método anterior si no hay datos de ask
-        const bookImb = total > 0
-          ? (yesPres - noPres) / (Math.abs(yesPres) + Math.abs(noPres))
-          : (yesBid + noBid > 0 ? (yesBid - noBid) / (yesBid + noBid) : 0);
-
-        logger.debug(`[BOOK-FILTER] yesBid=${yesBid.toFixed(0)} yesAsk=${yesAsk.toFixed(0)} noBid=${noBid.toFixed(0)} noAsk=${noAsk.toFixed(0)} → imb=${bookImb.toFixed(3)}`);
+        // Si viene del imbalance instantáneo (best_bid_ask), usarlo directamente
+        let bookImb;
+        if (bookSnap._instantImb != null) {
+          bookImb = bookSnap._instantImb;
+        } else {
+          // Imbalance mejorado con 4 componentes del snapshot
+          const yesPres = yesBid - yesAsk;
+          const noPres  = noBid  - noAsk;
+          const total   = Math.abs(yesPres) + Math.abs(noPres);
+          bookImb = total > 0
+            ? (yesPres - noPres) / (Math.abs(yesPres) + Math.abs(noPres))
+            : (yesBid + noBid > 0 ? (yesBid - noBid) / (yesBid + noBid) : 0);
+          logger.debug(`[BOOK-FILTER] yesBid=${yesBid.toFixed(0)} yesAsk=${yesAsk.toFixed(0)} noBid=${noBid.toFixed(0)} noAsk=${noAsk.toFixed(0)} → imb=${bookImb.toFixed(3)}`);
+        }
 
         if (total === 0 && yesBid + noBid === 0) {
           logger.warn(`[SKIP] 📖 BOOK-FILTER: sin datos de book`);
