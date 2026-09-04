@@ -1349,48 +1349,50 @@ async function main() {
     // Para DOWN: BUY NO tokens   (comprar NO esperando que suba a $1 cuando BTC baja)
     // NUNCA SELL — el bot no tiene tokens previos para vender
     const side = 'BUY';
-    const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
+    const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo; // solo para filtros y logs
 
-    // PRICE_TOLERANCE: acepta fills hasta N ticks arriba del precio detectado
-    // Cubre el movimiento de precio entre detección y ejecución (HTTP polling 0-2s)
-    // Default 0.02 = 2 ticks — sube fill rate de ~74% a ~90% con mínimo impacto en edge
-    const priceTolerance = parseFloat(process.env.PRICE_TOLERANCE || '0.02');
+    // PRECIO DE ORDEN = siempre del book real (bestAsk del WS, 0ms latencia)
+    // NO usar priceRaw + tolerance — ese precio fantasma causa todos los NO_FILL
+    // Regla: orderPrice = bestAsk + 1 tick, solo si bestAsk ≤ MAX_GTC_ENTRY_ASK
+    const MAX_ORDER_PRICE = parseFloat(process.env.MAX_GTC_ENTRY_ASK || process.env.MAX_ENTRY_PRICE || '0.85');
+    const tick = 0.01;
+    const round2 = v => parseFloat((Math.round(v * 100) / 100).toFixed(2));
 
-    // EDGE_BOOST: cuando el edge calculado supera un umbral, arrancar el primer
-    // intento con 1-2 ticks adicionales de agresividad. La lógica: una señal
-    // con edge ≥ 2% tiene tanta convicción que vale sacrificar un centavo más
-    // para asegurar el fill en vez de perder la oportunidad por falta de liquidez.
-    // Basado en evidencia: los fills que tardan >90s pierden sistemáticamente
-    // (04/08) — arrancar más agresivo en señales fuertes evita esos llenados tardíos.
-    //   EDGE_BOOST_THRESHOLD=2.0   → edge en % desde donde se activa
-    //   EDGE_BOOST_TICKS=0.01      → cuánto extra se suma al precio (1 tick = $0.01)
-    const edgeBoostThreshold = parseFloat(process.env.EDGE_BOOST_THRESHOLD || '0');
-    const edgeBoostTicks = parseFloat(process.env.EDGE_BOOST_TICKS || '0.01');
-    const edgePct = sig.edge?.edgePct || 0;
-    const edgeBoost = (edgeBoostThreshold > 0 && edgePct >= edgeBoostThreshold) ? edgeBoostTicks : 0;
-    if (edgeBoost > 0) logger.info(`[PRICE] Edge ${edgePct.toFixed(2)}% ≥ ${edgeBoostThreshold}% → boost de +$${edgeBoost} al precio inicial`);
+    const bestAskWS = polyWs.getBestAskForToken?.(tokenId) ?? null;
 
-    const price = Math.min(0.97, parseFloat((Math.round((priceRaw + priceTolerance + edgeBoost) * 100) / 100).toFixed(2)));
-    const size = Math.floor(finalExposure / price);
-
-    logger.info(`[PRICE] Raw: $${priceRaw.toFixed(2)} + tolerance: $${priceTolerance}${edgeBoost > 0 ? ` + boost: $${edgeBoost}` : ''} → orden: $${price.toFixed(2)}`);
-
-    // MAX_ENTRY_PRICE — bloquear cuando el precio raw ya se movió demasiado (token caro)
-    const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
-    if (maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
-      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} > máximo $${maxEntryPrice} — mercado ya se movió, sin liquidez real`);
+    if (bestAskWS == null) {
+      logger.warn(`[SKIP] 🚫 bestAsk null — sin book WS para token ${tokenId?.slice(0,12)} → no operar`);
       activePositions.delete(posId);
       return;
     }
 
-    // MIN_ENTRY_PRICE — bloquear cuando el token que compramos vale muy poco
-    // Ej: UP con YES=$0.14 → comprar YES a $0.14 con pérdida potencial $0.14, ganancia máxima $0.86
-    // pero si el mercado ya fue DOWN, el YES no vale nada — ratio riesgo/recompensa muy malo
-    // Default: 0.20 — no entrar cuando el token ya vale menos de $0.20
+    const orderPrice = round2(Math.min(0.97, bestAskWS + tick));
+
+    if (orderPrice > MAX_ORDER_PRICE) {
+      logger.warn(`[SKIP] 🚫 ask demasiado caro: bestAsk=$${bestAskWS.toFixed(2)} orderPx=$${orderPrice} > MAX=$${MAX_ORDER_PRICE} → NO_FILL conceptual`);
+      activePositions.delete(posId);
+      return;
+    }
+
+    logger.info(`[PRICE] bestAsk=$${bestAskWS.toFixed(2)} → orderPrice=$${orderPrice} (MAX=${MAX_ORDER_PRICE}) | priceRaw=$${priceRaw?.toFixed(2)} (señal, solo ref)`);
+
+    const price = orderPrice;
+    const size = Math.floor(finalExposure / price);
+
+    // MAX_ENTRY_PRICE — filtro sobre priceRaw de la señal (no del order price)
+    // Detecta cuando la señal ya viene de un precio extremo aunque el book esté bajo
+    const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
+    if (maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
+      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} > máximo $${maxEntryPrice} — señal vieja`);
+      activePositions.delete(posId);
+      return;
+    }
+
+    // MIN_ENTRY_PRICE — no entrar cuando el token ya perdió casi todo su valor
     const minEntryPrice = parseFloat(process.env.MIN_ENTRY_PRICE || '0.20');
     if (priceRaw < minEntryPrice) {
-      logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} < mínimo $${minEntryPrice} — token casi sin valor, mercado ya decidió en contra`);
+      logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} < mínimo $${minEntryPrice} — token casi sin valor`);
       activePositions.delete(posId);
       return;
     }
