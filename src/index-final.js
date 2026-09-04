@@ -1109,11 +1109,11 @@ async function main() {
 
     // MODO ÉLITE — cuando imb≥0.80 + Z≥2.0 históricamente 100% WR (183W/0L)
     // Usa el balance disponible completo en vez del size normal
-    // Configurable via ELITE_IMB_THRESHOLD y ELITE_ZSCORE_THRESHOLD en Railway
     const eliteImbThreshold = parseFloat(process.env.ELITE_IMB_THRESHOLD || '0.80');
     const eliteZscoreThreshold = parseFloat(process.env.ELITE_ZSCORE_THRESHOLD || '2.0');
-    const eliteEnabled = process.env.ELITE_MODE !== 'false'; // activo por default
-    const bookImbForElite = Math.abs(sig.edge?.bookImbalance || 0);
+    const eliteEnabled = process.env.ELITE_MODE !== 'false';
+    // sig.imbalance es el campo correcto — sig.edge no tiene bookImbalance
+    const bookImbForElite = Math.abs(sig.imbalance || 0);
     const isEliteSignal = eliteEnabled &&
       bookImbForElite >= eliteImbThreshold &&
       Math.abs(sig.zScore || 0) >= eliteZscoreThreshold;
