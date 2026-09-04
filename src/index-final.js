@@ -1227,6 +1227,15 @@ async function main() {
       marketId: marketKey,
       entryType,
     });
+    // Cleanup automático: si en 2 minutos el slot sigue con exposure=0
+    // (nunca llegó al fill) → es un zombie → liberarlo
+    setTimeout(() => {
+      const slot = activePositions.get(posId);
+      if (slot && slot.exposure === 0) {
+        logger.warn(`[CLEANUP] 🧹 Slot zombie ${posId} sin fill en 2min — liberando`);
+        activePositions.delete(posId);
+      }
+    }, 2 * 60 * 1000);
 
     logger.info(`[TIMING] ✅ ${segsRestantes}s restantes — OK para entrar (tipo: ${entryType})`);
     logger.info(`  [IND] Imbalance:${sig.imbalance?.toFixed(2)} Spread:${sig.spreadRatio?.toFixed(2)}x Ticks/10s:${sig.tickFreq} RSI:${sig.rsi?.toFixed(1)} Score:${sig.signalScore}`);
