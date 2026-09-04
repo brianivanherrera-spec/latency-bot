@@ -113,10 +113,13 @@ class PolymarketWS {
 
   // Síncrono, 0 I/O — solo Map.get
   // Si está stale (> maxAgeMs) → null → SKIP en el handler de señal, NO REST de emergencia
-  getBestAskForToken(tokenId, maxAgeMs = 10000) {
+  getBestAskForToken(tokenId, maxAgeMs = 3000) {
     const row = this._topOfBook.get(tokenId);
     if (!row || row.bestAsk == null) return null;
     if (Date.now() - row.updatedAt > maxAgeMs) return null; // stale → SKIP
+    // Si el ask viene del bootstrap y es ≥0.95, marcar como "sin top usable"
+    // para no anclar órdenes a un precio de mercado ya decidido
+    if (row.bestAsk >= 0.95 && row.bestBidSize == null && row.bestAskSize == null) return null;
     return row.bestAsk;
   }
 
@@ -669,15 +672,13 @@ class PolymarketWS {
       let mid = null;
       if (!isNaN(bid) && !isNaN(ask) && bid > 0 && ask > 0) {
         mid = (bid + ask) / 2;
-        // Actualizar topOfBook desde price_change — fallback cuando best_bid_ask se salta
-        const existing = this._topOfBook.get(tokenId);
-        if (!existing || Date.now() - existing.updatedAt > 500) {
-          this._topOfBook.set(tokenId, {
-            bestBid: bid, bestAsk: ask,
-            bestBidSize: null, bestAskSize: null,
-            updatedAt: Date.now(),
-          });
-        }
+        // Actualizar topOfBook SIEMPRE desde price_change — es el canal más frecuente
+        // No usar guard de 500ms: price_change es el feed de deltas, siempre es más nuevo
+        this._topOfBook.set(tokenId, {
+          bestBid: bid, bestAsk: ask,
+          bestBidSize: null, bestAskSize: null,
+          updatedAt: Date.now(),
+        });
       } else {
         const p = parseFloat(ch.price);
         if (!isNaN(p) && p > 0) mid = p;
