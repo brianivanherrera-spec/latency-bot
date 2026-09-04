@@ -75,6 +75,10 @@ class PolymarketWS {
     this._lastPriceByToken = new Map();   // precio combinado (para emitPair)
     this._marketPriceByToken = new Map(); // precio SOLO del canal market/best_bid_ask
     this._bestAskByToken = new Map();     // best_ask en tiempo real por tokenId — sin REST
+
+    // LocalOrderBook: top of book por tokenId, actualizado en cada tick del WS
+    // Estructura: tokenId -> { bestBid, bestAsk, bestBidSize, bestAskSize, updatedAt }
+    this._topOfBook = new Map();
     this._lastTradeByToken = loadTradeMap(); // último trade ejecutado por token — persiste reinicios
 
     // ─── Book depth state ─────────────────────────────────────────────────
@@ -107,11 +111,20 @@ class PolymarketWS {
     });
   }
 
-  // Retorna el best_ask en tiempo real desde el WS — sin REST call, latencia ~0ms
-  // Se actualiza con cada evento best_bid_ask del canal market
-  getBestAskForToken(tokenId) {
-    if (!tokenId) return null;
-    return this._bestAskByToken.get(tokenId) ?? null;
+  // Síncrono, 0 I/O — solo Map.get
+  // Si está stale (> maxAgeMs) → null → SKIP en el handler de señal, NO REST de emergencia
+  getBestAskForToken(tokenId, maxAgeMs = 800) {
+    const row = this._topOfBook.get(tokenId);
+    if (!row || row.bestAsk == null) return null;
+    if (Date.now() - row.updatedAt > maxAgeMs) return null; // stale → SKIP
+    return row.bestAsk;
+  }
+
+  // Síncrono, 0 I/O — tamaño disponible en el best ask
+  getBestAskSize(tokenId, maxAgeMs = 800) {
+    const row = this._topOfBook.get(tokenId);
+    if (!row || Date.now() - row.updatedAt > maxAgeMs) return null;
+    return row.bestAskSize;
   }
 
   // Retorna el último precio REAL de transacción para un tokenId
@@ -405,6 +418,8 @@ class PolymarketWS {
       this._lastPriceByToken.clear();
       this._marketPriceByToken.clear();
       this._bookByToken.clear();
+      this._topOfBook.clear();
+      this._bestAskByToken.clear();
       // NO limpiar _lastTradeByToken — los trades del mercado anterior
       // expiran solos (ventana de 30s). Limpiarlos aquí deja en null las
       // primeras señales del mercado nuevo, que son las más valiosas.
@@ -427,6 +442,8 @@ class PolymarketWS {
     this._lastPriceByToken.clear();
     this._marketPriceByToken.clear();
     this._bookByToken.clear();
+      this._topOfBook.clear();
+      this._bestAskByToken.clear();
     // NO limpiar _lastTradeByToken — igual que en subscribe(),
     // los trades expiran solos en 30s. Limpiarlos acá deja en null
     // las señales del mercado siguiente.
@@ -641,6 +658,14 @@ class PolymarketWS {
     this._lastPriceByToken.set(tokenId, mid);
     // Guardar best_ask real para uso directo sin REST call
     this._bestAskByToken.set(tokenId, ask);
+    // LocalOrderBook — top of book síncrono, 0 I/O
+    this._topOfBook.set(tokenId, {
+      bestBid: bid,
+      bestAsk: ask,
+      bestBidSize: msg.bid_size ? parseFloat(msg.bid_size) : null,
+      bestAskSize: msg.ask_size ? parseFloat(msg.ask_size) : null,
+      updatedAt: Date.now(),
+    });
     // Precio real de transacción — actualizar _marketPriceByToken
     this._marketPriceByToken.set(tokenId, mid);
 

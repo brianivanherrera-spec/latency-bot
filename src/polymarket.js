@@ -232,28 +232,12 @@ class PolymarketClient {
    * Devuelve null si no hay book.
    */
   async _getBestAsk(tokenId) {
-    // PRIMERO: intentar desde el WS (latencia ~0ms, actualizado en tiempo real)
+    // SIEMPRE desde el WS (síncrono, 0 I/O, < 1ms)
+    // Si null o stale → null. NUNCA REST en el hot path de la señal.
     if (this._polyWs && typeof this._polyWs.getBestAskForToken === 'function') {
-      const wsAsk = this._polyWs.getBestAskForToken(tokenId);
-      if (wsAsk != null && wsAsk > 0) {
-        return wsAsk;
-      }
+      return this._polyWs.getBestAskForToken(tokenId);
     }
-    // FALLBACK: REST call si el WS no tiene el precio todavía (~185ms)
-    try {
-      const book = await this.clobClient.getOrderBook(tokenId);
-      const asks = book?.asks || [];
-      if (!asks.length) return null;
-      let best = Infinity;
-      for (const a of asks) {
-        const px = parseFloat(a.price);
-        if (!isNaN(px) && px > 0 && px < best) best = px;
-      }
-      return best === Infinity ? null : best;
-    } catch (e) {
-      logger.warn(`[BOOK] getOrderBook falló: ${e.message}`);
-      return null;
-    }
+    return null;
   }
 
   async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs, forcedOrderType }) {
