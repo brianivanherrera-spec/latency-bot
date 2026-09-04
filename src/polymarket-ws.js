@@ -607,6 +607,19 @@ class PolymarketWS {
       updatedAt: Date.now(),
     });
 
+    // Alimentar _topOfBook desde el snapshot — más completo que best_bid_ask
+    // Solo actualizar si el snapshot tiene datos válidos y es más reciente
+    if (!isNaN(bestBid) && !isNaN(bestAsk) && bestBid > 0 && bestAsk > 0) {
+      const bestBidSize = parseSize(bids[0]) || null;
+      const bestAskSize = parseSize(asks[0]) || null;
+      const existing = this._topOfBook.get(tokenId);
+      // El snapshot es más autoritativo — actualizar siempre
+      this._topOfBook.set(tokenId, {
+        bestBid, bestAsk, bestBidSize, bestAskSize,
+        updatedAt: Date.now(),
+      });
+    }
+
     // Loguear solo la primera vez que recibimos depth real para este token
     if (!hadDepth && (bidDepth > 0 || askDepth > 0)) {
       const isYes = tokenId === this._yesTokenId;
@@ -625,8 +638,18 @@ class PolymarketWS {
       const bid = parseFloat(ch.best_bid);
       const ask = parseFloat(ch.best_ask);
       let mid = null;
-      if (!isNaN(bid) && !isNaN(ask) && bid > 0 && ask > 0) mid = (bid + ask) / 2;
-      else {
+      if (!isNaN(bid) && !isNaN(ask) && bid > 0 && ask > 0) {
+        mid = (bid + ask) / 2;
+        // Actualizar topOfBook desde price_change — fallback cuando best_bid_ask se salta
+        const existing = this._topOfBook.get(tokenId);
+        if (!existing || Date.now() - existing.updatedAt > 500) {
+          this._topOfBook.set(tokenId, {
+            bestBid: bid, bestAsk: ask,
+            bestBidSize: null, bestAskSize: null,
+            updatedAt: Date.now(),
+          });
+        }
+      } else {
         const p = parseFloat(ch.price);
         if (!isNaN(p) && p > 0) mid = p;
       }
