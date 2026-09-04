@@ -1129,8 +1129,14 @@ async function main() {
 
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);
-    const maxExposure = Math.min(config.MAX_TOTAL_EXPOSURE_USDC, finalExposure * maxSlots);
-    if (totalExposure + finalExposure > maxExposure) return;
+    // maxExposure: usar MAX_TOTAL_EXPOSURE_USDC como tope absoluto
+    // No limitar por finalExposure × maxSlots porque bloquea silenciosamente
+    // cuando el size dinámico es pequeño (ej: $3 × 3 = $9 bloquea la 3ra entrada)
+    const maxExposure = parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '100');
+    if (totalExposure + finalExposure > maxExposure) {
+      logger.warn(`[SKIP] 💰 Exposición total $${(totalExposure + finalExposure).toFixed(2)} supera máximo $${maxExposure} — esperando que cierren posiciones`);
+      return;
+    }
 
     if (!cachedMarket?.gammaId) {
       logger.warn('[SKIP] No hay mercado disponible');
