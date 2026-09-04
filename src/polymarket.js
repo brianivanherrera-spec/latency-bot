@@ -425,21 +425,15 @@ class PolymarketClient {
           return { success: false, error: 'fak_exhausted', noFill: true };
         }
 
-        // TRIPLE ORDER: FAK instantáneo + GTC permanente + GTD hasta cierre del mercado
+        // DUAL ORDER: FAK instantáneo + GTC como backup
+        // La primera que llena cancela la otra — una sola posición por señal
         const DUAL_ORDER = process.env.DUAL_FILL_ORDER === 'true';
         let dualGtcOrderId = null;
-        let tripleGtdOrderId = null;
 
         if (DUAL_ORDER && hasPostOrders) {
-          // GTD expiry: mínimo 181s en el futuro (Polymarket requiere ≥180s)
-          // Si el mercado cierra en menos de 181s, usar 181s desde ahora
-          const minExpiry = Math.floor((Date.now() + 181 * 1000) / 1000);
-          const marketExpiry = marketEndTs ? Math.floor(marketEndTs / 1000) : minExpiry;
-          const gtdExpiry = Math.max(minExpiry, marketExpiry);
-          const useGtd = gtdExpiry > minExpiry - 10; // siempre usar GTD con expiry válido
-          logger.info(`[LIVE] 🔀 TRIPLE ORDER: FAK + GTC${useGtd ? ' + GTD' : ''} @ $${worstPrice} (gtdExpiry=${gtdExpiry})`);
+          logger.info(`[LIVE] 🔀 DUAL ORDER: FAK + GTC @ $${worstPrice}`);
           try {
-            const [fakOrder, gtcOrder, gtdOrder] = await Promise.all([
+            const [fakOrder, gtcOrder] = await Promise.all([
               this.clobClient.createOrder(
                 { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
                   price: worstPrice, size, orderType: firstOrderType },
@@ -450,74 +444,62 @@ class PolymarketClient {
                   price: worstPrice, size, orderType: OrderType.GTC },
                 { tickSize: '0.01', negRisk: false }
               ),
-              this.clobClient.createOrder(
-                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                  price: worstPrice, size, orderType: OrderType.GTD,
-                  expiration: gtdExpiry },
-                { tickSize: '0.01', negRisk: false }
-              ),
             ]);
+
             const batchResult = await this.clobClient.postOrders(
               [{ order: fakOrder, orderType: firstOrderType },
-               { order: gtcOrder, orderType: OrderType.GTC },
-               { order: gtdOrder, orderType: OrderType.GTD }]
+               { order: gtcOrder, orderType: OrderType.GTC }]
             );
-            logger.info(`[LIVE] TRIPLE ORDER response: ${JSON.stringify(batchResult)}`);
+            logger.info(`[LIVE] DUAL ORDER response: ${JSON.stringify(batchResult)}`);
 
-            // Detectar "trading is disabled" — cancelar todo y NO_FILL inmediato
-            const batchError = batchResult?.error || (Array.isArray(batchResult) && batchResult[0]?.error) || '';
-            const tradingDisabled = batchError.toLowerCase().includes('trading is disabled') ||
-              (Array.isArray(batchResult) && batchResult.some(r => (r?.error || '').includes('trading is disabled')));
-            if (tradingDisabled) {
-              logger.warn(`[LIVE] ⛔ TRIPLE ORDER: "trading is disabled" — Polymarket en mantenimiento → NO_FILL inmediato (no reintentar)`);
+            // Detectar trading disabled
+            const batchError = Array.isArray(batchResult) ? batchResult[0]?.error : batchResult?.error;
+            if ((batchError || '').includes('trading is disabled')) {
+              logger.warn(`[LIVE] ⛔ DUAL ORDER: trading disabled → NO_FILL inmediato`);
               return { success: false, error: 'trading_disabled', noFill: true };
             }
+
+            await new Promise(r => setTimeout(r, 500));
+
             const results = Array.isArray(batchResult) ? batchResult : [batchResult];
-            const fakRes = results[0]; const gtcRes = results[1]; const gtdRes = results[2];
+            const fakRes = results[0]; const gtcRes = results[1];
             const fakFilled = (String(fakRes?.status || '')).toLowerCase() === 'matched';
-            dualGtcOrderId = gtcRes?.orderID || gtcRes?.orderId;
-            tripleGtdOrderId = gtdRes?.orderID || gtdRes?.orderId;
             const gtcFilled = (String(gtcRes?.status || '')).toLowerCase() === 'matched';
-            const gtdFilled = (String(gtdRes?.status || '')).toLowerCase() === 'matched';
+            dualGtcOrderId = gtcRes?.orderID || gtcRes?.orderId;
 
-            if (fakFilled || gtcFilled || gtdFilled) {
-              // Calcular fillPrice real desde takingAmount/makingAmount
-              const takingAmt = parseFloat(fakRes?.takingAmount || gtcRes?.takingAmount || 0);
-              const makingAmt = parseFloat(fakRes?.makingAmount || gtcRes?.makingAmount || 0);
-              const realFillPrice = (takingAmt > 0 && makingAmt > 0)
-                ? parseFloat((takingAmt / makingAmt).toFixed(4))
-                : worstPrice;
-              const realSizeFilled = makingAmt > 0 ? Math.round(makingAmt) : size;
-
-              // NO cancelar GTC/GTD — dejarlos vivos para capturar más tokens
-              // Si GTC o GTD también llenan, son tokens extra ganados
-              const filledOrders = [fakFilled?'FAK':null, gtcFilled?'GTC':null, gtdFilled?'GTD':null].filter(Boolean);
-              const liveOrders = [!gtcFilled&&dualGtcOrderId?'GTC':null, !gtdFilled&&tripleGtdOrderId?'GTD':null].filter(Boolean);
-              logger.info(`[LIVE] ✅ TRIPLE ORDER: ${filledOrders.join('+')} llenó @ $${realFillPrice.toFixed(4)} | ${liveOrders.length > 0 ? liveOrders.join('+') + ' vivos en libro' : 'todo llenó'}`);
-              result = {
-                ...fakRes,
-                fillPrice: realFillPrice,
-                sizeFilled: realSizeFilled,
-                success: true,
-                _tripleGtcId: !gtcFilled ? dualGtcOrderId : null,
-                _tripleGtdId: !gtdFilled ? tripleGtdOrderId : null,
-              };
-            } else if (dualGtcOrderId || tripleGtdOrderId) {
-              logger.info(`[LIVE] 🔀 TRIPLE ORDER: FAK sin liquidez → GTC+GTD vivos @ $${worstPrice}`);
+            if (fakFilled) {
+              // FAK llenó → cancelar GTC para no duplicar
+              if (dualGtcOrderId) {
+                await this.clobClient.cancelOrder({ orderID: dualGtcOrderId }).catch(() => {});
+                logger.info(`[LIVE] ✅ DUAL ORDER: FAK llenó — GTC cancelado`);
+              }
+              const taking = parseFloat(fakRes?.takingAmount || 0);
+              const making = parseFloat(fakRes?.makingAmount || 0);
+              const realFillPrice = taking > 0 && making > 0 ? parseFloat((taking/making).toFixed(4)) : worstPrice;
+              const realSize = making > 0 ? Math.round(making) : size;
+              return { success: true, fillPrice: realFillPrice, sizeFilled: realSize, status: 'matched' };
+            } else if (gtcFilled) {
+              // GTC llenó antes que el FAK
+              logger.info(`[LIVE] ✅ DUAL ORDER: GTC llenó primero`);
+              const taking = parseFloat(gtcRes?.takingAmount || 0);
+              const making = parseFloat(gtcRes?.makingAmount || 0);
+              const realFillPrice = taking > 0 && making > 0 ? parseFloat((taking/making).toFixed(4)) : worstPrice;
+              const realSize = making > 0 ? Math.round(making) : size;
+              return { success: true, fillPrice: realFillPrice, sizeFilled: realSize, status: 'matched' };
+            } else if (dualGtcOrderId) {
+              // Ninguno llenó instantáneo — GTC queda vivo en el libro
+              logger.info(`[LIVE] 🔀 DUAL ORDER: FAK sin liquidez, GTC vivo @ $${worstPrice}`);
               result = {
                 success: true, status: 'live',
-                orderID: dualGtcOrderId || tripleGtdOrderId,
-                _isDualGtc: true,
+                orderID: dualGtcOrderId, _isDualGtc: true,
                 _tripleGtcId: dualGtcOrderId,
-                _tripleGtdId: tripleGtdOrderId,
               };
             }
           } catch (dualErr) {
-            logger.warn(`[LIVE] TRIPLE ORDER falló (${dualErr.message}) — cayendo a FAK individual`);
+            logger.warn(`[LIVE] DUAL ORDER falló (${dualErr.message}) — cayendo a FAK individual`);
             result = null;
           }
         }
-
         // Camino normal FAK/FOK si no hay DUAL o falló
         if (!result) {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
