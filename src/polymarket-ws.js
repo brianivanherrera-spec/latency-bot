@@ -111,20 +111,70 @@ class PolymarketWS {
     });
   }
 
-  // Síncrono, 0 I/O — solo Map.get
-  // Si está stale (> maxAgeMs) → null → SKIP en el handler de señal, NO REST de emergencia
-  getBestAskForToken(tokenId, maxAgeMs = 3000) {
-    const row = this._topOfBook.get(tokenId);
-    if (!row || row.bestAsk == null) return null;
-    if (Date.now() - row.updatedAt > maxAgeMs) return null; // stale → SKIP
-    // Si el ask viene del bootstrap y es ≥0.95, marcar como "sin top usable"
-    // para no anclar órdenes a un precio de mercado ya decidido
-    if (row.bestAsk >= 0.95 && row.bestBidSize == null && row.bestAskSize == null) return null;
-    return row.bestAsk;
+  // Helper: actualizar _topOfBook de forma segura — merge con valores previos
+  // Solo actualiza si el nuevo valor es válido (0 < x <= 1)
+  _setTopOfBook(tokenId, { bestBid, bestAsk, bestBidSize, bestAskSize }) {
+    if (!tokenId) return;
+    const prev = this._topOfBook.get(tokenId) || {};
+    const ask = bestAsk != null && !isNaN(bestAsk) && bestAsk > 0 && bestAsk <= 1
+      ? bestAsk : prev.bestAsk ?? null;
+    const bid = bestBid != null && !isNaN(bestBid) && bestBid > 0 && bestBid <= 1
+      ? bestBid : prev.bestBid ?? null;
+    if (ask == null && bid == null) return;
+    this._topOfBook.set(tokenId, {
+      bestBid: bid, bestAsk: ask,
+      bestBidSize: bestBidSize ?? prev.bestBidSize ?? null,
+      bestAskSize: bestAskSize ?? prev.bestAskSize ?? null,
+      updatedAt: Date.now(),
+    });
+    if (ask != null) this._bestAskByToken.set(tokenId, ask);
   }
 
+  // Helper: encontrar el mejor precio de un array de niveles (puede venir desordenado)
+  _bestFromLevels(levels, side) {
+    if (!Array.isArray(levels) || !levels.length) return { price: null, size: null };
+    const parseSize = (l) => parseFloat(l?.size ?? l?.amount ?? 0) || 0;
+    let best = null, bestSize = null;
+    for (const l of levels) {
+      const p = parseFloat(l?.price);
+      if (isNaN(p) || p <= 0 || p > 1) continue;
+      if (best == null || (side === 'ask' && p < best) || (side === 'bid' && p > best)) {
+        best = p; bestSize = parseSize(l);
+      }
+    }
+    return { price: best, size: bestSize };
+  }
+
+  // Síncrono, 0 I/O — solo Map.get con fallback a _bookByToken
+  // maxAge 3s: tolera huecos cortos sin usar datos viejos
+  getBestAskForToken(tokenId, maxAgeMs = 3000) {
+    if (!tokenId) return null;
+    const row = this._topOfBook.get(tokenId);
+    if (row?.bestAsk != null && Date.now() - row.updatedAt <= maxAgeMs) {
+      return row.bestAsk;
+    }
+    // Fallback: intentar reconstruir desde _bookByToken (tiene asks[])
+    const book = this._bookByToken.get(tokenId);
+    if (book?.asks?.length) {
+      const { price } = this._bestFromLevels(book.asks, 'ask');
+      if (price != null) {
+        const age = book.updatedAt ? Date.now() - book.updatedAt : Infinity;
+        if (age <= maxAgeMs) {
+          this._setTopOfBook(tokenId, { bestAsk: price, bestBid: book.bids?.[0]?.price });
+          return price;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Síncrono — tamaño disponible en el best ask
+  getBestAskSize(tokenId, maxAgeMs = 3000) {
+    const row = this._topOfBook.get(tokenId);
+    if (!row || Date.now() - row.updatedAt > maxAgeMs) return null;
+    return row.bestAskSize;
+  }
   // Bootstrap del topOfBook desde REST — llamar UNA VEZ al suscribir el mercado
-  // No usar en hot path — solo para sembrar el dato inicial antes del primer tick WS
   async bootstrapTopOfBook(tokenId, clobClient) {
     if (!tokenId || !clobClient) return;
     // Si ya tiene datos frescos, no hacer nada
@@ -639,16 +689,14 @@ class PolymarketWS {
       updatedAt: Date.now(),
     });
 
-    // Alimentar _topOfBook desde el snapshot — más completo que best_bid_ask
-    // Solo actualizar si el snapshot tiene datos válidos y es más reciente
-    if (!isNaN(bestBid) && !isNaN(bestAsk) && bestBid > 0 && bestAsk > 0) {
-      const bestBidSize = parseSize(bids[0]) || null;
-      const bestAskSize = parseSize(asks[0]) || null;
-      const existing = this._topOfBook.get(tokenId);
-      // El snapshot es más autoritativo — actualizar siempre
-      this._topOfBook.set(tokenId, {
-        bestBid, bestAsk, bestBidSize, bestAskSize,
-        updatedAt: Date.now(),
+    // Alimentar _topOfBook desde snapshot — usar _bestFromLevels para manejar arrays desordenados
+    // Actualizar aunque solo haya ask (o solo bid) — no exigir ambos
+    const { price: topBid, size: topBidSize } = this._bestFromLevels(bids, 'bid');
+    const { price: topAsk, size: topAskSize } = this._bestFromLevels(asks, 'ask');
+    if (topAsk != null || topBid != null) {
+      this._setTopOfBook(tokenId, {
+        bestBid: topBid, bestAsk: topAsk,
+        bestBidSize: topBidSize, bestAskSize: topAskSize,
       });
     }
 
@@ -672,12 +720,10 @@ class PolymarketWS {
       let mid = null;
       if (!isNaN(bid) && !isNaN(ask) && bid > 0 && ask > 0) {
         mid = (bid + ask) / 2;
-        // Actualizar topOfBook SIEMPRE desde price_change — es el canal más frecuente
-        // No usar guard de 500ms: price_change es el feed de deltas, siempre es más nuevo
-        this._topOfBook.set(tokenId, {
+        // Actualizar topOfBook SIEMPRE desde price_change — canal de deltas más frecuente
+        this._setTopOfBook(tokenId, {
           bestBid: bid, bestAsk: ask,
           bestBidSize: null, bestAskSize: null,
-          updatedAt: Date.now(),
         });
       } else {
         const p = parseFloat(ch.price);
@@ -709,15 +755,11 @@ class PolymarketWS {
     if (bid <= 0 || ask <= 0 || ask > 1) return;
     const mid = (bid + ask) / 2;
     this._lastPriceByToken.set(tokenId, mid);
-    // Guardar best_ask real para uso directo sin REST call
-    this._bestAskByToken.set(tokenId, ask);
-    // LocalOrderBook — top of book síncrono, 0 I/O
-    this._topOfBook.set(tokenId, {
-      bestBid: bid,
-      bestAsk: ask,
+    // Usar _setTopOfBook para mantener consistencia y merge con valores previos
+    this._setTopOfBook(tokenId, {
+      bestBid: bid, bestAsk: ask,
       bestBidSize: msg.bid_size ? parseFloat(msg.bid_size) : null,
       bestAskSize: msg.ask_size ? parseFloat(msg.ask_size) : null,
-      updatedAt: Date.now(),
     });
     // Precio real de transacción — actualizar _marketPriceByToken
     this._marketPriceByToken.set(tokenId, mid);
