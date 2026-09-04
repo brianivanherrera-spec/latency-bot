@@ -113,7 +113,7 @@ class PolymarketWS {
 
   // Síncrono, 0 I/O — solo Map.get
   // Si está stale (> maxAgeMs) → null → SKIP en el handler de señal, NO REST de emergencia
-  getBestAskForToken(tokenId, maxAgeMs = 800) {
+  getBestAskForToken(tokenId, maxAgeMs = 10000) {
     const row = this._topOfBook.get(tokenId);
     if (!row || row.bestAsk == null) return null;
     if (Date.now() - row.updatedAt > maxAgeMs) return null; // stale → SKIP
@@ -150,7 +150,7 @@ class PolymarketWS {
   }
 
   // Síncrono, 0 I/O — tamaño disponible en el best ask
-  getBestAskSize(tokenId, maxAgeMs = 800) {
+  getBestAskSize(tokenId, maxAgeMs = 10000) {
     const row = this._topOfBook.get(tokenId);
     if (!row || Date.now() - row.updatedAt > maxAgeMs) return null;
     return row.bestAskSize;
