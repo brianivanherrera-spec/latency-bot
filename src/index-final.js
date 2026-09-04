@@ -542,6 +542,11 @@ async function main() {
           // Fix B: suscribir al nuevo mercado via WS
           polyWs.unsubscribeAll();
           polyWs.subscribe(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+          // Bootstrap topOfBook con REST una vez — siembra el dato antes del primer tick WS
+          if (poly.clobClient) {
+            polyWs.bootstrapTopOfBook(cachedMarket.yesTokenId, poly.clobClient).catch(() => {});
+            polyWs.bootstrapTopOfBook(cachedMarket.noTokenId, poly.clobClient).catch(() => {});
+          }
           if (RESEARCH_MODE) {
             marketResearch.startMarket({
               marketId: cachedMarket.conditionId || cachedMarket.gammaId,
@@ -563,6 +568,10 @@ async function main() {
           // Fix B: suscribir al WS de Polymarket para precio en tiempo real
           polyWs.unsubscribeAll();
           polyWs.subscribe(m.yesTokenId, m.noTokenId);
+          if (poly.clobClient) {
+            polyWs.bootstrapTopOfBook(m.yesTokenId, poly.clobClient).catch(() => {});
+            polyWs.bootstrapTopOfBook(m.noTokenId, poly.clobClient).catch(() => {});
+          }
           if (RESEARCH_MODE) {
             marketResearch.startMarket({
               marketId: m.conditionId || m.gammaId,

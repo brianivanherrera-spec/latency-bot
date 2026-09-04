@@ -120,6 +120,35 @@ class PolymarketWS {
     return row.bestAsk;
   }
 
+  // Bootstrap del topOfBook desde REST — llamar UNA VEZ al suscribir el mercado
+  // No usar en hot path — solo para sembrar el dato inicial antes del primer tick WS
+  async bootstrapTopOfBook(tokenId, clobClient) {
+    if (!tokenId || !clobClient) return;
+    // Si ya tiene datos frescos, no hacer nada
+    const existing = this._topOfBook.get(tokenId);
+    if (existing && Date.now() - existing.updatedAt < 2000) return;
+    try {
+      const book = await clobClient.getOrderBook(tokenId);
+      const asks = book?.asks || [];
+      const bids = book?.bids || [];
+      if (!asks.length && !bids.length) return;
+      const bestAsk = asks.length ? parseFloat(asks[0]?.price) : null;
+      const bestBid = bids.length ? parseFloat(bids[0]?.price) : null;
+      if (bestAsk && bestAsk > 0) {
+        this._topOfBook.set(tokenId, {
+          bestBid: bestBid || null,
+          bestAsk,
+          bestBidSize: null,
+          bestAskSize: null,
+          updatedAt: Date.now(),
+        });
+        logger.info(`[POLY-WS] 🌱 Bootstrap topOfBook token ${tokenId?.slice(0,12)}: ask=$${bestAsk.toFixed(2)}`);
+      }
+    } catch (e) {
+      logger.debug(`[POLY-WS] Bootstrap falló para ${tokenId?.slice(0,12)}: ${e.message}`);
+    }
+  }
+
   // Síncrono, 0 I/O — tamaño disponible en el best ask
   getBestAskSize(tokenId, maxAgeMs = 800) {
     const row = this._topOfBook.get(tokenId);
