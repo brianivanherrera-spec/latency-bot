@@ -1595,8 +1595,10 @@ async function main() {
         // success=true + status='live' = orden en el libro pero SIN fill todavía
         // success=true + status='matched' = fill real confirmado
         const orderStatus = (String(orderResult?.status || '')).toLowerCase();
-        const reallyFilled = orderResult.success && 
-          (orderStatus === 'matched' || orderResult.fillPrice || orderResult.sizeFilled);
+        // Exigir status=matched O sizeFilled verificable — fillPrice solo no alcanza
+        const reallyFilled = orderResult.success &&
+          (orderStatus === 'matched' ||
+           (orderResult.sizeFilled > 0 && orderResult.fillPrice > 0 && orderResult.fillPrice < 1));
         
         if (!orderResult.success || !reallyFilled) {
           const reason = orderResult.error === 'gtc_timeout'
@@ -1615,23 +1617,18 @@ async function main() {
         }
 
         const fillMs = orderResult.fillTimeMs || null;
-        // FIX: usar el tamaño REALMENTE llenado, no el pedido — un fill
-        // parcial (ej. 3 de 5 tokens) ya no se registra como si hubiera
-        // llenado completo.
-        const actualSize = orderResult.sizeFilled || size;
-        // FIX: usar el precio REAL al que llenó, no el precio original
-        // cotizado. Si el retry-loop tuvo que mejorar precio (ej. de $0.135
-        // a $0.155 en varios intentos), el costo real es más alto que el
-        // primer precio pedido — sin esto, el PnL registrado queda
-        // sistemáticamente más optimista que el gasto real de la wallet.
-        const actualPrice = orderResult.fillPrice || price;
+        // FIX: sizeFilled = shares recibidas (takingAmount en BUY), no USDC
+        // fillPrice = USDC gastado / shares = precio real por share
+        const actualSize  = orderResult.sizeFilled > 0 ? Math.round(orderResult.sizeFilled) : size;
+        const actualPrice = (orderResult.fillPrice > 0 && orderResult.fillPrice < 1) ? orderResult.fillPrice : price;
+        const actualUsdc  = orderResult.usdcSpent  > 0 ? orderResult.usdcSpent : actualPrice * actualSize;
         if (actualPrice !== price) {
-          logger.warn(`[LIVE] 💲 Precio real de fill ($${actualPrice.toFixed(3)}) distinto al cotizado ($${price.toFixed(3)}) — usando el real para el tracker`);
+          logger.warn(`[LIVE] 💲 Fill @ $${actualPrice.toFixed(4)} | ${actualSize} shares | USDC: $${actualUsdc.toFixed(2)}`);
         }
         if (orderResult.partial) {
-          logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} tokens — abriendo posición por el tamaño real, no el pedido`);
+          logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} shares`);
         }
-        logger.info(`[LIVE] ✅ Orden llenada (GTC): ${orderResult.orderId} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'} | size: ${actualSize}/${size} | price: $${actualPrice.toFixed(3)}`);
+        logger.info(`[LIVE] ✅ Orden llenada: ${actualSize} shares @ $${actualPrice.toFixed(4)} | USDC: $${actualUsdc.toFixed(2)} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
 
         // Guardar fill_time_ms en signal logger
         if (fillMs !== null) signalLogger.updateFillTime(posId, fillMs);

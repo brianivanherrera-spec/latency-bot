@@ -245,6 +245,18 @@ class PolymarketClient {
     const rec = { timestamp: new Date().toISOString(), marketId, marketQuestion,
       tokenId, side, price, size, usdcValue: (price * size).toFixed(2), status: 'PENDING' };
 
+    // Helper para parsear fill de BUY correctamente
+    // En CLOB BUY: makingAmount = USDC gastado, takingAmount = shares recibidas
+    // fillPrice = USDC / shares (no al revés)
+    const parseBuyFill = (res, fallbackPrice, fallbackSize) => {
+      const usdc   = parseFloat(res?.makingAmount || 0);
+      const shares = parseFloat(res?.takingAmount  || 0);
+      if (shares > 0 && usdc > 0) {
+        return { fillPrice: parseFloat((usdc / shares).toFixed(4)), sizeFilled: shares, usdcSpent: usdc };
+      }
+      return { fillPrice: fallbackPrice, sizeFilled: fallbackSize, usdcSpent: fallbackPrice * fallbackSize };
+    };
+
     if (config.DRY_RUN) {
       rec.status = 'DRY_RUN'; rec.orderId = `DRY_${Date.now()}`;
       this._orderHistory.push(rec);
@@ -397,13 +409,9 @@ class PolymarketClient {
 
               const fakStatus = (String(fakRes?.status || '')).toLowerCase();
               if (fakStatus === 'matched') {
-                const taking = parseFloat(fakRes?.takingAmount || 0);
-                const making = parseFloat(fakRes?.makingAmount || 0);
-                const realFillPrice = taking > 0 && making > 0 ? parseFloat((taking/making).toFixed(4)) : fakPrice;
-                const realSize = making > 0 ? Math.round(making) : size;
-                const ganancia = (1 - realFillPrice) * realSize;
-                logger.info(`[LIVE] ✅ FAK llenó @ $${realFillPrice.toFixed(4)} | ${realSize} tokens | ganancia estimada: $${ganancia.toFixed(2)}`);
-                return { success: true, fillPrice: realFillPrice, sizeFilled: realSize, status: 'matched' };
+                const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(fakRes, fakPrice, size);
+                logger.info(`[LIVE] ✅ FAK llenó @ $${fillPrice.toFixed(4)} | ${sizeFilled} shares | USDC: $${usdcSpent.toFixed(2)}`);
+                return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
               }
 
               // Esperar y refrescar el bestAsk para el siguiente intento
@@ -473,19 +481,15 @@ class PolymarketClient {
                 await this.clobClient.cancelOrder({ orderID: dualGtcOrderId }).catch(() => {});
                 logger.info(`[LIVE] ✅ DUAL ORDER: FAK llenó — GTC cancelado`);
               }
-              const taking = parseFloat(fakRes?.takingAmount || 0);
-              const making = parseFloat(fakRes?.makingAmount || 0);
-              const realFillPrice = taking > 0 && making > 0 ? parseFloat((taking/making).toFixed(4)) : worstPrice;
-              const realSize = making > 0 ? Math.round(making) : size;
-              return { success: true, fillPrice: realFillPrice, sizeFilled: realSize, status: 'matched' };
+              const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(fakRes, worstPrice, size);
+              logger.info(`[LIVE] ✅ FAK fill: ${sizeFilled} shares @ $${fillPrice.toFixed(4)} (USDC gastado: $${usdcSpent.toFixed(2)})`);
+              return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
             } else if (gtcFilled) {
               // GTC llenó antes que el FAK
               logger.info(`[LIVE] ✅ DUAL ORDER: GTC llenó primero`);
-              const taking = parseFloat(gtcRes?.takingAmount || 0);
-              const making = parseFloat(gtcRes?.makingAmount || 0);
-              const realFillPrice = taking > 0 && making > 0 ? parseFloat((taking/making).toFixed(4)) : worstPrice;
-              const realSize = making > 0 ? Math.round(making) : size;
-              return { success: true, fillPrice: realFillPrice, sizeFilled: realSize, status: 'matched' };
+              const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(gtcRes, worstPrice, size);
+              logger.info(`[LIVE] ✅ GTC fill: ${sizeFilled} shares @ $${fillPrice.toFixed(4)} (USDC gastado: $${usdcSpent.toFixed(2)})`);
+              return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
             } else if (dualGtcOrderId) {
               // Ninguno llenó instantáneo — GTC queda vivo en el libro
               logger.info(`[LIVE] 🔀 DUAL ORDER: FAK sin liquidez, GTC vivo @ $${worstPrice}`);
