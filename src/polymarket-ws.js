@@ -661,18 +661,19 @@ class PolymarketWS {
     if (!tokenId) return;
     const bids = msg.bids || [];
     const asks = msg.asks || [];
-    const bestBid = parseFloat(bids[0]?.price);
-    const bestAsk = parseFloat(asks[0]?.price);
+
+    // Usar _bestFromLevels para manejar arrays desordenados
+    const { price: topBid } = this._bestFromLevels(bids, 'bid');
+    const { price: topAsk } = this._bestFromLevels(asks, 'ask');
+
+    // Calcular mid si hay ambos; si solo hay uno, usar ese
     let mid = null;
-    if (!isNaN(bestBid) && !isNaN(bestAsk)) mid = (bestBid + bestAsk) / 2;
-    else if (!isNaN(bestAsk)) mid = bestAsk;
-    else if (!isNaN(bestBid)) mid = bestBid;
-    if (mid == null || mid <= 0) return;
-    // El canal book actualiza _lastPriceByToken (para emitPair/display)
-    // pero NO _marketPriceByToken — los snapshots t1/t2/t5 solo usan precios
-    // reales de transacciones del canal market, no el mid calculado del book
-    // que puede alternar entre 0.50 y 0.90+ causando lecturas falsas
-    this._lastPriceByToken.set(tokenId, mid);
+    if (topBid != null && topAsk != null) mid = (topBid + topAsk) / 2;
+    else if (topAsk != null) mid = topAsk;
+    else if (topBid != null) mid = topBid;
+
+    // No descartar si solo hay ask (mercado decidido al 99%) — actualizar _topOfBook igual
+    if (mid != null) this._lastPriceByToken.set(tokenId, mid);
 
     // Calcular profundidad total del book (suma de tokens en todos los niveles)
     // Polymarket puede mandar size como string o número
@@ -689,10 +690,10 @@ class PolymarketWS {
       updatedAt: Date.now(),
     });
 
-    // Alimentar _topOfBook desde snapshot — usar _bestFromLevels para manejar arrays desordenados
+    // Alimentar _topOfBook desde snapshot
     // Actualizar aunque solo haya ask (o solo bid) — no exigir ambos
-    const { price: topBid, size: topBidSize } = this._bestFromLevels(bids, 'bid');
-    const { price: topAsk, size: topAskSize } = this._bestFromLevels(asks, 'ask');
+    const { size: topBidSize } = this._bestFromLevels(bids, 'bid');
+    const { size: topAskSize } = this._bestFromLevels(asks, 'ask');
     if (topAsk != null || topBid != null) {
       this._setTopOfBook(tokenId, {
         bestBid: topBid, bestAsk: topAsk,
