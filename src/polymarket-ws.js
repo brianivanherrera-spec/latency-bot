@@ -79,6 +79,7 @@ class PolymarketWS {
     // LocalOrderBook: top of book por tokenId, actualizado en cada tick del WS
     // Estructura: tokenId -> { bestBid, bestAsk, bestBidSize, bestAskSize, updatedAt }
     this._topOfBook = new Map();
+    this._lastBootstrapAttempt = new Map(); // rate-limit: no re-bootstrap si < 2s
     this._lastTradeByToken = loadTradeMap(); // último trade ejecutado por token — persiste reinicios
 
     // ─── Book depth state ─────────────────────────────────────────────────
@@ -150,22 +151,11 @@ class PolymarketWS {
   getBestAskForToken(tokenId, maxAgeMs = 3000) {
     if (!tokenId) return null;
     const row = this._topOfBook.get(tokenId);
-    if (row?.bestAsk != null && Date.now() - row.updatedAt <= maxAgeMs) {
-      return row.bestAsk;
-    }
-    // Fallback: intentar reconstruir desde _bookByToken (tiene asks[])
-    const book = this._bookByToken.get(tokenId);
-    if (book?.asks?.length) {
-      const { price } = this._bestFromLevels(book.asks, 'ask');
-      if (price != null) {
-        const age = book.updatedAt ? Date.now() - book.updatedAt : Infinity;
-        if (age <= maxAgeMs) {
-          this._setTopOfBook(tokenId, { bestAsk: price, bestBid: book.bids?.[0]?.price });
-          return price;
-        }
-      }
-    }
-    return null;
+    if (!row || row.bestAsk == null) return null;
+    // Bootstrap tiene TTL más largo (8s) — WS no actualiza continuamente todos los tokens
+    const ttl = row.fromBootstrap ? 8000 : maxAgeMs;
+    if (Date.now() - row.updatedAt > ttl) return null;
+    return row.bestAsk;
   }
 
   // Síncrono — tamaño disponible en el best ask
@@ -177,9 +167,13 @@ class PolymarketWS {
   // Bootstrap del topOfBook desde REST — llamar UNA VEZ al suscribir el mercado
   async bootstrapTopOfBook(tokenId, clobClient) {
     if (!tokenId || !clobClient) return;
-    // Si ya tiene datos frescos, no hacer nada
+    // Rate-limit: no re-bootstrap si pasaron menos de 2s desde el último intento
+    const lastAttempt = this._lastBootstrapAttempt.get(tokenId) || 0;
+    if (Date.now() - lastAttempt < 2000) return;
+    this._lastBootstrapAttempt.set(tokenId, Date.now());
+    // Si ya tiene datos frescos del WS (no bootstrap), no hacer nada
     const existing = this._topOfBook.get(tokenId);
-    if (existing && Date.now() - existing.updatedAt < 2000) return;
+    if (existing && !existing.fromBootstrap && Date.now() - existing.updatedAt < 3000) return;
     try {
       const book = await clobClient.getOrderBook(tokenId);
       const asks = book?.asks || [];
@@ -194,8 +188,9 @@ class PolymarketWS {
           bestBidSize: null,
           bestAskSize: null,
           updatedAt: Date.now(),
+          fromBootstrap: true, // TTL más largo (8s) — WS puede no actualizar continuamente
         });
-        logger.info(`[POLY-WS] 🌱 Bootstrap topOfBook token ${tokenId?.slice(0,12)}: ask=$${bestAsk.toFixed(2)}`);
+        logger.info(`[POLY-WS] 🌱 Bootstrap topOfBook token ${tokenId?.slice(0,12)}: ask=$${bestAsk.toFixed(2)} (TTL=8s)`);
       }
     } catch (e) {
       logger.debug(`[POLY-WS] Bootstrap falló para ${tokenId?.slice(0,12)}: ${e.message}`);
