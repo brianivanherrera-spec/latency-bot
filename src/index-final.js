@@ -1381,7 +1381,12 @@ async function main() {
     const bestAskWS = polyWs.getBestAskForToken?.(tokenId) ?? null;
 
     if (bestAskWS == null) {
-      logger.warn(`[SKIP] 🚫 bestAsk null — sin book WS para token ${tokenId?.slice(0,12)} → no operar`);
+      // Re-bootstrap asíncrono fuera del hot path — no bloquea la señal actual
+      // pero siembra el dato para las próximas señales del mismo mercado
+      if (poly.clobClient && polyWs.bootstrapTopOfBook) {
+        polyWs.bootstrapTopOfBook(tokenId, poly.clobClient).catch(() => {});
+      }
+      logger.warn(`[SKIP] 🚫 bestAsk null — sin book WS para token ${tokenId?.slice(0,12)} → re-bootstrap lanzado`);
       activePositions.delete(posId);
       return;
     }
