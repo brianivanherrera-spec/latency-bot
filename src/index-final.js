@@ -1371,9 +1371,10 @@ async function main() {
     const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo; // solo para filtros y logs
 
     // PRECIO DE ORDEN = siempre del book real (bestAsk del WS, 0ms latencia)
-    // NO usar priceRaw + tolerance — ese precio fantasma causa todos los NO_FILL
-    // Regla: orderPrice = bestAsk + 1 tick, solo si bestAsk ≤ MAX_GTC_ENTRY_ASK
-    const MAX_ORDER_PRICE = parseFloat(process.env.MAX_GTC_ENTRY_ASK || process.env.MAX_ENTRY_PRICE || '0.85');
+    // Señales ÉLITE tienen umbral más permisivo — con 100% WR histórico vale pagar más
+    const MAX_ORDER_PRICE = isEliteSignal
+      ? parseFloat(process.env.ELITE_MAX_ASK || '0.97')
+      : parseFloat(process.env.MAX_GTC_ENTRY_ASK || process.env.MAX_ENTRY_PRICE || '0.85');
     const tick = 0.01;
     const round2 = v => parseFloat((Math.round(v * 100) / 100).toFixed(2));
 
@@ -1388,28 +1389,29 @@ async function main() {
     const orderPrice = round2(Math.min(0.97, bestAskWS + tick));
 
     if (orderPrice > MAX_ORDER_PRICE) {
-      logger.warn(`[SKIP] 🚫 ask demasiado caro: bestAsk=$${bestAskWS.toFixed(2)} orderPx=$${orderPrice} > MAX=$${MAX_ORDER_PRICE} → NO_FILL conceptual`);
+      logger.warn(`[SKIP] 🚫 ask demasiado caro: bestAsk=$${bestAskWS.toFixed(2)} orderPx=$${orderPrice} > MAX=$${MAX_ORDER_PRICE}${isEliteSignal ? ' (ÉLITE)' : ''} → NO_FILL conceptual`);
       activePositions.delete(posId);
       return;
     }
 
-    logger.info(`[PRICE] bestAsk=$${bestAskWS.toFixed(2)} → orderPrice=$${orderPrice} (MAX=${MAX_ORDER_PRICE}) | priceRaw=$${priceRaw?.toFixed(2)} (señal, solo ref)`);
+    logger.info(`[PRICE] bestAsk=$${bestAskWS.toFixed(2)} → orderPrice=$${orderPrice} (MAX=${MAX_ORDER_PRICE}${isEliteSignal ? ' ÉLITE' : ''}) | priceRaw=$${priceRaw?.toFixed(2)} (señal, solo ref)`);
 
     const price = orderPrice;
     const size = Math.floor(finalExposure / price);
 
     // MAX_ENTRY_PRICE — filtro sobre priceRaw de la señal (no del order price)
-    // Detecta cuando la señal ya viene de un precio extremo aunque el book esté bajo
+    // Señales ÉLITE lo saltean — con 100% WR histórico no importa el priceRaw
     const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
-    if (maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
+    if (!isEliteSignal && maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
       logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} > máximo $${maxEntryPrice} — señal vieja`);
       activePositions.delete(posId);
       return;
     }
 
     // MIN_ENTRY_PRICE — no entrar cuando el token ya perdió casi todo su valor
+    // Señales ÉLITE también lo saltean
     const minEntryPrice = parseFloat(process.env.MIN_ENTRY_PRICE || '0.20');
-    if (priceRaw < minEntryPrice) {
+    if (!isEliteSignal && priceRaw < minEntryPrice) {
       logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} < mínimo $${minEntryPrice} — token casi sin valor`);
       activePositions.delete(posId);
       return;
