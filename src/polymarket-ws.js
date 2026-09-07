@@ -519,8 +519,9 @@ class PolymarketWS {
     this._lastPriceByToken.clear();
     this._marketPriceByToken.clear();
     this._bookByToken.clear();
-      this._topOfBook.clear();
-      this._bestAskByToken.clear();
+    this._topOfBook.clear();
+    this._bestAskByToken.clear();
+    this._lastBootstrapAttempt.clear();
     // NO limpiar _lastTradeByToken — igual que en subscribe(),
     // los trades expiran solos en 30s. Limpiarlos acá deja en null
     // las señales del mercado siguiente.
