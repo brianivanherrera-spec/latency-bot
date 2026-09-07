@@ -1382,31 +1382,35 @@ async function main() {
     const bestAskWS = polyWs.getBestAskForToken?.(tokenId) ?? null;
 
     if (bestAskWS == null) {
-      // Determinar si ya intentamos el bootstrap para este token
+      // Re-bootstrap asíncrono fuera del hot path
       const lastAttempt = polyWs._lastBootstrapAttempt?.get(tokenId) || 0;
       const bootstrapYaIntentado = lastAttempt > 0;
-      const msgExtra = bootstrapYaIntentado
-        ? '(después de bootstrap fallido — sin liquidez real?)'
-        : '(primer intento — re-bootstrap lanzado)';
-
-      // Re-bootstrap asíncrono fuera del hot path — no bloquea la señal actual
       if (poly.clobClient && polyWs.bootstrapTopOfBook) {
         polyWs.bootstrapTopOfBook(tokenId, poly.clobClient).catch(() => {});
       }
-      logger.warn(`[SKIP] 🚫 bestAsk null ${msgExtra} — token ${tokenId?.slice(0,12)}`);
-      activePositions.delete(posId);
-      return;
+      const msgExtra = bootstrapYaIntentado
+        ? '(después de bootstrap fallido)'
+        : '(primer intento — re-bootstrap lanzado)';
+      logger.warn(`[PRICE] ⚠️ bestAsk null ${msgExtra} — usando priceRaw+tolerance como fallback`);
+      // Fallback: usar priceRaw + tolerance en vez de SKIP
+      // Antes del commit 812cf8f así funcionaba y el bot entraba
     }
 
-    const orderPrice = round2(Math.min(0.97, bestAskWS + tick));
+    // Precio final: bestAsk del WS si disponible, sino priceRaw + tolerance
+    const priceTolerance = parseFloat(process.env.PRICE_TOLERANCE || '0.02');
+    const orderPriceFromWS = bestAskWS != null
+      ? round2(Math.min(0.97, bestAskWS + tick))
+      : round2(Math.min(0.97, priceRaw + priceTolerance));
 
-    if (orderPrice > MAX_ORDER_PRICE) {
+    const orderPrice = orderPriceFromWS;
+
+    if (bestAskWS != null && orderPrice > MAX_ORDER_PRICE) {
       logger.warn(`[SKIP] 🚫 ask demasiado caro: bestAsk=$${bestAskWS.toFixed(2)} orderPx=$${orderPrice} > MAX=$${MAX_ORDER_PRICE}${isEliteSignal ? ' (ÉLITE)' : ''} → NO_FILL conceptual`);
       activePositions.delete(posId);
       return;
     }
 
-    logger.info(`[PRICE] bestAsk=$${bestAskWS.toFixed(2)} → orderPrice=$${orderPrice} (MAX=${MAX_ORDER_PRICE}${isEliteSignal ? ' ÉLITE' : ''}) | priceRaw=$${priceRaw?.toFixed(2)} (señal, solo ref)`);
+    logger.info(`[PRICE] ${bestAskWS != null ? `bestAsk=$${bestAskWS.toFixed(2)} (WS)` : `priceRaw=$${priceRaw?.toFixed(2)} (fallback)`} → orderPrice=$${orderPrice} (MAX=${MAX_ORDER_PRICE}${isEliteSignal ? ' ÉLITE' : ''})`);
 
     const price = orderPrice;
     const size = Math.floor(finalExposure / price);
