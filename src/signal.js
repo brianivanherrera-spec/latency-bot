@@ -43,7 +43,10 @@ class SignalEngine {
 
     this.prices.push(price);
     this.timestamps.push(timestamp);
-    this.buyPressure.push(isBuyerMaker ? 0 : 1);
+    // isBuyerMaker=undefined cuando la fuente (bookTicker) no tiene info de dirección
+    // En ese caso, no agregar presión compradora (neutral = 0.5)
+    const buyPressureVal = isBuyerMaker === undefined ? 0.5 : (isBuyerMaker ? 0 : 1);
+    this.buyPressure.push(buyPressureVal);
     this.tickFrequency.push(timestamp);
 
     // Orderbook imbalance: +1 = todo bids, -1 = todo asks

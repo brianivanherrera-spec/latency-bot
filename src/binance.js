@@ -79,7 +79,7 @@ class BinanceWS {
               bidQty: parseFloat(msg.B) || 0,
               askQty: parseFloat(msg.A) || 0,
               spread: bestAsk - bestBid,
-              isBuyerMaker: false,
+              isBuyerMaker: undefined, // bookTicker no tiene info de dirección del trade
             });
           }
         } catch (e) {
