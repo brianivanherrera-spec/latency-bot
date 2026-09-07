@@ -1,7 +1,7 @@
 /**
- * Coinbase WebSocket - BTC/USD precio en tiempo real
- * Reemplaza Binance (bloqueado en Railway)
- * No requiere API key
+ * BTC Price WebSocket — Binance primary, Coinbase fallback
+ * Binance btcusdt@bookTicker: bid/ask top en tiempo real (~10-15ms)
+ * Coinbase ticker: fallback si Binance no está disponible
  */
 
 const WebSocket = require('ws');
@@ -9,7 +9,8 @@ const { Logger } = require('./logger');
 
 const logger = new Logger('BINANCE-WS');
 
-const WS_URL = 'wss://advanced-trade-ws.coinbase.com';
+const BINANCE_URL  = 'wss://stream.binance.com:9443/ws/btcusdt@bookTicker';
+const COINBASE_URL = 'wss://advanced-trade-ws.coinbase.com';
 
 class BinanceWS {
   constructor() {
@@ -23,7 +24,8 @@ class BinanceWS {
     this._intentionalClose = false;
     this._lastPrice = null;
     this._lastTimestamp = null;
-    this._loggedFirst = false;  // ← LOG TEMPORAL
+    this._useCoinbase = false; // intenta Binance primero
+    this._pingInterval = null;
   }
 
   onPrice(cb) { this.priceCallback = cb; }
@@ -32,14 +34,86 @@ class BinanceWS {
   isConnected() { return this._connected; }
 
   async connect() {
+    // Intentar Binance primero, si falla en 5s usar Coinbase
+    try {
+      await this._connectBinance();
+    } catch (e) {
+      logger.warn(`Binance no disponible (${e.message}) — usando Coinbase como fallback`);
+      this._useCoinbase = true;
+      await this._connectCoinbase();
+    }
+  }
+
+  async _connectBinance() {
     return new Promise((resolve, reject) => {
-      this._intentionalClose = false;
-      this.ws = new WebSocket(WS_URL);
+      const timeout = setTimeout(() => {
+        reject(new Error('timeout conectando a Binance'));
+      }, 5000);
+
+      this.ws = new WebSocket(BINANCE_URL);
+
+      this.ws.on('open', () => {
+        clearTimeout(timeout);
+        this._connected = true;
+        this._reconnectDelay = 1000;
+        logger.info(`✅ Conectado a Binance bookTicker (BTC/USDT)`);
+        resolve();
+      });
+
+      this.ws.on('message', (data) => {
+        try {
+          const msg = JSON.parse(data);
+          // bookTicker: { b: bestBid, B: bestBidQty, a: bestAsk, A: bestAskQty }
+          const bestBid = parseFloat(msg.b);
+          const bestAsk = parseFloat(msg.a);
+          const price   = (bestBid + bestAsk) / 2;
+          if (!price || isNaN(price)) return;
+
+          this._lastPrice = price;
+          this._lastTimestamp = Date.now();
+
+          if (this.priceCallback) {
+            this.priceCallback({
+              price, timestamp: this._lastTimestamp,
+              bestBid, bestAsk,
+              bidQty: parseFloat(msg.B) || 0,
+              askQty: parseFloat(msg.A) || 0,
+              spread: bestAsk - bestBid,
+              isBuyerMaker: false,
+            });
+          }
+        } catch (e) {
+          logger.warn(`Error parseando Binance: ${e.message}`);
+        }
+      });
+
+      this.ws.on('error', (err) => {
+        clearTimeout(timeout);
+        this._connected = false;
+        reject(err);
+      });
+
+      this.ws.on('close', (code) => {
+        this._connected = false;
+        if (!this._intentionalClose) {
+          logger.warn(`Binance desconectado (${code}). Reconectando en ${this._reconnectDelay}ms...`);
+          setTimeout(() => this._reconnect(), this._reconnectDelay);
+          this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
+        }
+      });
+
+      this._startPing();
+    });
+  }
+
+  async _connectCoinbase() {
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(COINBASE_URL);
 
       this.ws.on('open', () => {
         this._connected = true;
         this._reconnectDelay = 1000;
-        logger.info(`Conectado: ${WS_URL}`);
+        logger.info(`✅ Conectado a Coinbase ticker (BTC-USD) [fallback]`);
         this.ws.send(JSON.stringify({
           type: 'subscribe',
           product_ids: ['BTC-USD'],
@@ -51,44 +125,36 @@ class BinanceWS {
       this.ws.on('message', (data) => {
         try {
           const msg = JSON.parse(data);
-
-          // ✅ LOG TEMPORAL: ver los primeros 3 mensajes
-          if (!this._loggedFirst) {
-            logger.info(`RAW MSG tipo=${msg.type} channel=${msg.channel}: ${data.toString().slice(0, 400)}`);
-            this._loggedFirst = true;
-          }
-
           if (msg.channel !== 'ticker') return;
-          const event = msg.events?.[0];
-          if (!event) return;
-          const ticker = event.tickers?.[0];
+          const ticker = msg.events?.[0]?.tickers?.[0];
           if (!ticker) return;
 
-          const price = parseFloat(ticker.price);
-          const timestamp = Date.now();
-          const isBuyerMaker = parseFloat(ticker.price) < parseFloat(ticker.best_ask);
+          const price   = parseFloat(ticker.price);
           const bestBid = parseFloat(ticker.best_bid) || price;
           const bestAsk = parseFloat(ticker.best_ask) || price;
-          const bidQty = parseFloat(ticker.best_bid_quantity) || 0;
-          const askQty = parseFloat(ticker.best_ask_quantity) || 0;
-          const spread = bestAsk - bestBid;
-
           if (!price || isNaN(price)) return;
 
           this._lastPrice = price;
-          this._lastTimestamp = timestamp;
+          this._lastTimestamp = Date.now();
 
           if (this.priceCallback) {
-            this.priceCallback({ price, timestamp, isBuyerMaker, bestBid, bestAsk, bidQty, askQty, spread });
+            this.priceCallback({
+              price, timestamp: this._lastTimestamp,
+              bestBid, bestAsk,
+              bidQty: parseFloat(ticker.best_bid_quantity) || 0,
+              askQty: parseFloat(ticker.best_ask_quantity) || 0,
+              spread: bestAsk - bestBid,
+              isBuyerMaker: price < bestAsk,
+            });
           }
         } catch (e) {
-          logger.warn(`Error parseando mensaje WS: ${e.message}`);
+          logger.warn(`Error parseando Coinbase: ${e.message}`);
         }
       });
 
       this.ws.on('error', (err) => {
         this._connected = false;
-        logger.error(`Error: ${err.message}`);
+        logger.error(`Coinbase error: ${err.message}`);
         if (this.errorCallback) this.errorCallback(err);
         reject(err);
       });
@@ -96,27 +162,31 @@ class BinanceWS {
       this.ws.on('close', (code) => {
         this._connected = false;
         if (!this._intentionalClose) {
-          logger.warn(`Desconectado (${code}). Reconectando en ${this._reconnectDelay}ms...`);
+          logger.warn(`Coinbase desconectado (${code}). Reconectando...`);
           setTimeout(() => this._reconnect(), this._reconnectDelay);
           this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
         }
       });
 
-      this._pingInterval = setInterval(() => {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          this.ws.ping();
-        }
-      }, 30000);
+      this._startPing();
     });
+  }
+
+  _startPing() {
+    if (this._pingInterval) clearInterval(this._pingInterval);
+    this._pingInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.ping();
+    }, 30000);
   }
 
   _reconnect() {
     if (this._pingInterval) clearInterval(this._pingInterval);
-    this.connect().then(() => {
+    const reconnectFn = this._useCoinbase
+      ? () => this._connectCoinbase()
+      : () => this._connectBinance().catch(() => { this._useCoinbase = true; return this._connectCoinbase(); });
+    reconnectFn().then(() => {
       if (this.reconnectCallback) this.reconnectCallback();
-    }).catch((err) => {
-      logger.error(`Reconexión fallida: ${err.message}`);
-    });
+    }).catch(err => logger.error(`Reconexión fallida: ${err.message}`));
   }
 
   close() {
