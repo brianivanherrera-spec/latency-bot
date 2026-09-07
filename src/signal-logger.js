@@ -134,8 +134,9 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     pnl:              null,
   };
 
-  // Guardar inmediatamente
+  // Guardar inmediatamente en disco + cache en memoria
   try { fs.appendFileSync(SIGNAL_FILE, JSON.stringify(record) + '\n'); } catch(e) {}
+  openRecordsCache.set(posId, record); // cache para updates rápidos sin I/O
 
   // Programar snapshots de precio Polymarket si tenemos la función
   if (getPolyPrice || polyT0 !== null) {
@@ -216,23 +217,69 @@ function logSignalClose(posId, result, pnl, btcPriceNow) {
   updateStats();
 }
 
+// ─── Cache en memoria de registros abiertos ───────────────────────────────────
+// Evita readFileSync/writeFileSync en el hot path
+// Solo escribe al disco cuando cierra la posición (fuera del hot path)
+const openRecordsCache = new Map(); // posId → record
+
 // ─── Actualizar campos de un registro existente ───────────────────────────────
 function updateRecord(posId, fields, calcDuration = false) {
+  // 1. Actualizar cache en memoria si existe
+  if (openRecordsCache.has(posId)) {
+    const r = openRecordsCache.get(posId);
+    Object.assign(r, fields);
+    if (calcDuration && r.open_timestamp && r.close_timestamp) {
+      r.trade_duration_seconds = Math.round((r.close_timestamp - r.open_timestamp) / 1000);
+    }
+    // Si ya está cerrado, escribir al disco de forma asíncrona
+    if (fields.result !== undefined) {
+      setImmediate(() => _flushRecordToDisk(posId, r));
+    }
+    return;
+  }
+
+  // 2. Fallback: actualizar en disco (para registros de sesiones anteriores)
+  setImmediate(() => {
+    try {
+      if (!fs.existsSync(SIGNAL_FILE)) return;
+      const lines = fs.readFileSync(SIGNAL_FILE, 'utf8').trim().split('\n');
+      const updated = lines.map(line => {
+        try {
+          const r = JSON.parse(line);
+          if (r.posId !== posId) return line;
+          Object.assign(r, fields);
+          if (calcDuration && r.open_timestamp && r.close_timestamp) {
+            r.trade_duration_seconds = Math.round((r.close_timestamp - r.open_timestamp) / 1000);
+          }
+          return JSON.stringify(r);
+        } catch { return line; }
+      });
+      fs.writeFileSync(SIGNAL_FILE, updated.join('\n') + '\n');
+    } catch(e) {}
+  });
+}
+
+// Escribir un registro cerrado al disco actualizando su línea en el archivo
+function _flushRecordToDisk(posId, record) {
   try {
-    if (!fs.existsSync(SIGNAL_FILE)) return;
-    const lines = fs.readFileSync(SIGNAL_FILE, 'utf8').trim().split('\n');
+    if (!fs.existsSync(SIGNAL_FILE)) {
+      fs.appendFileSync(SIGNAL_FILE, JSON.stringify(record) + '\n');
+      return;
+    }
+    const content = fs.readFileSync(SIGNAL_FILE, 'utf8');
+    const lines = content.trim().split('\n');
+    let found = false;
     const updated = lines.map(line => {
       try {
         const r = JSON.parse(line);
         if (r.posId !== posId) return line;
-        Object.assign(r, fields);
-        if (calcDuration && r.open_timestamp && r.close_timestamp) {
-          r.trade_duration_seconds = Math.round((r.close_timestamp - r.open_timestamp) / 1000);
-        }
-        return JSON.stringify(r);
+        found = true;
+        return JSON.stringify(record);
       } catch { return line; }
     });
+    if (!found) updated.push(JSON.stringify(record));
     fs.writeFileSync(SIGNAL_FILE, updated.join('\n') + '\n');
+    openRecordsCache.delete(posId);
   } catch(e) {}
 }
 
