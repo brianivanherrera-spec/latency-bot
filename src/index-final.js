@@ -1631,6 +1631,13 @@ async function main() {
         const signalToOrderMs = sig._t2_signal
           ? Number(t3_orderSent - sig._t2_signal) / 1_000_000
           : null;
+
+        // Profundidad real del libro antes de la orden
+        const depthInfo = polyWs.getDepthInfo?.(tokenId, size);
+        if (depthInfo) {
+          logger.info(`[DEPTH] bestAsk=$${depthInfo.bestAsk?.toFixed(2)} | avail@1tick=${depthInfo.availableAt1Tick} | avail@2ticks=${depthInfo.availableAt2Ticks} | vwap=$${depthInfo.vwap} | slippage=${(depthInfo.expectedSlippage * 100).toFixed(2)}% | fillable=${depthInfo.fillable}`);
+        }
+
         if (signalToOrderMs != null) {
           logger.info(`[LATENCY] signal→order: ${signalToOrderMs.toFixed(1)}ms | network: ${sig._networkLatencyMs ?? '?'}ms | signal_proc: ${sig._signalLatencyMs?.toFixed(1) ?? '?'}ms`);
         }

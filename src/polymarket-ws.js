@@ -207,10 +207,53 @@ class PolymarketWS {
   }
 
   // Síncrono, 0 I/O — tamaño disponible en el best ask
-  getBestAskSize(tokenId, maxAgeMs = 10000) {
+  getBestAskSize(tokenId, maxAgeMs = 3000) {
     const row = this._topOfBook.get(tokenId);
     if (!row || Date.now() - row.updatedAt > maxAgeMs) return null;
     return row.bestAskSize;
+  }
+
+  // Profundidad real del libro — calcula VWAP y disponibilidad hasta N ticks
+  // Usa los primeros 5 niveles del book snapshot para estimar el fill price real
+  // Retorna: { bestAsk, availableAt1Tick, availableAt2Ticks, vwap, expectedSlippage }
+  getDepthInfo(tokenId, sizeNeeded = 5) {
+    const book = this._bookByToken.get(tokenId);
+    if (!book?.asks?.length) return null;
+
+    const asks = book.asks; // ya ordenados por _bestFromLevels al guardar
+    let totalSize = 0;
+    let totalCost = 0;
+    let availableAt1Tick = 0;
+    let availableAt2Ticks = 0;
+    const bestAsk = this._topOfBook.get(tokenId)?.bestAsk;
+    if (!bestAsk) return null;
+
+    for (const level of asks) {
+      const px = parseFloat(level.price);
+      const sz = parseFloat(level.size || level.amount || 0);
+      if (isNaN(px) || isNaN(sz) || px <= 0) continue;
+
+      const ticksAboveBest = Math.round((px - bestAsk) / 0.01);
+      if (ticksAboveBest <= 1) availableAt1Tick += sz;
+      if (ticksAboveBest <= 2) availableAt2Ticks += sz;
+
+      const fill = Math.min(sz, Math.max(0, sizeNeeded - totalSize));
+      totalCost += fill * px;
+      totalSize += fill;
+      if (totalSize >= sizeNeeded) break;
+    }
+
+    const vwap = totalSize > 0 ? totalCost / totalSize : bestAsk;
+    const expectedSlippage = vwap - bestAsk;
+
+    return {
+      bestAsk,
+      availableAt1Tick: parseFloat(availableAt1Tick.toFixed(2)),
+      availableAt2Ticks: parseFloat(availableAt2Ticks.toFixed(2)),
+      vwap: parseFloat(vwap.toFixed(4)),
+      expectedSlippage: parseFloat(expectedSlippage.toFixed(4)),
+      fillable: totalSize >= sizeNeeded,
+    };
   }
 
   // Retorna el último precio REAL de transacción para un tokenId
