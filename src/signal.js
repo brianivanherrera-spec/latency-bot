@@ -253,7 +253,11 @@ _calcEdge(direction, movePct, absZ) {
                side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO' };
     }
 
-    const SENSITIVITY = config.POLY_SENSITIVITY || 2.5;
+    // SENSITIVITY calibrada con datos históricos (1613 trades):
+    // poly_move_avg = 0.41 constante independiente del Z-score
+    // Antes: SENSITIVITY=2.5 (sobreestimaba el edge)
+    // Ahora: SENSITIVITY=41 → adjustment = movePct * 0.41 (correlación real BTC→Poly)
+    const SENSITIVITY = config.POLY_SENSITIVITY || 41;
     const absMoveP = Math.abs(movePct);
     const adjustment = Math.min((absMoveP / 0.1) * (SENSITIVITY / 100), 0.10);
 
