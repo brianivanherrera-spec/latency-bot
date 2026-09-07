@@ -1655,6 +1655,14 @@ async function main() {
         // Guardar fill_time_ms en signal logger
         if (fillMs !== null) signalLogger.updateFillTime(posId, fillMs);
 
+        // Iniciar tick recorder — graba poly + BTC cada 1s mientras la posición está abierta
+        signalLogger.startTickRecorder(
+          posId,
+          sig._getPolyPrice || sig.getPolyPrice,
+          () => signal.getStats()?.lastPrice || null,
+          sig.direction
+        );
+
         // Fix 2: tracker solo se abre DESPUÉS de fill confirmado
         tracker.openPosition({
           marketId: cachedMarket.conditionId,
@@ -1669,7 +1677,10 @@ async function main() {
           tokenOutcome: sig.direction === 'UP' ? 'YES' : 'NO',
           mode: 'live',
           entryType,
-          onClose: () => activePositions.delete(posId),
+          onClose: () => {
+            activePositions.delete(posId);
+            signalLogger.stopTickRecorder(posId); // parar cuando cierra la posición
+          },
         });
 
         // Fallback de seguridad: si el tracker no llama onClose en 10 minutos

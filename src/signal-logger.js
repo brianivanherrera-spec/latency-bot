@@ -9,9 +9,37 @@ const path = require('path');
 const DATA_DIR    = process.env.DATA_DIR || '/data';
 const SIGNAL_FILE = path.join(DATA_DIR, 'signals.jsonl');
 const STATS_FILE  = path.join(DATA_DIR, 'stats.json');
+const TICKS_DIR   = path.join(DATA_DIR, 'ticks');
 
 function ensureDir() {
   try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); } catch(e) {}
+  try { if (!fs.existsSync(TICKS_DIR)) fs.mkdirSync(TICKS_DIR, { recursive: true }); } catch(e) {}
+}
+
+// ─── Tick Recorder ─────────────────────────────────────────────────────────
+// Graba precio Polymarket + BTC cada 1 segundo mientras la posición está abierta
+// Archivo: /data/ticks/POS_xxx.jsonl — una línea por segundo
+// Formato: {"t":0,"poly":0.840,"btc":58420.50,"ts":1234567890}
+const activeTickRecorders = new Map();
+
+function startTickRecorder(posId, getPolyPrice, getBtcPrice, direction) {
+  if (activeTickRecorders.has(posId)) return;
+  const tickFile = path.join(TICKS_DIR, `${posId}.jsonl`);
+  let t = 0;
+  const interval = setInterval(async () => {
+    try {
+      const poly = await getPolyPrice(direction);
+      const btc  = getBtcPrice ? getBtcPrice() : null;
+      fs.appendFileSync(tickFile, JSON.stringify({ t, poly, btc, ts: Date.now() }) + '\n');
+      t++;
+    } catch (e) { /* silencioso */ }
+  }, 1000);
+  activeTickRecorders.set(posId, interval);
+}
+
+function stopTickRecorder(posId) {
+  const interval = activeTickRecorders.get(posId);
+  if (interval) { clearInterval(interval); activeTickRecorders.delete(posId); }
 }
 
 // Contador de losses consecutivos (en memoria, se resetea al reiniciar)
@@ -401,4 +429,4 @@ function updateFillTime(posId, fillTimeMs) {
   }
 }
 
-module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot30s, getStats, getDailySummary, getConsecutiveLosses, updateFillTime };
+module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot30s, getStats, getDailySummary, getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder };
