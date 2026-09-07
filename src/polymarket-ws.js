@@ -179,18 +179,27 @@ class PolymarketWS {
       const asks = book?.asks || [];
       const bids = book?.bids || [];
       if (!asks.length && !bids.length) return;
-      const bestAsk = asks.length ? parseFloat(asks[0]?.price) : null;
-      const bestBid = bids.length ? parseFloat(bids[0]?.price) : null;
+
+      // Usar _bestFromLevels para encontrar el mejor ask real (no el primero del array)
+      const { price: bestAsk } = this._bestFromLevels(asks, 'ask');
+      const { price: bestBid } = this._bestFromLevels(bids, 'bid');
+
       if (bestAsk && bestAsk > 0) {
+        // Si bid y ask disponibles, verificar que el ask sea razonable
+        // Ask ≥ 0.95 cuando el bid está en 0.30-0.70 = orden residual, descartar
+        if (bestBid && bestBid > 0.10 && bestBid < 0.90 && bestAsk >= 0.95) {
+          logger.warn(`[POLY-WS] 🌱 Bootstrap token ${tokenId?.slice(0,12)}: ask=$${bestAsk.toFixed(2)} descartado (bid=$${bestBid.toFixed(2)}, spread absurdo)`);
+          return;
+        }
         this._topOfBook.set(tokenId, {
           bestBid: bestBid || null,
           bestAsk,
           bestBidSize: null,
           bestAskSize: null,
           updatedAt: Date.now(),
-          fromBootstrap: true, // TTL más largo (8s) — WS puede no actualizar continuamente
+          fromBootstrap: true,
         });
-        logger.info(`[POLY-WS] 🌱 Bootstrap topOfBook token ${tokenId?.slice(0,12)}: ask=$${bestAsk.toFixed(2)} (TTL=8s)`);
+        logger.info(`[POLY-WS] 🌱 Bootstrap token ${tokenId?.slice(0,12)}: ask=$${bestAsk.toFixed(2)} bid=$${bestBid?.toFixed(2) ?? '-'} (TTL=8s)`);
       }
     } catch (e) {
       logger.debug(`[POLY-WS] Bootstrap falló para ${tokenId?.slice(0,12)}: ${e.message}`);
