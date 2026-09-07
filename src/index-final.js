@@ -491,9 +491,10 @@ async function main() {
 
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
-  const ws = new BinanceWS();
-  const polyWs = new PolymarketWS(); // Fix B: WebSocket en tiempo real
-  poly.setPolyWs(polyWs); // usar bestAsk del WS en tiempo real sin REST call
+  const ws = new BinanceWS();        // Binance primary (bookTicker ~10-15ms)
+  const wsCoinbase = new BinanceWS(); // Coinbase fallback (ticker ~50-80ms)
+  const polyWs = new PolymarketWS();
+  poly.setPolyWs(polyWs);
 
   let cachedMarket = null;
   let nextMarketCache = null;   // FIX A: mercado pre-fetcheado
@@ -1729,6 +1730,15 @@ async function main() {
 
   logger.info('Conectando a Coinbase WebSocket...');
   await ws.connect();
+  // Coinbase en paralelo — mismo callback de precio, race pattern
+  // El primero que llega actualiza el signal, el otro es redundante pero inofensivo
+  wsCoinbase.onPrice(async (priceData) => {
+    // Solo procesar si Binance no actualizó en los últimos 500ms
+    const lastBinance = ws.getLastPrice();
+    if (lastBinance.timestamp && Date.now() - lastBinance.timestamp < 500) return;
+    if (ws.priceCallback) await ws.priceCallback(priceData);
+  });
+  wsCoinbase.connect().catch(e => logger.warn(`Coinbase WS no disponible: ${e.message}`));
   logger.info('✓ Conectado\n');
 
   // Balance inicial al arrancar
