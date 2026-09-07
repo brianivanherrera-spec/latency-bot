@@ -853,8 +853,20 @@ async function main() {
   const BTC_BUYER_MAKER_WINDOW = 20; // últimos N ticks
 
   ws.onPrice(async (priceData) => {
+    // ─── Telemetría de latencia ──────────────────────────────────────────
+    // T1: cuándo Node.js recibió y procesó este tick
+    const t1_receive = process.hrtime.bigint();
+    const t1_ms = Date.now();
+    // Latencia de red: diferencia entre exchange timestamp y recepción local
+    const exchangeTs = priceData.exchangeTs || priceData.timestamp || t1_ms;
+    const networkLatencyMs = t1_ms - exchangeTs;
+    // Log cada ~5 minutos (cada 300 ticks aprox) para no spamear
+    if (networkLatencyMs > 0 && Math.random() < 0.003) {
+      logger.info(`[LATENCY] BTC exchange→bot: ${networkLatencyMs}ms`);
+    }
+
     const btcPriceNow = priceData.price || priceData.currentPrice || priceData.lastPrice || 0;
-    const nowMs = Date.now();
+    const nowMs = t1_ms;
     if (btcPriceNow > 0) {
       btcPriceHistory.push({ price: btcPriceNow, ts: nowMs });
 
@@ -883,6 +895,13 @@ async function main() {
 
     const sig = signal.process(priceData);
     if (!sig || sig.direction === 'NEUTRAL') return;
+    // T2: cuándo se generó la señal
+    const t2_signal = process.hrtime.bigint();
+    const signalLatencyMs = Number(t2_signal - t1_receive) / 1_000_000;
+    sig._t1_receive = t1_receive;
+    sig._t2_signal = t2_signal;
+    sig._networkLatencyMs = networkLatencyMs;
+    sig._signalLatencyMs = signalLatencyMs;
     const MIN_BUFFER = parseInt(process.env.MIN_BUFFER_SIZE || '100');
     if (sig.bufferSize !== undefined && sig.bufferSize < MIN_BUFFER) return; // warmup
 
@@ -1607,6 +1626,15 @@ async function main() {
         const forcedOrderType = entryOrderTypes[Math.min(entryIndex, entryOrderTypes.length - 1)];
         logger.info(`[LIVE] 📋 Entrada #${entryIndex + 1} → tipo: ${forcedOrderType}`);
 
+        // T3: justo antes de mandar la orden
+        const t3_orderSent = process.hrtime.bigint();
+        const signalToOrderMs = sig._t2_signal
+          ? Number(t3_orderSent - sig._t2_signal) / 1_000_000
+          : null;
+        if (signalToOrderMs != null) {
+          logger.info(`[LATENCY] signal→order: ${signalToOrderMs.toFixed(1)}ms | network: ${sig._networkLatencyMs ?? '?'}ms | signal_proc: ${sig._signalLatencyMs?.toFixed(1) ?? '?'}ms`);
+        }
+
         const orderResult = await poly.placeLimitOrder({
           marketId: cachedMarket.conditionId,
           tokenId,
@@ -1615,7 +1643,7 @@ async function main() {
           size,
           marketQuestion: cachedMarket.question,
           marketEndTs: new Date(cachedMarket.endDate).getTime(),
-          forcedOrderType, // nuevo parámetro para forzar el tipo de orden
+          forcedOrderType,
         });
 
         // Fix 2: GTC — verificar fill antes de abrir posición en tracker
@@ -1656,6 +1684,13 @@ async function main() {
           logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} shares`);
         }
         logger.info(`[LIVE] ✅ Orden llenada: ${actualSize} shares @ $${actualPrice.toFixed(4)} | USDC: $${actualUsdc.toFixed(2)} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
+
+        // T4: fill confirmado — medir el recorrido completo
+        const t4_fill = process.hrtime.bigint();
+        if (sig._t1_receive) {
+          const totalLatencyMs = Number(t4_fill - sig._t1_receive) / 1_000_000;
+          logger.info(`[LATENCY] TOTAL btc_exchange→fill: network=${sig._networkLatencyMs ?? '?'}ms + signal=${sig._signalLatencyMs?.toFixed(1) ?? '?'}ms + order_exec=${fillMs ?? '?'}ms = ${totalLatencyMs.toFixed(1)}ms end-to-end`);
+        }
 
         // Guardar fill_time_ms en signal logger
         if (fillMs !== null) signalLogger.updateFillTime(posId, fillMs);
