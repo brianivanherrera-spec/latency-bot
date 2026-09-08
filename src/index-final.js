@@ -476,7 +476,7 @@ const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // conf
 async function main() {
   logger.info('═'.repeat(70));
   logger.info('🎯 LATENCY BOT - Versión Final');
-  logger.info('📦 BUILD: 37549a9 — ÉLITE fix + bestAsk WS + DUAL ORDER + parseBuyFill');
+  logger.info('📦 BUILD: 4547a51 — aggTrade + isBuyerMaker + SENSITIVITY=41 + telemetría');
   try {
     const { execSync } = require('child_process');
     const gitCommit = execSync('git rev-parse --short HEAD 2>/dev/null || echo "unknown"').toString().trim();
