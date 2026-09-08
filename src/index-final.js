@@ -585,6 +585,11 @@ async function main() {
           return;
         }
       }
+      // Al arrancar con mercado activo — pre-fetchear el siguiente inmediatamente
+      // sin esperar al último minuto (evita perder mercados después de redeploys)
+      if (cachedMarket?.gammaId && !nextMarketCache && !preFetchScheduled) {
+        preFetchNextMarket();
+      }
     }
 
     if (!cachedMarket?.gammaId) return;
