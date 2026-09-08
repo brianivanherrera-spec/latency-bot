@@ -879,6 +879,14 @@ async function main() {
       logger.info(`[BTC-TICK] #${ws._tickCount} price=$${btcPriceNow?.toFixed(2)} isBuyerMaker=${priceData.isBuyerMaker} finite=${Number.isFinite(btcPriceNow)}`);
     }
 
+    // Throttle: aggTrade llega 10-50x/seg — procesar máximo 1 tick/seg para signal engine
+    // Coinbase llegaba 1/seg con variación natural; aggTrade llena el buffer con precios iguales → stdDev=0
+    const TICK_INTERVAL_MS = parseInt(process.env.BTC_TICK_INTERVAL_MS || '500');
+    const lastProcessed = ws._lastProcessedTs || 0;
+    const shouldProcess = (t1_ms - lastProcessed) >= TICK_INTERVAL_MS;
+    if (!shouldProcess) return; // ignorar ticks intermedios
+    ws._lastProcessedTs = t1_ms;
+
     if (btcPriceNow > 0) {
       btcPriceHistory.push({ price: btcPriceNow, ts: nowMs });
 

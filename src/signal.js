@@ -138,7 +138,7 @@ class SignalEngine {
     const mean = this.prices.reduce((a, b) => a + b, 0) / n;
     const variance = this.prices.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / n;
     const stdDev = Math.sqrt(variance);
-    if (stdDev === 0) return null;
+    if (stdDev === 0) return null; // buffer sin variación — esperar más ticks
 
     const zScore = (currentPrice - mean) / stdDev;
 
