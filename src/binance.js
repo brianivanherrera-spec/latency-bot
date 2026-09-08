@@ -9,7 +9,7 @@ const { Logger } = require('./logger');
 
 const logger = new Logger('BINANCE-WS');
 
-const BINANCE_URL  = 'wss://stream.binance.com:9443/stream?streams=btcusdt@bookTicker/btcusdt@aggTrade';
+const BINANCE_URL  = 'wss://stream.binance.com:9443/ws/btcusdt@aggTrade';
 const COINBASE_URL = 'wss://advanced-trade-ws.coinbase.com';
 
 class BinanceWS {
@@ -65,56 +65,29 @@ class BinanceWS {
 
       this.ws.on('message', (data) => {
         try {
-          const outer = JSON.parse(data);
-          // Combined stream: { stream: 'btcusdt@bookTicker', data: {...} }
-          const streamName = outer.stream || '';
-          const msg = outer.data || outer;
+          const msg = JSON.parse(data);
           const receivedAt = Date.now();
           const exchangeTs = msg.E || msg.T || receivedAt;
 
-          if (streamName.includes('bookTicker') || (msg.b && msg.a)) {
-            // bookTicker: { b: bestBid, B: bidQty, a: bestAsk, A: askQty }
-            const bestBid = parseFloat(msg.b);
-            const bestAsk = parseFloat(msg.a);
-            const price   = (bestBid + bestAsk) / 2;
-            if (!price || isNaN(price)) return;
+          // aggTrade: { p: price, q: qty, m: isBuyerMaker, T: tradeTime, E: eventTime }
+          const price = parseFloat(msg.p);
+          if (!price || isNaN(price)) return;
 
-            this._lastBestBid = bestBid;
-            this._lastBestAsk = bestAsk;
-            this._lastPrice = price;
-            this._lastTimestamp = receivedAt;
+          this._lastPrice = price;
+          this._lastTimestamp = receivedAt;
 
-            // Solo emitir desde bookTicker si no hubo aggTrade reciente (<200ms)
-            if (Date.now() - (this._lastTradeAt || 0) > 200 && this.priceCallback) {
-              this.priceCallback({
-                price, timestamp: receivedAt, latencyMs: receivedAt - exchangeTs,
-                bestBid, bestAsk,
-                bidQty: parseFloat(msg.B) || 0,
-                askQty: parseFloat(msg.A) || 0,
-                spread: bestAsk - bestBid,
-                isBuyerMaker: undefined,
-              });
-            }
-
-          } else if (streamName.includes('aggTrade') || msg.m !== undefined) {
-            // aggTrade: { p: price, q: qty, m: isBuyerMaker, T: tradeTime, E: eventTime }
-            const price = parseFloat(msg.p);
-            if (!price || isNaN(price)) return;
-
-            this._lastPrice = price;
-            this._lastTimestamp = receivedAt;
-            this._lastTradeAt = receivedAt;
-
-            if (this.priceCallback) {
-              this.priceCallback({
-                price, timestamp: receivedAt, latencyMs: receivedAt - exchangeTs,
-                bestBid: this._lastBestBid || price,
-                bestAsk: this._lastBestAsk || price,
-                spread: (this._lastBestAsk || price) - (this._lastBestBid || price),
-                bidQty: 0, askQty: parseFloat(msg.q) || 0,
-                isBuyerMaker: msg.m === true, // true=seller, false=buyer
-              });
-            }
+          if (this.priceCallback) {
+            this.priceCallback({
+              price,
+              timestamp: receivedAt,
+              latencyMs: receivedAt - exchangeTs,
+              bestBid: price,
+              bestAsk: price,
+              spread: 0,
+              bidQty: 0,
+              askQty: parseFloat(msg.q) || 0,
+              isBuyerMaker: msg.m === true,
+            });
           }
         } catch (e) {
           logger.warn(`Error parseando Binance: ${e.message}`);
