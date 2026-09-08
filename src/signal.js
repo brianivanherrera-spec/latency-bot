@@ -39,6 +39,11 @@ class SignalEngine {
   }
 
   process({ price, timestamp, isBuyerMaker, bidQty = 0, askQty = 0, spread = 0 }) {
+    // Rechazar precio inválido antes de agregar al buffer — un NaN envenena todo
+    if (!Number.isFinite(price) || price <= 0) {
+      logger.warn(`[SIGNAL] precio inválido ignorado: ${price}`);
+      return null;
+    }
     this._totalTicks++;
 
     this.prices.push(price);

@@ -872,6 +872,13 @@ async function main() {
 
     const btcPriceNow = priceData.price || priceData.currentPrice || priceData.lastPrice || 0;
     const nowMs = t1_ms;
+
+    // Contador de ticks — diagnosticar si el callback se invoca correctamente
+    ws._tickCount = (ws._tickCount || 0) + 1;
+    if (ws._tickCount <= 3 || ws._tickCount % 1000 === 0) {
+      logger.info(`[BTC-TICK] #${ws._tickCount} price=$${btcPriceNow?.toFixed(2)} isBuyerMaker=${priceData.isBuyerMaker} finite=${Number.isFinite(btcPriceNow)}`);
+    }
+
     if (btcPriceNow > 0) {
       btcPriceHistory.push({ price: btcPriceNow, ts: nowMs });
 
