@@ -476,7 +476,8 @@ const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // conf
 async function main() {
   logger.info('═'.repeat(70));
   logger.info('🎯 LATENCY BOT - Versión Final');
-  logger.info('📦 BUILD: 4547a51 — aggTrade + isBuyerMaker + SENSITIVITY=41 + telemetría');
+  const buildCommit = process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) || process.env.GIT_COMMIT?.slice(0, 7) || 'local';
+  logger.info(`📦 BUILD: ${buildCommit}`);
   try {
     const { execSync } = require('child_process');
     const gitCommit = execSync('git rev-parse --short HEAD 2>/dev/null || echo "unknown"').toString().trim();
