@@ -9,7 +9,10 @@
  * antes de que el mercado actualice.
  */
 
+const { Logger } = require('./logger');
 const config = require('./config');
+
+const logger = new Logger('SIGNAL');
 
 class SignalEngine {
   constructor() {
