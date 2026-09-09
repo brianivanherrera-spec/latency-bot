@@ -187,8 +187,22 @@ class PolymarketClient {
       try { tokens = typeof m.clobTokenIds === 'string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds; }
       catch(e) { tokens = []; }
     }
+
+    // Extraer el strike price del description — "Will BTC be above $78,325 at..."
+    let strikePrice = null;
+    const desc = m.description || m.question || '';
+    const strikeMatch = desc.match(/\$([0-9,]+(?:\.[0-9]+)?)/);
+    if (strikeMatch) {
+      strikePrice = parseFloat(strikeMatch[1].replace(/,/g, ''));
+    }
+
+    if (strikePrice) {
+      logger.info(`[POLY] Strike price BTC: $${strikePrice.toLocaleString()}`);
+    }
+
     return { conditionId: m.conditionId||m.id, gammaId: m.id, question: m.question,
-      endDate: m.endDate, yesTokenId: tokens[0]||null, noTokenId: tokens[1]||null, marketSlug: m.marketSlug };
+      endDate: m.endDate, yesTokenId: tokens[0]||null, noTokenId: tokens[1]||null,
+      marketSlug: m.marketSlug, strikePrice, description: desc };
   }
 
   /**

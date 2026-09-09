@@ -556,6 +556,13 @@ async function main() {
               priceAtOpen: signal.getStats()?.lastPrice || 0,
             });
           }
+          // Mostrar strike price si disponible
+          if (cachedMarket.strikePrice) {
+            const btcNow = signal.getStats()?.lastPrice || 0;
+            const diff = btcNow - cachedMarket.strikePrice;
+            const pct = btcNow > 0 ? ((diff / cachedMarket.strikePrice) * 100).toFixed(3) : '?';
+            logger.info(`[POLY] Strike BTC: $${cachedMarket.strikePrice.toLocaleString()} | BTC actual: $${btcNow.toLocaleString()} | diff: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} (${pct}%)`);
+          }
         }
       }
       // Si no hay pre-cache, buscar normalmente
