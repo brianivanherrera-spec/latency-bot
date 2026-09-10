@@ -188,6 +188,19 @@ class PolymarketClient {
       catch(e) { tokens = []; }
     }
 
+    // CÓMO POLYMARKET FIJA LOS PRECIOS INICIALES DE MERCADOS BINARIOS:
+    // ═════════════════════════════════════════════════════════════════
+    //
+    // 1. MERCADOS CON STRIKE EXPLÍCITO (ej: "Will BTC be above $78,325?")
+    //    → Polymarket fija precio inicial en función de probabilidades
+    //    → Extraemos el strike price de la descripción
+    //
+    // 2. MERCADOS SIN STRIKE (ej: "Bitcoin Up or Down - 2:20-2:25PM ET")
+    //    → Polymarket fija precio inicial EN 0.50 (50% YES / 50% NO) — sin sesgo
+    //    → PERO: necesitamos capturar el precio de BTC EN BINANCE al momento de apertura
+    //       como BASELINE para analizar si subió/bajó durante esos 5 minutos
+    //    → El bot captura este precio después (en index-final.js)
+    //
     // Extraer el strike price solo si hay patrón claro "Will BTC be above/below $XX,XXX"
     // Para mercados "Bitcoin Up or Down" sin strike explícito, dejar como null
     let strikePrice = null;

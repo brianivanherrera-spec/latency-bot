@@ -538,12 +538,16 @@ async function main() {
         if (now >= marketStart) {
           cachedMarket = nextMarketCache;
           nextMarketCache = null;
-          // Capturar BTC price al momento de activación del mercado
+          // Para mercados "Bitcoin Up or Down" sin strike explícito:
+          // Polymarket fija el precio inicial en 0.50 (50% YES / 50% NO)
+          // pero necesitamos capturar el precio de BTC en Binance AL MOMENTO DE APERTURA
+          // como baseline de referencia para analizar si subió/bajó en esos 5 minutos
           const btcPriceNow = btcPriceHistory.length > 0
             ? btcPriceHistory[btcPriceHistory.length - 1].price
             : (signal.getStats()?.lastPrice || null);
           if (btcPriceNow && !cachedMarket.strikePrice) {
             cachedMarket.market_strike_price_captured_at_open = btcPriceNow;
+            logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
           }
           logger.info(`[POLY] ✅ Mercado pre-cacheado activado: ${cachedMarket.question}`);
           logger.info(`[POLY] yesToken: ${cachedMarket.yesTokenId}`);
@@ -579,12 +583,15 @@ async function main() {
       if (!cachedMarket?.gammaId) {
         const m = await poly.findBTCMarket();
         if (m) {
-          // Capturar BTC price al momento de activación del mercado
+          // Para mercados "Bitcoin Up or Down" sin strike explícito:
+          // Capturar el precio de BTC en Binance AL MOMENTO EN QUE COMIENZA EL MERCADO
+          // Este es el baseline para analizar si subió/bajó durante esos 5 minutos
           const btcPriceNow = btcPriceHistory.length > 0
             ? btcPriceHistory[btcPriceHistory.length - 1].price
             : (signal.getStats()?.lastPrice || null);
           if (btcPriceNow && !m.strikePrice) {
             m.market_strike_price_captured_at_open = btcPriceNow;
+            logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
           }
           cachedMarket = m;
           logger.info(`[POLY] Mercado: ${m.question}`);
