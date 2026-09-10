@@ -127,9 +127,6 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     // Momentum post-señal
     btc_price_t30:    null,
     btc_price_change_30s: null,
-    // Feint detection — early warning if price moves opposite direction
-    feint_detected_at_t1: false,
-    feint_move_pct:   null,
     // Resultado
     open_timestamp:   Date.now(),
     close_timestamp:  null,
@@ -157,21 +154,6 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
           const price = await getPolyPrice(direction);
           snap.record.poly_price_t1 = price;
           console.info(`[SNAP] ${posId} t1=${price} dir=${direction}`);
-
-          // ─── Feint detection: early warning if price moves opposite direction ──
-          const t0Price = snap.record.poly_price_t0;
-          if (t0Price && price) {
-            const moveDirection = price > t0Price ? 'UP' : price < t0Price ? 'DOWN' : 'FLAT';
-            const expectedDirection = direction; // 'UP', 'DOWN', or direction we predicted
-
-            // Feint = price moves opposite to our prediction
-            if ((expectedDirection === 'UP' && moveDirection === 'DOWN') ||
-                (expectedDirection === 'DOWN' && moveDirection === 'UP')) {
-              const movePct = ((price - t0Price) / t0Price * 100).toFixed(3);
-              console.warn(`[FEINT] ${posId} EARLY-WARNING: predicted ${expectedDirection} but price moved ${moveDirection} (${movePct}%) at t1`);
-              updateRecord(posId, { feint_detected_at_t1: true, feint_move_pct: parseFloat(movePct) });
-            }
-          }
         }
       } catch(e) { console.warn(`[SNAP] t1 error: ${e.message}`); }
     }, 1000);
