@@ -194,6 +194,8 @@ class PnLTracker {
     const emoji = won ? 'WIN' : 'LOSS';
     logger.info(`[${emoji}] Posicion cerrada: ${pos.id}`);
     logger.info(`   Resultado: ${winner} | PnL: ${pnl > 0 ? '+' : ''}$${pnl}`);
+    // Log claro para análisis: qué predijo el bot vs cómo resolvió el mercado
+    logger.info(`[SIGNAL-RESOLUTION] ${pos.id} | Predicted:${pos.direction || '?'} | Resolved:${winner} | Match:${(pos.direction === 'UP' && winner === 'YES') || (pos.direction === 'DOWN' && winner === 'NO') ? 'YES' : 'NO'}`);
     logger.info(`   P&L Total acumulado: ${this.totalPnL > 0 ? '+' : ''}$${this.totalPnL.toFixed(2)} | W:${this.wins} L:${this.losses}`);
     // Registrar resultado en signal logger
     // Intentar con pos.id y pos.posId (ambos formatos usados)
