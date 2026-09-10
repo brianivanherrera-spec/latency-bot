@@ -478,4 +478,58 @@ function updateFillTime(posId, fillTimeMs) {
   }
 }
 
-module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot1s, getStats, getDailySummary, getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder };
+// ─── PHASE 0: Detailed Fill Telemetry ─────────────────────────────────────
+// Logs detailed information about every order attempt (filled or not)
+// Purpose: Validate audit hypotheses about NO_FILL causes
+// File: /data/fills.jsonl — one line per order attempt
+const FILLS_FILE = path.join(DATA_DIR, 'fills.jsonl');
+
+function logFillTelemetry({
+  posId,
+  fill_result,           // 'FILLED' or 'NO_FILL'
+  order_status,          // 'matched', 'live', 'pending', etc.
+  order_price,           // price at which order was placed
+  best_ask,              // best ask from order book at time of order
+  rejection_reason,      // if NO_FILL: why it didn't fill
+  time_to_fill_ms,       // milliseconds to fill (null if NO_FILL)
+  order_size,            // number of shares requested
+  size_filled,           // number of shares actually filled
+  btc_price_entry,       // BTC price at signal entry
+  poly_price_entry,      // Poly price at signal entry
+  signal_direction,      // 'UP' or 'DOWN'
+  market_strike_price,   // reference price from market
+}) {
+  ensureDir();
+  try {
+    const record = {
+      posId,
+      timestamp: Date.now(),
+      fill_result,
+      order_status,
+      order_price: order_price?.toFixed(4),
+      best_ask: best_ask?.toFixed(4),
+      rejection_reason: rejection_reason || null,
+      time_to_fill_ms,
+      order_size,
+      size_filled: size_filled || null,
+      btc_price_entry: btc_price_entry?.toLocaleString(),
+      poly_price_entry: poly_price_entry?.toFixed(4),
+      signal_direction,
+      market_strike_price: market_strike_price?.toLocaleString(),
+    };
+
+    // Append as JSONL
+    fs.appendFileSync(FILLS_FILE, JSON.stringify(record) + '\n');
+
+    // Log summary to console
+    if (fill_result === 'FILLED') {
+      console.log(`[PHASE0-FILL] ✅ ${posId} filled @ $${record.order_price} in ${time_to_fill_ms}ms`);
+    } else {
+      console.log(`[PHASE0-NOFILL] ❌ ${posId} | status=${order_status} | reason=${rejection_reason || 'unknown'}`);
+    }
+  } catch (e) {
+    // Non-critical
+  }
+}
+
+module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot1s, getStats, getDailySummary, getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder, logFillTelemetry };

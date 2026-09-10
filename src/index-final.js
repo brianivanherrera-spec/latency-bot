@@ -1707,6 +1707,24 @@ async function main() {
             ? `orden en libro pero sin fill confirmado (status=live)`
             : (orderResult.error || 'sin liquidez');
           logger.warn(`[LIVE] ⚠️ Orden no llenada — ${reason}`);
+
+          // PHASE 0: Log fill telemetry for analysis
+          signalLogger.logFillTelemetry({
+            posId,
+            fill_result: 'NO_FILL',
+            order_status: orderStatus,
+            order_price: price,
+            best_ask: depthInfo?.bestAsk,
+            rejection_reason: reason,
+            time_to_fill_ms: null,
+            order_size: size,
+            size_filled: 0,
+            btc_price_entry: btcPriceAtSignal,
+            poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
+            signal_direction: sig.direction,
+            market_strike_price: cachedMarket.strikePrice,
+          });
+
           signalLogger.logSignalClose(posId, 'NO_FILL', 0);
           activePositions.delete(posId);
           return;
@@ -1725,6 +1743,23 @@ async function main() {
           logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} shares`);
         }
         logger.info(`[LIVE] ✅ Orden llenada: ${actualSize} shares @ $${actualPrice.toFixed(4)} | USDC: $${actualUsdc.toFixed(2)} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
+
+        // PHASE 0: Log fill telemetry for analysis
+        signalLogger.logFillTelemetry({
+          posId,
+          fill_result: 'FILLED',
+          order_status: orderStatus,
+          order_price: price,
+          best_ask: depthInfo?.bestAsk,
+          rejection_reason: null,
+          time_to_fill_ms: fillMs,
+          order_size: size,
+          size_filled: actualSize,
+          btc_price_entry: btcPriceAtSignal,
+          poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
+          signal_direction: sig.direction,
+          market_strike_price: cachedMarket.strikePrice,
+        });
 
         // T4: fill confirmado — medir el recorrido completo
         const t4_fill = process.hrtime.bigint();
@@ -1772,6 +1807,24 @@ async function main() {
 
       } catch (err) {
         logger.error(`[LIVE] ❌ Error: ${err.message}`);
+
+        // PHASE 0: Log error as NO_FILL
+        signalLogger.logFillTelemetry({
+          posId,
+          fill_result: 'NO_FILL',
+          order_status: 'error',
+          order_price: price,
+          best_ask: depthInfo?.bestAsk,
+          rejection_reason: `Exception: ${err.message}`,
+          time_to_fill_ms: null,
+          order_size: size,
+          size_filled: 0,
+          btc_price_entry: btcPriceAtSignal,
+          poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
+          signal_direction: sig.direction,
+          market_strike_price: cachedMarket.strikePrice,
+        });
+
         signalLogger.logSignalClose(posId, 'NO_FILL', 0);
         activePositions.delete(posId);
         return;
@@ -1784,10 +1837,45 @@ async function main() {
 
       if (!filled) {
         logger.warn(`[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);
+
+        // PHASE 0: Log paper mode NO_FILL
+        signalLogger.logFillTelemetry({
+          posId,
+          fill_result: 'NO_FILL',
+          order_status: 'simulated_no_fill',
+          order_price: price,
+          best_ask: null,
+          rejection_reason: `Paper mode simulation (fill_rate=${(paperFillRate*100).toFixed(0)}%)`,
+          time_to_fill_ms: null,
+          order_size: size,
+          size_filled: 0,
+          btc_price_entry: btcPriceAtSignal,
+          poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
+          signal_direction: sig.direction,
+          market_strike_price: cachedMarket.strikePrice,
+        });
+
         signalLogger.logSignalClose(posId, 'NO_FILL', 0);
         activePositions.delete(posId);
         return;
       }
+
+      // PHASE 0: Log paper mode FILLED
+      signalLogger.logFillTelemetry({
+        posId,
+        fill_result: 'FILLED',
+        order_status: 'simulated_filled',
+        order_price: price,
+        best_ask: null,
+        rejection_reason: null,
+        time_to_fill_ms: Math.random() * 500,  // Simulate 0-500ms
+        order_size: size,
+        size_filled: size,
+        btc_price_entry: btcPriceAtSignal,
+        poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
+        signal_direction: sig.direction,
+        market_strike_price: cachedMarket.strikePrice,
+      });
 
       tracker.openPosition({
         marketId: cachedMarket.conditionId,
