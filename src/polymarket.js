@@ -188,25 +188,22 @@ class PolymarketClient {
       catch(e) { tokens = []; }
     }
 
-    // Extraer el strike price del description/question — buscar múltiples formatos
+    // Extraer el strike price solo si hay patrón claro "Will BTC be above/below $XX,XXX"
+    // Para mercados "Bitcoin Up or Down" sin strike explícito, dejar como null
     let strikePrice = null;
     const desc = m.description || '';
     const question = m.question || '';
     const fullText = `${desc} ${question}`;
 
-    // Intentar formatos: $78,325 | $78325 | 78,325 | 78325 seguido de números
-    let strikeMatch = fullText.match(/(?:Will BTC be|above|below)?\s*(?:\$)?([0-9]{2}[0-9,]*?)(?:\s|$|[;.,])/i);
-    if (!strikeMatch) {
-      strikeMatch = fullText.match(/\$([0-9,]+(?:\.[0-9]+)?)/);
-    }
+    // Solo capturar si hay patrón claro: "Will BTC be above/below $78,325"
+    const strikeMatch = fullText.match(/(?:Will BTC be|above|below)?\s*(?:\$)?([0-9]{4,}[0-9,]*)(?:\s|$|[;.,])/i);
     if (strikeMatch) {
       const priceStr = strikeMatch[1].replace(/,/g, '').trim();
       strikePrice = parseFloat(priceStr);
-      if (isNaN(strikePrice)) strikePrice = null;
-    }
-
-    if (strikePrice) {
-      logger.info(`[POLY] Strike price BTC: $${strikePrice.toLocaleString()}`);
+      if (isNaN(strikePrice) || strikePrice < 100) strikePrice = null;  // BTC prices are usually >$100
+      if (strikePrice) {
+        logger.info(`[POLY] Strike price BTC: $${strikePrice.toLocaleString()}`);
+      }
     }
 
     return { conditionId: m.conditionId||m.id, gammaId: m.id, question: m.question,
