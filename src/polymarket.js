@@ -188,12 +188,21 @@ class PolymarketClient {
       catch(e) { tokens = []; }
     }
 
-    // Extraer el strike price del description — "Will BTC be above $78,325 at..."
+    // Extraer el strike price del description/question — buscar múltiples formatos
     let strikePrice = null;
-    const desc = m.description || m.question || '';
-    const strikeMatch = desc.match(/\$([0-9,]+(?:\.[0-9]+)?)/);
+    const desc = m.description || '';
+    const question = m.question || '';
+    const fullText = `${desc} ${question}`;
+
+    // Intentar formatos: $78,325 | $78325 | 78,325 | 78325 seguido de números
+    let strikeMatch = fullText.match(/(?:Will BTC be|above|below)?\s*(?:\$)?([0-9]{2}[0-9,]*?)(?:\s|$|[;.,])/i);
+    if (!strikeMatch) {
+      strikeMatch = fullText.match(/\$([0-9,]+(?:\.[0-9]+)?)/);
+    }
     if (strikeMatch) {
-      strikePrice = parseFloat(strikeMatch[1].replace(/,/g, ''));
+      const priceStr = strikeMatch[1].replace(/,/g, '').trim();
+      strikePrice = parseFloat(priceStr);
+      if (isNaN(strikePrice)) strikePrice = null;
     }
 
     if (strikePrice) {

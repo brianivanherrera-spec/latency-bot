@@ -1756,6 +1756,7 @@ async function main() {
           posId,
           tokenId,
           tokenOutcome: sig.direction === 'UP' ? 'YES' : 'NO',
+          direction: sig.direction,
           mode: 'live',
           entryType,
           onClose: () => {
@@ -1798,6 +1799,7 @@ async function main() {
         endDate: cachedMarket.endDate,
         posId,
         tokenOutcome: sig.direction === 'UP' ? 'YES' : 'NO',
+        direction: sig.direction,
         mode: 'paper',
         entryType,
       });

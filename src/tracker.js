@@ -59,7 +59,7 @@ class PnLTracker {
     }
   }
  
-  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType, tokenId, tokenOutcome, onClose }) {
+  openPosition({ marketId, gammaId, marketQuestion, side, price, size, endDate, posId, entryType, tokenId, tokenOutcome, direction, onClose }) {
     const pos = {
       id: posId || `POS_${Date.now()}`,
       marketId,
@@ -74,6 +74,7 @@ class PnLTracker {
       openedAt: new Date(),
       status: 'OPEN',
       tokenOutcome: tokenOutcome || 'YES',
+      direction: direction || '?',
       entryType: entryType || 'early',
       _onClose: onClose || null,  // callback para liberar slot en index-final
     };
