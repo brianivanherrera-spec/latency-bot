@@ -1,3 +1,5 @@
 node_modules/
 analyze-trades.js
 export-signals.js
+ANALYSIS-QUICK-START.txt
+DATA-ANALYSIS-SETUP.md
