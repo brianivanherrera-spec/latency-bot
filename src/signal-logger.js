@@ -77,7 +77,7 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     filled_price:     price,
     size,
     market:           market?.question?.slice(-30) || '',
-    strike_price:     market?.strikePrice || null,
+    strike_price:     market?.strikePrice || market?.market_strike_price_captured_at_open || null,
     // Indicadores de señal
     zscore:           parseFloat(sig?.zScore?.toFixed(3) || 0),
     movePct:          parseFloat(sig?.movePct?.toFixed(4) || 0),

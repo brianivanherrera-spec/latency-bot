@@ -538,6 +538,13 @@ async function main() {
         if (now >= marketStart) {
           cachedMarket = nextMarketCache;
           nextMarketCache = null;
+          // Capturar BTC price al momento de activación del mercado
+          const btcPriceNow = btcPriceHistory.length > 0
+            ? btcPriceHistory[btcPriceHistory.length - 1].price
+            : (signal.getStats()?.lastPrice || null);
+          if (btcPriceNow && !cachedMarket.strikePrice) {
+            cachedMarket.market_strike_price_captured_at_open = btcPriceNow;
+          }
           logger.info(`[POLY] ✅ Mercado pre-cacheado activado: ${cachedMarket.question}`);
           logger.info(`[POLY] yesToken: ${cachedMarket.yesTokenId}`);
           logger.info(`[POLY] noToken: ${cachedMarket.noTokenId}`);
@@ -558,11 +565,13 @@ async function main() {
             });
           }
           // Mostrar strike price si disponible
-          if (cachedMarket.strikePrice) {
+          const effectiveStrike = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
+          if (effectiveStrike) {
             const btcNow = signal.getStats()?.lastPrice || 0;
-            const diff = btcNow - cachedMarket.strikePrice;
-            const pct = btcNow > 0 ? ((diff / cachedMarket.strikePrice) * 100).toFixed(3) : '?';
-            logger.info(`[POLY] Strike BTC: $${cachedMarket.strikePrice.toLocaleString()} | BTC actual: $${btcNow.toLocaleString()} | diff: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} (${pct}%)`);
+            const diff = btcNow - effectiveStrike;
+            const pct = btcNow > 0 ? ((diff / effectiveStrike) * 100).toFixed(3) : '?';
+            const sourceLabel = cachedMarket.strikePrice ? 'desc' : 'captured@open';
+            logger.info(`[POLY] Strike BTC ($${sourceLabel}): $${effectiveStrike.toLocaleString()} | BTC actual: $${btcNow.toLocaleString()} | diff: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} (${pct}%)`);
           }
         }
       }
@@ -570,6 +579,13 @@ async function main() {
       if (!cachedMarket?.gammaId) {
         const m = await poly.findBTCMarket();
         if (m) {
+          // Capturar BTC price al momento de activación del mercado
+          const btcPriceNow = btcPriceHistory.length > 0
+            ? btcPriceHistory[btcPriceHistory.length - 1].price
+            : (signal.getStats()?.lastPrice || null);
+          if (btcPriceNow && !m.strikePrice) {
+            m.market_strike_price_captured_at_open = btcPriceNow;
+          }
           cachedMarket = m;
           logger.info(`[POLY] Mercado: ${m.question}`);
           logger.info(`[POLY] yesToken: ${m.yesTokenId}`);
@@ -1722,7 +1738,7 @@ async function main() {
             btc_price_entry: btcPriceAtSignal,
             poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
             signal_direction: sig.direction,
-            market_strike_price: cachedMarket.strikePrice,
+            market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open,
           });
 
           signalLogger.logSignalClose(posId, 'NO_FILL', 0);
