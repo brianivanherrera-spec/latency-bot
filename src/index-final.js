@@ -1637,10 +1637,16 @@ async function main() {
       },
     });
 
-    // BTC snapshot 30s después
+    // BTC snapshot 1s después (mercados de 5 min, cada segundo importa)
     setTimeout(() => {
-      signalLogger.logBtcSnapshot30s(posId, btcPriceAtSignal, signal.getStats()?.lastPrice);
-    }, 30000);
+      const btcPrice1s = signal.getStats()?.lastPrice;
+      signalLogger.logBtcSnapshot1s(posId, btcPriceAtSignal, btcPrice1s);
+      // Log claro del estado inicial vs 1s después
+      const changePct = btcPrice1s && btcPriceAtSignal
+        ? ((btcPrice1s - btcPriceAtSignal) / btcPriceAtSignal * 100).toFixed(3)
+        : '?';
+      logger.info(`[SIGNAL-MONITOR] ${posId} | Strike:$${cachedMarket.strikePrice?.toLocaleString() || '?'} | Entry-BTC:$${btcPriceAtSignal.toLocaleString()} | BTC@1s:$${btcPrice1s?.toLocaleString() || '?'} | Change:${changePct}% | Pred:${sig.direction} | Resolved:?`);
+    }, 1000);
 
     // ✅ Ejecutar orden real (solo en LIVE)
     if (!config.DRY_RUN) {

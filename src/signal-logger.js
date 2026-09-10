@@ -124,9 +124,9 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     poly_price_t1:    null,
     poly_price_t2:    null,
     poly_price_t5:    null,
-    // Momentum post-señal
-    btc_price_t30:    null,
-    btc_price_change_30s: null,
+    // Momentum post-señal — capturar a 1s para mercados de 5 min
+    btc_price_t1s:    null,
+    btc_price_change_1s: null,
     // Resultado
     open_timestamp:   Date.now(),
     close_timestamp:  null,
@@ -284,13 +284,14 @@ function _flushRecordToDisk(posId, record) {
   } catch(e) {}
 }
 
-// ─── Guardar BTC price 30s después de la señal ───────────────────────────────
-function logBtcSnapshot30s(posId, btcPriceThen, btcPriceNow) {
+// ─── Guardar BTC price 1s después de la señal ──────────────────────────────────
+// Capturamos a 1s (no 30s) porque los mercados duran 5 min y cada segundo importa
+function logBtcSnapshot1s(posId, btcPriceThen, btcPriceNow) {
   if (!btcPriceThen || !btcPriceNow) return;
   const change = ((btcPriceNow - btcPriceThen) / btcPriceThen * 100);
   updateRecord(posId, {
-    btc_price_t30: btcPriceNow,
-    btc_price_change_30s: parseFloat(change.toFixed(4)),
+    btc_price_t1s: btcPriceNow,
+    btc_price_change_1s: parseFloat(change.toFixed(4)),
   });
 }
 
@@ -477,4 +478,4 @@ function updateFillTime(posId, fillTimeMs) {
   }
 }
 
-module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot30s, getStats, getDailySummary, getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder };
+module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot1s, getStats, getDailySummary, getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder };
