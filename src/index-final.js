@@ -956,18 +956,32 @@ async function main() {
 
     // ─── Hard-gate: precio extremo de Polymarket ──────────────────────────
     // Nunca entrar si el token que compramos está en zona extrema.
-    // Default: 0.95 — permite señales élite hasta $0.95 (antes era 0.85, bloqueaba demasiado)
+    // Default: 0.90 — permite señales élite hasta $0.90 (bajado de 0.95 para evitar feints)
     // Configurable via POLY_EXTREME_THRESHOLD en Railway
     const polyYesNow = sig.edge?.polyYes ?? livePolyYes;
     if (polyYesNow !== null && polyYesNow !== undefined) {
       const tokenMid = sig.direction === 'UP' ? polyYesNow : (1 - polyYesNow);
-      const extremeThreshold = parseFloat(process.env.POLY_EXTREME_THRESHOLD || '0.95');
-      // Bloquear cuando el token que compramos vale demasiado poco (< 5%) o demasiado (> 95%)
-      // tokenMid < 0.05 = token casi sin valor, ganancia mínima con riesgo máximo
-      // tokenMid > 0.95 = token casi en $1, ídem
+      const extremeThreshold = parseFloat(process.env.POLY_EXTREME_THRESHOLD || '0.90');
+      // Bloquear cuando el token que compramos vale demasiado poco (< 10%) o demasiado (> 90%)
+      // tokenMid < 0.10 = token casi sin valor, ganancia mínima con riesgo máximo
+      // tokenMid > 0.90 = token casi en $1, ídem
       // El umbral bajo es SIMÉTRICO: (1 - extremeThreshold)
       if (tokenMid < (1 - extremeThreshold) || tokenMid > extremeThreshold) {
         logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real (umbral: ${(1-extremeThreshold).toFixed(2)}-${extremeThreshold})`);
+        return;
+      }
+    }
+
+    // ─── Feint detection gate: bloquear polymarket extrema antes de abrir ────
+    // Análisis histórico: 7/8 LOSS trades estaban en poly_t0 = 0.505 o 0.255
+    // El patrón: poly en extremo + feint = Poly cae cuando bot predice UP (o sube para DOWN)
+    // FEINT_POLY_MIN/MAX: zonas donde hay riesgo de "feint" del mercado
+    // Configurable via FEINT_POLY_MIN y FEINT_POLY_MAX en Railway
+    const faintPolyMin = parseFloat(process.env.FEINT_POLY_MIN || '0.42');
+    const faintPolyMax = parseFloat(process.env.FEINT_POLY_MAX || '0.58');
+    if (polyYesNow !== null && polyYesNow !== undefined) {
+      if (polyYesNow < faintPolyMin || polyYesNow > faintPolyMax) {
+        logger.warn(`[SKIP] ⚠️ FEINT-RISK: poly @ $${polyYesNow.toFixed(3)} (riesgo de feint en zona extrema [${faintPolyMin.toFixed(2)}-${faintPolyMax.toFixed(2)}])`);
         return;
       }
     }
