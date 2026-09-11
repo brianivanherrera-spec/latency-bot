@@ -878,6 +878,30 @@ class PolymarketWS {
     this._teardownSocket();
     this._connected = false;
   }
+  // PHASE 2: Obtener estado completo del book para logging RAW
+  getBookSnapshot() {
+    const yes = this._topOfBook.get(this._yesTokenId) || {};
+    const no = this._topOfBook.get(this._noTokenId) || {};
+    return {
+      yes_bid: yes.bestBid || null,
+      yes_ask: yes.bestAsk || null,
+      yes_bid_size: yes.bestBidSize || null,
+      yes_ask_size: yes.bestAskSize || null,
+      no_bid: no.bestBid || null,
+      no_ask: no.bestAsk || null,
+      no_bid_size: no.bestBidSize || null,
+      no_ask_size: no.bestAskSize || null,
+      yes_spread: yes.bestAsk && yes.bestBid ? yes.bestAsk - yes.bestBid : null,
+      no_spread: no.bestAsk && no.bestBid ? no.bestAsk - no.bestBid : null,
+    };
+  }
+
+  // PHASE 2: Obtener precios actuales
+  getCurrentPrices() {
+    const yes = this._marketPriceByToken.get(this._yesTokenId);
+    const no = this._marketPriceByToken.get(this._noTokenId);
+    return { yes, no };
+  }
 }
 
 module.exports = { PolymarketWS };
