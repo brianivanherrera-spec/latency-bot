@@ -840,6 +840,46 @@ async function main() {
   // Hook al resolver — mostrar resolución
   polyWs.onResolved2 = logMarketResolution;
 
+  // PHASE 2: Endpoint para diagnósticos
+  const diagnosticsRouter = require('express').Router();
+  diagnosticsRouter.get('/phase2-status', (req, res) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const DATA_DIR = process.env.DATA_DIR || '/data';
+      const files = {
+        binanceRaw: path.join(DATA_DIR, 'binance-raw.jsonl'),
+        polymarketRaw: path.join(DATA_DIR, 'polymarket-raw.jsonl'),
+        botEvents: path.join(DATA_DIR, 'bot-events.jsonl'),
+      };
+
+      const status = {};
+      for (const [name, filePath] of Object.entries(files)) {
+        if (fs.existsSync(filePath)) {
+          const stats = fs.statSync(filePath);
+          const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(l => l.trim()).length;
+          status[name] = {
+            exists: true,
+            size: (stats.size / 1024).toFixed(2) + ' KB',
+            lines: lines,
+            path: filePath
+          };
+        } else {
+          status[name] = { exists: false, lines: 0, path: filePath };
+        }
+      }
+      res.json({
+        timestamp: new Date().toISOString(),
+        dataDir: DATA_DIR,
+        status: status
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  if (app) app.use(diagnosticsRouter);
+
   // Conectar WS de Polymarket en paralelo
   polyWs.connect().catch(err => logger.warn(`Polymarket WS no disponible: ${err.message} — usando HTTP polling`));
 
