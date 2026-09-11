@@ -6,6 +6,7 @@
 
 const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
+const UserWebSocket = require('./polymarket-user-ws');
 const marketResearch = require('./market-research');
 const RESEARCH_MODE = process.env.RESEARCH_MODE === 'true';
 const { SignalEngine } = require('./signal');
@@ -497,6 +498,24 @@ async function main() {
   const polyWs = new PolymarketWS();
   poly.setPolyWs(polyWs);
 
+  // PHASE 1: Initialize User WebSocket for real-time fill detection
+  let userWs = null;
+  if (!config.DRY_RUN) {
+    // Auth header for User WS (derived from CLOB credentials)
+    const authHeader = process.env.USER_WS_AUTH || config.POLY_API_KEY;
+    if (authHeader) {
+      userWs = new UserWebSocket(authHeader);
+      // Wire up fill detection callback
+      userWs.onFill((fillInfo) => {
+        logger.info(`[PHASE1-FILL-WS] Detected fill: ${fillInfo.orderId}`);
+        // Mark in signal-logger that this fill was detected via User WS
+        // We'll use this flag when logging telemetry
+        if (!global.ws_detected_fills) global.ws_detected_fills = {};
+        global.ws_detected_fills[fillInfo.orderId] = fillInfo;
+      });
+    }
+  }
+
   let cachedMarket = null;
   let nextMarketCache = null;   // FIX A: mercado pre-fetcheado
   let lastPolyPrice = '';
@@ -749,6 +768,11 @@ async function main() {
 
   // Conectar WS de Polymarket en paralelo
   polyWs.connect().catch(err => logger.warn(`Polymarket WS no disponible: ${err.message} — usando HTTP polling`));
+
+  // PHASE 1: Connect User WebSocket for fill detection
+  if (userWs) {
+    userWs.connect().catch(err => logger.warn(`User WS no disponible: ${err.message} — fills detected via polling`));
+  }
 
   logger.info('[POLY] Obteniendo precio inicial...');
   await actualizarPrecioPolymarket();
@@ -1801,6 +1825,15 @@ async function main() {
         // PHASE 0: Log fill telemetry for analysis
         // PHASE 1: Include latency tracking
         const latencyDataFilled = signalLogger.getLatencyTracking(posId);
+
+        // Check if this fill was detected via User WebSocket
+        const wsDetectedFill = global.ws_detected_fills && global.ws_detected_fills[posId];
+        const user_ws_fill_detected = !!wsDetectedFill;
+        if (user_ws_fill_detected) {
+          logger.info(`[PHASE1] ✅ Fill confirmed via User WebSocket for ${posId}`);
+          delete global.ws_detected_fills[posId]; // Clean up after processing
+        }
+
         signalLogger.logFillTelemetry({
           posId,
           fill_result: 'FILLED',
@@ -1821,7 +1854,7 @@ async function main() {
           t5_order_accepted_ms,
           t6_order_resting_ms,
           t7_order_filled_ms: t7_final_ms,
-          user_ws_fill_detected: false,
+          user_ws_fill_detected,
         });
 
         // T4: fill confirmado — medir el recorrido completo
@@ -1952,6 +1985,10 @@ async function main() {
       // PHASE 1: Include latency tracking (simulated)
       const paperFillMs = Math.random() * 500;  // Simulate 0-500ms
       const t7_paper_ms = t4_paper_ms + paperFillMs;
+
+      // In paper mode, simulate User WS fill detection for half the orders
+      const paperWsDetected = Math.random() < 0.5;
+
       signalLogger.logFillTelemetry({
         posId,
         fill_result: 'FILLED',
@@ -1972,7 +2009,7 @@ async function main() {
         t5_order_accepted_ms: t5_paper_ms,
         t6_order_resting_ms: t5_paper_ms,
         t7_order_filled_ms: t7_paper_ms,
-        user_ws_fill_detected: false,
+        user_ws_fill_detected: paperWsDetected,
       });
       signalLogger.clearLatencyTracking(posId);
 
@@ -2080,6 +2117,13 @@ main().catch(err => {
   process.exit(1);
 });
 
-process.on('SIGTERM', () => process.exit(0));
-process.on('SIGINT', () => process.exit(0));
+// PHASE 1: Cleanup on exit
+process.on('SIGTERM', () => {
+  if (userWs) userWs.close();
+  process.exit(0);
+});
+process.on('SIGINT', () => {
+  if (userWs) userWs.close();
+  process.exit(0);
+});
 // build trigger 1788958727
