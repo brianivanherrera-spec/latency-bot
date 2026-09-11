@@ -445,7 +445,21 @@ const httpServer = http.createServer((req, res) => {
     fs.createReadStream(file).pipe(res);
     return;
   }
-  
+
+  // PHASE 1: Endpoint para descargar fills.jsonl con T3-T7 latency data
+  if (url.pathname === '/fills' && url.searchParams.get('key') === SECRET) {
+    const file = path.join(process.env.DATA_DIR || '/data', 'fills.jsonl');
+    if (!fs.existsSync(file)) {
+      res.writeHead(404); res.end('No fills file yet'); return;
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Content-Disposition': 'attachment; filename=fills.jsonl',
+    });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
+
   if (url.pathname === '/stats' && url.searchParams.get('key') === SECRET) {
     // Resumen liviano sin bajar el log completo: /stats?key=X&days=1
     const days = parseInt(url.searchParams.get('days') || '1');
@@ -465,7 +479,7 @@ const httpServer = http.createServer((req, res) => {
 });
 
 httpServer.listen(PORT, () => {
-  logger.info(`🌐 HTTP server en puerto ${PORT} — /signals?key=${SECRET} para descargar`);
+  logger.info(`🌐 HTTP server en puerto ${PORT} — endpoints: /signals?key=X | /fills?key=X | /stats?key=X`);
 });
 
 const tracker = new PnLTracker();
