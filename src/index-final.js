@@ -752,34 +752,33 @@ async function main() {
     livePolyNo  = no;
 
     // PHASE 2: Log raw Polymarket data — CADA update
-    if (cachedMarket?.gammaId) {
-      const bookSnap = polyWs.getBookSnapshot();
-      phase2Logger.logPolymarketRaw(
-        {
-          yes_price: yes,
-          no_price: no,
-          yes_mid: yes,
-          no_mid: no,
-          yes_bid: bookSnap?.yes_bid,
-          yes_ask: bookSnap?.yes_ask,
-          no_bid: bookSnap?.no_bid,
-          no_ask: bookSnap?.no_ask,
-          yes_bid_size: bookSnap?.yes_bid_size,
-          yes_ask_size: bookSnap?.yes_ask_size,
-          no_bid_size: bookSnap?.no_bid_size,
-          no_ask_size: bookSnap?.no_ask_size,
-          yes_spread: bookSnap?.yes_spread,
-          no_spread: bookSnap?.no_spread,
-          timestamp: Date.now(),
-          event_source: 'ws',
-        },
-        {
-          tokenId: cachedMarket?.yesTokenId,
-          market_start_time: cachedMarket?.startTime || null,
-          market_end_time: cachedMarket?.endTime || null,
-        }
-      );
-    }
+    // PHASE 2: Log all Polymarket updates (even when no active market)
+    const bookSnap = polyWs.getBookSnapshot();
+    phase2Logger.logPolymarketRaw(
+      {
+        yes_price: yes,
+        no_price: no,
+        yes_mid: yes,
+        no_mid: no,
+        yes_bid: bookSnap?.yes_bid,
+        yes_ask: bookSnap?.yes_ask,
+        no_bid: bookSnap?.no_bid,
+        no_ask: bookSnap?.no_ask,
+        yes_bid_size: bookSnap?.yes_bid_size,
+        yes_ask_size: bookSnap?.yes_ask_size,
+        no_bid_size: bookSnap?.no_bid_size,
+        no_ask_size: bookSnap?.no_ask_size,
+        yes_spread: bookSnap?.yes_spread,
+        no_spread: bookSnap?.no_spread,
+        timestamp: Date.now(),
+        event_source: 'ws',
+      },
+      {
+        tokenId: cachedMarket?.yesTokenId || null,
+        market_start_time: cachedMarket?.startTime || null,
+        market_end_time: cachedMarket?.endTime || null,
+      }
+    );
 
     // Loguear solo si: cambió >0.02 desde el último log Y pasaron >5s
     // El WS manda decenas de ticks/minuto — sin este throttle llena el log
@@ -1019,34 +1018,32 @@ async function main() {
         btcPriceHistory10m.shift();
       }
 
-      // PHASE 2: Log raw Binance data
-      if (cachedMarket?.gammaId) {
-        phase2Logger.logBinanceRaw(
-          {
-            price: btcPriceNow,
-            timestamp: nowMs,
-            binance_timestamp_ms: priceData.timestamp || null,
-            bestBid: priceData.bestBid || null,
-            bestAsk: priceData.bestAsk || null,
-            volume: priceData.volume || null,
-            numberOfTrades: priceData.numberOfTrades || null,
-            isBuyerMaker: priceData.isBuyerMaker !== undefined ? priceData.isBuyerMaker : null,
-            source: 'binance_ws',
-          },
-          {
-            tokenId: cachedMarket?.yesTokenId,
-            market_start_time: cachedMarket?.startTime || null,
-            market_end_time: cachedMarket?.endTime || null,
-            market_resolution: null,
-          },
-          {
-            official: cachedMarket?.strikePrice || null,
-            captured: cachedMarket?.market_strike_price_captured_at_open || null,
-            source: cachedMarket?.strikePrice ? 'polymarket_metadata' : 'bot_captured_at_open',
-            timestamp: nowMs,
-          }
-        );
-      }
+      // PHASE 2: Log raw Binance data (always, even between markets)
+      phase2Logger.logBinanceRaw(
+        {
+          price: btcPriceNow,
+          timestamp: nowMs,
+          binance_timestamp_ms: priceData.timestamp || null,
+          bestBid: priceData.bestBid || null,
+          bestAsk: priceData.bestAsk || null,
+          volume: priceData.volume || null,
+          numberOfTrades: priceData.numberOfTrades || null,
+          isBuyerMaker: priceData.isBuyerMaker !== undefined ? priceData.isBuyerMaker : null,
+          source: 'binance_ws',
+        },
+        {
+          tokenId: cachedMarket?.yesTokenId || null,
+          market_start_time: cachedMarket?.startTime || null,
+          market_end_time: cachedMarket?.endTime || null,
+          market_resolution: null,
+        },
+        {
+          official: cachedMarket?.strikePrice || null,
+          captured: cachedMarket?.market_strike_price_captured_at_open || null,
+          source: cachedMarket?.strikePrice ? 'polymarket_metadata' : 'bot_captured_at_open',
+          timestamp: nowMs,
+        }
+      );
     }
 
     const sig = signal.process(priceData);
