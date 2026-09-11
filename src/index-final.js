@@ -848,6 +848,15 @@ async function main() {
     userWs.connect().catch(err => logger.warn(`User WS no disponible: ${err.message} — fills detected via polling`));
   }
 
+  // PHASE 2: Run diagnostics at startup
+  if (process.env.ENABLE_PHASE2_DIAGNOSTICS !== 'false') {
+    try {
+      const diagnostics = require('./phase2-diagnostics.js');
+    } catch (e) {
+      logger.warn(`[PHASE2] Diagnostics failed: ${e.message}`);
+    }
+  }
+
   logger.info('[POLY] Obteniendo precio inicial...');
   await actualizarPrecioPolymarket();
 
