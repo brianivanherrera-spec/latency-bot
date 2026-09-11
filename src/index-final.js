@@ -487,6 +487,7 @@ const activePositions = new Map();
 
 let lastTradeTime = 0;
 const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // configurable via Railway
+let userWs = null; // PHASE 1: Will be initialized in main()
 
 async function main() {
   logger.info('═'.repeat(70));
@@ -513,7 +514,6 @@ async function main() {
   poly.setPolyWs(polyWs);
 
   // PHASE 1: Initialize User WebSocket for real-time fill detection
-  let userWs = null;
   if (!config.DRY_RUN) {
     // Auth header for User WS (derived from CLOB credentials)
     const authHeader = process.env.USER_WS_AUTH || config.POLY_API_KEY;
