@@ -4,3 +4,9 @@ export-signals.js
 ANALYSIS-QUICK-START.txt
 DATA-ANALYSIS-SETUP.md
 .claude/
+
+# Test/Debug
+logs/
+*.log
+/data/*.jsonl
+.env.local
