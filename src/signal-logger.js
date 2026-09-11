@@ -139,6 +139,11 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
   try { fs.appendFileSync(SIGNAL_FILE, JSON.stringify(record) + '\n'); } catch(e) {}
   openRecordsCache.set(posId, record); // cache para updates rápidos sin I/O
 
+  // PHASE 1: Store T3 timestamp (price decision) for latency tracking
+  // This is used when logFillTelemetry is called later
+  if (!global.signal_t3_times) global.signal_t3_times = {};
+  global.signal_t3_times[posId] = Date.now();
+
   // Programar snapshots de precio Polymarket si tenemos la función
   if (getPolyPrice || polyT0 !== null) {
     pendingSnapshots.set(posId, { record, getPolyPrice });
@@ -480,7 +485,7 @@ function updateFillTime(posId, fillTimeMs) {
 
 // ─── PHASE 0: Detailed Fill Telemetry ─────────────────────────────────────
 // Logs detailed information about every order attempt (filled or not)
-// Purpose: Validate audit hypotheses about NO_FILL causes
+// Purpose: Validate audit hypotheses about NO_FILL causes + PHASE 1 latency tracking
 // File: /data/fills.jsonl — one line per order attempt
 const FILLS_FILE = path.join(DATA_DIR, 'fills.jsonl');
 
@@ -498,6 +503,13 @@ function logFillTelemetry({
   poly_price_entry,      // Poly price at signal entry
   signal_direction,      // 'UP' or 'DOWN'
   market_strike_price,   // reference price from market
+  // PHASE 1: Latency tracking T3-T7
+  t3_price_decision_ms,  // T3: timestamp when price decision was made (signal generated)
+  t4_order_sent_ms,      // T4: timestamp when order was sent to exchange
+  t5_order_accepted_ms,  // T5: timestamp when order was accepted by exchange
+  t6_order_resting_ms,   // T6: timestamp when order began resting in book
+  t7_order_filled_ms,    // T7: timestamp when order was actually filled
+  user_ws_fill_detected, // whether fill was detected via User WebSocket
 }) {
   ensureDir();
   try {
@@ -516,6 +528,22 @@ function logFillTelemetry({
       poly_price_entry: poly_price_entry?.toFixed(4),
       signal_direction,
       market_strike_price: market_strike_price?.toLocaleString(),
+      // PHASE 1: Latency breakdown (ms)
+      latencies: t3_price_decision_ms && t4_order_sent_ms ? {
+        t3_price_decision_ms,
+        t4_order_sent_ms,
+        t5_order_accepted_ms: t5_order_accepted_ms || null,
+        t6_order_resting_ms: t6_order_resting_ms || null,
+        t7_order_filled_ms: t7_order_filled_ms || null,
+        // Deltas between stages
+        t3_to_t4_ms: t4_order_sent_ms ? t4_order_sent_ms - t3_price_decision_ms : null,
+        t4_to_t5_ms: t4_order_sent_ms && t5_order_accepted_ms ? t5_order_accepted_ms - t4_order_sent_ms : null,
+        t5_to_t6_ms: t5_order_accepted_ms && t6_order_resting_ms ? t6_order_resting_ms - t5_order_accepted_ms : null,
+        t6_to_t7_ms: t6_order_resting_ms && t7_order_filled_ms ? t7_order_filled_ms - t6_order_resting_ms : null,
+        // Total latency from decision to fill
+        t3_to_t7_ms: t3_price_decision_ms && t7_order_filled_ms ? t7_order_filled_ms - t3_price_decision_ms : null,
+      } : null,
+      user_ws_fill_detected: user_ws_fill_detected || false,
     };
 
     // Append as JSONL
@@ -523,13 +551,59 @@ function logFillTelemetry({
 
     // Log summary to console
     if (fill_result === 'FILLED') {
-      console.log(`[PHASE0-FILL] ✅ ${posId} filled @ $${record.order_price} in ${time_to_fill_ms}ms`);
+      const latency = record.latencies?.t3_to_t7_ms ? `(${record.latencies.t3_to_t7_ms}ms)` : '';
+      console.log(`[PHASE1-FILL] ✅ ${posId} filled @ $${record.order_price} in ${time_to_fill_ms}ms ${latency}`);
     } else {
-      console.log(`[PHASE0-NOFILL] ❌ ${posId} | status=${order_status} | reason=${rejection_reason || 'unknown'}`);
+      console.log(`[PHASE1-NOFILL] ❌ ${posId} | status=${order_status} | reason=${rejection_reason || 'unknown'}`);
     }
   } catch (e) {
     // Non-critical
   }
 }
 
-module.exports = { logSignalOpen, logSignalClose, logBtcSnapshot1s, getStats, getDailySummary, getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder, logFillTelemetry };
+// PHASE 1: Helper functions for latency tracking
+function getT3Timestamp(posId) {
+  if (!global.signal_t3_times) return null;
+  return global.signal_t3_times[posId] || null;
+}
+
+function recordOrderSent(posId, t4_ms) {
+  if (!global.latency_tracking) global.latency_tracking = {};
+  if (!global.latency_tracking[posId]) global.latency_tracking[posId] = {};
+  global.latency_tracking[posId].t4_order_sent_ms = t4_ms || Date.now();
+}
+
+function recordOrderAccepted(posId, t5_ms) {
+  if (!global.latency_tracking) global.latency_tracking = {};
+  if (!global.latency_tracking[posId]) global.latency_tracking[posId] = {};
+  global.latency_tracking[posId].t5_order_accepted_ms = t5_ms || Date.now();
+}
+
+function recordOrderResting(posId, t6_ms) {
+  if (!global.latency_tracking) global.latency_tracking = {};
+  if (!global.latency_tracking[posId]) global.latency_tracking[posId] = {};
+  global.latency_tracking[posId].t6_order_resting_ms = t6_ms || Date.now();
+}
+
+function recordOrderFilled(posId, t7_ms) {
+  if (!global.latency_tracking) global.latency_tracking = {};
+  if (!global.latency_tracking[posId]) global.latency_tracking[posId] = {};
+  global.latency_tracking[posId].t7_order_filled_ms = t7_ms || Date.now();
+}
+
+function getLatencyTracking(posId) {
+  if (!global.latency_tracking) return null;
+  return global.latency_tracking[posId] || null;
+}
+
+function clearLatencyTracking(posId) {
+  if (global.signal_t3_times) delete global.signal_t3_times[posId];
+  if (global.latency_tracking) delete global.latency_tracking[posId];
+}
+
+module.exports = {
+  logSignalOpen, logSignalClose, logBtcSnapshot1s, getStats, getDailySummary,
+  getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder,
+  logFillTelemetry, getT3Timestamp, recordOrderSent, recordOrderAccepted,
+  recordOrderResting, recordOrderFilled, getLatencyTracking, clearLatencyTracking
+};

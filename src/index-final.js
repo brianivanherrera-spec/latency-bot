@@ -1683,8 +1683,15 @@ async function main() {
         const forcedOrderType = entryOrderTypes[Math.min(entryIndex, entryOrderTypes.length - 1)];
         logger.info(`[LIVE] 📋 Entrada #${entryIndex + 1} → tipo: ${forcedOrderType}`);
 
-        // T3: justo antes de mandar la orden
+        // PHASE 1: Timestamp tracking T3-T7
+        // T3: price decision (signal generated) — captured in signal-logger at logSignalOpen
+        const t3_ms = signalLogger.getT3Timestamp(posId);
+
+        // T4: order sent — right before placeLimitOrder
         const t3_orderSent = process.hrtime.bigint();
+        const t4_order_sent_ms = Date.now();
+        signalLogger.recordOrderSent(posId, t4_order_sent_ms);
+
         const signalToOrderMs = sig._t2_signal
           ? Number(t3_orderSent - sig._t2_signal) / 1_000_000
           : null;
@@ -1699,6 +1706,7 @@ async function main() {
           logger.info(`[LATENCY] signal→order: ${signalToOrderMs.toFixed(1)}ms | network: ${sig._networkLatencyMs ?? '?'}ms | signal_proc: ${sig._signalLatencyMs?.toFixed(1) ?? '?'}ms`);
         }
 
+        // T5: order accepted (when placeLimitOrder returns)
         const orderResult = await poly.placeLimitOrder({
           marketId: cachedMarket.conditionId,
           tokenId,
@@ -1710,10 +1718,19 @@ async function main() {
           forcedOrderType,
         });
 
+        // PHASE 1: T5 recorded when API returns
+        const t5_order_accepted_ms = Date.now();
+        signalLogger.recordOrderAccepted(posId, t5_order_accepted_ms);
+
         // Fix 2: GTC — verificar fill antes de abrir posición en tracker
         // success=true + status='live' = orden en el libro pero SIN fill todavía
         // success=true + status='matched' = fill real confirmado
         const orderStatus = (String(orderResult?.status || '')).toLowerCase();
+
+        // PHASE 1: T6 = order resting (if status='live') or immediately filled (if status='matched')
+        // T7 = order filled (either immediately or after time_to_fill_ms)
+        const t6_order_resting_ms = orderStatus === 'live' ? t5_order_accepted_ms : null;
+        const t7_order_filled_ms = orderStatus === 'matched' ? t5_order_accepted_ms : null;
         // Exigir status=matched O sizeFilled verificable — fillPrice solo no alcanza
         const reallyFilled = orderResult.success &&
           (orderStatus === 'matched' ||
@@ -1732,6 +1749,8 @@ async function main() {
           logger.warn(`[LIVE] ⚠️ Orden no llenada — ${reason}`);
 
           // PHASE 0: Log fill telemetry for analysis
+          // PHASE 1: Include latency tracking
+          const latencyData = signalLogger.getLatencyTracking(posId);
           signalLogger.logFillTelemetry({
             posId,
             fill_result: 'NO_FILL',
@@ -1746,9 +1765,17 @@ async function main() {
             poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
             signal_direction: sig.direction,
             market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open,
+            // PHASE 1: Latency timestamps
+            t3_price_decision_ms: t3_ms,
+            t4_order_sent_ms,
+            t5_order_accepted_ms,
+            t6_order_resting_ms,
+            t7_order_filled_ms: null,
+            user_ws_fill_detected: false,
           });
 
           signalLogger.logSignalClose(posId, 'NO_FILL', 0);
+          signalLogger.clearLatencyTracking(posId);
           activePositions.delete(posId);
           return;
         }
@@ -1767,7 +1794,13 @@ async function main() {
         }
         logger.info(`[LIVE] ✅ Orden llenada: ${actualSize} shares @ $${actualPrice.toFixed(4)} | USDC: $${actualUsdc.toFixed(2)} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
 
+        // PHASE 1: Update T7 if fill happened (we now know the actual fill time)
+        const t7_final_ms = fillMs ? t4_order_sent_ms + fillMs : t5_order_accepted_ms;
+        signalLogger.recordOrderFilled(posId, t7_final_ms);
+
         // PHASE 0: Log fill telemetry for analysis
+        // PHASE 1: Include latency tracking
+        const latencyDataFilled = signalLogger.getLatencyTracking(posId);
         signalLogger.logFillTelemetry({
           posId,
           fill_result: 'FILLED',
@@ -1782,6 +1815,13 @@ async function main() {
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
           market_strike_price: cachedMarket.strikePrice,
+          // PHASE 1: Latency timestamps
+          t3_price_decision_ms: t3_ms,
+          t4_order_sent_ms,
+          t5_order_accepted_ms,
+          t6_order_resting_ms,
+          t7_order_filled_ms: t7_final_ms,
+          user_ws_fill_detected: false,
         });
 
         // T4: fill confirmado — medir el recorrido completo
@@ -1832,6 +1872,9 @@ async function main() {
         logger.error(`[LIVE] ❌ Error: ${err.message}`);
 
         // PHASE 0: Log error as NO_FILL
+        // PHASE 1: Include latency tracking (may be partial if error occurred mid-flow)
+        const t3_err_ms = signalLogger.getT3Timestamp(posId);
+        const latencyDataErr = signalLogger.getLatencyTracking(posId);
         signalLogger.logFillTelemetry({
           posId,
           fill_result: 'NO_FILL',
@@ -1846,15 +1889,28 @@ async function main() {
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
           market_strike_price: cachedMarket.strikePrice,
+          // PHASE 1: Latency tracking (may be partial)
+          t3_price_decision_ms: t3_err_ms,
+          t4_order_sent_ms: latencyDataErr?.t4_order_sent_ms || null,
+          t5_order_accepted_ms: latencyDataErr?.t5_order_accepted_ms || null,
+          t6_order_resting_ms: null,
+          t7_order_filled_ms: null,
+          user_ws_fill_detected: false,
         });
 
         signalLogger.logSignalClose(posId, 'NO_FILL', 0);
+        signalLogger.clearLatencyTracking(posId);
         activePositions.delete(posId);
         return;
       }
 
     } else {
       // PAPER: simular fill rate realista (GTC no siempre llena)
+      // PHASE 1: Simulate latency timestamps for paper mode
+      const t3_paper_ms = signalLogger.getT3Timestamp(posId);
+      const t4_paper_ms = Date.now();
+      const t5_paper_ms = t4_paper_ms + Math.random() * 50; // Simulate 0-50ms acceptance latency
+
       const paperFillRate = parseFloat(process.env.PAPER_FILL_RATE || '0.75');
       const filled = Math.random() < paperFillRate;
 
@@ -1862,6 +1918,7 @@ async function main() {
         logger.warn(`[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);
 
         // PHASE 0: Log paper mode NO_FILL
+        // PHASE 1: Include latency tracking (simulated)
         signalLogger.logFillTelemetry({
           posId,
           fill_result: 'NO_FILL',
@@ -1876,14 +1933,25 @@ async function main() {
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
           market_strike_price: cachedMarket.strikePrice,
+          // PHASE 1: Simulated latency timestamps
+          t3_price_decision_ms: t3_paper_ms,
+          t4_order_sent_ms: t4_paper_ms,
+          t5_order_accepted_ms: t5_paper_ms,
+          t6_order_resting_ms: t5_paper_ms,
+          t7_order_filled_ms: null,
+          user_ws_fill_detected: false,
         });
 
         signalLogger.logSignalClose(posId, 'NO_FILL', 0);
+        signalLogger.clearLatencyTracking(posId);
         activePositions.delete(posId);
         return;
       }
 
       // PHASE 0: Log paper mode FILLED
+      // PHASE 1: Include latency tracking (simulated)
+      const paperFillMs = Math.random() * 500;  // Simulate 0-500ms
+      const t7_paper_ms = t4_paper_ms + paperFillMs;
       signalLogger.logFillTelemetry({
         posId,
         fill_result: 'FILLED',
@@ -1891,14 +1959,22 @@ async function main() {
         order_price: price,
         best_ask: null,
         rejection_reason: null,
-        time_to_fill_ms: Math.random() * 500,  // Simulate 0-500ms
+        time_to_fill_ms: paperFillMs,
         order_size: size,
         size_filled: size,
         btc_price_entry: btcPriceAtSignal,
         poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
         signal_direction: sig.direction,
         market_strike_price: cachedMarket.strikePrice,
+        // PHASE 1: Simulated latency timestamps
+        t3_price_decision_ms: t3_paper_ms,
+        t4_order_sent_ms: t4_paper_ms,
+        t5_order_accepted_ms: t5_paper_ms,
+        t6_order_resting_ms: t5_paper_ms,
+        t7_order_filled_ms: t7_paper_ms,
+        user_ws_fill_detected: false,
       });
+      signalLogger.clearLatencyTracking(posId);
 
       tracker.openPosition({
         marketId: cachedMarket.conditionId,
