@@ -593,6 +593,8 @@ async function main() {
         const marketStart = new Date(nextMarketCache.endDate).getTime() - 300000;
         if (now >= marketStart) {
           cachedMarket = nextMarketCache;
+          cachedMarket.startTime = marketStart;
+          cachedMarket.endTime = new Date(nextMarketCache.endDate).getTime();
           nextMarketCache = null;
           // Para mercados "Bitcoin Up or Down" sin strike explícito:
           // Polymarket fija el precio inicial en 0.50 (50% YES / 50% NO)
@@ -649,6 +651,10 @@ async function main() {
             m.market_strike_price_captured_at_open = btcPriceNow;
             logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
           }
+          const marketEndTime = new Date(m.endDate).getTime();
+          const marketStartTime = marketEndTime - 300000; // 5 minutos atrás
+          m.startTime = marketStartTime;
+          m.endTime = marketEndTime;
           cachedMarket = m;
           logger.info(`[POLY] Mercado: ${m.question}`);
           logger.info(`[POLY] yesToken: ${m.yesTokenId}`);
@@ -1802,7 +1808,9 @@ async function main() {
             btc_price_entry: btcPriceAtSignal,
             poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
             signal_direction: sig.direction,
-            market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open,
+            market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
+            market_start_time: cachedMarket.startTime || null,
+            market_end_time: cachedMarket.endTime || null,
             // PHASE 1: Latency timestamps
             t3_price_decision_ms: t3_ms,
             t4_order_sent_ms,
@@ -1861,7 +1869,9 @@ async function main() {
           btc_price_entry: btcPriceAtSignal,
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
-          market_strike_price: cachedMarket.strikePrice,
+          market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
+          market_start_time: cachedMarket.startTime || null,
+          market_end_time: cachedMarket.endTime || null,
           // PHASE 1: Latency timestamps
           t3_price_decision_ms: t3_ms,
           t4_order_sent_ms,
@@ -1935,7 +1945,9 @@ async function main() {
           btc_price_entry: btcPriceAtSignal,
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
-          market_strike_price: cachedMarket.strikePrice,
+          market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
+          market_start_time: cachedMarket.startTime || null,
+          market_end_time: cachedMarket.endTime || null,
           // PHASE 1: Latency tracking (may be partial)
           t3_price_decision_ms: t3_err_ms,
           t4_order_sent_ms: latencyDataErr?.t4_order_sent_ms || null,
@@ -1979,7 +1991,9 @@ async function main() {
           btc_price_entry: btcPriceAtSignal,
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
-          market_strike_price: cachedMarket.strikePrice,
+          market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
+          market_start_time: cachedMarket.startTime || null,
+          market_end_time: cachedMarket.endTime || null,
           // PHASE 1: Simulated latency timestamps
           t3_price_decision_ms: t3_paper_ms,
           t4_order_sent_ms: t4_paper_ms,
@@ -2016,7 +2030,9 @@ async function main() {
         btc_price_entry: btcPriceAtSignal,
         poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
         signal_direction: sig.direction,
-        market_strike_price: cachedMarket.strikePrice,
+        market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
+        market_start_time: cachedMarket.startTime || null,
+        market_end_time: cachedMarket.endTime || null,
         // PHASE 1: Simulated latency timestamps
         t3_price_decision_ms: t3_paper_ms,
         t4_order_sent_ms: t4_paper_ms,
