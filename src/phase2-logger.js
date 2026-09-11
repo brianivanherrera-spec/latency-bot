@@ -236,8 +236,33 @@ function logBotEvent(eventType, data) {
   }
 }
 
+// Contador de eventos para monitoreo
+let eventCounts = {
+  binanceRaw: 0,
+  polymarketRaw: 0,
+  botEvents: {}
+};
+
+function getStats() {
+  return {
+    binanceRaw: eventCounts.binanceRaw,
+    polymarketRaw: eventCounts.polymarketRaw,
+    botEvents: eventCounts.botEvents
+  };
+}
+
+function resetStats() {
+  eventCounts = {
+    binanceRaw: 0,
+    polymarketRaw: 0,
+    botEvents: {}
+  };
+}
+
 module.exports = {
   logBinanceRaw,
   logPolymarketRaw,
   logBotEvent,
+  getStats,
+  resetStats,
 };
