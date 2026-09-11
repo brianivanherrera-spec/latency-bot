@@ -514,6 +514,48 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
+  // PHASE 2: Endpoint para descargar JSONL
+  if (url.pathname === '/phase2-download') {
+    try {
+      const fileName = url.searchParams.get('file');
+      if (!fileName) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing file parameter. Use: ?file=binance-raw or ?file=polymarket-raw or ?file=bot-events' }));
+        return;
+      }
+
+      const DATA_DIR = process.env.DATA_DIR || '/data';
+      const allowedFiles = {
+        'binance-raw': path.join(DATA_DIR, 'binance-raw.jsonl'),
+        'polymarket-raw': path.join(DATA_DIR, 'polymarket-raw.jsonl'),
+        'bot-events': path.join(DATA_DIR, 'bot-events.jsonl'),
+      };
+
+      const filePath = allowedFiles[fileName];
+      if (!filePath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid file. Allowed: binance-raw, polymarket-raw, bot-events' }));
+        return;
+      }
+
+      if (!fs.existsSync(filePath)) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'File not found: ' + filePath }));
+        return;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'application/x-ndjson',
+        'Content-Disposition': `attachment; filename="${fileName}.jsonl"`,
+      });
+      fs.createReadStream(filePath).pipe(res);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   res.writeHead(401); res.end('Unauthorized');
 });
 
