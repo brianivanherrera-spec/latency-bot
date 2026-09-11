@@ -506,6 +506,29 @@ async function main() {
   logger.info('');
   alertBotStart({ dryRun: config.DRY_RUN });
 
+  // Historial de precio BTC con timestamp para filtro de tendencia exacto
+  const btcPriceHistory = []; // [{price, ts}] — ventana de 1 hora (filtro rápido)
+  const BTC_TREND_WINDOW_MS = 60 * 60 * 1000; // 1 hora en ms
+
+  // Segundo historial para el filtro de ventana larga — detecta derivas lentas
+  // y sostenidas que el filtro de 1 hora no puede ver (ej: BTC +$1800 en 38hs
+  // a ~$60/hora, nunca supera $500/hora pero acumula una tendencia real).
+  // Controlado por BTC_TREND_FILTER_LONG y BTC_TREND_WINDOW_HOURS_LONG.
+  const btcPriceHistoryLong = []; // [{price, ts}]
+  const BTC_TREND_WINDOW_HOURS_LONG = parseFloat(process.env.BTC_TREND_WINDOW_HOURS_LONG || '4');
+  const BTC_TREND_WINDOW_MS_LONG = BTC_TREND_WINDOW_HOURS_LONG * 60 * 60 * 1000;
+
+  // Tercer historial: ventana de 10 minutos para detectar movimientos bruscos
+  // rápidos. Complementa al de 1h (sacudidas) y al de 4h (derivas lentas).
+  // Controlado por BTC_TREND_FILTER_10M (umbral en $, default 0 = desactivado).
+  const btcPriceHistory10m = []; // [{price, ts}]
+  const BTC_TREND_WINDOW_10M_MS = 10 * 60 * 1000; // 10 minutos
+
+  // Ventana deslizante de isBuyerMaker — últimos 20 ticks de Coinbase
+  // Ratio > 0.7 = compradores agresivos (momentum UP), < 0.3 = vendedores (momentum DOWN)
+  const btcBuyerMakerWindow = []; // [true/false] — true = tick iniciado por comprador
+  const BTC_BUYER_MAKER_WINDOW = 20; // últimos N ticks
+
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
   const ws = new BinanceWS();        // Binance primary (bookTicker ~10-15ms)
@@ -902,29 +925,6 @@ async function main() {
     }, MONITOR_INTERVAL);
     logger.info(`[POSITION-MONITOR] ✅ Activo (${config.DRY_RUN ? 'PAPER' : 'LIVE'}) — lock-in: $${LOCK_IN} | SL: ${SL_PCT*100}% | intervalo: ${MONITOR_INTERVAL}ms`);
   }
-
-  // Historial de precio BTC con timestamp para filtro de tendencia exacto
-  const btcPriceHistory = []; // [{price, ts}] — ventana de 1 hora (filtro rápido)
-  const BTC_TREND_WINDOW_MS = 60 * 60 * 1000; // 1 hora en ms
-
-  // Segundo historial para el filtro de ventana larga — detecta derivas lentas
-  // y sostenidas que el filtro de 1 hora no puede ver (ej: BTC +$1800 en 38hs
-  // a ~$60/hora, nunca supera $500/hora pero acumula una tendencia real).
-  // Controlado por BTC_TREND_FILTER_LONG y BTC_TREND_WINDOW_HOURS_LONG.
-  const btcPriceHistoryLong = []; // [{price, ts}]
-  const BTC_TREND_WINDOW_HOURS_LONG = parseFloat(process.env.BTC_TREND_WINDOW_HOURS_LONG || '4');
-  const BTC_TREND_WINDOW_MS_LONG = BTC_TREND_WINDOW_HOURS_LONG * 60 * 60 * 1000;
-
-  // Tercer historial: ventana de 10 minutos para detectar movimientos bruscos
-  // rápidos. Complementa al de 1h (sacudidas) y al de 4h (derivas lentas).
-  // Controlado por BTC_TREND_FILTER_10M (umbral en $, default 0 = desactivado).
-  const btcPriceHistory10m = []; // [{price, ts}]
-  const BTC_TREND_WINDOW_10M_MS = 10 * 60 * 1000; // 10 minutos
-
-  // Ventana deslizante de isBuyerMaker — últimos 20 ticks de Coinbase
-  // Ratio > 0.7 = compradores agresivos (momentum UP), < 0.3 = vendedores (momentum DOWN)
-  const btcBuyerMakerWindow = []; // [true/false] — true = tick iniciado por comprador
-  const BTC_BUYER_MAKER_WINDOW = 20; // últimos N ticks
 
   ws.onPrice(async (priceData) => {
     // ─── Telemetría de latencia ──────────────────────────────────────────
