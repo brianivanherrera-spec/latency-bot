@@ -586,6 +586,55 @@ async function main() {
   logger.info(`Modo: ${config.DRY_RUN ? 'PAPER TRADING ✓' : 'LIVE 🔴'}`);
   logger.info(`Cooldown: ${COOLDOWN/1000}s | Min edge: ${config.MIN_EDGE_PCT}%`);
   logger.info('');
+
+  // ──────────────────────────────────────────────────────────────────
+  // CRITICAL ENV VARS LOGGING — FASE 2 DEBUG
+  // ──────────────────────────────────────────────────────────────────
+  logger.info('📊 CRITICAL CONFIGURATION (checking which filter blocks trades):');
+  logger.info(`├─ DRY_RUN: ${config.DRY_RUN}`);
+  logger.info(`├─ TRADING_HOURS_ENABLED: ${config.TRADING_HOURS_ENABLED}`);
+  logger.info(`├─ TRADING_HOURS_BLOCKED_UTC: [${config.TRADING_HOURS_BLOCKED_UTC.join(', ')}]`);
+  logger.info(`├─ ZSCORE_THRESHOLD: ${config.ZSCORE_THRESHOLD}`);
+  logger.info(`├─ MOVE_PCT_THRESHOLD: ${config.MOVE_PCT_THRESHOLD}%`);
+  logger.info(`├─ MIN_VELOCITY: ${config.MIN_VELOCITY}%/s`);
+  logger.info(`├─ MIN_EDGE_PCT: ${config.MIN_EDGE_PCT}%`);
+  logger.info(`├─ MAX_REALISTIC_EDGE: ${config.MAX_REALISTIC_EDGE}%`);
+  logger.info(`├─ IMBALANCE_MAX: ${config.IMBALANCE_MAX}`);
+  logger.info(`├─ MIN_SIGNAL_SCORE: ${config.MIN_SIGNAL_SCORE}`);
+  logger.info(`├─ MAX_SIGNAL_SCORE: ${config.MAX_SIGNAL_SCORE}`);
+  logger.info(`├─ MIN_TICKS_REQUIRED: ${config.MIN_TICKS_REQUIRED}`);
+  logger.info(`├─ SIGNAL_WINDOW: ${config.SIGNAL_WINDOW}`);
+  logger.info(`├─ MIN_SECONDS_REMAINING: ${config.MIN_SECONDS_REMAINING}s`);
+  logger.info(`├─ MAX_SECONDS_REMAINING: ${config.MAX_SECONDS_REMAINING}s`);
+  logger.info(`├─ BTC_TREND_FILTER: ${config.BTC_TREND_FILTER} USD/hour`);
+  logger.info(`├─ LATE_ENTRY_MODE: ${config.LATE_ENTRY_MODE}`);
+  logger.info(`├─ DUAL_ENTRY_MODE: ${config.DUAL_ENTRY_MODE}`);
+  logger.info(`├─ MARKET_RETRY: ${config.MARKET_RETRY}`);
+  logger.info(`├─ ORDER_TYPE: ${config.ORDER_TYPE}`);
+  logger.info(`├─ PRICE_TOLERANCE: ${config.PRICE_TOLERANCE}`);
+  logger.info(`├─ PAPER_FILL_RATE: ${config.PAPER_FILL_RATE * 100}%`);
+  logger.info(`└─ ORDER_SIZE_USDC: ${config.ORDER_SIZE_USDC} USDC`);
+  logger.info('');
+
+  // Log additional environment variables not in config.js
+  logger.info('📋 ADDITIONAL ENV VARS:');
+  const relevantEnvVars = [
+    'MAX_POLY_MOVE',
+    'POLY_EXTREME_THRESHOLD',
+    'POLY_SENSITIVITY',
+    'BTC_TREND_WINDOW_HOURS_LONG',
+    'BTC_TREND_FILTER_10M',
+    'MAX_PRICE_AGE_MS',
+    'DYNAMIC_SIZE_SCALE',
+    'RESEARCH_MODE'
+  ];
+  for (const varName of relevantEnvVars) {
+    const val = process.env[varName];
+    logger.info(`├─ ${varName}: ${val || '(not set)'}`);
+  }
+  logger.info('└─ END OF CONFIG DUMP');
+  logger.info('');
+
   alertBotStart({ dryRun: config.DRY_RUN });
 
   // Historial de precio BTC con timestamp para filtro de tendencia exacto
