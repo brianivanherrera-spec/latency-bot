@@ -899,6 +899,7 @@ async function main() {
   // Permite saber si el bot tenía razón aunque no haya entrado
   const marketSignalLog = []; // señales del mercado actual
   let marketStartTs = null;
+  let marketFillData = null; // { filled_price, filled_direction } for position_result calculation
 
   // Guardar señal en el log del mercado actual
   const logMarketSignal = (sig, skipReason, bookImb) => {
@@ -937,6 +938,23 @@ async function main() {
     // PHASE 2: Log MARKET_END
     if (cachedMarket?.gammaId) {
       const bookSnapEnd = polyWs.getBookSnapshot();
+
+      // Calculate position_result if there was a FILL
+      let position_result = null;
+      if (marketFillData) {
+        const resolutionPrice = winner === 'YES' ? 1.0 : 0.0;
+        const filledPrice = marketFillData.filled_price;
+        const direction = marketFillData.filled_direction;
+
+        if (direction === 'UP') {
+          position_result = ((resolutionPrice - filledPrice) / filledPrice) * 100;
+        } else {
+          const noResolutionPrice = 1.0 - resolutionPrice;
+          const noFilledPrice = 1.0 - filledPrice;
+          position_result = ((noResolutionPrice - noFilledPrice) / noFilledPrice) * 100;
+        }
+      }
+
       phase2Logger.logBotEvent('MARKET_END', {
         market_id: cachedMarket?.yesTokenId,
         market_start_ms: cachedMarket?.startTime || null,
@@ -950,10 +968,14 @@ async function main() {
         no_bid_snapshot: bookSnapEnd?.no_bid,
         no_ask_snapshot: bookSnapEnd?.no_ask,
         btc_price_snapshot: signal.getStats()?.lastPrice || null,
+        position_result: position_result,
       });
 
       // Update market stats: this market is ending
       phase2Logger.updateMarketStats(true, marketSignalLog.length > 0);
+
+      // Reset fill data for next market
+      marketFillData = null;
     }
 
     if (polyWs.onResolved2) polyWs.onResolved2(winner);
@@ -1197,12 +1219,19 @@ async function main() {
     // PHASE 2: Log SIGNAL_GENERATED
     if (cachedMarket?.gammaId) {
       const bookSnap = polyWs.getBookSnapshot();
+      const marketStartMs = cachedMarket?.startTime || null;
+      const marketEndMs = cachedMarket?.endTime || null;
+      const windowElapsedSec = marketStartMs ? Math.floor((nowMs - marketStartMs) / 1000) : null;
+      const windowRemainingSec = marketEndMs ? Math.floor((marketEndMs - nowMs) / 1000) : null;
+
       phase2Logger.logBotEvent('SIGNAL_GENERATED', {
         signal_id: signal_id,
         market_id: cachedMarket?.yesTokenId,
-        market_start_ms: cachedMarket?.startTime || null,
-        market_end_ms: cachedMarket?.endTime || null,
+        market_start_ms: marketStartMs,
+        market_end_ms: marketEndMs,
         event_timestamp_ms: nowMs,
+        window_elapsed_sec: windowElapsedSec,
+        window_remaining_sec: windowRemainingSec,
         btc_price_snapshot: btcPriceNow,
         official_strike_price: cachedMarket?.strikePrice || null,
         bot_captured_strike_price: cachedMarket?.market_strike_price_captured_at_open || null,
@@ -2129,6 +2158,15 @@ async function main() {
           logger.info(`[PHASE1] ✅ Fill confirmed via User WebSocket for ${posId}`);
           delete global.ws_detected_fills[posId]; // Clean up after processing
         }
+
+        // Store fill info for MARKET_END position_result calculation
+        sig._filled_price = actualPrice;
+        sig._filled_direction = sig.direction;
+        marketFillData = {
+          filled_price: actualPrice,
+          filled_direction: sig.direction,
+          filled_timestamp_ms: t7_final_ms,
+        };
 
         // PHASE 2: Log FILL
         if (cachedMarket?.gammaId) {
