@@ -86,6 +86,7 @@ function logBinanceRaw(data, market, strikes) {
     };
 
     fs.appendFileSync(BINANCE_RAW_FILE, JSON.stringify(record) + '\n');
+    incrementCounter('binanceRaw');
   } catch (e) {
     console.error(`[PHASE2] Error logging binance raw: ${e.message}`);
   }
@@ -156,6 +157,7 @@ function logPolymarketRaw(data, market, eventId) {
     };
 
     fs.appendFileSync(POLYMARKET_RAW_FILE, JSON.stringify(record) + '\n');
+    incrementCounter('polymarketRaw');
   } catch (e) {
     console.error(`[PHASE2] Error logging polymarket raw: ${e.message}`);
   }
@@ -231,6 +233,7 @@ function logBotEvent(eventType, data) {
     };
 
     fs.appendFileSync(BOT_EVENTS_FILE, JSON.stringify(record) + '\n');
+    incrementCounter(`botEvents_${eventType}`);
   } catch (e) {
     console.error(`[PHASE2] Error logging bot event: ${e.message}`);
   }
@@ -240,22 +243,52 @@ function logBotEvent(eventType, data) {
 let eventCounts = {
   binanceRaw: 0,
   polymarketRaw: 0,
-  botEvents: {}
+  botEvents: {},
+  markets_total: 0,
+  markets_with_signal: 0,
+  markets_no_signal: 0
 };
 
 function getStats() {
   return {
     binanceRaw: eventCounts.binanceRaw,
     polymarketRaw: eventCounts.polymarketRaw,
-    botEvents: eventCounts.botEvents
+    botEvents: eventCounts.botEvents,
+    markets_total: eventCounts.markets_total,
+    markets_with_signal: eventCounts.markets_with_signal,
+    markets_no_signal: eventCounts.markets_no_signal
   };
+}
+
+function incrementCounter(key) {
+  if (key === 'binanceRaw') eventCounts.binanceRaw++;
+  else if (key === 'polymarketRaw') eventCounts.polymarketRaw++;
+  else if (key?.startsWith('botEvents_')) {
+    const eventType = key.replace('botEvents_', '');
+    if (!eventCounts.botEvents[eventType]) eventCounts.botEvents[eventType] = 0;
+    eventCounts.botEvents[eventType]++;
+  }
+}
+
+function updateMarketStats(marketStarted, hasSignal) {
+  if (marketStarted) {
+    eventCounts.markets_total++;
+    if (hasSignal) {
+      eventCounts.markets_with_signal++;
+    } else {
+      eventCounts.markets_no_signal++;
+    }
+  }
 }
 
 function resetStats() {
   eventCounts = {
     binanceRaw: 0,
     polymarketRaw: 0,
-    botEvents: {}
+    botEvents: {},
+    markets_total: 0,
+    markets_with_signal: 0,
+    markets_no_signal: 0
   };
 }
 
@@ -265,4 +298,6 @@ module.exports = {
   logBotEvent,
   getStats,
   resetStats,
+  incrementCounter,
+  updateMarketStats,
 };

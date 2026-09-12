@@ -14,6 +14,7 @@ const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const config = require('./config');
+const { randomUUID } = require('crypto');
 
 // DYNAMIC_SIZING: escala automática de order size según balance actual.
 // Variable de entorno: DYNAMIC_SIZE_SCALE="30:3,50:5,100:7,200:10,500:20,1000:50"
@@ -737,6 +738,24 @@ async function main() {
           m.startTime = marketStartTime;
           m.endTime = marketEndTime;
           cachedMarket = m;
+
+          // PHASE 2: Log MARKET_START
+          const bookSnapStart = polyWs.getBookSnapshot();
+          phase2Logger.logBotEvent('MARKET_START', {
+            market_id: m.yesTokenId,
+            market_start_ms: marketStartTime,
+            market_end_ms: marketEndTime,
+            event_timestamp_ms: Date.now(),
+            official_strike_price: m.strikePrice || null,
+            yes_price_snapshot: livePolyYes,
+            no_price_snapshot: livePolyNo,
+            yes_bid_snapshot: bookSnapStart?.yes_bid,
+            yes_ask_snapshot: bookSnapStart?.yes_ask,
+            no_bid_snapshot: bookSnapStart?.no_bid,
+            no_ask_snapshot: bookSnapStart?.no_ask,
+            btc_price_snapshot: signal.getStats()?.lastPrice || null,
+          });
+
           logger.info(`[POLY] Mercado: ${m.question}`);
           logger.info(`[POLY] yesToken: ${m.yesTokenId}`);
           logger.info(`[POLY] noToken: ${m.noTokenId}`);
@@ -914,6 +933,29 @@ async function main() {
 
   polyWs.onResolved((winner) => {
     logger.info(`[POLY-WS] Mercado resuelto (${winner}) — esperando transición natural`);
+
+    // PHASE 2: Log MARKET_END
+    if (cachedMarket?.gammaId) {
+      const bookSnapEnd = polyWs.getBookSnapshot();
+      phase2Logger.logBotEvent('MARKET_END', {
+        market_id: cachedMarket?.yesTokenId,
+        market_start_ms: cachedMarket?.startTime || null,
+        market_end_ms: cachedMarket?.endTime || null,
+        event_timestamp_ms: Date.now(),
+        market_resolution: winner,
+        yes_price_snapshot: livePolyYes,
+        no_price_snapshot: livePolyNo,
+        yes_bid_snapshot: bookSnapEnd?.yes_bid,
+        yes_ask_snapshot: bookSnapEnd?.yes_ask,
+        no_bid_snapshot: bookSnapEnd?.no_bid,
+        no_ask_snapshot: bookSnapEnd?.no_ask,
+        btc_price_snapshot: signal.getStats()?.lastPrice || null,
+      });
+
+      // Update market stats: this market is ending
+      phase2Logger.updateMarketStats(true, marketSignalLog.length > 0);
+    }
+
     if (polyWs.onResolved2) polyWs.onResolved2(winner);
   });
 
@@ -1148,10 +1190,15 @@ async function main() {
     const MIN_BUFFER = parseInt(process.env.MIN_BUFFER_SIZE || '100');
     if (sig.bufferSize !== undefined && sig.bufferSize < MIN_BUFFER) return; // warmup
 
+    // PHASE 2: Generar signal_id único para esta señal
+    const signal_id = randomUUID();
+    sig._signal_id = signal_id;
+
     // PHASE 2: Log SIGNAL_GENERATED
     if (cachedMarket?.gammaId) {
       const bookSnap = polyWs.getBookSnapshot();
       phase2Logger.logBotEvent('SIGNAL_GENERATED', {
+        signal_id: signal_id,
         market_id: cachedMarket?.yesTokenId,
         market_start_ms: cachedMarket?.startTime || null,
         market_end_ms: cachedMarket?.endTime || null,
@@ -1916,7 +1963,7 @@ async function main() {
           const bookSnap = polyWs.getBookSnapshot();
           phase2Logger.logBotEvent('ORDER_SENT', {
             order_id: posId,
-            signal_id: posId,
+            signal_id: sig._signal_id || null,
             market_id: cachedMarket?.yesTokenId,
             market_start_ms: cachedMarket?.startTime || null,
             market_end_ms: cachedMarket?.endTime || null,
@@ -2026,7 +2073,7 @@ async function main() {
             const bookSnap = polyWs.getBookSnapshot();
             phase2Logger.logBotEvent('NO_FILL', {
               order_id: posId,
-              signal_id: posId,
+              signal_id: sig._signal_id || null,
               market_id: cachedMarket?.yesTokenId,
               market_start_ms: cachedMarket?.startTime || null,
               market_end_ms: cachedMarket?.endTime || null,
@@ -2088,7 +2135,7 @@ async function main() {
           const bookSnap = polyWs.getBookSnapshot();
           phase2Logger.logBotEvent('FILL', {
             order_id: posId,
-            signal_id: posId,
+            signal_id: sig._signal_id || null,
             market_id: cachedMarket?.yesTokenId,
             market_start_ms: cachedMarket?.startTime || null,
             market_end_ms: cachedMarket?.endTime || null,
