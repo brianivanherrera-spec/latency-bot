@@ -18,6 +18,9 @@ const BINANCE_RAW_FILE = path.join(DATA_DIR, 'binance-raw.jsonl');
 const POLYMARKET_RAW_FILE = path.join(DATA_DIR, 'polymarket-raw.jsonl');
 const BOT_EVENTS_FILE = path.join(DATA_DIR, 'bot-events.jsonl');
 
+// Tracking de último estado Polymarket por mercado — solo loguea cambios
+const polymarketLastState = {};
+
 function ensureDir() {
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -94,20 +97,52 @@ function logBinanceRaw(data, market, strikes) {
 
 // ─── POLYMARKET RAW ───────────────────────────────────────────────────────
 /**
- * Log raw Polymarket data — cada update del WebSocket sin filtrar
+ * Log raw Polymarket data — SOLO cuando detecta cambios en precios/book
+ * REDUCCIÓN: De 880 MB a ~50 MB (90% menos) sin perder serie temporal de cambios
  * @param {Object} data - Update de Polymarket
- *   - yes_price, no_price, spreads, bid/ask, sizes
- *   - timestamp: cuándo llegó al bot
- *   - event_source_timestamp_ms: si viene del WS (timestamp de origen)
  * @param {Object} market - mercado actual
  * @param {string} eventId - ID único del evento
  */
 function logPolymarketRaw(data, market, eventId) {
   ensureDir();
   try {
+    const marketId = market?.tokenId;
+    if (!marketId) return;
+
+    // Campos que importan para detectar cambios
+    const currentState = {
+      yes_price: data.yes_price,
+      no_price: data.no_price,
+      yes_bid: data.yes_bid,
+      yes_ask: data.yes_ask,
+      yes_bid_size: data.yes_bid_size,
+      yes_ask_size: data.yes_ask_size,
+      yes_spread: data.yes_spread || (data.yes_ask && data.yes_bid ? data.yes_ask - data.yes_bid : null),
+    };
+
+    const lastState = polymarketLastState[marketId];
+
+    // Detectar cambios
+    let hasChanges = !lastState; // Primer evento siempre se loguea
+    if (lastState) {
+      hasChanges =
+        currentState.yes_price !== lastState.yes_price ||
+        currentState.no_price !== lastState.no_price ||
+        currentState.yes_bid !== lastState.yes_bid ||
+        currentState.yes_ask !== lastState.yes_ask ||
+        currentState.yes_bid_size !== lastState.yes_bid_size ||
+        currentState.yes_ask_size !== lastState.yes_ask_size ||
+        currentState.yes_spread !== lastState.yes_spread;
+    }
+
+    if (!hasChanges) return; // No loguear si no hay cambios
+
+    // Actualizar estado
+    polymarketLastState[marketId] = currentState;
+
     const record = {
       // Identificación
-      market_id: market?.tokenId || null,
+      market_id: marketId,
       market_start_ms: market?.market_start_time || null,
       market_end_ms: market?.market_end_time || null,
       event_id: eventId || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -143,7 +178,7 @@ function logPolymarketRaw(data, market, eventId) {
       no_ask_size: data.no_ask_size || null,
 
       // Spreads
-      yes_spread: data.yes_spread || (data.yes_ask && data.yes_bid ? data.yes_ask - data.yes_bid : null),
+      yes_spread: currentState.yes_spread,
       no_spread: data.no_spread || (data.no_ask && data.no_bid ? data.no_ask - data.no_bid : null),
 
       // Cambio desde evento anterior
