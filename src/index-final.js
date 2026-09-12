@@ -1664,12 +1664,22 @@ async function main() {
     // Evidencia: 0/11 WIN cuando contradice >0.30, 100% WIN cuando confirma.
     // Fallback HTTP: si el WS no tiene el book, lo pide via REST para no
     // saltear el filtro silenciosamente cuando no hay datos en el WS.
-    if (process.env.BOOK_FILTER_ENABLED === 'true') {
+
+    const bookFilterEnabled = process.env.BOOK_FILTER_ENABLED === 'true';
+    logger.info(`[BOOK-FILTER-DEBUG] BOOK_FILTER_ENABLED=${bookFilterEnabled}`);
+
+    if (bookFilterEnabled) {
       const bookMinImb = parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30');
       let bookSnap = polyWs.getBookSnapshot();
 
+      logger.info(`[BOOK-FILTER-DEBUG] polyWs.getBookSnapshot() = ${bookSnap ? 'HAS DATA' : 'NULL'}`);
+      if (bookSnap) {
+        logger.info(`[BOOK-FILTER-DEBUG] bookSnap keys: ${Object.keys(bookSnap).join(', ')}`);
+      }
+
       // Fallback HTTP si el WS no tiene el book todavía
       if (!bookSnap && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
+        logger.info(`[BOOK-FILTER-DEBUG] No WS data, attempting HTTP fallback...`);
         // Primero intentar el imbalance instantáneo del WS (best_bid_ask, <100ms)
         const instantImb = polyWs.getInstantImbalance?.();
         if (instantImb != null) {
@@ -1696,19 +1706,23 @@ async function main() {
       }
 
       if (bookSnap) {
+        logger.info(`[BOOK-FILTER-DEBUG] Processing bookSnap...`);
         const yesBid = bookSnap.yes_bid_depth || 0;
         const noBid  = bookSnap.no_bid_depth  || 0;
         const yesAsk = bookSnap.yes_ask_depth || 0;
         const noAsk  = bookSnap.no_ask_depth  || 0;
 
+        logger.info(`[BOOK-FILTER-DEBUG] yesBid=${yesBid} noBid=${noBid} yesAsk=${yesAsk} noAsk=${noAsk}`);
+
         // Si viene del imbalance instantáneo (best_bid_ask), usarlo directamente
         let bookImb;
         if (bookSnap._instantImb != null) {
+          logger.info(`[BOOK-FILTER-DEBUG] Using _instantImb=${bookSnap._instantImb}`);
           bookImb = bookSnap._instantImb;
         } else {
           // Verificar que hay datos antes de calcular
           if (yesBid + noBid === 0 && yesAsk + noAsk === 0) {
-            logger.warn(`[SKIP] 📖 BOOK-FILTER: sin datos de book`);
+            logger.warn(`[SKIP] 📖 BOOK-FILTER: sin datos de book (yesBid+noBid=0 AND yesAsk+noAsk=0)`);
             activePositions.delete(posId);
             return;
           }
@@ -1744,6 +1758,20 @@ async function main() {
 
         logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
         logMarketSignal(sig, null, bookImb); // señal que pasó el filtro
+      } else {
+        // bookSnap es null - esto es lo que está causando el bloqueo
+        logger.error(`[BOOK-FILTER-DEBUG] ❌ NO BOOK DATA AVAILABLE - Signal will be skipped!`);
+        logger.error(`[BOOK-FILTER-DEBUG] cachedMarket.yesTokenId: ${cachedMarket?.yesTokenId}`);
+        logger.error(`[BOOK-FILTER-DEBUG] cachedMarket.noTokenId: ${cachedMarket?.noTokenId}`);
+        logger.error(`[BOOK-FILTER-DEBUG] polyWs state: ${polyWs ? 'initialized' : 'null'}`);
+
+        // Si BOOK_FILTER_ENABLED, no entramos sin datos
+        if (bookFilterEnabled) {
+          logger.warn(`[SKIP] 📖 BOOK-FILTER: No book data available AND BOOK_FILTER_ENABLED=true`);
+          activePositions.delete(posId);
+          return;
+        }
+      }
 
           // 3) BTC_CONFIRM_WEAK_BOOK — cuando el book es débil, exigir que BTC confirme
           // Datos: book débil (<0.50) + BTC contra = 9W/9L = 50% WR, -$16 PnL (18 trades)
