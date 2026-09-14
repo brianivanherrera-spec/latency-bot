@@ -122,8 +122,8 @@ module.exports = {
   MARKET_RETRY: process.env.MARKET_RETRY === 'true',
   // Cuántos intentos rápidos de MARKET (FOK) hacer antes de caer a GTC
   MARKET_RETRY_ATTEMPTS: parseInt(process.env.MARKET_RETRY_ATTEMPTS || '3'),
-  // OPTIMIZADO: 3 posiciones vs 1 para capital de $30
-  MAX_ACTIVE_POSITIONS: parseInt(process.env.MAX_ACTIVE_POSITIONS || '3'),
+  // OPTIMIZADO: 1 posición a la vez (sin pérdidas compuestas)
+  MAX_ACTIVE_POSITIONS: parseInt(process.env.MAX_ACTIVE_POSITIONS || '1'),
   MAX_SECONDS_REMAINING: parseInt(process.env.MAX_SECONDS_REMAINING || '150'),
   LATE_ENTRY_MAX_PRICE: parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30'),
 
