@@ -275,8 +275,9 @@ class PolymarketClient {
 
   async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs, forcedOrderType }) {
 
+    const usdcValue = parseFloat((Math.round(price * size * 100) / 100).toFixed(2));
     const rec = { timestamp: new Date().toISOString(), marketId, marketQuestion,
-      tokenId, side, price, size, usdcValue: (price * size).toFixed(2), status: 'PENDING' };
+      tokenId, side, price, size, usdcValue, status: 'PENDING' };
 
     // Helper para parsear fill de BUY correctamente
     // En CLOB BUY: makingAmount = USDC gastado, takingAmount = shares recibidas
@@ -571,8 +572,9 @@ class PolymarketClient {
           if (hasMarketOrderMethod) {
             // Cambio 1 CRÍTICO: usar el path correcto createAndPostMarketOrder
             // amount = size * price para BUY (USDC gastado), size para SELL (shares)
+            // Precision fix: ensure exactly 2 decimals for CLOB validation
             const marketAmt = side === 'BUY'
-              ? parseFloat((orderParams.size * orderParams.price).toFixed(2))
+              ? parseFloat((Math.round(orderParams.size * orderParams.price * 100) / 100).toFixed(2))
               : orderParams.size;
             result = await this.clobClient.createAndPostMarketOrder(
               {

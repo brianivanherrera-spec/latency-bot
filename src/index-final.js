@@ -1849,7 +1849,16 @@ async function main() {
     logger.info(`[PRICE] ${bestAskWS != null ? `bestAsk=$${bestAskWS.toFixed(2)} (WS)` : `priceRaw=$${priceRaw?.toFixed(2)} (fallback)`} → orderPrice=$${orderPrice} (MAX=${MAX_ORDER_PRICE}${isEliteSignal ? ' ÉLITE' : ''})`);
 
     const price = orderPrice;
-    const size = Math.floor(finalExposure / price);
+    // FIX: Garantizar precisión de 2 decimales en makerAmount (price × size)
+    // JavaScript floating-point puede producir 4.859999999... en vez de 4.86
+    // CLOB rechaza si makerAmount tiene >2 decimales
+    // Solución: calcular size de forma que Math.round(price*size*100)/100 = exacto
+    let size = Math.floor(finalExposure / price);
+    const makerAmount = parseFloat((Math.round(price * size * 100) / 100).toFixed(2));
+    // Si makerAmount superó el objetivo por error de redondeo, bajar size en 1
+    if (makerAmount > finalExposure + 0.01) {
+      size = size - 1;
+    }
 
     // MAX_ENTRY_PRICE — filtro sobre priceRaw de la señal (no del order price)
     // Señales ÉLITE lo saltean — con 100% WR histórico no importa el priceRaw
