@@ -1522,6 +1522,12 @@ async function main() {
 
     const price = orderPrice;
     const size = Math.floor(finalExposure / price);
+    // Verificar precisión: makerAmount (USDC) máx 2 decimales, takerAmount (shares) máx 4
+    // SDK puede generar 4.859999... en vez de 4.86 con float arithmetic
+    const makerAmountCheck = parseFloat((size * price).toFixed(2));
+    if (Math.abs(makerAmountCheck - size * price) > 0.001) {
+      logger.debug(`[PRICE] Ajuste de precisión: ${size * price} → ${makerAmountCheck}`);
+    }
 
     // MAX_ENTRY_PRICE — filtro sobre priceRaw de la señal (no del order price)
     // Señales ÉLITE lo saltean — con 100% WR histórico no importa el priceRaw
