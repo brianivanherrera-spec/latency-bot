@@ -433,10 +433,12 @@ class PolymarketClient {
 
             logger.info(`[LIVE] ⚡ FAK intento ${fakAttempt}/${FAK_MAX_ATTEMPTS} @ $${fakPrice.toFixed(2)}`);
             try {
+              // Precision fix: ensure exactly 2 decimals for FAK order amount
+              const fakAmount = parseFloat((Math.round(size * fakPrice * 100) / 100).toFixed(2));
               const fakRes = hasMarketOrderMethod
                 ? await this.clobClient.createAndPostMarketOrder(
                     { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                      amount: parseFloat((size * fakPrice).toFixed(2)), price: fakPrice, orderType: OrderType.FAK },
+                      amount: fakAmount, price: fakPrice, orderType: OrderType.FAK },
                     { tickSize: '0.01', negRisk: false }, OrderType.FAK, true
                   )
                 : await this.clobClient.createAndPostOrder({ ...orderParams, price: fakPrice, orderType: OrderType.FAK });
