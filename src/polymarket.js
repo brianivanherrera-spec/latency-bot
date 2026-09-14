@@ -188,6 +188,20 @@ class PolymarketClient {
       catch(e) { tokens = []; }
     }
 
+    let yesTokenId = tokens[0] || null;
+    let noTokenId = tokens[1] || null;
+
+    if (tokens.length >= 2 && m.outcomes && Array.isArray(m.outcomes)) {
+      for (let i = 0; i < m.outcomes.length; i++) {
+        const outcome = (m.outcomes[i] || '').toLowerCase();
+        if (outcome.includes('yes')) {
+          yesTokenId = tokens[i];
+        } else if (outcome.includes('no')) {
+          noTokenId = tokens[i];
+        }
+      }
+    }
+
     // CÓMO POLYMARKET FIJA LOS PRECIOS INICIALES DE MERCADOS BINARIOS:
     // ═════════════════════════════════════════════════════════════════
     //
@@ -220,7 +234,7 @@ class PolymarketClient {
     }
 
     return { conditionId: m.conditionId||m.id, gammaId: m.id, question: m.question,
-      endDate: m.endDate, yesTokenId: tokens[0]||null, noTokenId: tokens[1]||null,
+      endDate: m.endDate, yesTokenId, noTokenId,
       marketSlug: m.marketSlug, strikePrice, description: desc };
   }
 
