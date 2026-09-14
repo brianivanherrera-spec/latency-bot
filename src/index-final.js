@@ -1681,10 +1681,13 @@ async function main() {
         logger.info(`[BOOK-FILTER-DEBUG] No instant imbalance, attempting HTTP fallback...`);
         const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
         if (depth) {
-          const total = depth.yesBid + depth.noBid;
+          // Usar best prices (consistente con getInstantImbalance())
+          const yesBestBid = depth.yesBestBid ?? 0.50;
+          const noBestBid = depth.noBestBid ?? 0.50;
+          const total = yesBestBid + noBestBid;
           if (total > 0) {
-            bookImb = parseFloat(((depth.yesBid - depth.noBid) / total).toFixed(3));
-            logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid} → imb=${bookImb.toFixed(3)}`);
+            bookImb = parseFloat(((yesBestBid - noBestBid) / total).toFixed(3));
+            logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=$${yesBestBid.toFixed(3)} no_bid=$${noBestBid.toFixed(3)} → imb=${bookImb.toFixed(3)}`);
           }
         }
       }

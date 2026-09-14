@@ -241,7 +241,16 @@ class PolymarketClient {
       const yesBook = yesRes?.ok ? await yesRes.json().catch(() => null) : null;
       const noBook  = noRes?.ok  ? await noRes.json().catch(() => null)  : null;
 
+      const parsePrice = (l) => parseFloat(l?.price ?? 0) || 0;
       const parseSize = (l) => parseFloat(l?.size ?? l?.amount ?? 0) || 0;
+
+      // BEST prices (primer nivel del book)
+      const yesBestPrice = parsePrice(yesBook?.bids?.[0]);
+      const yesAskPrice = parsePrice(yesBook?.asks?.[0]);
+      const noBestPrice = parsePrice(noBook?.bids?.[0]);
+      const noAskPrice = parsePrice(noBook?.asks?.[0]);
+
+      // TOTAL depth (suma de todos los levels) — para compatibilidad
       const yesBid = (yesBook?.bids || []).reduce((s,l) => s+parseSize(l), 0);
       const yesAsk = (yesBook?.asks || []).reduce((s,l) => s+parseSize(l), 0);
       const noBid  = (noBook?.bids  || []).reduce((s,l) => s+parseSize(l), 0);
@@ -249,6 +258,12 @@ class PolymarketClient {
 
       if (yesBid === 0 && yesAsk === 0 && noBid === 0 && noAsk === 0) return null;
       return {
+        // Best prices (para BOOK_FILTER imbalance calculation)
+        yesBestBid: yesBestPrice || null,
+        yesAskPrice: yesAskPrice || null,
+        noBestBid: noBestPrice || null,
+        noAskPrice: noAskPrice || null,
+        // Total depth (para compatibilidad con código existente)
         yesBid: parseFloat(yesBid.toFixed(2)),
         yesAsk: parseFloat(yesAsk.toFixed(2)),
         noBid:  parseFloat(noBid.toFixed(2)),
