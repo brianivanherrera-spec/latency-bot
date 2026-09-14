@@ -1671,71 +1671,27 @@ async function main() {
 
     if (bookFilterEnabled) {
       const bookMinImb = parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30');
-      let bookSnap = polyWs.getBookSnapshot();
 
-      logger.info(`[BOOK-FILTER-DEBUG] polyWs.getBookSnapshot() = ${bookSnap ? 'HAS DATA' : 'NULL'}`);
-      if (bookSnap) {
-        logger.info(`[BOOK-FILTER-DEBUG] bookSnap keys: ${Object.keys(bookSnap).join(', ')}`);
-      }
+      // PRIMARY: Usar getInstantImbalance (best_bid/ask precios) — SIEMPRE disponible
+      let bookImb = polyWs.getInstantImbalance?.();
+      logger.info(`[BOOK-FILTER-DEBUG] getInstantImbalance() = ${bookImb != null ? bookImb.toFixed(3) : 'NULL'}`);
 
-      // Fallback HTTP si el WS no tiene el book todavía
-      if (!bookSnap && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
-        logger.info(`[BOOK-FILTER-DEBUG] No WS data, attempting HTTP fallback...`);
-        // Primero intentar el imbalance instantáneo del WS (best_bid_ask, <100ms)
-        const instantImb = polyWs.getInstantImbalance?.();
-        if (instantImb != null) {
-          logger.info(`[BOOK-FILTER] ⚡ Imbalance instantáneo (best_bid_ask): ${instantImb.toFixed(3)}`);
-          bookSnap = {
-            yes_bid_size: 1, no_bid_size: 1, // valores proxy
-            yes_ask_size: 0, no_ask_size: 0,
-            _instantImb: instantImb, // pasar el imbalance ya calculado
-          };
-        } else {
-          // Último recurso: REST call (~185ms)
-          const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
-          if (depth) {
-            const total = depth.yesBid + depth.noBid;
-            bookSnap = total > 0 ? {
-              yes_bid_size: depth.yesBid,
-              no_bid_size:  depth.noBid,
-              yes_ask_size: 0,
-              no_ask_size: 0,
-            } : null;
-            if (bookSnap) logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid}`);
+      // Si no hay imbalance instantáneo, intentar fallback HTTP
+      if (bookImb == null && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
+        logger.info(`[BOOK-FILTER-DEBUG] No instant imbalance, attempting HTTP fallback...`);
+        const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+        if (depth) {
+          const total = depth.yesBid + depth.noBid;
+          if (total > 0) {
+            bookImb = parseFloat(((depth.yesBid - depth.noBid) / total).toFixed(3));
+            logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid} → imb=${bookImb.toFixed(3)}`);
           }
         }
       }
 
-      if (bookSnap) {
-        logger.info(`[BOOK-FILTER-DEBUG] Processing bookSnap...`);
-        const yesBid = bookSnap.yes_bid_size || 0;
-        const noBid  = bookSnap.no_bid_size  || 0;
-        const yesAsk = bookSnap.yes_ask_size || 0;
-        const noAsk  = bookSnap.no_ask_size  || 0;
-
-        logger.info(`[BOOK-FILTER-DEBUG] yesBid=${yesBid} noBid=${noBid} yesAsk=${yesAsk} noAsk=${noAsk}`);
-
-        // Si viene del imbalance instantáneo (best_bid_ask), usarlo directamente
-        let bookImb;
-        if (bookSnap._instantImb != null) {
-          logger.info(`[BOOK-FILTER-DEBUG] Using _instantImb=${bookSnap._instantImb}`);
-          bookImb = bookSnap._instantImb;
-        } else {
-          // Verificar que hay datos antes de calcular
-          if (yesBid + noBid === 0 && yesAsk + noAsk === 0) {
-            logger.warn(`[SKIP] 📖 BOOK-FILTER: sin datos de book (yesBid+noBid=0 AND yesAsk+noAsk=0)`);
-            activePositions.delete(posId);
-            return;
-          }
-          // Imbalance mejorado con 4 componentes del snapshot
-          const yesPres = yesBid - yesAsk;
-          const noPres  = noBid  - noAsk;
-          const total   = Math.abs(yesPres) + Math.abs(noPres);
-          bookImb = total > 0
-            ? (yesPres - noPres) / (Math.abs(yesPres) + Math.abs(noPres))
-            : (yesBid + noBid > 0 ? (yesBid - noBid) / (yesBid + noBid) : 0);
-          logger.debug(`[BOOK-FILTER] yesBid=${yesBid.toFixed(0)} yesAsk=${yesAsk.toFixed(0)} noBid=${noBid.toFixed(0)} noAsk=${noAsk.toFixed(0)} → imb=${bookImb.toFixed(3)}`);
-        }
+      if (bookImb != null) {
+        logger.info(`[BOOK-FILTER-DEBUG] bookImb=${bookImb.toFixed(3)}`);
+        // bookImb está calculado
 
         // 1) Bloquear si el book contradice activamente la dirección
         const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
