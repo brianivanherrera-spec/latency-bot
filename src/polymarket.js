@@ -479,21 +479,26 @@ class PolymarketClient {
           const gtdExpiry = Math.max(minExpiry, marketExpiry);
 
           logger.info(`[LIVE] 🔀 TRIPLE ORDER: FAK + GTC + GTD @ $${worstPrice}`);
+          // Garantizar precisión decimal: makerAmount (USDC) máx 2 decimales
+          // Ajustar size para que price × size sea exactamente 2 decimales
+          const safeSize = Math.floor(parseFloat((size * worstPrice).toFixed(2)) / worstPrice);
+          const safeSizeFinal = safeSize > 0 ? safeSize : size;
+          logger.debug(`[PRICE] size=${size} → safeSize=${safeSizeFinal} (makerAmount=$${(safeSizeFinal * worstPrice).toFixed(2)})`);
           try {
             const [fakOrder, gtcOrder, gtdOrder] = await Promise.all([
               this.clobClient.createOrder(
                 { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                  price: worstPrice, size, orderType: firstOrderType },
+                  price: worstPrice, size: safeSizeFinal, orderType: firstOrderType },
                 { tickSize: '0.01', negRisk: false }
               ),
               this.clobClient.createOrder(
                 { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                  price: worstPrice, size, orderType: OrderType.GTC },
+                  price: worstPrice, size: safeSizeFinal, orderType: OrderType.GTC },
                 { tickSize: '0.01', negRisk: false }
               ),
               this.clobClient.createOrder(
                 { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                  price: worstPrice, size, orderType: OrderType.GTD, expiration: gtdExpiry },
+                  price: worstPrice, size: safeSizeFinal, orderType: OrderType.GTD, expiration: gtdExpiry },
                 { tickSize: '0.01', negRisk: false }
               ),
             ]);

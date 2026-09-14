@@ -423,7 +423,12 @@ class PolymarketWS {
     let settled = false;
     let ws;
     try {
-      ws = new WebSocket(WS_URL);
+      // maxPayload: limitar tamaño de mensajes para evitar slow consumer
+      // perMessageDeflate: compresión para reducir el volumen de datos
+      ws = new WebSocket(WS_URL, {
+        maxPayload: 10 * 1024 * 1024, // 10MB max
+        perMessageDeflate: true,
+      });
     } catch (err) {
       this._connecting = false;
       logger.error(`No se pudo crear WS: ${err.message}`);
@@ -455,14 +460,14 @@ class PolymarketWS {
         this._lastPongAt = Date.now();
         return;
       }
-      // Polymarket a veces responde texto plano a ops inválidas
-      if (raw === 'INVALID OPERATION' || raw.startsWith('INVALID')) {
-        return; // silencioso — suele ser unsubscribe viejo o subscribe duplicado
-      }
+      if (raw === 'INVALID OPERATION' || raw.startsWith('INVALID')) return;
       try {
         const parsed = JSON.parse(raw);
         const events = Array.isArray(parsed) ? parsed : [parsed];
-        for (const msg of events) this._handleMessage(msg);
+        // setImmediate cede el event loop — evita slow consumer (code=1013)
+        setImmediate(() => {
+          for (const msg of events) this._handleMessage(msg);
+        });
       } catch (e) {
         if (raw && raw.length < 120) {
           logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);
