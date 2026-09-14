@@ -188,6 +188,20 @@ class PolymarketClient {
       catch(e) { tokens = []; }
     }
 
+    let yesTokenId = tokens[0] || null;
+    let noTokenId = tokens[1] || null;
+
+    if (tokens.length >= 2 && m.outcomes && Array.isArray(m.outcomes)) {
+      for (let i = 0; i < m.outcomes.length; i++) {
+        const outcome = (m.outcomes[i] || '').toLowerCase();
+        if (outcome.includes('yes')) {
+          yesTokenId = tokens[i];
+        } else if (outcome.includes('no')) {
+          noTokenId = tokens[i];
+        }
+      }
+    }
+
     // CÓMO POLYMARKET FIJA LOS PRECIOS INICIALES DE MERCADOS BINARIOS:
     // ═════════════════════════════════════════════════════════════════
     //
@@ -220,7 +234,7 @@ class PolymarketClient {
     }
 
     return { conditionId: m.conditionId||m.id, gammaId: m.id, question: m.question,
-      endDate: m.endDate, yesTokenId: tokens[0]||null, noTokenId: tokens[1]||null,
+      endDate: m.endDate, yesTokenId, noTokenId,
       marketSlug: m.marketSlug, strikePrice, description: desc };
   }
 
@@ -241,7 +255,16 @@ class PolymarketClient {
       const yesBook = yesRes?.ok ? await yesRes.json().catch(() => null) : null;
       const noBook  = noRes?.ok  ? await noRes.json().catch(() => null)  : null;
 
+      const parsePrice = (l) => parseFloat(l?.price ?? 0) || 0;
       const parseSize = (l) => parseFloat(l?.size ?? l?.amount ?? 0) || 0;
+
+      // BEST prices (primer nivel del book)
+      const yesBestPrice = parsePrice(yesBook?.bids?.[0]);
+      const yesAskPrice = parsePrice(yesBook?.asks?.[0]);
+      const noBestPrice = parsePrice(noBook?.bids?.[0]);
+      const noAskPrice = parsePrice(noBook?.asks?.[0]);
+
+      // TOTAL depth (suma de todos los levels) — para compatibilidad
       const yesBid = (yesBook?.bids || []).reduce((s,l) => s+parseSize(l), 0);
       const yesAsk = (yesBook?.asks || []).reduce((s,l) => s+parseSize(l), 0);
       const noBid  = (noBook?.bids  || []).reduce((s,l) => s+parseSize(l), 0);
@@ -249,6 +272,12 @@ class PolymarketClient {
 
       if (yesBid === 0 && yesAsk === 0 && noBid === 0 && noAsk === 0) return null;
       return {
+        // Best prices (para BOOK_FILTER imbalance calculation)
+        yesBestBid: yesBestPrice || null,
+        yesAskPrice: yesAskPrice || null,
+        noBestBid: noBestPrice || null,
+        noAskPrice: noAskPrice || null,
+        // Total depth (para compatibilidad con código existente)
         yesBid: parseFloat(yesBid.toFixed(2)),
         yesAsk: parseFloat(yesAsk.toFixed(2)),
         noBid:  parseFloat(noBid.toFixed(2)),
@@ -275,8 +304,9 @@ class PolymarketClient {
 
   async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs, forcedOrderType }) {
 
+    const usdcValue = parseFloat((Math.round(price * size * 100) / 100).toFixed(2));
     const rec = { timestamp: new Date().toISOString(), marketId, marketQuestion,
-      tokenId, side, price, size, usdcValue: (price * size).toFixed(2), status: 'PENDING' };
+      tokenId, side, price, size, usdcValue, status: 'PENDING' };
 
     // Helper para parsear fill de BUY correctamente
     // En CLOB BUY: makingAmount = USDC gastado, takingAmount = shares recibidas
@@ -432,10 +462,12 @@ class PolymarketClient {
 
             logger.info(`[LIVE] ⚡ FAK intento ${fakAttempt}/${FAK_MAX_ATTEMPTS} @ $${fakPrice.toFixed(2)}`);
             try {
+              // Precision fix: ensure exactly 2 decimals for FAK order amount
+              const fakAmount = parseFloat((Math.round(size * fakPrice * 100) / 100).toFixed(2));
               const fakRes = hasMarketOrderMethod
                 ? await this.clobClient.createAndPostMarketOrder(
                     { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                      amount: parseFloat((size * fakPrice).toFixed(2)), price: fakPrice, orderType: OrderType.FAK },
+                      amount: fakAmount, price: fakPrice, orderType: OrderType.FAK },
                     { tickSize: '0.01', negRisk: false }, OrderType.FAK, true
                   )
                 : await this.clobClient.createAndPostOrder({ ...orderParams, price: fakPrice, orderType: OrderType.FAK });
@@ -576,8 +608,9 @@ class PolymarketClient {
           if (hasMarketOrderMethod) {
             // Cambio 1 CRÍTICO: usar el path correcto createAndPostMarketOrder
             // amount = size * price para BUY (USDC gastado), size para SELL (shares)
+            // Precision fix: ensure exactly 2 decimals for CLOB validation
             const marketAmt = side === 'BUY'
-              ? parseFloat((orderParams.size * orderParams.price).toFixed(2))
+              ? parseFloat((Math.round(orderParams.size * orderParams.price * 100) / 100).toFixed(2))
               : orderParams.size;
             result = await this.clobClient.createAndPostMarketOrder(
               {

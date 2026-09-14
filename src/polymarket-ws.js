@@ -345,41 +345,6 @@ class PolymarketWS {
     };
   }
 
-  getBookSnapshot() {
-    const yesBook = this._bookByToken.get(this._yesTokenId) || null;
-    const noBook  = this._bookByToken.get(this._noTokenId)  || null;
-    if (!yesBook && !noBook) return null;
-
-    // Usar profundidad del snapshot si existe, sino usar bestBid/bestAsk del best_bid_ask
-    // best_bid_ask llega en tiempo real (<100ms) vs snapshot que llega cada 2-5s
-    const yesBidDepth = yesBook?.bid ?? yesBook?.bestBid ?? 0;
-    const yesAskDepth = yesBook?.ask ?? yesBook?.bestAsk ?? 0;
-    const noBidDepth  = noBook?.bid  ?? noBook?.bestBid  ?? 0;
-    const noAskDepth  = noBook?.ask  ?? noBook?.bestAsk  ?? 0;
-
-    // Indicar si viene de snapshot real (profundidad) o de best_bid_ask (tiempo real)
-    const hasDepth = (yesBook?.bid != null) || (noBook?.bid != null);
-    if (!hasDepth) {
-      // Imbalance desde best_bid_ask: YES_bid vs NO_bid
-      // Con solo bid/ask top, usar bid como proxy de profundidad
-      // Un bestBid alto en YES = más compradores de YES = imbalance positivo
-    }
-
-    const totalBid = yesBidDepth + noBidDepth;
-    const volImbalance = totalBid > 0
-      ? parseFloat(((yesBidDepth - noBidDepth) / totalBid).toFixed(3))
-      : 0;
-
-    return {
-      yes_bid_depth: yesBidDepth,
-      yes_ask_depth: yesAskDepth,
-      no_bid_depth:  noBidDepth,
-      no_ask_depth:  noAskDepth,
-      vol_imbalance: volImbalance,
-      from_best_bid_ask: !hasDepth, // flag para saber la fuente
-    };
-  }
-
   // Imbalance instantáneo desde best_bid_ask — latencia <100ms vs snapshot 2-5s
   // Usa el precio del mejor bid de YES/NO como proxy del sentimiento del mercado
   // YES_bid alto = más compradores de YES = mercado yendo UP
@@ -460,6 +425,7 @@ class PolymarketWS {
         this._lastPongAt = Date.now();
         return;
       }
+<<<<<<< HEAD
       if (raw === 'INVALID OPERATION' || raw.startsWith('INVALID')) return;
       try {
         const parsed = JSON.parse(raw);
@@ -471,8 +437,23 @@ class PolymarketWS {
       } catch (e) {
         if (raw && raw.length < 120) {
           logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);
-        }
+=======
+      // Polymarket a veces responde texto plano a ops inválidas
+      if (raw === 'INVALID OPERATION' || raw.startsWith('INVALID')) {
+        return; // silencioso — suele ser unsubscribe viejo o subscribe duplicado
       }
+      setImmediate(() => {
+        try {
+          const parsed = JSON.parse(raw);
+          const events = Array.isArray(parsed) ? parsed : [parsed];
+          for (const msg of events) this._handleMessage(msg);
+        } catch (e) {
+          if (raw && raw.length < 120) {
+            logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);
+          }
+>>>>>>> claude/code-analysis-pqoez0
+        }
+      });
     });
 
     ws.on('error', (err) => {
@@ -882,6 +863,30 @@ class PolymarketWS {
     this._clearPing();
     this._teardownSocket();
     this._connected = false;
+  }
+  // PHASE 2: Obtener estado completo del book para logging RAW
+  getBookSnapshot() {
+    const yes = this._topOfBook.get(this._yesTokenId) || {};
+    const no = this._topOfBook.get(this._noTokenId) || {};
+    return {
+      yes_bid: yes.bestBid || null,
+      yes_ask: yes.bestAsk || null,
+      yes_bid_size: yes.bestBidSize || null,
+      yes_ask_size: yes.bestAskSize || null,
+      no_bid: no.bestBid || null,
+      no_ask: no.bestAsk || null,
+      no_bid_size: no.bestBidSize || null,
+      no_ask_size: no.bestAskSize || null,
+      yes_spread: yes.bestAsk && yes.bestBid ? yes.bestAsk - yes.bestBid : null,
+      no_spread: no.bestAsk && no.bestBid ? no.bestAsk - no.bestBid : null,
+    };
+  }
+
+  // PHASE 2: Obtener precios actuales
+  getCurrentPrices() {
+    const yes = this._marketPriceByToken.get(this._yesTokenId);
+    const no = this._marketPriceByToken.get(this._noTokenId);
+    return { yes, no };
   }
 }
 

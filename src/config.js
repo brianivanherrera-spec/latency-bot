@@ -56,16 +56,16 @@ module.exports = {
   // =============================================
 
   // USDC por orden (en modo live)
-  ORDER_SIZE_USDC: parseFloat(process.env.ORDER_SIZE_USDC || '5'),
+  ORDER_SIZE_USDC: parseFloat(process.env.ORDER_SIZE_USDC || '4'),
 
   // Límites de posiciones y capital
   MAX_POSITIONS: parseInt(process.env.MAX_POSITIONS || '10'),
-  MAX_TOTAL_EXPOSURE_USDC: parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '100'),
-  MAX_POSITION_SIZE_USDC: parseFloat(process.env.MAX_POSITION_SIZE_USDC || '20'),
+  MAX_TOTAL_EXPOSURE_USDC: parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '30'),
+  MAX_POSITION_SIZE_USDC: parseFloat(process.env.MAX_POSITION_SIZE_USDC || '12'),
   STOP_LOSS_PERCENT: parseFloat(process.env.STOP_LOSS_PERCENT || '10'),
 
-  // Cooldown entre órdenes
-  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '360'),
+  // Cooldown entre órdenes - OPTIMIZADO: 30s vs 360s para máxima operación
+  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '30'),
 
   // =============================================
   // LATENCIA Y FRESHNESS DE DATOS
@@ -86,7 +86,8 @@ module.exports = {
   // =============================================
   // FILTROS DE HORARIO
   // =============================================
-  TRADING_HOURS_ENABLED: process.env.TRADING_HOURS_ENABLED !== 'false',
+  // OPTIMIZADO: Disabled por defecto para operar 24/7. Reemplaza con true si quieres restricciones.
+  TRADING_HOURS_ENABLED: process.env.TRADING_HOURS_ENABLED === 'true',
 
   // Horas UTC bloqueadas — calibradas con datos reales de signals.jsonl
   // Horas doradas: 3,4,5,8,12,13,14 | Malas: todo lo demás listado abajo
@@ -121,7 +122,8 @@ module.exports = {
   MARKET_RETRY: process.env.MARKET_RETRY === 'true',
   // Cuántos intentos rápidos de MARKET (FOK) hacer antes de caer a GTC
   MARKET_RETRY_ATTEMPTS: parseInt(process.env.MARKET_RETRY_ATTEMPTS || '3'),
-  MAX_ACTIVE_POSITIONS: parseInt(process.env.MAX_ACTIVE_POSITIONS || '1'),
+  // OPTIMIZADO: 3 posiciones vs 1 para capital de $30
+  MAX_ACTIVE_POSITIONS: parseInt(process.env.MAX_ACTIVE_POSITIONS || '3'),
   MAX_SECONDS_REMAINING: parseInt(process.env.MAX_SECONDS_REMAINING || '150'),
   LATE_ENTRY_MAX_PRICE: parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30'),
 
@@ -148,6 +150,19 @@ module.exports = {
   // Score 90-99 tiene solo 53% WR (señales en momentos extremos de BTC)
   MIN_SIGNAL_SCORE: parseInt(process.env.MIN_SIGNAL_SCORE || '60'),
   MAX_SIGNAL_SCORE: parseInt(process.env.MAX_SIGNAL_SCORE || '89'),
+
+  // =============================================
+  // BOOK FILTER - Real-time order book analysis
+  // =============================================
+  // BOOK_FILTER_ENABLED: activa el filtro de imbalance del book
+  // Requiere datos del book disponibles — si está true y no hay datos, BLOQUEA todas las órdenes
+  BOOK_FILTER_ENABLED: process.env.BOOK_FILTER_ENABLED === 'true',
+  BOOK_FILTER_MIN_IMBALANCE: parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30'),
+
+  // BTC_CONFIRM_WEAK_BOOK: si el book es débil (<0.50), exigir que BTC confirme
+  // Datos: débil + BTC contra = 50% WR; débil + BTC alineado = 93% WR
+  BTC_CONFIRM_WEAK_BOOK: process.env.BTC_CONFIRM_WEAK_BOOK === 'true',
+  BTC_WEAK_BOOK_THRESHOLD: parseFloat(process.env.BTC_WEAK_BOOK_THRESHOLD || '0.50'),
 
   // =============================================
   // LOGGING
