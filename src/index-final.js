@@ -1344,8 +1344,9 @@ async function main() {
     if (now - lastTradeTime < COOLDOWN) return;
 
     // ─── Circuit Breaker ──────────────────────────────────────────────────
-    const CIRCUIT_BREAKER_LOSSES = parseInt(process.env.CIRCUIT_BREAKER_LOSSES || '3');
-    const CIRCUIT_BREAKER_PAUSE_MS = parseInt(process.env.CIRCUIT_BREAKER_PAUSE_MIN || '30') * 60 * 1000;
+    // OPTIMIZADO: 5 pérdidas (vs 3) + 10min pausa (vs 30) para mayor operación
+    const CIRCUIT_BREAKER_LOSSES = parseInt(process.env.CIRCUIT_BREAKER_LOSSES || '5');
+    const CIRCUIT_BREAKER_PAUSE_MS = parseInt(process.env.CIRCUIT_BREAKER_PAUSE_MIN || '10') * 60 * 1000;
     const consecLosses = signalLogger.getConsecutiveLosses();
     if (consecLosses >= CIRCUIT_BREAKER_LOSSES) {
       if (!global._lastCircuitBreakTime) global._lastCircuitBreakTime = now;
