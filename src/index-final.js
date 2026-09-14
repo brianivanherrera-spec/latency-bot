@@ -1372,8 +1372,8 @@ async function main() {
       const bookEntryMinImb = parseFloat(process.env.BOOK_ENTRY_MIN_IMBALANCE || '0.60');
       const bookSnap = polyWs.getBookSnapshot();
       if (bookSnap) {
-        const yesBid = bookSnap.yes_bid_depth || 0;
-        const noBid  = bookSnap.no_bid_depth  || 0;
+        const yesBid = bookSnap.yes_bid_size || 0;
+        const noBid  = bookSnap.no_bid_size  || 0;
         const total  = yesBid + noBid;
         if (total > 0) {
           const bookImb = (yesBid - noBid) / total;
@@ -1708,10 +1708,10 @@ async function main() {
 
       if (bookSnap) {
         logger.info(`[BOOK-FILTER-DEBUG] Processing bookSnap...`);
-        const yesBid = bookSnap.yes_bid_depth || 0;
-        const noBid  = bookSnap.no_bid_depth  || 0;
-        const yesAsk = bookSnap.yes_ask_depth || 0;
-        const noAsk  = bookSnap.no_ask_depth  || 0;
+        const yesBid = bookSnap.yes_bid_size || 0;
+        const noBid  = bookSnap.no_bid_size  || 0;
+        const yesAsk = bookSnap.yes_ask_size || 0;
+        const noAsk  = bookSnap.no_ask_size  || 0;
 
         logger.info(`[BOOK-FILTER-DEBUG] yesBid=${yesBid} noBid=${noBid} yesAsk=${yesAsk} noAsk=${noAsk}`);
 
