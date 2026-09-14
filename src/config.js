@@ -152,6 +152,19 @@ module.exports = {
   MAX_SIGNAL_SCORE: parseInt(process.env.MAX_SIGNAL_SCORE || '89'),
 
   // =============================================
+  // BOOK FILTER - Real-time order book analysis
+  // =============================================
+  // BOOK_FILTER_ENABLED: activa el filtro de imbalance del book
+  // Requiere datos del book disponibles — si está true y no hay datos, BLOQUEA todas las órdenes
+  BOOK_FILTER_ENABLED: process.env.BOOK_FILTER_ENABLED === 'true',
+  BOOK_FILTER_MIN_IMBALANCE: parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30'),
+
+  // BTC_CONFIRM_WEAK_BOOK: si el book es débil (<0.50), exigir que BTC confirme
+  // Datos: débil + BTC contra = 50% WR; débil + BTC alineado = 93% WR
+  BTC_CONFIRM_WEAK_BOOK: process.env.BTC_CONFIRM_WEAK_BOOK === 'true',
+  BTC_WEAK_BOOK_THRESHOLD: parseFloat(process.env.BTC_WEAK_BOOK_THRESHOLD || '0.50'),
+
+  // =============================================
   // LOGGING
   // =============================================
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
