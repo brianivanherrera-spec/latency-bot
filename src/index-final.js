@@ -1686,8 +1686,8 @@ async function main() {
         if (instantImb != null) {
           logger.info(`[BOOK-FILTER] ⚡ Imbalance instantáneo (best_bid_ask): ${instantImb.toFixed(3)}`);
           bookSnap = {
-            yes_bid_depth: 1, no_bid_depth: 1, // valores proxy
-            yes_ask_depth: 0, no_ask_depth: 0,
+            yes_bid_size: 1, no_bid_size: 1, // valores proxy
+            yes_ask_size: 0, no_ask_size: 0,
             _instantImb: instantImb, // pasar el imbalance ya calculado
           };
         } else {
@@ -1696,10 +1696,10 @@ async function main() {
           if (depth) {
             const total = depth.yesBid + depth.noBid;
             bookSnap = total > 0 ? {
-              yes_bid_depth: depth.yesBid,
-              no_bid_depth:  depth.noBid,
-              yes_ask_depth: 0,
-              no_ask_depth: 0,
+              yes_bid_size: depth.yesBid,
+              no_bid_size:  depth.noBid,
+              yes_ask_size: 0,
+              no_ask_size: 0,
             } : null;
             if (bookSnap) logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid}`);
           }
@@ -1941,7 +1941,7 @@ async function main() {
         return dir === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
       },
       // getBookSnapshot: captura la profundidad del book al momento exacto
-      // de la señal — yes_bid_depth, yes_ask_depth, no_bid_depth, no_ask_depth,
+      // de la señal — yes_bid_size, yes_ask_size, no_bid_size, no_ask_size,
       // vol_imbalance — para analizar si el order flow confirma la dirección.
       getBookSnapshot: async () => {        let snap = polyWs.getBookSnapshot();
         if (!snap && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
@@ -1950,10 +1950,10 @@ async function main() {
           if (depth) {
             const totalBid = depth.yesBid + depth.noBid;
             snap = {
-              yes_bid_depth: depth.yesBid,
-              yes_ask_depth: depth.yesAsk,
-              no_bid_depth:  depth.noBid,
-              no_ask_depth:  depth.noAsk,
+              yes_bid_size: depth.yesBid,
+              yes_ask_size: depth.yesAsk,
+              no_bid_size:  depth.noBid,
+              no_ask_size:  depth.noAsk,
               vol_imbalance: totalBid > 0
                 ? parseFloat(((depth.yesBid - depth.noBid) / totalBid).toFixed(3))
                 : 0,

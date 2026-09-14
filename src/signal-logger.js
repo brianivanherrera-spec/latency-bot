@@ -95,10 +95,10 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     // Profundidad del book de Polymarket al momento de la señal.
     // Permite analizar si hay más compradores de YES o NO en ese instante.
     // vol_imbalance: -1 = todo el volumen en NO, +1 = todo en YES
-    book_yes_bid:     bookSnap?.yes_bid_depth ?? null,
-    book_yes_ask:     bookSnap?.yes_ask_depth ?? null,
-    book_no_bid:      bookSnap?.no_bid_depth  ?? null,
-    book_no_ask:      bookSnap?.no_ask_depth  ?? null,
+    book_yes_bid:     bookSnap?.yes_bid_size ?? null,
+    book_yes_ask:     bookSnap?.yes_ask_size ?? null,
+    book_no_bid:      bookSnap?.no_bid_size  ?? null,
+    book_no_ask:      bookSnap?.no_ask_size  ?? null,
     book_vol_imbalance: bookSnap?.vol_imbalance ?? null,
     // Último trade ejecutado en Polymarket al momento de la señal
     poly_last_trade_token:     tradeSnap?.latest_token      ?? null,
