@@ -1682,8 +1682,19 @@ async function main() {
         const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
         if (depth) {
           // Usar best prices (consistente con getInstantImbalance())
-          const yesBestBid = depth.yesBestBid ?? 0.50;
-          const noBestBid = depth.noBestBid ?? 0.50;
+          let yesBestBid = depth.yesBestBid ?? null;
+          let noBestBid = depth.noBestBid ?? null;
+
+          // Apply binary market property: YES + NO = 1
+          if (yesBestBid != null && noBestBid == null) {
+            noBestBid = 1 - yesBestBid;
+          } else if (noBestBid != null && yesBestBid == null) {
+            yesBestBid = 1 - noBestBid;
+          } else if (yesBestBid == null || noBestBid == null) {
+            yesBestBid = 0.50;
+            noBestBid = 0.50;
+          }
+
           const total = yesBestBid + noBestBid;
           if (total > 0) {
             bookImb = parseFloat(((yesBestBid - noBestBid) / total).toFixed(3));

@@ -122,6 +122,7 @@ class PolymarketWS {
     const bid = bestBid != null && !isNaN(bestBid) && bestBid > 0 && bestBid <= 1
       ? bestBid : prev.bestBid ?? null;
     if (ask == null && bid == null) return;
+    // ALWAYS update updatedAt when data arrives, even if reusing old bid/ask
     this._topOfBook.set(tokenId, {
       bestBid: bid, bestAsk: ask,
       bestBidSize: bestBidSize ?? prev.bestBidSize ?? null,
@@ -350,19 +351,41 @@ class PolymarketWS {
   // YES_bid alto = más compradores de YES = mercado yendo UP
   // Menos preciso que la profundidad pero MUCHO más rápido
   getInstantImbalance() {
+    const now = Date.now();
     const yesBook = this._topOfBook.get(this._yesTokenId);
     const noBook  = this._topOfBook.get(this._noTokenId);
+
+    // Validar TTL: datos con más de 5 segundos son stale, retornar null para trigger fallback HTTP
+    const STALE_MS = 5000;
+    if (yesBook && (now - yesBook.updatedAt) > STALE_MS) {
+      return null; // Force fallback to HTTP
+    }
+    if (noBook && (now - noBook.updatedAt) > STALE_MS) {
+      return null; // Force fallback to HTTP
+    }
+
     if (!yesBook?.bestBid && !noBook?.bestBid) return null;
 
-    const yesBid = yesBook?.bestBid ?? 0.50;
-    const noBid  = noBook?.bestBid  ?? 0.50;
+    const yesBid = yesBook?.bestBid ?? null;
+    const noBid  = noBook?.bestBid  ?? null;
 
-    // Con mercado binario: YES + NO = 1 siempre
-    // Si YES_bid = 0.70, implícitamente NO_bid ≈ 0.30
+    // Use binary market property: YES + NO = 1
+    // If YES_bid = 0.70, then NO_bid ≈ 0.30 (not 0.50)
+    let calcYesBid = yesBid;
+    let calcNoBid = noBid;
+
+    if (yesBid != null && noBid == null) {
+      calcNoBid = 1 - yesBid; // Binary market constraint
+    } else if (noBid != null && yesBid == null) {
+      calcYesBid = 1 - noBid; // Binary market constraint
+    } else if (yesBid == null || noBid == null) {
+      return null; // Need at least one valid bid
+    }
+
     // Imbalance = (YES_bid - NO_bid) / (YES_bid + NO_bid)
-    const total = yesBid + noBid;
+    const total = calcYesBid + calcNoBid;
     if (total <= 0) return null;
-    return parseFloat(((yesBid - noBid) / total).toFixed(3));
+    return parseFloat(((calcYesBid - calcNoBid) / total).toFixed(3));
   }
 
   async connect() {
