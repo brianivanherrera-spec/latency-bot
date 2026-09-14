@@ -350,8 +350,8 @@ class PolymarketWS {
   // YES_bid alto = más compradores de YES = mercado yendo UP
   // Menos preciso que la profundidad pero MUCHO más rápido
   getInstantImbalance() {
-    const yesBook = this._bookByToken.get(this._yesTokenId);
-    const noBook  = this._bookByToken.get(this._noTokenId);
+    const yesBook = this._topOfBook.get(this._yesTokenId);
+    const noBook  = this._topOfBook.get(this._noTokenId);
     if (!yesBook?.bestBid && !noBook?.bestBid) return null;
 
     const yesBid = yesBook?.bestBid ?? 0.50;
@@ -425,23 +425,11 @@ class PolymarketWS {
         this._lastPongAt = Date.now();
         return;
       }
-<<<<<<< HEAD
-      if (raw === 'INVALID OPERATION' || raw.startsWith('INVALID')) return;
-      try {
-        const parsed = JSON.parse(raw);
-        const events = Array.isArray(parsed) ? parsed : [parsed];
-        // setImmediate cede el event loop — evita slow consumer (code=1013)
-        setImmediate(() => {
-          for (const msg of events) this._handleMessage(msg);
-        });
-      } catch (e) {
-        if (raw && raw.length < 120) {
-          logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);
-=======
       // Polymarket a veces responde texto plano a ops inválidas
       if (raw === 'INVALID OPERATION' || raw.startsWith('INVALID')) {
         return; // silencioso — suele ser unsubscribe viejo o subscribe duplicado
       }
+      // setImmediate cede el event loop — evita slow consumer (code=1013)
       setImmediate(() => {
         try {
           const parsed = JSON.parse(raw);
@@ -451,7 +439,6 @@ class PolymarketWS {
           if (raw && raw.length < 120) {
             logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);
           }
->>>>>>> claude/code-analysis-pqoez0
         }
       });
     });
