@@ -49,10 +49,13 @@ class ChainlinkRTDS {
     this.ws.on('open', () => {
       logger.info('[RTDS] ✅ Conectado a Polymarket RTDS (Chainlink TWAP 30s+60s)');
       this._connected = true; this._reconnectDelay = 1000;
-      this.ws.send(JSON.stringify({ action: 'subscribe', subscriptions: [
+      const subMsg = JSON.stringify({ action: 'subscribe', subscriptions: [
         { topic: 'crypto_prices_twap_thirty', type: 'update', filters: '{"symbol":"btc/usd"}' },
         { topic: 'crypto_prices_twap_sixty',  type: 'update', filters: '{"symbol":"btc/usd"}' },
-      ]}));
+      ]});
+      this.ws.send(subMsg);
+      logger.info(`[RTDS] Suscripción enviada: ${subMsg}`);
+      this._msgCount = 0;
       this._pingTimer = setInterval(() => {
         if (this.ws?.readyState === WebSocket.OPEN) this.ws.send('PING');
       }, PING_MS);
@@ -61,7 +64,14 @@ class ChainlinkRTDS {
       const received_ts = Date.now();
       const raw = data.toString();
       if (raw === 'PONG') return;
-      try { this._handle(JSON.parse(raw), received_ts); } catch(e) {}
+      // Log primeros 15 mensajes para diagnosticar formato del RTDS
+      this._msgCount = (this._msgCount || 0) + 1;
+      if (this._msgCount <= 15) {
+        logger.info(`[RTDS] MSG #${this._msgCount}: ${raw.slice(0, 300)}`);
+      }
+      try { this._handle(JSON.parse(raw), received_ts); } catch(e) {
+        logger.warn(`[RTDS] Parse error: ${e.message} | raw: ${raw.slice(0, 100)}`);
+      }
     });
     this.ws.on('close', (code) => {
       this._connected = false; this.diag.disconnections++;
