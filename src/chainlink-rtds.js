@@ -51,7 +51,31 @@ class ChainlinkRTDS extends EventEmitter {
     this.diag.connected = true;
     this.currentReconnectDelay = this.reconnectDelay;
     this.logger.info('[CHAINLINK-RTDS] ✓ Connected to Polymarket RTDS');
+    this._subscribe();
     this._startPing();
+  }
+
+  _subscribe() {
+    const subscriptionMsg = {
+      action: 'subscribe',
+      subscriptions: [
+        {
+          event_type: 'crypto_prices_twap_thirty',
+          filters: { asset_pair: 'BTC/USD' }
+        },
+        {
+          event_type: 'crypto_prices_twap_sixty',
+          filters: { asset_pair: 'BTC/USD' }
+        }
+      ]
+    };
+    try {
+      const msgStr = JSON.stringify(subscriptionMsg);
+      this.logger.info(`[CHAINLINK-RTDS] Suscripción enviada: ${msgStr}`);
+      this.ws.send(msgStr);
+    } catch (e) {
+      this.logger.error(`[CHAINLINK-RTDS] Subscribe error: ${e.message}`);
+    }
   }
 
   _startPing() {
@@ -72,8 +96,11 @@ class ChainlinkRTDS extends EventEmitter {
   _onMessage(data) {
     try {
       const msg = JSON.parse(data);
+      this.logger.debug(`[CHAINLINK-RTDS] MSG recibido: ${JSON.stringify(msg).substring(0, 200)}`);
       if (msg.event_type === 'crypto_prices_twap_thirty' || msg.event_type === 'crypto_prices_twap_sixty') {
         this._processTWAP(msg);
+      } else if (msg.action === 'subscribe_confirmation' || msg.status === 'subscribed') {
+        this.logger.info(`[CHAINLINK-RTDS] Suscripción confirmada: ${JSON.stringify(msg)}`);
       }
     } catch (e) {
       this.logger.warn(`[CHAINLINK-RTDS] Parse error: ${e.message}`);
