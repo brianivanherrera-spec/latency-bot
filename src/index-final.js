@@ -6,6 +6,8 @@
 
 const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
+const { ChainlinkRTDS } = require('./chainlink-rtds');
+const { MarketRecorder } = require('./market-recorder');
 const UserWebSocket = require('./polymarket-user-ws');
 const marketResearch = require('./market-research');
 const RESEARCH_MODE = process.env.RESEARCH_MODE === 'true';
@@ -667,6 +669,13 @@ async function main() {
   const polyWs = new PolymarketWS();
   poly.setPolyWs(polyWs);
 
+  // ─── Instrumentación observacional (NO afecta trading) ────────────────────
+  const clRTDS    = new ChainlinkRTDS();   // TWAP 30s + 60s de Chainlink
+  const mRecorder = new MarketRecorder();  // timeline completo por mercado
+  clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
+  clRTDS.connect();
+  // ─────────────────────────────────────────────────────────────────────────
+
   // PHASE 1: Initialize User WebSocket for real-time fill detection
   if (!config.DRY_RUN) {
     // Auth header for User WS (derived from CLOB credentials)
@@ -766,6 +775,16 @@ async function main() {
             const sourceLabel = cachedMarket.strikePrice ? 'desc' : 'captured@open';
             logger.info(`[POLY] Strike BTC ($${sourceLabel}): $${effectiveStrike.toLocaleString()} | BTC actual: $${btcNow.toLocaleString()} | diff: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} (${pct}%)`);
           }
+          // ── MarketRecorder: inicio del mercado ─────────────────────────
+          mRecorder.startMarket({
+            market_id:     cachedMarket.conditionId || cachedMarket.gammaId,
+            question:      cachedMarket.question,
+            start_ts:      Date.now(),
+            end_ts:        cachedMarket.endDate ? new Date(cachedMarket.endDate).getTime() : null,
+            strike_price:  effectiveStrike || null,
+            strike_source: cachedMarket.strikePrice ? 'polymarket_description' : 'binance_at_open',
+          });
+          // ────────────────────────────────────────────────────────────────
         }
       }
       // Si no hay pre-cache, buscar normalmente
@@ -898,10 +917,18 @@ async function main() {
     signal.updatePolyPrice(yes, no);
     livePolyYes = yes;
     livePolyNo  = no;
+    // ── MarketRecorder: precio Polymarket ──────────────────────────────────
+    const bookSnap = polyWs.getBookSnapshot();
+    mRecorder.recordPolymarket({
+      yes, no,
+      bid_yes: bookSnap?.yes_bid_depth ?? null, ask_yes: bookSnap?.yes_ask_depth ?? null,
+      bid_no:  bookSnap?.no_bid_depth  ?? null, ask_no:  bookSnap?.no_ask_depth  ?? null,
+      received_ts: Date.now(),
+    });
+    // ────────────────────────────────────────────────────────────────────────
 
     // PHASE 2: Log raw Polymarket data — CADA update
     // PHASE 2: Log all Polymarket updates (even when no active market)
-    const bookSnap = polyWs.getBookSnapshot();
     phase2Logger.logPolymarketRaw(
       {
         yes_price: yes,
@@ -983,6 +1010,12 @@ async function main() {
 
   polyWs.onResolved((winner) => {
     logger.info(`[POLY-WS] Mercado resuelto (${winner}) — esperando transición natural`);
+    // ── MarketRecorder: fin del mercado ──────────────────────────────────────
+    { const tw30 = clRTDS.getLatestTWAP(30); const tw60 = clRTDS.getLatestTWAP(60);
+      mRecorder.endMarket({ resolution: winner, resolution_price: null,
+        resolution_ts: Date.now(), twap_30_final: tw30?.value_num ?? null,
+        twap_60_final: tw60?.value_num ?? null, received_ts: Date.now() }); }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // PHASE 2: Log MARKET_END
     if (cachedMarket?.gammaId) {
@@ -1198,6 +1231,13 @@ async function main() {
 
     if (btcPriceNow > 0) {
       btcPriceHistory.push({ price: btcPriceNow, ts: nowMs });
+      // ── MarketRecorder: precio Binance ───────────────────────────────────
+      mRecorder.recordBinance({
+        price: btcPriceNow, source_ts: priceData.exchangeTs || priceData.timestamp || null,
+        received_ts: nowMs, bid: priceData.bestBid || null, ask: priceData.bestAsk || null,
+        is_buyer_maker: priceData.isBuyerMaker ?? null,
+      });
+      // ────────────────────────────────────────────────────────────────────
 
       // Ventana de isBuyerMaker — mantener últimos N ticks
       if (priceData.isBuyerMaker !== undefined) {
@@ -1264,6 +1304,27 @@ async function main() {
     // PHASE 2: Generar signal_id único para esta señal
     const signal_id = randomUUID();
     sig._signal_id = signal_id;
+
+    // ── MarketRecorder: señal generada ──────────────────────────────────────
+    {
+      const twap30 = clRTDS.getLatestTWAP(30);
+      const twap60 = clRTDS.getLatestTWAP(60);
+      mRecorder.recordSignal({
+        signal_id,
+        direction:             sig.direction,
+        zscore:                sig.zScore,
+        imbalance:             sig.imbalance,
+        score:                 sig.signalScore,
+        edge_pct:              sig.edge?.edgePct ?? null,
+        binance_price:         btcPriceNow,
+        twap_30:               twap30?.value_num    ?? null,
+        twap_60:               twap60?.value_num    ?? null,
+        binance_to_twap_30_ms: twap30 ? nowMs - twap30.received_ts : null,
+        binance_to_twap_60_ms: twap60 ? nowMs - twap60.received_ts : null,
+        received_ts:           nowMs,
+      });
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     // PHASE 2: Log SIGNAL_GENERATED
     if (cachedMarket?.gammaId) {
@@ -2038,6 +2099,16 @@ async function main() {
         const t4_order_sent_ms = Date.now();
         signalLogger.recordOrderSent(posId, t4_order_sent_ms);
 
+        // ── MarketRecorder: orden enviada ──────────────────────────────────
+        mRecorder.recordOrder({
+          signal_id: sig._signal_id || null,
+          order_id:  posId,
+          order_type: forcedOrderType || 'MARKET',
+          price, size,
+          received_ts: t4_order_sent_ms,
+        });
+        // ───────────────────────────────────────────────────────────────────
+
         // PHASE 2: Log ORDER_SENT
         if (cachedMarket?.gammaId) {
           const bookSnap = polyWs.getBookSnapshot();
@@ -2176,13 +2247,16 @@ async function main() {
 
           signalLogger.logSignalClose(posId, 'NO_FILL', 0);
           signalLogger.clearLatencyTracking(posId);
+          // ── MarketRecorder: NO_FILL ──────────────────────────────────────
+          mRecorder.recordNoFill({ signal_id: sig._signal_id, order_id: posId,
+            reason: orderResult.error || 'no_fill', received_ts: Date.now() });
+          // ─────────────────────────────────────────────────────────────────
           activePositions.delete(posId);
           return;
         }
 
         const fillMs = orderResult.fillTimeMs || null;
         // FIX: sizeFilled = shares recibidas (takingAmount en BUY), no USDC
-        // fillPrice = USDC gastado / shares = precio real por share
         const actualSize  = orderResult.sizeFilled > 0 ? Math.round(orderResult.sizeFilled) : size;
         const actualPrice = (orderResult.fillPrice > 0 && orderResult.fillPrice < 1) ? orderResult.fillPrice : price;
         const actualUsdc  = orderResult.usdcSpent  > 0 ? orderResult.usdcSpent : actualPrice * actualSize;
@@ -2193,6 +2267,12 @@ async function main() {
           logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} shares`);
         }
         logger.info(`[LIVE] ✅ Orden llenada: ${actualSize} shares @ $${actualPrice.toFixed(4)} | USDC: $${actualUsdc.toFixed(2)} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
+
+        // ── MarketRecorder: FILL ─────────────────────────────────────────────
+        mRecorder.recordFill({ signal_id: sig._signal_id, order_id: posId,
+          fill_price: actualPrice, size_filled: actualSize, usdc_spent: actualUsdc,
+          fill_time_ms: fillMs, received_ts: Date.now() });
+        // ─────────────────────────────────────────────────────────────────────
 
         // PHASE 1: Update T7 if fill happened (we now know the actual fill time)
         const t7_final_ms = fillMs ? t4_order_sent_ms + fillMs : t5_order_accepted_ms;
@@ -2512,6 +2592,15 @@ async function main() {
     logger.info(`  Poly YES: ${sigStats.polyYes ?? 'n/a'} | Poly age: ${sigStats.polyAge}`);
     logger.info(`  Active slots: ${activePositions.size}/10`);
     logger.info(`  Cooldown: ${Math.max(0, Math.ceil((lastTradeTime + COOLDOWN - Date.now()) / 1000))}s`);
+    // ── Diagnóstico ChainlinkRTDS + MarketRecorder ───────────────────────────
+    try {
+      const clD = clRTDS.getDiag();
+      const mrD = mRecorder.getDiag();
+      logger.info(`  [RTDS] conn=${clD.connected} | 30s: ${clD.events_30s}evts ${clD.latest_twap_30s ?? 'n/a'} (age ${clD.age_30s_ms ?? '?'}ms) | 60s: ${clD.events_60s}evts ${clD.latest_twap_60s ?? 'n/a'} (age ${clD.age_60s_ms ?? '?'}ms)`);
+      logger.info(`  [RTDS] gaps=${clD.gaps} dupl=${clD.duplicates} stale=${clD.stale} oor=${clD.out_of_range} disc=${clD.disconnections}`);
+      logger.info(`  [MKT] markets=${mrD.markets_started}/${mrD.markets_completed} | bin=${mrD.events_binance} cl30=${mrD.events_chainlink_30s} cl60=${mrD.events_chainlink_60s} poly=${mrD.events_polymarket} sig=${mrD.events_signal} ord=${mrD.events_order} fill=${mrD.events_fill} nofill=${mrD.events_nofill}`);
+    } catch(e) {}
+    // ─────────────────────────────────────────────────────────────────────────
     logger.info('');
     logger.info('=== BALANCE REAL ===');
     if (config.DRY_RUN) {
