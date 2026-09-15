@@ -27,37 +27,13 @@ class ChainlinkRTDS extends EventEmitter {
       stale: 0,
       out_of_range: 0,
       disconnections: 0,
+      subscription_format_attempts: 0,
+      subscription_confirmed: false,
     };
     this.lastSeq = {};
     this.lastTs = {};
     this.msgCount = 0;
-  }
-
-  connect() {
-    if (this.connected) return;
-    try {
-      this.ws = new WebSocket(this.url, { perMessageDeflate: true });
-      this.ws.on('open', () => this._onOpen());
-      this.ws.on('message', (data) => this._onMessage(data));
-      this.ws.on('close', () => this._onClose());
-      this.ws.on('error', (err) => this._onError(err));
-    } catch (e) {
-      this.logger.error(`[CHAINLINK-RTDS] Connection error: ${e.message}`);
-      this._scheduleReconnect();
-    }
-  }
-
-  _onOpen() {
-    this.connected = true;
-    this.diag.connected = true;
-    this.currentReconnectDelay = this.reconnectDelay;
-    this.logger.info('[CHAINLINK-RTDS] ✓ Connected to Polymarket RTDS');
-    this._subscribe();
-    this._startPing();
-  }
-
-  _subscribe() {
-    const formats = [
+    this.subscriptionFormats = [
       {
         name: 'FORMAT_A (event_type + filters.asset_pair)',
         msg: {
@@ -89,15 +65,57 @@ class ChainlinkRTDS extends EventEmitter {
         }
       }
     ];
+    this.currentFormatIndex = 0;
+    this.subscriptionFormat = null;
+  }
 
-    this.subscriptionFormat = formats[0];
+  connect() {
+    if (this.connected) return;
+    try {
+      this.ws = new WebSocket(this.url, { perMessageDeflate: true });
+      this.ws.on('open', () => this._onOpen());
+      this.ws.on('message', (data) => this._onMessage(data));
+      this.ws.on('close', () => this._onClose());
+      this.ws.on('error', (err) => this._onError(err));
+    } catch (e) {
+      this.logger.error(`[CHAINLINK-RTDS] Connection error: ${e.message}`);
+      this._scheduleReconnect();
+    }
+  }
+
+  _onOpen() {
+    this.connected = true;
+    this.diag.connected = true;
+    this.currentReconnectDelay = this.reconnectDelay;
+    this.logger.info('[CHAINLINK-RTDS] ✓ Connected to Polymarket RTDS');
+    this._subscribe();
+    this._startPing();
+  }
+
+  _subscribe() {
+    if (this.currentFormatIndex >= this.subscriptionFormats.length) {
+      this.logger.error('[CHAINLINK-RTDS] All subscription formats exhausted, giving up');
+      return;
+    }
+
+    this.subscriptionFormat = this.subscriptionFormats[this.currentFormatIndex];
+    this.diag.subscription_format_attempts++;
+
     try {
       const msgStr = JSON.stringify(this.subscriptionFormat.msg);
-      this.logger.info(`[CHAINLINK-RTDS] Intentando ${this.subscriptionFormat.name}`);
-      this.logger.info(`[CHAINLINK-RTDS] Suscripción enviada: ${msgStr}`);
+      this.logger.info(`[CHAINLINK-RTDS] Attempt ${this.currentFormatIndex + 1}/${this.subscriptionFormats.length}: ${this.subscriptionFormat.name}`);
+      this.logger.info(`[CHAINLINK-RTDS] Subscription message: ${msgStr}`);
       this.ws.send(msgStr);
     } catch (e) {
       this.logger.error(`[CHAINLINK-RTDS] Subscribe error: ${e.message}`);
+    }
+  }
+
+  _tryNextFormat() {
+    this.currentFormatIndex++;
+    this.logger.info(`[CHAINLINK-RTDS] ✗ Current format rejected, trying next format...`);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this._subscribe();
     }
   }
 
@@ -126,7 +144,11 @@ class ChainlinkRTDS extends EventEmitter {
         this.logger.info(`[CHAINLINK-RTDS] ✓ TWAP recibido: ${msg.event_type}`);
         this._processTWAP(msg);
       } else if (msg.action === 'subscribe_confirmation' || msg.status === 'subscribed' || msg.subscribed) {
-        this.logger.info(`[CHAINLINK-RTDS] ✓ Confirmación de suscripción: ${summary}`);
+        this.logger.info(`[CHAINLINK-RTDS] ✓ Subscription confirmed with ${this.subscriptionFormat.name}`);
+        this.diag.subscription_confirmed = true;
+      } else if (msg.message === 'Invalid request body') {
+        this.logger.warn(`[CHAINLINK-RTDS] ⚠ Invalid request body for ${this.subscriptionFormat.name}`);
+        this._tryNextFormat();
       } else if (msg.error) {
         this.logger.error(`[CHAINLINK-RTDS] Error del servidor: ${msg.error}`);
       }
