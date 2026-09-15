@@ -842,6 +842,16 @@ async function main() {
               priceAtOpen: signal.getStats()?.lastPrice || 0,
             });
           }
+          // ── MarketRecorder: inicio del mercado (path sin pre-cache) ────────
+          mRecorder.startMarket({
+            market_id:     m.conditionId || m.gammaId,
+            question:      m.question,
+            start_ts:      Date.now(),
+            end_ts:        m.endDate ? new Date(m.endDate).getTime() : null,
+            strike_price:  m.strikePrice || m.market_strike_price_captured_at_open || null,
+            strike_source: m.strikePrice ? 'polymarket_description' : 'binance_at_open',
+          });
+          // ──────────────────────────────────────────────────────────────────
         } else {
           return;
         }
