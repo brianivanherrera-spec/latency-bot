@@ -30,6 +30,7 @@ class ChainlinkRTDS extends EventEmitter {
     };
     this.lastSeq = {};
     this.lastTs = {};
+    this.msgCount = 0;
   }
 
   connect() {
@@ -56,21 +57,43 @@ class ChainlinkRTDS extends EventEmitter {
   }
 
   _subscribe() {
-    const subscriptionMsg = {
-      action: 'subscribe',
-      subscriptions: [
-        {
-          event_type: 'crypto_prices_twap_thirty',
-          filters: { asset_pair: 'BTC/USD' }
-        },
-        {
-          event_type: 'crypto_prices_twap_sixty',
-          filters: { asset_pair: 'BTC/USD' }
+    const formats = [
+      {
+        name: 'FORMAT_A (event_type + filters.asset_pair)',
+        msg: {
+          action: 'subscribe',
+          subscriptions: [
+            { event_type: 'crypto_prices_twap_thirty', filters: { asset_pair: 'BTC/USD' } },
+            { event_type: 'crypto_prices_twap_sixty', filters: { asset_pair: 'BTC/USD' } }
+          ]
         }
-      ]
-    };
+      },
+      {
+        name: 'FORMAT_B (topic + symbol)',
+        msg: {
+          action: 'subscribe',
+          subscriptions: [
+            { topic: 'crypto_prices_twap_thirty', symbol: 'BTC/USD' },
+            { topic: 'crypto_prices_twap_sixty', symbol: 'BTC/USD' }
+          ]
+        }
+      },
+      {
+        name: 'FORMAT_C (sin filtros)',
+        msg: {
+          action: 'subscribe',
+          subscriptions: [
+            { event_type: 'crypto_prices_twap_thirty' },
+            { event_type: 'crypto_prices_twap_sixty' }
+          ]
+        }
+      }
+    ];
+
+    this.subscriptionFormat = formats[0];
     try {
-      const msgStr = JSON.stringify(subscriptionMsg);
+      const msgStr = JSON.stringify(this.subscriptionFormat.msg);
+      this.logger.info(`[CHAINLINK-RTDS] Intentando ${this.subscriptionFormat.name}`);
       this.logger.info(`[CHAINLINK-RTDS] Suscripción enviada: ${msgStr}`);
       this.ws.send(msgStr);
     } catch (e) {
@@ -96,11 +119,16 @@ class ChainlinkRTDS extends EventEmitter {
   _onMessage(data) {
     try {
       const msg = JSON.parse(data);
-      this.logger.debug(`[CHAINLINK-RTDS] MSG recibido: ${JSON.stringify(msg).substring(0, 200)}`);
+      const summary = JSON.stringify(msg).substring(0, 150);
+      this.logger.info(`[CHAINLINK-RTDS] MSG #${++this.msgCount}: ${summary}`);
+
       if (msg.event_type === 'crypto_prices_twap_thirty' || msg.event_type === 'crypto_prices_twap_sixty') {
+        this.logger.info(`[CHAINLINK-RTDS] ✓ TWAP recibido: ${msg.event_type}`);
         this._processTWAP(msg);
-      } else if (msg.action === 'subscribe_confirmation' || msg.status === 'subscribed') {
-        this.logger.info(`[CHAINLINK-RTDS] Suscripción confirmada: ${JSON.stringify(msg)}`);
+      } else if (msg.action === 'subscribe_confirmation' || msg.status === 'subscribed' || msg.subscribed) {
+        this.logger.info(`[CHAINLINK-RTDS] ✓ Confirmación de suscripción: ${summary}`);
+      } else if (msg.error) {
+        this.logger.error(`[CHAINLINK-RTDS] Error del servidor: ${msg.error}`);
       }
     } catch (e) {
       this.logger.warn(`[CHAINLINK-RTDS] Parse error: ${e.message}`);
