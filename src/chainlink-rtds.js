@@ -93,31 +93,83 @@ class ChainlinkRTDS {
     const topic = msg.topic || '';
     const payload = msg.payload;
     if (!payload) return;
+
+    // Formato real del RTDS: llegan 2 mensajes por segundo (30s y 60s)
+    // sin campo topic en los updates — se identifica por alternancia
+    // MSG de snapshot (type=subscribe): payload.data = array de historico
+    // MSG de update: payload = { full_accuracy_value, symbol, timestamp, value }
     let window_s = null;
     if (topic === 'crypto_prices_twap_thirty') window_s = 30;
     else if (topic === 'crypto_prices_twap_sixty') window_s = 60;
-    else return;
+    else if (!topic && payload.symbol) {
+      // Sin topic — alternar entre 30s y 60s basándonos en el contador de mensajes
+      // Los mensajes llegan en pares: par con mismo timestamp → 30s y 60s
+      // Usamos el _msgPairTracker para identificar cuál es cuál
+      const ts = payload.timestamp;
+      if (!this._pairTs || this._pairTs !== ts) {
+        // Nuevo timestamp → es el primero del par (30s)
+        this._pairTs = ts;
+        window_s = 30;
+      } else {
+        // Mismo timestamp que el anterior → es el segundo del par (60s)
+        this._pairTs = null;
+        window_s = 60;
+      }
+    }
+
+    if (!window_s) return;
+
+    // Snapshot inicial (array de histórico)
+    if (Array.isArray(payload.data)) {
+      if (payload.data.length > 0) {
+        const last = payload.data[payload.data.length - 1];
+        const value_num = parseFloat(String(last.value));
+        if (isNaN(value_num) || value_num < 1000 || value_num > 10_000_000) return;
+        const event = {
+          source: 'chainlink_rtds', symbol: payload.symbol || 'btc/usd',
+          window_s, value: String(last.full_accuracy_value || last.value), value_num,
+          source_ts: last.timestamp || null, received_ts,
+          outer_ts: msg.timestamp || null, type: 'snapshot',
+          timestamp_quality: 'good',
+        };
+        this._last[window_s] = event;
+        if (window_s === 30) { this.diag.events_30s++; this.diag.connected_30s = true; this.diag.last_received_30s = received_ts; }
+        else                 { this.diag.events_60s++; this.diag.connected_60s = true; this.diag.last_received_60s = received_ts; }
+        if (this._onUpdate) this._onUpdate(event);
+      }
+      return;
+    }
+
+    // Update individual
     const source_ts = payload.timestamp || null;
     if (!source_ts) this.diag.missing_ts++;
-    const value_num = parseFloat(String(payload.value ?? '0'));
-    if (isNaN(value_num) || value_num < BTC_MIN || value_num > BTC_MAX) {
+
+    // Preferir full_accuracy_value pero está en wei — usar value (float)
+    const value_num = parseFloat(String(payload.value || 0));
+    if (isNaN(value_num) || value_num < 1000 || value_num > 10_000_000) {
       this.diag.out_of_range++;
       logger.warn(`[RTDS] Valor fuera de rango: ${payload.value} window=${window_s}s`);
       return;
     }
-    if (source_ts && (received_ts - source_ts) > STALE_MS) this.diag.stale++;
+
+    if (source_ts && (received_ts - source_ts) > 10000) this.diag.stale++;
+
     const prev = this._last[window_s];
-    if (prev && source_ts && prev.source_ts === source_ts) { this.diag.duplicates++; return; }
+    if (prev && source_ts && prev.source_ts === source_ts && prev.value_num === value_num) {
+      this.diag.duplicates++; return;
+    }
     if (prev?.source_ts && source_ts && (source_ts - prev.source_ts) > 5000) {
       this.diag.gaps++;
       logger.warn(`[RTDS] Gap ${source_ts - prev.source_ts}ms en TWAP ${window_s}s`);
     }
+
     const event = {
       source: 'chainlink_rtds', symbol: payload.symbol || 'btc/usd',
-      window_s, value: String(payload.value), value_num, source_ts, received_ts,
-      outer_ts: msg.timestamp || null,
+      window_s, value: String(payload.full_accuracy_value || payload.value), value_num,
+      source_ts, received_ts, outer_ts: msg.timestamp || null, type: 'update',
       timestamp_quality: source_ts ? ((received_ts - source_ts) < 2000 ? 'good' : 'stale') : 'no_source_ts',
     };
+
     this._last[window_s] = event;
     if (window_s === 30) { this.diag.events_30s++; this.diag.connected_30s = true; this.diag.last_received_30s = received_ts; }
     else                 { this.diag.events_60s++; this.diag.connected_60s = true; this.diag.last_received_60s = received_ts; }
