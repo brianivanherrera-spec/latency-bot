@@ -21,10 +21,32 @@ const BOT_EVENTS_FILE = path.join(DATA_DIR, 'bot-events.jsonl');
 // Tracking de último estado Polymarket por mercado — solo loguea cambios
 const polymarketLastState = {};
 
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
 function ensureDir() {
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   } catch (e) {}
+}
+
+// Rotar archivo si supera 50MB
+function checkAndRotateFile(filePath, baseName) {
+  try {
+    if (!fs.existsSync(filePath)) return;
+    const stats = fs.statSync(filePath);
+    if (stats.size > MAX_FILE_SIZE) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const dir = path.dirname(filePath);
+      const ext = path.extname(filePath);
+      const name = path.basename(filePath, ext);
+      const rotatedPath = path.join(dir, `${name}.${timestamp}${ext}`);
+      fs.renameSync(filePath, rotatedPath);
+      return rotatedPath;
+    }
+  } catch (e) {
+    console.error(`[PHASE2] Error rotating ${baseName}: ${e.message}`);
+  }
+  return null;
 }
 
 // ─── BINANCE RAW ──────────────────────────────────────────────────────────
@@ -88,6 +110,7 @@ function logBinanceRaw(data, market, strikes) {
       isBuyerMaker: data.isBuyerMaker !== undefined ? data.isBuyerMaker : null,
     };
 
+    checkAndRotateFile(BINANCE_RAW_FILE, 'binance-raw');
     fs.appendFileSync(BINANCE_RAW_FILE, JSON.stringify(record) + '\n');
     incrementCounter('binanceRaw');
   } catch (e) {
@@ -191,6 +214,7 @@ function logPolymarketRaw(data, market, eventId) {
       window_remaining_sec: data.window_remaining_sec || null,
     };
 
+    checkAndRotateFile(POLYMARKET_RAW_FILE, 'polymarket-raw');
     fs.appendFileSync(POLYMARKET_RAW_FILE, JSON.stringify(record) + '\n');
     incrementCounter('polymarketRaw');
   } catch (e) {
@@ -267,6 +291,7 @@ function logBotEvent(eventType, data) {
       edge_at_resolution_pct: data.edge_at_resolution_pct || null,
     };
 
+    checkAndRotateFile(BOT_EVENTS_FILE, 'bot-events');
     fs.appendFileSync(BOT_EVENTS_FILE, JSON.stringify(record) + '\n');
     incrementCounter(`botEvents_${eventType}`);
   } catch (e) {

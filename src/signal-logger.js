@@ -49,7 +49,7 @@ let consecutiveLosses = 0;
 const pendingSnapshots = new Map();
 
 // ─── Abrir trade ─────────────────────────────────────────────────────────────
-async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot, getLastTradeSnapshot, btcBuyerMakerRatio, getClobSnapshot }) {
+async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot, getLastTradeSnapshot, btcBuyerMakerRatio, getClobSnapshot, twap30AtSignal, twap60AtSignal, binanceToTwap30Ms, binanceToTwap60Ms }) {
   ensureDir();
 
   // Capturar snapshot del book al momento exacto de la señal
@@ -119,6 +119,13 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     clob_vol60s_total:         clobSnap?.vol60s_total    ?? null, // volumen total ejecutado en 60s
     clob_vol60s_imbalance:     clobSnap?.vol60s_imbalance ?? null, // (yes-no)/total — positivo = más YES
     clob_trades60s_count:      clobSnap?.trades60s_count ?? null, // cantidad de trades en 60s
+    // TWAP observacionales al momento de la señal
+    twap_30_at_signal:         twap30AtSignal ?? null, // precio TWAP 30s desde Chainlink RTDS
+    twap_60_at_signal:         twap60AtSignal ?? null, // precio TWAP 60s desde Chainlink RTDS
+    binance_to_twap_30_ms:     binanceToTwap30Ms ?? null, // latencia BTC tick a TWAP 30s
+    binance_to_twap_60_ms:     binanceToTwap60Ms ?? null, // latencia BTC tick a TWAP 60s
+    twap_30_final:             null, // se completa en logMarketEnd
+    twap_60_final:             null, // se completa en logMarketEnd
     // Edge decay — se completan con snapshots
     poly_price_t0:    null,
     poly_price_t1:    null,
@@ -601,9 +608,34 @@ function clearLatencyTracking(posId) {
   if (global.latency_tracking) delete global.latency_tracking[posId];
 }
 
+// Actualizar TWAP final para todas las señales de un mercado
+function logMarketTwapFinal(twap30Final, twap60Final) {
+  ensureDir();
+  if (!fs.existsSync(SIGNAL_FILE)) return;
+  try {
+    const content = fs.readFileSync(SIGNAL_FILE, 'utf8');
+    const lines = content.trim().split('\n');
+    const updated = lines.map(line => {
+      try {
+        const r = JSON.parse(line);
+        if (r.twap_30_final === null) r.twap_30_final = twap30Final ?? null;
+        if (r.twap_60_final === null) r.twap_60_final = twap60Final ?? null;
+        return JSON.stringify(r);
+      } catch { return line; }
+    });
+    fs.writeFileSync(SIGNAL_FILE, updated.join('\n') + '\n');
+    // Actualizar cache también
+    for (const [posId, record] of openRecordsCache.entries()) {
+      if (record.twap_30_final === null) record.twap_30_final = twap30Final ?? null;
+      if (record.twap_60_final === null) record.twap_60_final = twap60Final ?? null;
+    }
+  } catch(e) {}
+}
+
 module.exports = {
   logSignalOpen, logSignalClose, logBtcSnapshot1s, getStats, getDailySummary,
   getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder,
   logFillTelemetry, getT3Timestamp, recordOrderSent, recordOrderAccepted,
-  recordOrderResting, recordOrderFilled, getLatencyTracking, clearLatencyTracking
+  recordOrderResting, recordOrderFilled, getLatencyTracking, clearLatencyTracking,
+  logMarketTwapFinal
 };
