@@ -35,32 +35,32 @@ class ChainlinkRTDS extends EventEmitter {
     this.msgCount = 0;
     this.subscriptionFormats = [
       {
-        name: 'FORMAT_A (event_type + filters.asset_pair)',
+        name: 'FORMAT_A (official: topic + type + filters as JSON string)',
         msg: {
           action: 'subscribe',
           subscriptions: [
-            { event_type: 'crypto_prices_twap_thirty', filters: { asset_pair: 'BTC/USD' } },
-            { event_type: 'crypto_prices_twap_sixty', filters: { asset_pair: 'BTC/USD' } }
+            { topic: 'crypto_prices_twap_thirty', type: '*', filters: '{"symbol":"btc/usd"}' },
+            { topic: 'crypto_prices_twap_sixty', type: '*', filters: '{"symbol":"btc/usd"}' }
           ]
         }
       },
       {
-        name: 'FORMAT_B (topic + symbol)',
+        name: 'FORMAT_B (topic + symbol only)',
         msg: {
           action: 'subscribe',
           subscriptions: [
-            { topic: 'crypto_prices_twap_thirty', symbol: 'BTC/USD' },
-            { topic: 'crypto_prices_twap_sixty', symbol: 'BTC/USD' }
+            { topic: 'crypto_prices_twap_thirty', symbol: 'btc/usd' },
+            { topic: 'crypto_prices_twap_sixty', symbol: 'btc/usd' }
           ]
         }
       },
       {
-        name: 'FORMAT_C (sin filtros)',
+        name: 'FORMAT_C (topic only, no filters)',
         msg: {
           action: 'subscribe',
           subscriptions: [
-            { event_type: 'crypto_prices_twap_thirty' },
-            { event_type: 'crypto_prices_twap_sixty' }
+            { topic: 'crypto_prices_twap_thirty' },
+            { topic: 'crypto_prices_twap_sixty' }
           ]
         }
       }
