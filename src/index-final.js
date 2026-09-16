@@ -44,6 +44,7 @@ const signalLogger = require('./signal-logger');
 const phase2Logger = require('./phase2-logger');
 const { ChainlinkRTDS } = require('./chainlink-rtds');
 const { MarketRecorder } = require('./market-recorder');
+const { DiagnosticsIntegration } = require('./diagnostics-integration');
 
 const logger = new Logger('MAIN');
 const http = require('http');
@@ -675,6 +676,12 @@ async function main() {
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
   clRTDS.connect();
 
+  // Initialize DiagnosticsIntegration for non-invasive event tracking
+  const diag = new DiagnosticsIntegration(logger);
+  diag.hookRTDS(clRTDS);
+  diag.hookBinance(ws);
+  diag.hookPolymarket(polyWs);
+
   // PHASE 1: Initialize User WebSocket for real-time fill detection
   if (!config.DRY_RUN) {
     // Auth header for User WS (derived from CLOB credentials)
@@ -767,14 +774,16 @@ async function main() {
           }
           // Record market start for instrumentation
           const effectiveStrike = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
+          const marketId = cachedMarket.conditionId || cachedMarket.gammaId;
           mRecorder.startMarket({
-            market_id: cachedMarket.conditionId || cachedMarket.gammaId,
+            market_id: marketId,
             question: cachedMarket.question,
             start_ts: Date.now(),
             end_ts: cachedMarket.endDate ? new Date(cachedMarket.endDate).getTime() : null,
             strike_price: effectiveStrike || null,
             strike_source: cachedMarket.strikePrice ? 'polymarket_description' : 'binance_at_open',
           });
+          diag.logMarketStart(marketId, effectiveStrike || null);
           // Mostrar strike price si disponible
           if (effectiveStrike) {
             const btcNow = signal.getStats()?.lastPrice || 0;
@@ -1043,6 +1052,8 @@ async function main() {
           twap_30_final: tw30?.value_num ?? null,
           twap_60_final: tw60?.value_num ?? null,
         });
+        diag.logMarketEnd(cachedMarket?.yesTokenId || cachedMarket?.gammaId);
+        diag.logResolution(cachedMarket?.yesTokenId || cachedMarket?.gammaId, winner);
       }
 
       phase2Logger.logBotEvent('MARKET_END', {
@@ -1333,6 +1344,12 @@ async function main() {
         binance_to_twap_30_ms: twap30 ? nowMs - twap30.received_ts : null,
         binance_to_twap_60_ms: twap60 ? nowMs - twap60.received_ts : null,
         received_ts: nowMs,
+      });
+      diag.logSignal(cachedMarket?.yesTokenId || cachedMarket?.gammaId, {
+        signal_id,
+        direction: sig.direction,
+        zscore: sig.zScore || null,
+        edge_pct: sig.edge?.edgePct || null,
       });
     }
 
@@ -2107,6 +2124,13 @@ async function main() {
           size,
           received_ts: t4_order_sent_ms,
         });
+        diag.logOrder(cachedMarket?.yesTokenId || cachedMarket?.gammaId, {
+          order_id: posId,
+          signal_id: sig._signal_id || null,
+          price,
+          size,
+          direction: sig.direction,
+        });
 
         // PHASE 2: Log ORDER_SENT
         if (cachedMarket?.gammaId) {
@@ -2306,6 +2330,13 @@ async function main() {
           usdc_spent: actualUsdc,
           fill_time_ms: fillMs || null,
           received_ts: Date.now(),
+        });
+        diag.logFill(cachedMarket?.yesTokenId || cachedMarket?.gammaId, {
+          order_id: posId,
+          signal_id: sig._signal_id || null,
+          fill_price: actualPrice,
+          size_filled: actualSize,
+          fill_latency_ms: fillMs || null,
         });
 
         // PHASE 2: Log FILL
@@ -2626,6 +2657,16 @@ async function main() {
     }
     logger.info('─'.repeat(60));
   }, 5 * 60 * 1000);
+
+  // Periodic diagnostics report generation (every 30 minutes)
+  setInterval(() => {
+    try {
+      const reportPath = diag.saveReport();
+      logger.info(`[DIAG] 📊 Reporte guardado: ${reportPath}`);
+    } catch (e) {
+      logger.warn(`[DIAG] ⚠️ Error al guardar reporte: ${e.message}`);
+    }
+  }, 30 * 60 * 1000);
 }
 
 main().catch(err => {
