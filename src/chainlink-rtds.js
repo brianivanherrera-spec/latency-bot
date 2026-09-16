@@ -168,10 +168,13 @@ class ChainlinkRTDS extends EventEmitter {
     const now = Date.now();
     const age = now - ts;
 
-    if (age > 5000) {
-      this.logger.warn(`[CHAINLINK-RTDS] High latency: ${age}ms for ${event_type}`);
+    if (age > 10000) {
       this.diag.stale++;
       return;
+    }
+
+    if (age > 500) {
+      this.logger.warn(`[CHAINLINK-RTDS] High latency: ${age}ms for ${event_type}`);
     }
 
     const price = parseFloat(twap_value);
@@ -193,7 +196,7 @@ class ChainlinkRTDS extends EventEmitter {
     this.lastSeq[key] = sequence;
     this.lastTs[key] = ts;
 
-    if (age > 1000) this.diag.high_latency_events++;
+    if (age > 500) this.diag.high_latency_events++;
     this.diag.avg_latency_ms = Math.round((this.diag.avg_latency_ms + age) / 2);
 
     if (isThirty) {
