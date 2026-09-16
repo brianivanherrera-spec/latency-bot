@@ -60,22 +60,17 @@ class ChainlinkRTDS {
       });
       this.ws.send(subMsg);
       logger.info(`[RTDS] Suscripción enviada: ${subMsg}`);
-      this._msgCount = 0;
       this._pingTimer = setInterval(() => {
         if (this.ws?.readyState === WebSocket.OPEN) this.ws.send('PING');
-      }, PING_MS);
+      }, 3000); // 3s — reduce detección de caídas vs 5s original
     });
     this.ws.on('message', (data) => {
       const received_ts = Date.now();
       const raw = data.toString();
       if (raw === 'PONG') return;
-      // Log primeros 15 mensajes para diagnosticar formato del RTDS
-      this._msgCount = (this._msgCount || 0) + 1;
-      if (this._msgCount <= 15) {
-        logger.info(`[RTDS] MSG #${this._msgCount}: ${raw.slice(0, 300)}`);
-      }
+      // NO loguear cada MSG — overhead de I/O causaba 1-2s de latencia
       try { this._handle(JSON.parse(raw), received_ts); } catch(e) {
-        logger.warn(`[RTDS] Parse error: ${e.message} | raw: ${raw.slice(0, 100)}`);
+        logger.warn(`[RTDS] Parse error: ${e.message}`);
       }
     });
     this.ws.on('close', (code) => {
@@ -143,6 +138,14 @@ class ChainlinkRTDS {
     // Update individual
     const source_ts = payload.timestamp || null;
     if (!source_ts) this.diag.missing_ts++;
+
+    // Medir latencia real — loguear solo si supera 500ms
+    if (source_ts) {
+      const latency_ms = received_ts - source_ts;
+      if (latency_ms > 500) {
+        logger.warn(`[RTDS] Alta latencia: ${latency_ms}ms (window=${window_s}s)`);
+      }
+    }
 
     // Preferir full_accuracy_value pero está en wei — usar value (float)
     const value_num = parseFloat(String(payload.value || 0));
