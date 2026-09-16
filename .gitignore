@@ -10,3 +10,6 @@ logs/
 *.log
 /data/*.jsonl
 .env.local
+
+# Runtime data
+/data/
