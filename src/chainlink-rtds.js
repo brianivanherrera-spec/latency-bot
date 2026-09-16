@@ -29,6 +29,8 @@ class ChainlinkRTDS extends EventEmitter {
       disconnections: 0,
       subscription_format_attempts: 0,
       subscription_confirmed: false,
+      avg_latency_ms: 0,
+      high_latency_events: 0,
     };
     this.lastSeq = {};
     this.lastTs = {};
@@ -124,7 +126,7 @@ class ChainlinkRTDS extends EventEmitter {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.ping();
       }
-    }, 5000);
+    }, 3000);
   }
 
   _stopPing() {
@@ -137,11 +139,9 @@ class ChainlinkRTDS extends EventEmitter {
   _onMessage(data) {
     try {
       const msg = JSON.parse(data);
-      const summary = JSON.stringify(msg).substring(0, 150);
-      this.logger.info(`[CHAINLINK-RTDS] MSG #${++this.msgCount}: ${summary}`);
+      ++this.msgCount;
 
       if (msg.event_type === 'crypto_prices_twap_thirty' || msg.event_type === 'crypto_prices_twap_sixty') {
-        this.logger.info(`[CHAINLINK-RTDS] ✓ TWAP recibido: ${msg.event_type}`);
         this._processTWAP(msg);
       } else if (msg.action === 'subscribe_confirmation' || msg.status === 'subscribed' || msg.subscribed) {
         this.logger.info(`[CHAINLINK-RTDS] ✓ Subscription confirmed with ${this.subscriptionFormat.name}`);
@@ -150,7 +150,7 @@ class ChainlinkRTDS extends EventEmitter {
         this.logger.warn(`[CHAINLINK-RTDS] ⚠ Invalid request body for ${this.subscriptionFormat.name}`);
         this._tryNextFormat();
       } else if (msg.error) {
-        this.logger.error(`[CHAINLINK-RTDS] Error del servidor: ${msg.error}`);
+        this.logger.error(`[CHAINLINK-RTDS] Error: ${msg.error}`);
       }
     } catch (e) {
       this.logger.warn(`[CHAINLINK-RTDS] Parse error: ${e.message}`);
@@ -168,7 +168,8 @@ class ChainlinkRTDS extends EventEmitter {
     const now = Date.now();
     const age = now - ts;
 
-    if (age > 10000) {
+    if (age > 5000) {
+      this.logger.warn(`[CHAINLINK-RTDS] High latency: ${age}ms for ${event_type}`);
       this.diag.stale++;
       return;
     }
@@ -191,6 +192,9 @@ class ChainlinkRTDS extends EventEmitter {
 
     this.lastSeq[key] = sequence;
     this.lastTs[key] = ts;
+
+    if (age > 1000) this.diag.high_latency_events++;
+    this.diag.avg_latency_ms = Math.round((this.diag.avg_latency_ms + age) / 2);
 
     if (isThirty) {
       this.twap_30s = { value_num: price, received_ts: now, event_count: this.twap_30s.event_count + 1 };
