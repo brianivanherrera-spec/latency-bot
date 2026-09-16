@@ -49,16 +49,17 @@ class ChainlinkRTDS {
     this.ws.on('open', () => {
       logger.info('[RTDS] ✅ Conectado a Polymarket RTDS (Chainlink TWAP 30s+60s)');
       this._connected = true; this._reconnectDelay = 1000;
-      // Intentar formato 1: topic + type (formato original docs)
+      // Formato correcto según docs oficiales: topic, type="*", filters=JSON string
+      // Los topics crypto_prices_twap_thirty y crypto_prices_twap_sixty están en el SDK oficial
       const subMsg = JSON.stringify({
         action: 'subscribe',
         subscriptions: [
-          { topic: 'crypto_prices_twap_thirty' },
-          { topic: 'crypto_prices_twap_sixty'  },
+          { topic: 'crypto_prices_twap_thirty', type: '*', filters: '{"symbol":"btc/usd"}' },
+          { topic: 'crypto_prices_twap_sixty',  type: '*', filters: '{"symbol":"btc/usd"}' },
         ]
       });
       this.ws.send(subMsg);
-      logger.info(`[RTDS] Suscripción enviada (formato simple): ${subMsg}`);
+      logger.info(`[RTDS] Suscripción enviada: ${subMsg}`);
       this._msgCount = 0;
       this._pingTimer = setInterval(() => {
         if (this.ws?.readyState === WebSocket.OPEN) this.ws.send('PING');
