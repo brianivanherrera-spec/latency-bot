@@ -663,6 +663,17 @@ async function main() {
   const btcBuyerMakerWindow = []; // [true/false] — true = tick iniciado por comprador
   const BTC_BUYER_MAKER_WINDOW = 20; // últimos N ticks
 
+  // BUG A FIX: Parsear strike price del question/description del mercado
+  // Patrón: "Will BTC be above $75,821 at..." → extrae 75821
+  function extractStrikePrice(text) {
+    if (!text) return null;
+    const match = text.match(/above\s+\$?([\d,]+(?:\.\d{2})?)/i);
+    if (match) {
+      return parseFloat(match[1].replace(/,/g, ''));
+    }
+    return null;
+  }
+
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
   const ws = new BinanceWS();        // Binance primary (bookTicker ~10-15ms)
@@ -749,9 +760,10 @@ async function main() {
           const btcPriceNow = btcPriceHistory.length > 0
             ? btcPriceHistory[btcPriceHistory.length - 1].price
             : (signal.getStats()?.lastPrice || null);
-          if (btcPriceNow && !cachedMarket.strikePrice) {
-            cachedMarket.market_strike_price_captured_at_open = btcPriceNow;
-            logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
+          if (!cachedMarket.strikePrice) {
+            const parsedStrike = extractStrikePrice(cachedMarket.question);
+            cachedMarket.market_strike_price_captured_at_open = parsedStrike || btcPriceNow;
+            logger.info(`[POLY] 📍 Strike (de ${parsedStrike ? 'question' : 'captura @open'}): $${(parsedStrike || btcPriceNow)?.toLocaleString()}`);
           }
           logger.info(`[POLY] ✅ Mercado pre-cacheado activado: ${cachedMarket.question}`);
           logger.info(`[POLY] yesToken: ${cachedMarket.yesTokenId}`);
@@ -804,9 +816,10 @@ async function main() {
           const btcPriceNow = btcPriceHistory.length > 0
             ? btcPriceHistory[btcPriceHistory.length - 1].price
             : (signal.getStats()?.lastPrice || null);
-          if (btcPriceNow && !m.strikePrice) {
-            m.market_strike_price_captured_at_open = btcPriceNow;
-            logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
+          if (!m.strikePrice) {
+            const parsedStrike = extractStrikePrice(m.question);
+            m.market_strike_price_captured_at_open = parsedStrike || btcPriceNow;
+            logger.info(`[POLY] 📍 Strike (de ${parsedStrike ? 'question' : 'captura @open'}): $${(parsedStrike || btcPriceNow)?.toLocaleString()}`);
           }
           const marketEndTime = new Date(m.endDate).getTime();
           const marketStartTime = marketEndTime - 300000; // 5 minutos atrás
@@ -1052,6 +1065,7 @@ async function main() {
           twap_30_final: tw30?.value_num ?? null,
           twap_60_final: tw60?.value_num ?? null,
         });
+        signalLogger.logMarketTwapFinal(tw30?.value_num ?? null, tw60?.value_num ?? null);
         diag.logMarketEnd(cachedMarket?.yesTokenId || cachedMarket?.gammaId);
         diag.logResolution(cachedMarket?.yesTokenId || cachedMarket?.gammaId, winner);
       }
@@ -1962,6 +1976,10 @@ async function main() {
     const snapshotYesTokenId = cachedMarket?.yesTokenId ?? null;
     const snapshotNoTokenId  = cachedMarket?.noTokenId  ?? null;
 
+    // Capturar TWAP observacionales al momento exacto de la señal
+    const twap30AtSignal = clRTDS.getLatestTWAP(30);
+    const twap60AtSignal = clRTDS.getLatestTWAP(60);
+
     // Registrar señal en volumen persistente
     const utcHour = new Date().getUTCHours();
     const btcPriceAtSignal = sig.currentPrice;
@@ -1974,6 +1992,10 @@ async function main() {
       sig,
       utcHour,
       btcPrice: btcPriceAtSignal,
+      twap30AtSignal: twap30AtSignal?.value_num ?? null,
+      twap60AtSignal: twap60AtSignal?.value_num ?? null,
+      binanceToTwap30Ms: twap30AtSignal ? nowMs - twap30AtSignal.received_ts : null,
+      binanceToTwap60Ms: twap60AtSignal ? nowMs - twap60AtSignal.received_ts : null,
       getPolyPrice: (dir) => {
         // Usar tokenIds capturados al momento de apertura — no cachedMarket
         // que puede ya apuntar al siguiente mercado cuando corran t1/t2/t5
