@@ -8,6 +8,7 @@ class DiagnosticsIntegration {
 
   hookRTDS(rtdsInstance) {
     const originalEmit = rtdsInstance.emit.bind(rtdsInstance);
+    const diag = this.diag;
 
     rtdsInstance.emit = function(eventType, data) {
       if (eventType === 'update') {
@@ -15,13 +16,13 @@ class DiagnosticsIntegration {
         const sourceTs = twap_timestamp || Date.now() - age_ms;
 
         if (event_type === 'crypto_prices_twap_thirty') {
-          this.diag.logEvent('RTDS_TWAP_30', {
+          diag.logEvent('RTDS_TWAP_30', {
             market_id: data.market_id,
             price: data.twap_value,
             age_ms,
           }, sourceTs);
         } else if (event_type === 'crypto_prices_twap_sixty') {
-          this.diag.logEvent('RTDS_TWAP_60', {
+          diag.logEvent('RTDS_TWAP_60', {
             market_id: data.market_id,
             price: data.twap_value,
             age_ms,
@@ -36,11 +37,12 @@ class DiagnosticsIntegration {
 
   hookBinance(binanceInstance) {
     const originalOnPrice = binanceInstance.onPrice.bind(binanceInstance);
+    const diag = this.diag;
 
     binanceInstance.onPrice = function(callback) {
       const wrappedCallback = (tick) => {
         const sourceTs = tick.E || tick.timestamp || Date.now();
-        this.diag.logEvent('BINANCE_TICK', {
+        diag.logEvent('BINANCE_TICK', {
           market_id: tick.symbol,
           price: tick.c,
           timestamp: tick.E,
@@ -55,21 +57,22 @@ class DiagnosticsIntegration {
   }
 
   hookPolymarket(polymarketInstance) {
-    const originalOnBook = polymarketInstance.onBook.bind(polymarketInstance);
+    const diag = this.diag;
+    const originalOnPrice = polymarketInstance.onPrice?.bind(polymarketInstance);
 
-    polymarketInstance.onBook = function(callback) {
-      const wrappedCallback = (book) => {
-        this.diag.logEvent('POLYMARKET_UPDATE', {
-          market_id: book.market_id,
-          yes_price: book.yes,
-          no_price: book.no,
-          yes_size: book.yesSize,
-          no_size: book.noSize,
-        }, Date.now());
-        return callback(book);
+    if (originalOnPrice) {
+      polymarketInstance.onPrice = function(callback) {
+        const wrappedCallback = (priceData) => {
+          diag.logEvent('POLYMARKET_UPDATE', {
+            market_id: priceData.tokenId || priceData.market_id,
+            price: priceData.price,
+            side: priceData.side,
+          }, Date.now());
+          return callback(priceData);
+        };
+        return originalOnPrice(wrappedCallback);
       };
-      return originalOnBook(wrappedCallback);
-    };
+    }
 
     polymarketInstance.diag = this.diag;
   }
