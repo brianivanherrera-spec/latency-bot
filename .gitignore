@@ -13,3 +13,5 @@ logs/
 
 # Runtime data
 /data/
+# Analysis artifacts
+book-filter-visual.html
