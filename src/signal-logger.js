@@ -632,10 +632,118 @@ function logMarketTwapFinal(twap30Final, twap60Final) {
   } catch(e) {}
 }
 
+// Analizar razón de NO_FILL basado en error, status y contexto
+function analyzeNoFillReason(orderResult, orderStatus, context = {}) {
+  const error = orderResult?.error || '';
+  const statusStr = (String(orderStatus || '')).toLowerCase();
+
+  // Extraer info del contexto
+  const {
+    signalPrice = null,
+    currentPolyPrice = null,
+    priceMovedThreshold = 0.02, // 2% = 0.02
+    marketClosed = false,
+    apiResponseCode = null,
+    apiResponseMsg = '',
+  } = context;
+
+  // 1. market_closed: mercado ya cerró
+  if (marketClosed || error.includes('market') && error.includes('closed')) {
+    return {
+      rejection_reason: 'market_closed',
+      detail: 'El mercado ya cerró al momento del intento',
+    };
+  }
+
+  // 2. price_moved: precio de Polymarket se movió significativamente
+  if (signalPrice != null && currentPolyPrice != null) {
+    const priceDiff = Math.abs(currentPolyPrice - signalPrice) / signalPrice;
+    if (priceDiff > priceMovedThreshold) {
+      return {
+        rejection_reason: 'price_moved',
+        detail: `Precio movió ${(priceDiff * 100).toFixed(2)}% (señal: $${signalPrice.toFixed(4)}, intento: $${currentPolyPrice.toFixed(4)})`,
+      };
+    }
+  }
+
+  // 3. api_error: error de API de Polymarket
+  if (error.includes('trading is disabled') || error === 'trading_disabled') {
+    return {
+      rejection_reason: 'api_error',
+      detail: `API error: trading disabled (mantenimiento)`,
+      error_code: 503,
+    };
+  }
+  if (error.includes('not enough balance') || error.includes('allowance')) {
+    return {
+      rejection_reason: 'api_error',
+      detail: `API error: saldo insuficiente o allowance`,
+    };
+  }
+  if (apiResponseCode) {
+    return {
+      rejection_reason: 'api_error',
+      detail: `API error code ${apiResponseCode}: ${apiResponseMsg || error}`,
+      error_code: apiResponseCode,
+    };
+  }
+  if (error && error.length > 0 && !['ask_too_high', 'fak_exhausted', 'gtc_timeout', 'cancelled', 'Token ID'].some(e => error.includes(e))) {
+    return {
+      rejection_reason: 'api_error',
+      detail: `API error: ${error}`,
+    };
+  }
+
+  // 4. insufficient_liquidity: no hay liquidez
+  if (error === 'ask_too_high' || error.includes('ask demasiado')) {
+    return {
+      rejection_reason: 'insufficient_liquidity',
+      detail: 'Ask price demasiado alto → no hay liquidez al precio requerido',
+    };
+  }
+  if (error === 'fak_exhausted' || error.includes('FAK agotó')) {
+    return {
+      rejection_reason: 'insufficient_liquidity',
+      detail: 'FAK agotó reintentos → sin liquidez a precio aceptable',
+    };
+  }
+
+  // 5. order_expired: orden venció por timeout
+  if (error === 'gtc_timeout' || error.includes('timeout')) {
+    return {
+      rejection_reason: 'order_expired',
+      detail: 'GTC timeout: orden no se llenó dentro del tiempo límite',
+    };
+  }
+
+  // 6. size_rejected: tamaño rechazado
+  if (error.includes('size') || error.includes('token') && error.includes('mínimo')) {
+    return {
+      rejection_reason: 'size_rejected',
+      detail: `Tamaño rechazado: ${error}`,
+    };
+  }
+
+  // 7. order_resting_without_fill: orden en libro pero sin fill
+  if (statusStr === 'live') {
+    return {
+      rejection_reason: 'order_resting_without_fill',
+      detail: 'Orden en libro pero sin fill confirmado antes del timeout',
+    };
+  }
+
+  // 8. unknown: cualquier otro caso
+  return {
+    rejection_reason: 'unknown',
+    detail: `Status: ${statusStr}, Error: ${error || 'sin info'}`,
+    raw_error: error,
+  };
+}
+
 module.exports = {
   logSignalOpen, logSignalClose, logBtcSnapshot1s, getStats, getDailySummary,
   getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder,
   logFillTelemetry, getT3Timestamp, recordOrderSent, recordOrderAccepted,
   recordOrderResting, recordOrderFilled, getLatencyTracking, clearLatencyTracking,
-  logMarketTwapFinal
+  logMarketTwapFinal, analyzeNoFillReason
 };

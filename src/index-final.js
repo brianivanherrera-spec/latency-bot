@@ -2268,16 +2268,28 @@ async function main() {
            (orderResult.sizeFilled > 0 && orderResult.fillPrice > 0 && orderResult.fillPrice < 1));
         
         if (!orderResult.success || !reallyFilled) {
-          const reason = orderResult.error === 'gtc_timeout'
-            ? `timeout ${config.GTC_TIMEOUT_SECONDS || 60}s sin fill`
-            : orderResult.error === 'ask_too_high'
-            ? `bestAsk demasiado alto — ganancia insuficiente`
-            : orderResult.error === 'fak_exhausted'
-            ? `FAK agotó ${process.env.FAK_MAX_ATTEMPTS || 10} intentos`
-            : orderStatus === 'live'
-            ? `orden en libro pero sin fill confirmado (status=live)`
-            : (orderResult.error || 'sin liquidez');
-          logger.warn(`[LIVE] ⚠️ Orden no llenada — ${reason}`);
+          // Calculate order age from signal generation to order attempt
+          const order_age_ms = (t3_ms && t4_order_sent_ms) ? (t4_order_sent_ms - t3_ms) : null;
+
+          // Capture Polymarket price at the moment of order attempt
+          const poly_price_at_attempt = sig.direction === 'UP' ? livePolyYes : livePolyNo;
+
+          // Use signal entry price to check if price moved
+          const poly_price_at_signal = sig.getPolyPrice?.() || sig._initialPolyPrice;
+
+          // Analyze the detailed reason for NO_FILL
+          const noFillAnalysis = signalLogger.analyzeNoFillReason(orderResult, orderStatus, {
+            signalPrice: poly_price_at_signal,
+            currentPolyPrice: poly_price_at_attempt,
+            priceMovedThreshold: 0.02, // 2% threshold
+            marketClosed: false,
+            apiResponseMsg: orderResult.error || '',
+          });
+
+          const rejectionReason = noFillAnalysis.rejection_reason;
+          const rejectionDetail = noFillAnalysis.detail;
+
+          logger.warn(`[LIVE] ⚠️ Orden no llenada [${rejectionReason}] — ${rejectionDetail}`);
 
           // PHASE 0: Log fill telemetry for analysis
           // PHASE 1: Include latency tracking
@@ -2288,12 +2300,12 @@ async function main() {
             order_status: orderStatus,
             order_price: price,
             best_ask: depthInfo?.bestAsk,
-            rejection_reason: reason,
+            rejection_reason: rejectionDetail,
             time_to_fill_ms: null,
             order_size: size,
             size_filled: 0,
             btc_price_entry: btcPriceAtSignal,
-            poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
+            poly_price_entry: poly_price_at_signal,
             signal_direction: sig.direction,
             market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
             market_start_time: cachedMarket.startTime || null,
@@ -2311,11 +2323,11 @@ async function main() {
           mRecorder.recordNoFill({
             signal_id: sig._signal_id || null,
             order_id: posId,
-            reason: reason || orderResult.error || 'no_fill',
+            reason: rejectionReason || orderResult.error || 'no_fill',
             received_ts: Date.now(),
           });
 
-          // PHASE 2: Log NO_FILL
+          // PHASE 2: Log NO_FILL with detailed rejection analysis
           if (cachedMarket?.gammaId) {
             const bookSnap = polyWs.getBookSnapshot();
             phase2Logger.logBotEvent('NO_FILL', {
@@ -2338,6 +2350,16 @@ async function main() {
               order_price: price,
               order_size: size,
               fill_latency_ms: null,
+              // NEW: Rejection reason categorization
+              rejection_reason: rejectionReason,
+              rejection_detail: rejectionDetail,
+              // NEW: Order timing analysis
+              order_age_ms: order_age_ms,
+              poly_price_at_signal: poly_price_at_signal,
+              poly_price_at_attempt: poly_price_at_attempt,
+              price_moved_pct: poly_price_at_signal && poly_price_at_attempt
+                ? Math.abs(poly_price_at_attempt - poly_price_at_signal) / poly_price_at_signal * 100
+                : null,
             });
           }
 
@@ -2507,6 +2529,9 @@ async function main() {
         // PHASE 1: Include latency tracking (may be partial if error occurred mid-flow)
         const t3_err_ms = signalLogger.getT3Timestamp(posId);
         const latencyDataErr = signalLogger.getLatencyTracking(posId);
+        const t4_err_ms = latencyDataErr?.t4_order_sent_ms || Date.now();
+        const order_age_err_ms = (t3_err_ms && t4_err_ms) ? (t4_err_ms - t3_err_ms) : null;
+
         signalLogger.logFillTelemetry({
           posId,
           fill_result: 'NO_FILL',
@@ -2525,7 +2550,7 @@ async function main() {
           market_end_time: cachedMarket.endTime || null,
           // PHASE 1: Latency tracking (may be partial)
           t3_price_decision_ms: t3_err_ms,
-          t4_order_sent_ms: latencyDataErr?.t4_order_sent_ms || null,
+          t4_order_sent_ms: t4_err_ms,
           t5_order_accepted_ms: latencyDataErr?.t5_order_accepted_ms || null,
           t6_order_resting_ms: null,
           t7_order_filled_ms: null,
@@ -2553,6 +2578,9 @@ async function main() {
 
         // PHASE 0: Log paper mode NO_FILL
         // PHASE 1: Include latency tracking (simulated)
+        const order_age_paper_ms = (t3_paper_ms && t4_paper_ms) ? (t4_paper_ms - t3_paper_ms) : null;
+        const poly_price_paper_signal = sig.getPolyPrice?.() || sig._initialPolyPrice;
+
         signalLogger.logFillTelemetry({
           posId,
           fill_result: 'NO_FILL',
@@ -2564,7 +2592,7 @@ async function main() {
           order_size: size,
           size_filled: 0,
           btc_price_entry: btcPriceAtSignal,
-          poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
+          poly_price_entry: poly_price_paper_signal,
           signal_direction: sig.direction,
           market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
           market_start_time: cachedMarket.startTime || null,
