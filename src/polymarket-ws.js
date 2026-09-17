@@ -417,9 +417,10 @@ class PolymarketWS {
     });
 
     ws.on('message', (data) => {
+      const receivedTs = Date.now();
       const raw = data.toString();
       if (raw === 'PONG' || raw === 'pong') {
-        this._lastPongAt = Date.now();
+        this._lastPongAt = receivedTs;
         return;
       }
       // Polymarket a veces responde texto plano a ops inválidas
@@ -430,7 +431,23 @@ class PolymarketWS {
         try {
           const parsed = JSON.parse(raw);
           const events = Array.isArray(parsed) ? parsed : [parsed];
-          for (const msg of events) this._handleMessage(msg);
+          for (const msg of events) {
+            // Extraer timestamp de fuente si existe
+            const sourceTs = msg.timestamp || msg.ts || msg.event_time || null;
+            const timestampQuality = sourceTs ? 'source' : 'received_only';
+            const eventLatencyMs = sourceTs ? (receivedTs - sourceTs) : null;
+
+            // Enriquecer payload con metadata de timestamp
+            const enrichedMsg = {
+              ...msg,
+              _event_received_timestamp_ms: receivedTs,
+              _event_source_timestamp_ms: sourceTs,
+              _timestamp_quality: timestampQuality,
+              _event_latency_ms: eventLatencyMs,
+            };
+
+            this._handleMessage(enrichedMsg);
+          }
         } catch (e) {
           if (raw && raw.length < 120) {
             logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);

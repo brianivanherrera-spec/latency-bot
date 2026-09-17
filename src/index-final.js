@@ -1464,6 +1464,34 @@ async function main() {
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
 
+    // ─── Filtro 1: Rechazar signalScore < 40 ────────────────────────────────
+    const signalScoreThreshold = parseFloat(process.env.SIGNAL_SCORE_MIN || '40');
+    if (sig.signalScore && sig.signalScore < signalScoreThreshold) {
+      logger.warn(`[SKIP] Signal score too low: ${sig.signalScore.toFixed(0)} < ${signalScoreThreshold} threshold`);
+      phase2Logger.logBotEvent('SIGNAL_REJECTED', {
+        event_timestamp_ms: nowMs,
+        market_id: cachedMarket?.yesTokenId,
+        signal_id: sig._signal_id,
+        reject_reason: 'LOW_SCORE',
+        signal_score: sig.signalScore,
+      });
+      return;
+    }
+
+    // ─── Filtro 2: Rechazar UP + RSI overbought (70-80) ────────────────────
+    const isRSIOverbought = sig.direction === 'UP' && sig.rsi && sig.rsi >= 70 && sig.rsi < 80;
+    if (isRSIOverbought) {
+      logger.warn(`[SKIP] Overbought RSI: UP signal with RSI=${sig.rsi.toFixed(2)}`);
+      phase2Logger.logBotEvent('SIGNAL_REJECTED', {
+        event_timestamp_ms: nowMs,
+        market_id: cachedMarket?.yesTokenId,
+        signal_id: sig._signal_id,
+        reject_reason: 'OVERBOUGHT_RSI',
+        rsi: sig.rsi,
+      });
+      return;
+    }
+
     // ─── BOOK_ENTRY_MODE — chequear book ANTES de BTC trend filters ──────
     // Si el book es muy fuerte (≥ umbral), entrar directo salteando filtros BTC.
     // Evidencia: book ≥0.70 = 100% WR históricamente sin importar BTC trend.
@@ -1652,6 +1680,17 @@ async function main() {
       const eliteExposure = parseFloat((balanceForSizing * eliteMax).toFixed(2));
       finalExposure = Math.max(exposure, eliteExposure);
       logger.info(`[SIZE] 🏆 MODO ÉLITE: imb=${bookImbForElite.toFixed(2)} Z=${Math.abs(sig.zScore).toFixed(1)} → usando $${finalExposure.toFixed(2)} (${(eliteMax*100).toFixed(0)}% del balance $${balanceForSizing})`);
+    }
+
+    // ─── Filtro 3: Priorizar (sizing up) con imbalance < 0.3 ────────────────
+    // Evidencia: 96% win rate vs 80% en imbalance alto
+    const strongImbalanceThreshold = parseFloat(process.env.STRONG_IMBALANCE_THRESHOLD || '0.3');
+    const sizeMultiplier = parseFloat(process.env.STRONG_IMBALANCE_SIZE_MULT || '1.5');
+    const strongImbalance = Math.abs(sig.imbalance || 0) < strongImbalanceThreshold;
+    if (strongImbalance && sizeMultiplier > 1.0) {
+      const originalExposure = finalExposure;
+      finalExposure = parseFloat((finalExposure * sizeMultiplier).toFixed(2));
+      logger.info(`[SIZE-UP] Strong imbalance ${Math.abs(sig.imbalance || 0).toFixed(3)}: sizing up ${sizeMultiplier}x from $${originalExposure} to $${finalExposure}`);
     }
 
     const totalExposure = Array.from(activePositions.values())
@@ -2158,6 +2197,8 @@ async function main() {
         // PHASE 2: Log ORDER_SENT
         if (cachedMarket?.gammaId) {
           const bookSnap = polyWs.getBookSnapshot();
+          const strongImbForLogging = Math.abs(sig.imbalance || 0) < strongImbalanceThreshold;
+          const sizeMultiplierLogged = strongImbForLogging && sizeMultiplier > 1.0 ? sizeMultiplier : 1.0;
           phase2Logger.logBotEvent('ORDER_SENT', {
             order_id: posId,
             signal_id: sig._signal_id || null,
@@ -2178,6 +2219,7 @@ async function main() {
             order_price: price,
             order_size: size,
             order_side: 'buy',
+            size_multiplier: sizeMultiplierLogged,
           });
         }
 
@@ -2690,6 +2732,81 @@ async function main() {
       logger.warn(`[DIAG] ⚠️ Error al guardar reporte: ${e.message}`);
     }
   }, 30 * 60 * 1000);
+
+  // ─── DAILY SUMMARY SCHEDULING ─────────────────────────────────────────
+  const scheduleDailySummary = () => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    const msUntilMidnight = tomorrow - now;
+
+    setTimeout(() => {
+      try {
+        const stats = compileSessionStats();
+        logDailySummary(stats);
+      } catch (e) {
+        logger.error(`[DAILY-SUMMARY] Error: ${e.message}`);
+      }
+      scheduleDailySummary(); // Schedule next day
+    }, msUntilMidnight);
+  };
+
+  // Función para compilar estadísticas de la sesión
+  const compileSessionStats = () => {
+    const trackerStats = tracker.getSummary();
+    const volStats = signalLogger.getStats();
+
+    return {
+      tradesExecuted: volStats?.closedTrades || 0,
+      tradesFilled: volStats?.filledTrades || 0,
+      tradesNoFill: (volStats?.closedTrades || 0) - (volStats?.filledTrades || 0),
+      wins: trackerStats.wins || 0,
+      losses: trackerStats.losses || 0,
+      winRate: trackerStats.winRate || 0,
+      pnlNeto: parseFloat(trackerStats.totalPnL?.replace(/[^0-9.-]/g, '') || '0'),
+      pnlGross: volStats?.grossPnL || 0,
+      pnlFees: volStats?.totalFees || 0,
+      noFillRate: volStats?.closedTrades > 0 ?
+        ((volStats?.closedTrades || 0) - (volStats?.filledTrades || 0)) / (volStats?.closedTrades || 0) : 0,
+      avgFillLatencyMs: volStats?.avgFillLatency || 0,
+    };
+  };
+
+  // Función para loguear resumen diario
+  const logDailySummary = (stats) => {
+    const record = {
+      event_type: 'DAILY_SUMMARY',
+      event_timestamp_ms: Date.now(),
+
+      // Trades
+      trades_executed: stats.tradesExecuted,
+      trades_filled: stats.tradesFilled,
+      trades_nofill: stats.tradesNoFill,
+
+      // Win/Loss
+      wins: stats.wins,
+      losses: stats.losses,
+      win_rate: stats.winRate,
+
+      // PnL
+      pnl_neto: stats.pnlNeto,
+      pnl_gross: stats.pnlGross,
+      pnl_fees: stats.pnlFees,
+
+      // Execution
+      no_fill_count: stats.tradesNoFill,
+      no_fill_rate: stats.noFillRate,
+      avg_fill_latency_ms: stats.avgFillLatencyMs,
+    };
+
+    phase2Logger.logBotEvent('DAILY_SUMMARY', record);
+    logger.info(`[DAILY] Executed=${stats.tradesExecuted} Filled=${stats.tradesFilled} NoFill=${stats.tradesNoFill} Wins=${stats.wins} WinRate=${(stats.winRate*100).toFixed(2)}% PnL=$${stats.pnlNeto.toFixed(2)}`);
+  };
+
+  // Iniciar scheduling de resumen diario
+  scheduleDailySummary();
 }
 
 main().catch(err => {

@@ -170,16 +170,13 @@ function logPolymarketRaw(data, market, eventId) {
       market_end_ms: market?.market_end_time || null,
       event_id: eventId || `evt_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
 
-      // === TIMESTAMPS: ORIGEN vs RECEPCIÓN ===
-      event_source_timestamp_ms: data.event_source_timestamp_ms || null,
-      event_received_timestamp_ms: data.timestamp || Date.now(),
-      timestamp_quality: data.event_source_timestamp_ms ? 'source' : 'received_only',
+      // === TIMESTAMPS: ORIGEN vs RECEPCIÓN (mejorado con metadata de WS) ===
+      bot_received_timestamp_ms: data._event_received_timestamp_ms || Date.now(),
+      event_source_timestamp_ms: data._event_source_timestamp_ms || null,
+      timestamp_quality: data._timestamp_quality || 'received_only',
 
       // Latency si hay timestamp de origen
-      event_latency_ms:
-        data.event_source_timestamp_ms && data.timestamp
-          ? data.timestamp - data.event_source_timestamp_ms
-          : null,
+      event_latency_ms: data._event_latency_ms || null,
 
       event_source: data.event_source || 'ws',
 
