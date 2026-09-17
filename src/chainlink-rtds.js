@@ -154,6 +154,10 @@ class ChainlinkRTDS extends EventEmitter {
       }
     } catch (e) {
       this.logger.warn(`[CHAINLINK-RTDS] Parse error: ${e.message}`);
+      this._tryNextFormat();
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.close();
+      }
     }
   }
 

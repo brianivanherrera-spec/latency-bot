@@ -1922,11 +1922,12 @@ async function main() {
       size = size - 1;
     }
 
-    // MAX_ENTRY_PRICE — filtro sobre priceRaw de la señal (no del order price)
-    // Señales ÉLITE lo saltean — con 100% WR histórico no importa el priceRaw
+    // MAX_ENTRY_PRICE — filtro sobre bestAskWS (precio actual) o priceRaw de fallback
+    // Señales ÉLITE lo saltean — con 100% WR histórico no importa el precio
     const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
-    if (!isEliteSignal && maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
-      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} > máximo $${maxEntryPrice} — señal vieja`);
+    const priceForEntryCheck = bestAskWS != null ? bestAskWS : priceRaw;
+    if (!isEliteSignal && maxEntryPrice < 0.97 && priceForEntryCheck > maxEntryPrice) {
+      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio $${priceForEntryCheck.toFixed(2)} (${bestAskWS != null ? 'WS' : 'fallback'}) > máximo $${maxEntryPrice}`);
       activePositions.delete(posId);
       return;
     }
