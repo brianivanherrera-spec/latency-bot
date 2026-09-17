@@ -185,87 +185,7 @@ function logPolymarketRaw(data, market, strikes) {
 
 ---
 
-## 🛑 MEJORA #4: Circuit Breaker por Racha de Pérdidas
-
-### Cambios Requeridos:
-
-**4.1 Trackear consecutive_losses**
-- **Ubicación**: `src/tracker.js` (agregar campo si no existe)
-- **Implementación**:
-```javascript
-class PositionTracker {
-  constructor() {
-    this.positions = new Map();
-    this.consecutiveLosses = 0;
-    this.circuitBreakerTriggeredAt = null;
-  }
-  
-  recordLoss(positionId) {
-    this.consecutiveLosses++;
-    logger.info(`[LOSS] Consecutive losses: ${this.consecutiveLosses}`);
-    
-    const threshold = parseInt(process.env.CIRCUIT_BREAKER_LOSS_THRESHOLD || '5');
-    if (this.consecutiveLosses >= threshold) {
-      this.triggerCircuitBreaker();
-    }
-  }
-  
-  recordWin(positionId) {
-    this.consecutiveLosses = 0;  // Reset on any win
-  }
-}
-```
-
-**4.2 Implementar Circuit Breaker**
-- **Ubicación**: `src/index-final.js` línea ~1300 (antes de generar señales)
-- **Implementación**:
-```javascript
-const checkCircuitBreaker = () => {
-  if (!tracker.isCircuitBreakerActive()) return true;
-  
-  const triggeredAt = tracker.circuitBreakerTriggeredAt;
-  const pauseDurationMs = parseInt(process.env.CIRCUIT_BREAKER_PAUSE_MINS || '30') * 60 * 1000;
-  const elapsedMs = Date.now() - triggeredAt;
-  
-  if (elapsedMs < pauseDurationMs) {
-    logger.warn(`[CIRCUIT-BREAKER] Active for ${Math.round(elapsedMs/1000)}s / ${pauseDurationMs/1000}s`);
-    return false;  // Don't execute orders
-  }
-  
-  // Pause expired, reset
-  tracker.resetCircuitBreaker();
-  logger.info(`[CIRCUIT-BREAKER] Reset after ${Math.round(elapsedMs/1000)}s pause`);
-  return true;
-};
-
-// En el signal processing:
-if (!checkCircuitBreaker()) {
-  logger.info(`[SKIP] Circuit breaker active, skipping order execution`);
-  return;
-}
-```
-
-**4.3 Logging de evento**
-- **Ubicación**: Cuando se activa/resetea el circuit breaker
-- **Implementación**:
-```javascript
-phase2Logger.logBotEvent('CIRCUIT_BREAKER_TRIGGERED', {
-  event_timestamp_ms: Date.now(),
-  consecutive_losses: tracker.consecutiveLosses,
-  pause_duration_mins: pauseDurationMs / 60 / 1000,
-  triggered_at_timestamp_ms: triggeredAt,
-});
-
-phase2Logger.logBotEvent('CIRCUIT_BREAKER_RESET', {
-  event_timestamp_ms: Date.now(),
-  pause_duration_ms: pauseDurationMs,
-  resumed_at_timestamp_ms: Date.now(),
-});
-```
-
----
-
-## 📊 MEJORA #5: Métricas Diarias en Logs
+## 📊 MEJORA #4: Métricas Diarias en Logs
 
 ### Cambios Requeridos:
 
@@ -297,10 +217,6 @@ function logDailySummary(stats) {
     no_fill_count: stats.tradesNoFill,
     no_fill_rate: stats.noFillRate,  // percentage 0-100
     avg_fill_latency_ms: stats.avgFillLatencyMs,
-    
-    // Circuit Breaker
-    circuit_breaker_triggered_count: stats.cbTriggeredCount,
-    consecutive_losses_max: stats.consecutiveLossesMax,
   };
   
   phase2Logger.logBotEvent('DAILY_SUMMARY', record);
@@ -355,8 +271,6 @@ function compileSessionStats() {
       noFill.length / closedPositions.length : 0,
     avgFillLatencyMs: executed.length > 0 ?
       executed.reduce((sum, p) => sum + (p.fill_latency_ms || 0), 0) / executed.length : 0,
-    cbTriggeredCount: tracker.circuitBreakerStats?.timesTriggered || 0,
-    consecutiveLossesMax: tracker.circuitBreakerStats?.maxConsecutiveLosses || 0,
   };
 }
 ```
@@ -382,8 +296,7 @@ function compileSessionStats() {
 **Fase 2 (1-2 horas)**: Mejora #3
 - Timestamp de fuente WebSocket
 
-**Fase 3 (1-2 horas)**: Mejoras #4 + #5
-- Circuit breaker
+**Fase 3 (1-2 horas)**: Mejora #4
 - Daily summary
 
 **Fase 4 (0.5 horas)**: Recuperar volumen
@@ -395,7 +308,6 @@ function compileSessionStats() {
 - [ ] NO_FILL rate reducido a < 40% en live (vs 72.8% actual)
 - [ ] Win rate mejorado a > 85% (vs 68-80% actual)
 - [ ] Timestamp quality: > 80% con `source` timestamps
-- [ ] Circuit breaker activado < 2x por día en operación normal
 - [ ] DAILY_SUMMARY logs presentes en phase2 eventos
 
 ---
