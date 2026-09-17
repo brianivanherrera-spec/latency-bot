@@ -7,7 +7,9 @@
  * 3. Validación de strikes
  * 4. Disponibilidad de timestamps
  * 5. Disponibilidad de order book
- * 6. Ejemplos de reconstrucción completa
+ * 6. Polymarket lag detection metrics (NEW)
+ * 7. NO_FILL diagnostic system fields (NEW)
+ * 8. Ejemplos de reconstrucción completa
  */
 
 const fs = require('fs');
@@ -316,6 +318,92 @@ async function generateReport() {
         }
       }
     });
+    console.log();
+  }
+
+  // === 7. POLYMARKET LAG DETECTION METRICS (NEW) ===
+  console.log('7️⃣  POLYMARKET LAG DETECTION METRICS');
+  console.log('─'.repeat(60));
+
+  const signalEvents = botEvents.filter(e => e.event_type === 'SIGNAL_GENERATED');
+  if (signalEvents.length === 0) {
+    console.log('   No SIGNAL_GENERATED events found yet.\n');
+  } else {
+    const lagMetrics = signalEvents
+      .filter(e => e.poly_lag_ms !== undefined)
+      .map(e => ({
+        polyLagMs: e.poly_lag_ms,
+        absorptionRate: e.poly_absorption_rate,
+        gapPct: e.btc_poly_price_gap_pct,
+      }));
+
+    if (lagMetrics.length === 0) {
+      console.log('   ⚠️  No lag metrics captured yet. Metrics may not be implemented.\n');
+    } else {
+      const lags = lagMetrics.map(m => m.polyLagMs);
+      const rates = lagMetrics.map(m => m.absorptionRate || 0);
+      const gaps = lagMetrics.map(m => m.gapPct || 0);
+
+      const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+      const sort = (arr) => [...arr].sort((a, b) => a - b);
+      const percentile = (arr, p) => sort(arr)[Math.floor(arr.length * p / 100)] || 0;
+
+      console.log(`   ✓ Signals with lag metrics: ${lagMetrics.length}/${signalEvents.length}`);
+      console.log(`   ✓ poly_lag_ms (ms since last Polymarket update):`);
+      console.log(`     - p50: ${percentile(lags, 50).toFixed(0)}ms | p95: ${percentile(lags, 95).toFixed(0)}ms | max: ${Math.max(...lags).toFixed(0)}ms`);
+      console.log(`   ✓ poly_absorption_rate (¢/sec conversion speed):`);
+      console.log(`     - p50: ${percentile(rates, 50).toFixed(6)} | p95: ${percentile(rates, 95).toFixed(6)} | max: ${Math.max(...rates).toFixed(6)}`);
+      console.log(`   ✓ btc_poly_price_gap_pct (lag indicator, >0.02 = lag exists):`);
+      console.log(`     - p50: ${percentile(gaps, 50).toFixed(6)} | p95: ${percentile(gaps, 95).toFixed(6)} | max: ${Math.max(...gaps).toFixed(6)}`);
+      const lagExistsCount = lagMetrics.filter(m => m.gapPct > 0.02).length;
+      console.log(`     - Signals with gap >2% (lag indicator): ${lagExistsCount}/${lagMetrics.length}`);
+    }
+    console.log();
+  }
+
+  // === 8. NO_FILL DIAGNOSTIC SYSTEM (NEW) ===
+  console.log('8️⃣  NO_FILL DIAGNOSTIC SYSTEM');
+  console.log('─'.repeat(60));
+
+  const noFillEvents = botEvents.filter(e => e.event_type === 'NO_FILL');
+  if (noFillEvents.length === 0) {
+    console.log('   No NO_FILL events recorded.\n');
+  } else {
+    const reasonCounts = {};
+    const withReason = noFillEvents.filter(e => e.rejection_reason);
+    const orderAges = noFillEvents.filter(e => e.order_age_ms !== undefined).map(e => e.order_age_ms);
+    const priceMovements = noFillEvents.filter(e => e.price_moved_pct !== undefined).map(e => e.price_moved_pct);
+
+    noFillEvents.forEach(evt => {
+      const reason = evt.rejection_reason || 'unknown';
+      reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+    });
+
+    console.log(`   ✓ Total NO_FILL events: ${noFillEvents.length}`);
+    console.log(`   ✓ Events with rejection reason: ${withReason.length}/${noFillEvents.length}`);
+
+    console.log(`   Breakdown by rejection reason:`);
+    Object.entries(reasonCounts)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([reason, count]) => {
+        const pct = ((count / noFillEvents.length) * 100).toFixed(1);
+        console.log(`     - ${reason.padEnd(30)}: ${count} (${pct}%)`);
+      });
+
+    if (orderAges.length > 0) {
+      const sort = (arr) => [...arr].sort((a, b) => a - b);
+      const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+      const percentile = (arr, p) => sort(arr)[Math.floor(arr.length * p / 100)] || 0;
+      console.log(`   ✓ Order age (T3→T4 latency in ms):`);
+      console.log(`     - p50: ${percentile(orderAges, 50).toFixed(0)}ms | p95: ${percentile(orderAges, 95).toFixed(0)}ms | avg: ${avg(orderAges).toFixed(0)}ms`);
+    }
+
+    if (priceMovements.length > 0) {
+      const sort = (arr) => [...arr].sort((a, b) => a - b);
+      const percentile = (arr, p) => sort(arr)[Math.floor(arr.length * p / 100)] || 0;
+      console.log(`   ✓ Price movements for NO_FILL events:`);
+      console.log(`     - p50: ${percentile(priceMovements, 50).toFixed(4)} | p95: ${percentile(priceMovements, 95).toFixed(4)}`);
+    }
     console.log();
   }
 
