@@ -127,6 +127,11 @@ class ChainlinkRTDS extends EventEmitter {
   _subscribe() {
     if (this.currentFormatIndex >= this.subscriptionFormats.length) {
       this.logger.error('[CHAINLINK-RTDS] All subscription formats exhausted, giving up');
+      this.logger.warn('[CHAINLINK-RTDS] ⚠️ FALLBACK: Entering BINANCE_ONLY_MODE - Chainlink RTDS unavailable');
+      this.emit('fallback', { mode: 'BINANCE_ONLY', reason: 'All subscription formats rejected' });
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.close();
+      }
       return;
     }
 

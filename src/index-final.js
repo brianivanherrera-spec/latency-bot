@@ -685,6 +685,14 @@ async function main() {
   const clRTDS = new ChainlinkRTDS(logger);
   const mRecorder = new MarketRecorder('./data/markets', logger);
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
+
+  // FALLBACK: Handle Chainlink RTDS unavailability
+  global.BINANCE_ONLY_MODE = false;
+  clRTDS.on('fallback', (fallbackInfo) => {
+    global.BINANCE_ONLY_MODE = true;
+    logger.error(`[CHAINLINK-FALLBACK] ${fallbackInfo.reason} - Operating in BINANCE_ONLY_MODE`);
+  });
+
   clRTDS.connect();
 
   // Initialize DiagnosticsIntegration for non-invasive event tracking
