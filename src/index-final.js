@@ -933,10 +933,22 @@ async function main() {
   let lastLoggedPolyYes = null;
   let lastLoggedPolyAt = 0;
 
+  // PHASE 3: Lag detection — track Polymarket update timestamps and historical prices
+  let lastPolyUpdateMs = Date.now();
+  let polyPriceHistory = []; // Circular buffer of {yes, no, ts_ms}
+  const POLY_HISTORY_SIZE = 5; // Last 5 updates for absorption rate calculation
+
   polyWs.onPrice((yes, no) => {
     signal.updatePolyPrice(yes, no);
     livePolyYes = yes;
     livePolyNo  = no;
+
+    // PHASE 3: Capture timestamp and update history
+    lastPolyUpdateMs = Date.now();
+    polyPriceHistory.push({ yes, no, ts_ms: lastPolyUpdateMs });
+    if (polyPriceHistory.length > POLY_HISTORY_SIZE) {
+      polyPriceHistory.shift(); // Keep only last N updates
+    }
 
     // Record Polymarket price for instrumentation
     const bookSnap = polyWs.getBookSnapshot();
@@ -1337,6 +1349,37 @@ async function main() {
     const MIN_BUFFER = parseInt(process.env.MIN_BUFFER_SIZE || '100');
     if (sig.bufferSize !== undefined && sig.bufferSize < MIN_BUFFER) return; // warmup
 
+    // PHASE 3: Calculate lag metrics
+    // Metric 1: poly_lag_ms — how long since last Polymarket update
+    const poly_lag_ms = nowMs - lastPolyUpdateMs;
+
+    // Metric 2: poly_absorption_rate — price change per second in last N ticks
+    let poly_absorption_rate = 0;
+    if (polyPriceHistory.length >= 2) {
+      const first = polyPriceHistory[0];
+      const last = polyPriceHistory[polyPriceHistory.length - 1];
+      const elapsedSec = (last.ts_ms - first.ts_ms) / 1000;
+      if (elapsedSec > 0.1) { // only calculate if meaningful time elapsed
+        const direction = sig.direction === 'UP' ? 'yes' : 'no';
+        const priceDiff = Math.abs(last[direction] - first[direction]);
+        poly_absorption_rate = priceDiff / elapsedSec;
+      }
+    }
+
+    // Metric 3: btc_poly_price_gap_pct — implied vs actual price difference
+    let btc_poly_price_gap_pct = null;
+    if (cachedMarket?.strikePrice && btcPriceNow && (livePolyYes || livePolyNo)) {
+      const btcStrike = cachedMarket.strikePrice;
+      const btcMove = (btcPriceNow - btcStrike) / btcStrike;
+      const polyPrice = sig.direction === 'UP' ? livePolyYes : livePolyNo;
+      btc_poly_price_gap_pct = (btcMove - polyPrice);
+    }
+
+    // Store metrics in signal for logging
+    sig._poly_lag_ms = poly_lag_ms;
+    sig._poly_absorption_rate = poly_absorption_rate;
+    sig._btc_poly_price_gap_pct = btc_poly_price_gap_pct;
+
     // PHASE 2: Generar signal_id único para esta señal
     const signal_id = randomUUID();
     sig._signal_id = signal_id;
@@ -1399,6 +1442,10 @@ async function main() {
         move_pct: sig.movePct || null,
         btc_velocity: null, // TODO: calcular desde btcPriceHistory
         volatility_60s: sig.volatility60s || null,
+        // PHASE 3: Polymarket lag metrics
+        poly_lag_ms: sig._poly_lag_ms || null,
+        poly_absorption_rate: sig._poly_absorption_rate != null ? parseFloat(sig._poly_absorption_rate.toFixed(6)) : null,
+        btc_poly_price_gap_pct: sig._btc_poly_price_gap_pct != null ? parseFloat(sig._btc_poly_price_gap_pct.toFixed(6)) : null,
       });
     }
 
@@ -2220,6 +2267,10 @@ async function main() {
             order_size: size,
             order_side: 'buy',
             size_multiplier: sizeMultiplierLogged,
+            // PHASE 3: Polymarket lag metrics (repeated for order timestamp context)
+            poly_lag_ms: sig._poly_lag_ms || null,
+            poly_absorption_rate: sig._poly_absorption_rate != null ? parseFloat(sig._poly_absorption_rate.toFixed(6)) : null,
+            btc_poly_price_gap_pct: sig._btc_poly_price_gap_pct != null ? parseFloat(sig._btc_poly_price_gap_pct.toFixed(6)) : null,
           });
         }
 
