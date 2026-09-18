@@ -160,6 +160,7 @@ class ChainlinkRTDS extends EventEmitter {
       } else if (this.msgCount > 2 && !this.diag.subscription_confirmed) {
         // After receiving several messages without subscription confirmation, try next format
         this.logger.warn(`[CHAINLINK-RTDS] ⚠ No subscription confirmation after ${this.msgCount} messages for ${this.subscriptionFormat.name}`);
+        this.logger.debug(`[CHAINLINK-RTDS] Unrecognized message: ${JSON.stringify(msg).slice(0, 200)}`);
         this._tryNextFormat();
       }
     } catch (e) {
