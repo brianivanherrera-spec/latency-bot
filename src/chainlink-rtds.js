@@ -99,6 +99,36 @@ class ChainlinkRTDS extends EventEmitter {
             { topic: 'crypto_prices_twap_sixty', asset_pair: 'btc/usd' }
           ]
         }
+      },
+      {
+        name: 'FORMAT_E (assets_ids Polymarket CLOB)',
+        msg: {
+          assets_ids: ['crypto_prices_twap_thirty', 'crypto_prices_twap_sixty'],
+          type: 'Market'
+        }
+      },
+      {
+        name: 'FORMAT_F (channel-based)',
+        msg: {
+          action: 'subscribe',
+          channel: 'crypto_prices',
+          symbol: 'BTC-USD'
+        }
+      },
+      {
+        name: 'FORMAT_G (feedId singular)',
+        msg: {
+          action: 'subscribe',
+          feedId: 'crypto_prices_twap',
+          symbol: 'btc/usd'
+        }
+      },
+      {
+        name: 'FORMAT_H (bare topics array)',
+        msg: {
+          action: 'subscribe',
+          topics: ['crypto_prices_twap_thirty', 'crypto_prices_twap_sixty']
+        }
       }
     ];
     this.currentFormatIndex = 0;
@@ -187,6 +217,8 @@ class ChainlinkRTDS extends EventEmitter {
 
   _onMessage(data) {
     try {
+      const rawStr = data.toString();
+      this.logger.info(`[CHAINLINK-RTDS] RAW: ${rawStr.substring(0, 800)}`);
       const msg = JSON.parse(data);
       ++this.msgCount;
 
@@ -204,9 +236,6 @@ class ChainlinkRTDS extends EventEmitter {
     } catch (e) {
       this.logger.warn(`[CHAINLINK-RTDS] Parse error: ${e.message}`);
       this._tryNextFormat();
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.close();
-      }
     }
   }
 
