@@ -222,9 +222,9 @@ class ChainlinkRTDS extends EventEmitter {
       const msg = JSON.parse(data);
       ++this.msgCount;
 
-      if (msg.event_type === 'crypto_prices_twap_thirty' || msg.event_type === 'crypto_prices_twap_sixty') {
+      if (msg.type === 'update' && (msg.topic === 'crypto_prices_twap_thirty' || msg.topic === 'crypto_prices_twap_sixty')) {
         this._processTWAP(msg);
-      } else if (msg.action === 'subscribe_confirmation' || msg.status === 'subscribed' || msg.subscribed) {
+      } else if (msg.type === 'subscribed' || msg.action === 'subscribe_confirmation' || msg.status === 'subscribed' || msg.subscribed) {
         this.logger.info(`[CHAINLINK-RTDS] ✓ Subscription confirmed with ${this.subscriptionFormat.name}`);
         this.diag.subscription_confirmed = true;
       } else if (msg.message === 'Invalid request body') {
@@ -240,13 +240,12 @@ class ChainlinkRTDS extends EventEmitter {
   }
 
   _processTWAP(msg) {
-    const { event_type, asset_pair, twap_value, twap_timestamp, sequence } = msg;
-    const isThirty = event_type === 'crypto_prices_twap_thirty';
-    const key = `${event_type}`;
+    const { topic, payload, timestamp: receivedTs } = msg;
+    if (!payload || !payload.value || !payload.timestamp) return;
 
-    if (!twap_timestamp || !twap_value) return;
-
-    const ts = new Date(twap_timestamp).getTime();
+    const isThirty = topic === 'crypto_prices_twap_thirty';
+    const key = topic;
+    const ts = payload.timestamp; // already ms epoch
     const now = Date.now();
     const age = now - ts;
 
@@ -256,17 +255,12 @@ class ChainlinkRTDS extends EventEmitter {
     }
 
     if (age > 500) {
-      this.logger.warn(`[CHAINLINK-RTDS] High latency: ${age}ms for ${event_type}`);
+      this.logger.warn(`[CHAINLINK-RTDS] High latency: ${age}ms for ${topic}`);
     }
 
-    const price = parseFloat(twap_value);
+    const price = parseFloat(payload.value);
     if (price < 1000 || price > 10000000) {
       this.diag.out_of_range++;
-      return;
-    }
-
-    if (this.lastSeq[key] !== undefined && sequence <= this.lastSeq[key]) {
-      this.diag.duplicates++;
       return;
     }
 
@@ -275,7 +269,6 @@ class ChainlinkRTDS extends EventEmitter {
       if (gap > 5000) this.diag.gaps++;
     }
 
-    this.lastSeq[key] = sequence;
     this.lastTs[key] = ts;
 
     if (age > 500) this.diag.high_latency_events++;
@@ -293,7 +286,7 @@ class ChainlinkRTDS extends EventEmitter {
       this.diag.age_60s_ms = age;
     }
 
-    this.emit('update', { event_type, asset_pair, twap_value: price, twap_timestamp: ts, received_ts: now, age_ms: age });
+    this.emit('update', { event_type: topic, asset_pair: payload.symbol, twap_value: price, twap_timestamp: ts, received_ts: now, age_ms: age });
   }
 
   _onClose() {
