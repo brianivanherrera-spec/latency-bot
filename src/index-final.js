@@ -1926,8 +1926,7 @@ async function main() {
             const btcNow = btcPriceHistory[btcPriceHistory.length - 1].price;
             // Buscar precio de hace ~30s en el historial
             const nowMs = Date.now();
-            const ref30 = btcPriceHistory.find(e => nowMs - e.ts <= 35000 && nowMs - e.ts >= 25000)
-                       || btcPriceHistory[0];
+            const ref30 = btcPriceHistory.find(e => nowMs - e.ts <= 35000 && nowMs - e.ts >= 25000);
             if (ref30 && ref30.price > 0) {
               const btcChg30s = (btcNow - ref30.price) / ref30.price;
               const btcContra = (sig.direction === 'UP'   && btcChg30s < 0) ||

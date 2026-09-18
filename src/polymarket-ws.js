@@ -352,10 +352,12 @@ class PolymarketWS {
   getInstantImbalance() {
     const yesBook = this._bookByToken.get(this._yesTokenId);
     const noBook  = this._bookByToken.get(this._noTokenId);
-    if (!yesBook?.bestBid && !noBook?.bestBid) return null;
 
-    const yesBid = yesBook?.bestBid ?? 0.50;
-    const noBid  = noBook?.bestBid  ?? 0.50;
+    // Require both sides to have data — don't fallback to fake 0.50
+    if (!yesBook?.bestBid || !noBook?.bestBid) return null;
+
+    const yesBid = yesBook.bestBid;
+    const noBid  = noBook.bestBid;
 
     // Con mercado binario: YES + NO = 1 siempre
     // Si YES_bid = 0.70, implícitamente NO_bid ≈ 0.30
