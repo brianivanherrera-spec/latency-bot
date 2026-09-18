@@ -264,7 +264,7 @@ class ChainlinkRTDS extends EventEmitter {
       this.diag.age_60s_ms = age;
     }
 
-    this.emit('update', { event_type, asset_pair, twap_value: price, twap_timestamp: ts, age_ms: age });
+    this.emit('update', { event_type, asset_pair, twap_value: price, twap_timestamp: ts, received_ts: now, age_ms: age });
   }
 
   _onClose() {

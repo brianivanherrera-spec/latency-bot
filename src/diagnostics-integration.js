@@ -12,18 +12,18 @@ class DiagnosticsIntegration {
 
     rtdsInstance.emit = function(eventType, data) {
       if (eventType === 'update') {
-        const { event_type, age_ms, twap_timestamp } = data;
+        const { event_type, age_ms, twap_timestamp, asset_pair } = data;
         const sourceTs = twap_timestamp || Date.now() - age_ms;
 
         if (event_type === 'crypto_prices_twap_thirty') {
           diag.logEvent('RTDS_TWAP_30', {
-            market_id: data.market_id,
+            asset_pair: asset_pair || 'unknown',
             price: data.twap_value,
             age_ms,
           }, sourceTs);
         } else if (event_type === 'crypto_prices_twap_sixty') {
           diag.logEvent('RTDS_TWAP_60', {
-            market_id: data.market_id,
+            asset_pair: asset_pair || 'unknown',
             price: data.twap_value,
             age_ms,
           }, sourceTs);
@@ -41,7 +41,7 @@ class DiagnosticsIntegration {
 
     binanceInstance.onPrice = function(callback) {
       const wrappedCallback = (tick) => {
-        const sourceTs = tick.E || tick.timestamp || Date.now();
+        const sourceTs = tick.E ?? tick.timestamp ?? Date.now();
         diag.logEvent('BINANCE_TICK', {
           market_id: tick.symbol,
           price: tick.c,

@@ -629,7 +629,9 @@ function logMarketTwapFinal(twap30Final, twap60Final) {
       if (record.twap_30_final === null) record.twap_30_final = twap30Final ?? null;
       if (record.twap_60_final === null) record.twap_60_final = twap60Final ?? null;
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn(`[SIGNAL-LOGGER] Error updating TWAP final values: ${e.message}`);
+  }
 }
 
 // Analizar razón de NO_FILL basado en error, status y contexto
@@ -656,7 +658,7 @@ function analyzeNoFillReason(orderResult, orderStatus, context = {}) {
   }
 
   // 2. price_moved: precio de Polymarket se movió significativamente
-  if (signalPrice != null && currentPolyPrice != null) {
+  if (signalPrice != null && currentPolyPrice != null && signalPrice !== 0) {
     const priceDiff = Math.abs(currentPolyPrice - signalPrice) / signalPrice;
     if (priceDiff > priceMovedThreshold) {
       return {

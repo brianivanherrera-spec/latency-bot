@@ -435,9 +435,9 @@ class PolymarketWS {
           const events = Array.isArray(parsed) ? parsed : [parsed];
           for (const msg of events) {
             // Extraer timestamp de fuente si existe
-            const sourceTs = msg.timestamp || msg.ts || msg.event_time || null;
-            const timestampQuality = sourceTs ? 'source' : 'received_only';
-            const eventLatencyMs = sourceTs ? (receivedTs - sourceTs) : null;
+            const sourceTs = msg.timestamp ?? msg.ts ?? msg.event_time ?? null;
+            const timestampQuality = sourceTs !== null ? 'source' : 'received_only';
+            const eventLatencyMs = sourceTs !== null ? (receivedTs - sourceTs) : null;
 
             // Enriquecer payload con metadata de timestamp
             const enrichedMsg = {
