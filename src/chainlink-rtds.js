@@ -35,6 +35,7 @@ class ChainlinkRTDS extends EventEmitter {
     this.lastSeq = {};
     this.lastTs = {};
     this.msgCount = 0;
+    this.inFallbackMode = false; // Flag to prevent reconnect loop after fallback
     this.subscriptionFormats = [
       {
         name: 'FORMAT_A-ALT (topic + type + filters as OBJECT)',
@@ -128,7 +129,9 @@ class ChainlinkRTDS extends EventEmitter {
     if (this.currentFormatIndex >= this.subscriptionFormats.length) {
       this.logger.error('[CHAINLINK-RTDS] All subscription formats exhausted, giving up');
       this.logger.warn('[CHAINLINK-RTDS] ⚠️ FALLBACK: Entering BINANCE_ONLY_MODE - Chainlink RTDS unavailable');
+      this.inFallbackMode = true; // Flag to prevent reconnect attempts
       this.emit('fallback', { mode: 'BINANCE_ONLY', reason: 'All subscription formats rejected' });
+      this._stopPing();
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.close();
       }
@@ -257,8 +260,15 @@ class ChainlinkRTDS extends EventEmitter {
     this.connected = false;
     this.diag.connected = false;
     this._stopPing();
-    this.logger.warn('[CHAINLINK-RTDS] Disconnected, reconnecting...');
     this.diag.disconnections++;
+
+    // Don't reconnect if we're in fallback mode (all subscription formats exhausted)
+    if (this.inFallbackMode) {
+      this.logger.warn('[CHAINLINK-RTDS] In BINANCE_ONLY_MODE - not reconnecting to Chainlink');
+      return;
+    }
+
+    this.logger.warn('[CHAINLINK-RTDS] Disconnected, reconnecting...');
     this._scheduleReconnect();
   }
 
@@ -292,6 +302,8 @@ class ChainlinkRTDS extends EventEmitter {
     }
     this.connected = false;
     this.diag.connected = false;
+    this.inFallbackMode = false; // Reset fallback flag on explicit disconnect
+    this.currentFormatIndex = 0; // Reset format index for potential future reconnect
   }
 }
 
