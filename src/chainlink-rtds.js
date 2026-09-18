@@ -41,43 +41,10 @@ class ChainlinkRTDS extends EventEmitter {
     this.fallbackRetryTimeout = null; // Handle to clear retry timeout
     this.subscriptionFormats = [
       {
-        name: 'FORMAT_A-ALT (topic + type + filters as OBJECT)',
+        name: 'FORMAT_E (assets_ids Polymarket CLOB)',
         msg: {
-          action: 'subscribe',
-          subscriptions: [
-            { topic: 'crypto_prices_twap_thirty', type: '*', filters: {symbol: 'btc/usd'} },
-            { topic: 'crypto_prices_twap_sixty', type: '*', filters: {symbol: 'btc/usd'} }
-          ]
-        }
-      },
-      {
-        name: 'FORMAT_A (official: topic + type + filters as JSON string)',
-        msg: {
-          action: 'subscribe',
-          subscriptions: [
-            { topic: 'crypto_prices_twap_thirty', type: '*', filters: '{"symbol":"btc/usd"}' },
-            { topic: 'crypto_prices_twap_sixty', type: '*', filters: '{"symbol":"btc/usd"}' }
-          ]
-        }
-      },
-      {
-        name: 'FORMAT_B (topic + symbol only)',
-        msg: {
-          action: 'subscribe',
-          subscriptions: [
-            { topic: 'crypto_prices_twap_thirty', symbol: 'btc/usd' },
-            { topic: 'crypto_prices_twap_sixty', symbol: 'btc/usd' }
-          ]
-        }
-      },
-      {
-        name: 'FORMAT_B-UPPER (topic + symbol uppercase)',
-        msg: {
-          action: 'subscribe',
-          subscriptions: [
-            { topic: 'crypto_prices_twap_thirty', symbol: 'BTC/USD' },
-            { topic: 'crypto_prices_twap_sixty', symbol: 'BTC/USD' }
-          ]
+          assets_ids: ['crypto_prices_twap_thirty', 'crypto_prices_twap_sixty'],
+          type: 'Market'
         }
       },
       {
@@ -88,46 +55,6 @@ class ChainlinkRTDS extends EventEmitter {
             { topic: 'crypto_prices_twap_thirty' },
             { topic: 'crypto_prices_twap_sixty' }
           ]
-        }
-      },
-      {
-        name: 'FORMAT_D (asset_pair)',
-        msg: {
-          action: 'subscribe',
-          subscriptions: [
-            { topic: 'crypto_prices_twap_thirty', asset_pair: 'btc/usd' },
-            { topic: 'crypto_prices_twap_sixty', asset_pair: 'btc/usd' }
-          ]
-        }
-      },
-      {
-        name: 'FORMAT_E (assets_ids Polymarket CLOB)',
-        msg: {
-          assets_ids: ['crypto_prices_twap_thirty', 'crypto_prices_twap_sixty'],
-          type: 'Market'
-        }
-      },
-      {
-        name: 'FORMAT_F (channel-based)',
-        msg: {
-          action: 'subscribe',
-          channel: 'crypto_prices',
-          symbol: 'BTC-USD'
-        }
-      },
-      {
-        name: 'FORMAT_G (feedId singular)',
-        msg: {
-          action: 'subscribe',
-          feedId: 'crypto_prices_twap',
-          symbol: 'btc/usd'
-        }
-      },
-      {
-        name: 'FORMAT_H (bare topics array)',
-        msg: {
-          action: 'subscribe',
-          topics: ['crypto_prices_twap_thirty', 'crypto_prices_twap_sixty']
         }
       }
     ];
@@ -217,8 +144,6 @@ class ChainlinkRTDS extends EventEmitter {
 
   _onMessage(data) {
     try {
-      const rawStr = data.toString();
-      this.logger.info(`[CHAINLINK-RTDS] RAW: ${rawStr.substring(0, 800)}`);
       const msg = JSON.parse(data);
       ++this.msgCount;
 
@@ -254,7 +179,7 @@ class ChainlinkRTDS extends EventEmitter {
       return;
     }
 
-    if (age > 500) {
+    if (age > 3000) {
       this.logger.warn(`[CHAINLINK-RTDS] High latency: ${age}ms for ${topic}`);
     }
 
@@ -271,7 +196,7 @@ class ChainlinkRTDS extends EventEmitter {
 
     this.lastTs[key] = ts;
 
-    if (age > 500) this.diag.high_latency_events++;
+    if (age > 3000) this.diag.high_latency_events++;
     this.diag.avg_latency_ms = Math.round((this.diag.avg_latency_ms + age) / 2);
 
     if (isThirty) {
