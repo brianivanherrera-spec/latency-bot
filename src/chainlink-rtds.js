@@ -36,6 +36,9 @@ class ChainlinkRTDS extends EventEmitter {
     this.lastTs = {};
     this.msgCount = 0;
     this.inFallbackMode = false; // Flag to prevent reconnect loop after fallback
+    this.fallbackStartTime = null; // Track when fallback mode started
+    this.fallbackRetryInterval = 5 * 60 * 1000; // Retry every 5 minutes
+    this.fallbackRetryTimeout = null; // Handle to clear retry timeout
     this.subscriptionFormats = [
       {
         name: 'FORMAT_A-ALT (topic + type + filters as OBJECT)',
@@ -130,11 +133,19 @@ class ChainlinkRTDS extends EventEmitter {
       this.logger.error('[CHAINLINK-RTDS] All subscription formats exhausted, giving up');
       this.logger.warn('[CHAINLINK-RTDS] ⚠️ FALLBACK: Entering BINANCE_ONLY_MODE - Chainlink RTDS unavailable');
       this.inFallbackMode = true; // Flag to prevent reconnect attempts
+      this.fallbackStartTime = Date.now(); // Track when fallback started
       this.emit('fallback', { mode: 'BINANCE_ONLY', reason: 'All subscription formats rejected' });
       this._stopPing();
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.close();
       }
+      // Schedule retry after fallback interval
+      this.fallbackRetryTimeout = setTimeout(() => {
+        this.logger.info('[CHAINLINK-RTDS] Attempting recovery from fallback mode...');
+        this.inFallbackMode = false;
+        this.currentFormatIndex = 0;
+        this.connect();
+      }, this.fallbackRetryInterval);
       return;
     }
 
@@ -299,6 +310,10 @@ class ChainlinkRTDS extends EventEmitter {
     if (this.ws) {
       this.ws.close();
       this.ws = null;
+    }
+    if (this.fallbackRetryTimeout) {
+      clearTimeout(this.fallbackRetryTimeout);
+      this.fallbackRetryTimeout = null;
     }
     this.connected = false;
     this.diag.connected = false;
