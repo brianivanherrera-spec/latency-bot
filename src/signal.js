@@ -155,9 +155,18 @@ class SignalEngine {
     const absZ = Math.abs(zScore);
     const absMoveP = Math.abs(movePct);
 
-    if (absZ < config.ZSCORE_THRESHOLD) return null;
-    if (absMoveP < config.MOVE_PCT_THRESHOLD) return null;
-    if (velocity < config.MIN_VELOCITY) return null;
+    if (absZ < config.ZSCORE_THRESHOLD) {
+      logger.info(`[SIGNAL_FILTER] reason=ZSCORE_TOO_LOW zscore=${zScore.toFixed(2)} threshold=${config.ZSCORE_THRESHOLD} movePct=${movePct.toFixed(3)} velocity=${velocity.toFixed(6)} ts=${currentTimestamp}`);
+      return null;
+    }
+    if (absMoveP < config.MOVE_PCT_THRESHOLD) {
+      logger.info(`[SIGNAL_FILTER] reason=MOVE_PCT_TOO_LOW movePct=${movePct.toFixed(3)} threshold=${config.MOVE_PCT_THRESHOLD} zscore=${zScore.toFixed(2)} velocity=${velocity.toFixed(6)} ts=${currentTimestamp}`);
+      return null;
+    }
+    if (velocity < config.MIN_VELOCITY) {
+      logger.info(`[SIGNAL_FILTER] reason=VELOCITY_TOO_LOW velocity=${velocity.toFixed(6)} threshold=${config.MIN_VELOCITY} movePct=${movePct.toFixed(3)} zscore=${zScore.toFixed(2)} ts=${currentTimestamp}`);
+      return null;
+    }
 
     let direction;
     if (zScore > 0 && movePct > 0 && buyRatio > 0.55) {
@@ -174,14 +183,23 @@ class SignalEngine {
     // MACRO_TREND_THRESHOLD=0.04 → % de movimiento para considerar tendencia
     if (direction !== 'NEUTRAL' && process.env.MACRO_TREND_ENABLED !== 'false') {
       const macro = this._macroTrend(currentPrice);
-      if (macro === 'UP' && direction === 'DOWN') return null;
-      if (macro === 'DOWN' && direction === 'UP') return null;
+      if (macro === 'UP' && direction === 'DOWN') {
+        logger.info(`[SIGNAL_FILTER] reason=MACRO_TREND_CONFLICT macroTrend=UP signalDirection=DOWN zscore=${zScore.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${currentTimestamp}`);
+        return null;
+      }
+      if (macro === 'DOWN' && direction === 'UP') {
+        logger.info(`[SIGNAL_FILTER] reason=MACRO_TREND_CONFLICT macroTrend=DOWN signalDirection=UP zscore=${zScore.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${currentTimestamp}`);
+        return null;
+      }
     }
 
     // ─── Filtro orderbook imbalance ───────────────────────────────────
     // Datos reales: imbalance >0.3 (buyers dominan fuerte) = 42% WR — bloquear
     const imbalance = this._avgImbalance(20);
-    if (Math.abs(imbalance) > config.IMBALANCE_MAX) return null;
+    if (Math.abs(imbalance) > config.IMBALANCE_MAX) {
+      logger.info(`[SIGNAL_FILTER] reason=IMBALANCE_TOO_HIGH imbalance=${imbalance.toFixed(3)} threshold=${config.IMBALANCE_MAX} direction=${direction} zscore=${zScore.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${currentTimestamp}`);
+      return null;
+    }
 
     const spreadRatio = this._spreadSignal(20);
     const tickFreq = this._tickFrequency();
@@ -199,7 +217,10 @@ class SignalEngine {
     if (rsiFilterEnabled) {
       const rsiMin = parseFloat(process.env.RSI_FILTER_MIN || '30');
       const rsiMax = parseFloat(process.env.RSI_FILTER_MAX || '80');
-      if (rsi >= rsiMin && rsi <= rsiMax) return null;
+      if (rsi >= rsiMin && rsi <= rsiMax) {
+        logger.info(`[SIGNAL_FILTER] reason=RSI_OUT_OF_RANGE rsi=${rsi.toFixed(1)} range=[${rsiMin},${rsiMax}] direction=${direction} zscore=${zScore.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${currentTimestamp}`);
+        return null;
+      }
     }
 
     if (direction === 'NEUTRAL') {
@@ -216,7 +237,10 @@ class SignalEngine {
     const MIN_SCORE = config.MIN_SIGNAL_SCORE || 60;
     const MAX_SCORE = config.MAX_SIGNAL_SCORE || 89;
     // Score 90-99: 53% WR — señales en momentos extremos donde el mercado ya se movió
-    if (signalScore < MIN_SCORE || signalScore > MAX_SCORE) return null;
+    if (signalScore < MIN_SCORE || signalScore > MAX_SCORE) {
+      logger.info(`[SIGNAL_FILTER] reason=SIGNAL_SCORE_OUT_OF_RANGE score=${signalScore} range=[${MIN_SCORE},${MAX_SCORE}] direction=${direction} zscore=${zScore.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${currentTimestamp}`);
+      return null;
+    }
 
     const edge = this._calcEdge(direction, movePct, absZ);
 
@@ -246,6 +270,7 @@ class SignalEngine {
 
 _calcEdge(direction, movePct, absZ) {
     if (this.polyYesPrice === null) {
+      logger.info(`[SIGNAL_FILTER] reason=NO_POLY_PRICE direction=${direction} zscore=${absZ.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${Date.now()}`);
       return { hasEdge: false, edgePct: null, reason: 'NO_POLY_PRICE',
                side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO' };
     }
@@ -253,6 +278,7 @@ _calcEdge(direction, movePct, absZ) {
     const polyAge = Date.now() - this.polyUpdatedAt;
     const MAX_AGE = config.MAX_PRICE_AGE_MS || 3000;
     if (polyAge > MAX_AGE) {
+      logger.info(`[SIGNAL_FILTER] reason=POLY_PRICE_STALE polyAge=${polyAge} maxAge=${MAX_AGE} direction=${direction} zscore=${absZ.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${Date.now()}`);
       return { hasEdge: false, edgePct: null, polyYes: this.polyYesPrice,
                reason: 'POLY_PRICE_STALE', age: polyAge, maxAge: MAX_AGE,
                side: direction === 'UP' ? 'BUY_YES' : 'BUY_NO' };
@@ -278,6 +304,9 @@ _calcEdge(direction, movePct, absZ) {
     if (direction === 'UP') {
       const edgePct = (fairYes - this.polyYesPrice) * 100;
       const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2);
+      if (!hasEdge) {
+        logger.info(`[SIGNAL_FILTER] reason=EDGE_TOO_SMALL edgePct=${edgePct.toFixed(2)} minRequired=${config.MIN_EDGE_PCT || 2} direction=${direction} zscore=${absZ.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${Date.now()}`);
+      }
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),
@@ -289,6 +318,9 @@ _calcEdge(direction, movePct, absZ) {
     } else {
       const edgePct = (fairNo - this.polyNoPrice) * 100;
       const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2);
+      if (!hasEdge) {
+        logger.info(`[SIGNAL_FILTER] reason=EDGE_TOO_SMALL edgePct=${edgePct.toFixed(2)} minRequired=${config.MIN_EDGE_PCT || 2} direction=${direction} zscore=${absZ.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${Date.now()}`);
+      }
       return {
         hasEdge,
         fairYes: parseFloat(fairYes.toFixed(3)),

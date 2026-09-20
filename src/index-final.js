@@ -1461,7 +1461,8 @@ async function main() {
     if (config.TRADING_HOURS_ENABLED) {
       const utcHour = new Date().getUTCHours();
       if (config.TRADING_HOURS_BLOCKED_UTC.includes(utcHour)) {
-        return; // hora bloqueada — win rate histórico < 45%
+        logger.info(`[SIGNAL_FILTER] reason=TRADING_HOURS_BLOCKED hour=${utcHour} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+        return;
       }
     }
 
@@ -1473,7 +1474,7 @@ async function main() {
     if (maxPolyMove > 0) {
       const polyMid = sig.direction === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
       if (polyMid !== undefined && Math.abs(polyMid - 0.5) > maxPolyMove) {
-        logger.warn(`[SKIP] 📊 POLY-MOVIDO: mid $${polyMid?.toFixed(3)} ya absorbió el lag (umbral: ${maxPolyMove})`);
+        logger.info(`[SIGNAL_FILTER] reason=POLY_ALREADY_MOVED polyMid=${polyMid?.toFixed(3)} threshold=${maxPolyMove} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
         return;
       }
     }
@@ -1491,7 +1492,7 @@ async function main() {
       // tokenMid > 0.95 = token casi en $1, ídem
       // El umbral bajo es SIMÉTRICO: (1 - extremeThreshold)
       if (tokenMid < (1 - extremeThreshold) || tokenMid > extremeThreshold) {
-        logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real (umbral: ${(1-extremeThreshold).toFixed(2)}-${extremeThreshold})`);
+        logger.info(`[SIGNAL_FILTER] reason=POLY_EXTREME_PRICE tokenMid=${tokenMid.toFixed(3)} polyYes=${polyYesNow.toFixed(3)} threshold=${extremeThreshold} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
         return;
       }
     }
@@ -1639,16 +1640,22 @@ async function main() {
     } // fin !bookEntryOverride
 
     if (!bookEntryOverride) {
-      if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
+      if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') {
+        logger.info(`[SIGNAL_FILTER] reason=EDGE_NOT_FOUND edge_reason=${sig.edge?.reason || 'MISSING'} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+        return;
+      }
       const maxEdgePct = parseFloat(process.env.MAX_EDGE_PCT || '15');
-      if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > maxEdgePct) return;
+      if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > maxEdgePct) {
+        logger.info(`[SIGNAL_FILTER] reason=EDGE_OUT_OF_RANGE edgePct=${sig.edge.edgePct} min=${config.MIN_EDGE_PCT} max=${maxEdgePct} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+        return;
+      }
     }
 
     const maxSlots = parseInt(process.env.MAX_ACTIVE_POSITIONS || '1');
     if (activePositions.size >= maxSlots) {
-      logger.warn(`[SKIP] Slot ocupado (${activePositions.size}/${maxSlots}) — esperando que se libere una posición`);
+      logger.info(`[SIGNAL_FILTER] reason=POSITION_LIMIT_REACHED activePositions=${activePositions.size} maxSlots=${maxSlots} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
       return;
-    } // límite de posiciones simultáneas
+    }
 
     // DUAL_ENTRY_MODE: feature avanzado — permite 2 entradas en el mismo mercado
     // (una temprana + una tardía confirmada). Deshabilitado por defecto.
@@ -1668,7 +1675,7 @@ async function main() {
       : Array.from(activePositions.values());
 
     if (!marketKey && activePositions.size > 0) {
-      logger.warn(`[SKIP] Sin ID de mercado confiable y ya hay ${activePositions.size} posición(es) activa(s) — bloqueando por seguridad`);
+      logger.info(`[SIGNAL_FILTER] reason=NO_MARKET_KEY_WITH_ACTIVE_POSITIONS activePositions=${activePositions.size} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
       return;
     }
 
@@ -1676,7 +1683,7 @@ async function main() {
       if (dualEntryMode) {
         const maxPerMarket = parseInt(process.env.MAX_ENTRIES_PER_MARKET || '2');
         if (entriesInThisMarket.length >= maxPerMarket) {
-          logger.warn(`[SKIP] Ya hay ${entriesInThisMarket.length} posiciones en este mercado (máx ${maxPerMarket})`);
+          logger.info(`[SIGNAL_FILTER] reason=MARKET_ENTRY_LIMIT_REACHED marketEntries=${entriesInThisMarket.length} maxPerMarket=${maxPerMarket} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${marketKey} ts=${Date.now()}`);
           return;
         }
         if (entriesInThisMarket.length >= 1 && entriesInThisMarket[0].entryType !== 'late') {
@@ -1687,7 +1694,7 @@ async function main() {
         }
       } else {
         if (entriesInThisMarket.length >= 1) {
-          logger.warn(`[SKIP] Ya hay posición abierta en este mercado — evitando doble entry`);
+          logger.info(`[SIGNAL_FILTER] reason=MARKET_DUPLICATE_ENTRY marketEntries=${entriesInThisMarket.length} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${marketKey} ts=${Date.now()}`);
           return;
         }
       }
@@ -1757,12 +1764,12 @@ async function main() {
     // cuando el size dinámico es pequeño (ej: $3 × 3 = $9 bloquea la 3ra entrada)
     const maxExposure = parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '100');
     if (totalExposure + finalExposure > maxExposure) {
-      logger.warn(`[SKIP] 💰 Exposición total $${(totalExposure + finalExposure).toFixed(2)} supera máximo $${maxExposure} — esperando que cierren posiciones`);
+      logger.info(`[SIGNAL_FILTER] reason=MAX_EXPOSURE_EXCEEDED totalExposure=${totalExposure} finalExposure=${finalExposure} maxExposure=${maxExposure} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
       return;
     }
 
     if (!cachedMarket?.gammaId) {
-      logger.warn('[SKIP] No hay mercado disponible');
+      logger.info(`[SIGNAL_FILTER] reason=NO_MARKET_FOUND edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} ts=${Date.now()}`);
       return;
     }
 
@@ -1771,14 +1778,14 @@ async function main() {
     const segsRestantes = Math.floor(msRestantes / 1000);
 
     if (msRestantes <= 0) {
-      logger.warn(`[SKIP] ⏱️ Mercado YA CERRADO hace ${Math.abs(segsRestantes)}s`);
+      logger.info(`[SIGNAL_FILTER] reason=MARKET_CLOSED secondsAgo=${Math.abs(segsRestantes)} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
       cachedMarket = null;
       return;
     }
 
     const MIN_SECS = parseInt(process.env.MIN_SECONDS_REMAINING || '60');
     if (segsRestantes < MIN_SECS) {
-      logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde (mín ${MIN_SECS}s)`);
+      logger.info(`[SIGNAL_FILTER] reason=MARKET_CLOSING_SOON secondsRemaining=${segsRestantes} minRequired=${MIN_SECS} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
       return;
     }
 
@@ -1799,7 +1806,7 @@ async function main() {
     if (applyLateEntryFilter) {
       const maxSecs = parseInt(process.env.MAX_SECONDS_REMAINING || '150');
       if (segsRestantes > maxSecs) {
-        logger.info(`[SKIP] 🕐 LATE_ENTRY: ${segsRestantes}s restantes — muy pronto (máx ${maxSecs}s), esperando confirmación`);
+        logger.info(`[SIGNAL_FILTER] reason=LATE_ENTRY_TOO_EARLY secondsRemaining=${segsRestantes} maxAllowed=${maxSecs} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
         global.__pendingEntryType = null;
         return;
       }
@@ -1807,14 +1814,14 @@ async function main() {
       const tokenPrice = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
       const minConviction = parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30');
       if (tokenPrice > minConviction) {
-        logger.info(`[SKIP] 🕐 LATE_ENTRY: precio $${tokenPrice.toFixed(3)} > $${minConviction} — sin convicción suficiente todavía`);
+        logger.info(`[SIGNAL_FILTER] reason=LATE_ENTRY_LOW_CONVICTION tokenPrice=${tokenPrice.toFixed(3)} maxAllowed=${minConviction} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
         global.__pendingEntryType = null;
         return;
       }
       logger.info(`[LATE_ENTRY] ✅ Confirmado: ${segsRestantes}s restantes, precio $${tokenPrice.toFixed(3)} — alta convicción`);
       entryType = 'late';
     }
-    global.__pendingEntryType = null; // reset — se usa una sola vez por evaluación
+    global.__pendingEntryType = null;
 
     // Fix (causa raíz de las "entradas duplicadas"): con DUAL_ENTRY_MODE=true
     // y LATE_ENTRY_MODE=false, la segunda entrada del mismo mercado quedaba
@@ -1824,7 +1831,7 @@ async function main() {
     // simultáneas en el mismo mercado. La regla real es: la segunda entrada
     // SOLO es válida si fue confirmada como 'late'; si no, se bloquea.
     if (isSecondEntry && entryType !== 'late') {
-      logger.warn(`[SKIP] Segunda entrada en el mismo mercado sin confirmación LATE_ENTRY — bloqueando (DUAL_ENTRY requiere LATE_ENTRY_MODE para la 2da entrada)`);
+      logger.info(`[SIGNAL_FILTER] reason=DUAL_ENTRY_NO_CONFIRMATION entryType=${entryType} requiresLateConfirmation=true edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${marketKey} ts=${Date.now()}`);
       return;
     }
 
@@ -1898,7 +1905,7 @@ async function main() {
         const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
                            (sig.direction === 'UP'   && bookImb < -bookMinImb);
         if (contradice) {
-          logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} contradice ${sig.direction} (umbral: ±${bookMinImb}) — mercado ya absorbió el movimiento`);
+          logger.info(`[SIGNAL_FILTER] reason=BOOK_FILTER_CONTRADICTS bookImb=${bookImb.toFixed(3)} direction=${sig.direction} threshold=${bookMinImb} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
           logMarketSignal(sig, `BOOK contradice (imb=${bookImb.toFixed(3)})`, bookImb);
           activePositions.delete(posId);
           return;
@@ -1908,7 +1915,7 @@ async function main() {
         const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
                          (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
         if (!confirma) {
-          logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} no confirma ${sig.direction} (necesito ${sig.direction === 'UP' ? '>=' : '<='} ${sig.direction === 'UP' ? '' : '-'}${bookMinImb}) — book neutro`);
+          logger.info(`[SIGNAL_FILTER] reason=BOOK_FILTER_NO_CONFIRMATION bookImb=${bookImb.toFixed(3)} direction=${sig.direction} required=${sig.direction === 'UP' ? '>=' : '<='} threshold=${bookMinImb} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
           logMarketSignal(sig, `BOOK neutro (imb=${bookImb.toFixed(3)})`, bookImb);
           activePositions.delete(posId);
           return;
@@ -1934,7 +1941,7 @@ async function main() {
               const btcContra = (sig.direction === 'UP'   && btcChg30s < 0) ||
                                 (sig.direction === 'DOWN' && btcChg30s > 0);
               if (btcContra) {
-                logger.warn(`[SKIP] 📖 BTC-CONFIRM: book débil (${bookImb.toFixed(3)}) + BTC contra (${(btcChg30s*100).toFixed(3)}%) — 50% WR histórico, bloqueando`);
+                logger.info(`[SIGNAL_FILTER] reason=BTC_CONFIRM_WEAK_BOOK bookImb=${bookImb.toFixed(3)} btcChange30s=${(btcChg30s*100).toFixed(3)}% direction=${sig.direction} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
                 activePositions.delete(posId);
                 return;
               }
@@ -1943,12 +1950,12 @@ async function main() {
           }
         }
       } else {
-        // bookSnap es null - esto es lo que está causando el bloqueo
+        // bookSnap es null
         logger.error(`[BOOK-FILTER-DEBUG] ❌ NO BOOK DATA AVAILABLE`);
 
         // Si BOOK_FILTER_ENABLED, no entramos sin datos
         if (bookFilterEnabled) {
-          logger.warn(`[SKIP] 📖 BOOK-FILTER: No book data available AND BOOK_FILTER_ENABLED=true`);
+          logger.info(`[SIGNAL_FILTER] reason=BOOK_DATA_MISSING bookFilterEnabled=true edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
           activePositions.delete(posId);
           return;
         }
