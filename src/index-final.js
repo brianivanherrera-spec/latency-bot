@@ -1520,8 +1520,8 @@ async function main() {
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
 
-    // ─── Filtro 1: Rechazar signalScore < 40 ────────────────────────────────
-    const signalScoreThreshold = parseFloat(process.env.SIGNAL_SCORE_MIN || '40');
+    // ─── Filtro 1: Rechazar signalScore < MIN_SIGNAL_SCORE ────────────────────────────────
+    const signalScoreThreshold = config.MIN_SIGNAL_SCORE || 60;
     if (sig.signalScore && sig.signalScore < signalScoreThreshold) {
       logger.warn(`[SKIP] Signal score too low: ${sig.signalScore.toFixed(0)} < ${signalScoreThreshold} threshold`);
       phase2Logger.logBotEvent('SIGNAL_REJECTED', {
@@ -1899,30 +1899,39 @@ async function main() {
 
       if (bookImb != null) {
         logger.info(`[BOOK-FILTER-DEBUG] bookImb=${bookImb.toFixed(3)}`);
-        // bookImb está calculado
 
-        // 1) Bloquear si el book contradice activamente la dirección
-        const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
-                           (sig.direction === 'UP'   && bookImb < -bookMinImb);
-        if (contradice) {
-          logger.info(`[SIGNAL_FILTER] reason=BOOK_FILTER_CONTRADICTS bookImb=${bookImb.toFixed(3)} direction=${sig.direction} threshold=${bookMinImb} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
-          logMarketSignal(sig, `BOOK contradice (imb=${bookImb.toFixed(3)})`, bookImb);
-          activePositions.delete(posId);
-          return;
+        // SKIP filter if book is essentially empty (no meaningful data)
+        // Empty book (imb ≈ 0) means NO INFORMATION, not "book disagrees"
+        const isEmptyBook = Math.abs(bookImb) < 0.05;
+        if (isEmptyBook) {
+          logger.info(`[BOOK-FILTER] ⚠️ Book empty (imb=${bookImb.toFixed(3)} < 0.05), skipping confirmation check`);
+          logMarketSignal(sig, null, bookImb); // señal sin confirmación del book pero tampoco bloqueada
+        } else {
+          // bookImb está calculado y tiene datos reales
+
+          // 1) Bloquear si el book contradice activamente la dirección
+          const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
+                             (sig.direction === 'UP'   && bookImb < -bookMinImb);
+          if (contradice) {
+            logger.info(`[SIGNAL_FILTER] reason=BOOK_FILTER_CONTRADICTS bookImb=${bookImb.toFixed(3)} direction=${sig.direction} threshold=${bookMinImb} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+            logMarketSignal(sig, `BOOK contradice (imb=${bookImb.toFixed(3)})`, bookImb);
+            activePositions.delete(posId);
+            return;
+          }
+
+          // 2) Bloquear si el book es neutro — no confirma la dirección
+          const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
+                           (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
+          if (!confirma) {
+            logger.info(`[SIGNAL_FILTER] reason=BOOK_FILTER_NO_CONFIRMATION bookImb=${bookImb.toFixed(3)} direction=${sig.direction} required=${sig.direction === 'UP' ? '>=' : '<='} threshold=${bookMinImb} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+            logMarketSignal(sig, `BOOK neutro (imb=${bookImb.toFixed(3)})`, bookImb);
+            activePositions.delete(posId);
+            return;
+          }
+
+          logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
+          logMarketSignal(sig, null, bookImb); // señal que pasó el filtro
         }
-
-        // 2) Bloquear si el book es neutro — no confirma la dirección
-        const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
-                         (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
-        if (!confirma) {
-          logger.info(`[SIGNAL_FILTER] reason=BOOK_FILTER_NO_CONFIRMATION bookImb=${bookImb.toFixed(3)} direction=${sig.direction} required=${sig.direction === 'UP' ? '>=' : '<='} threshold=${bookMinImb} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
-          logMarketSignal(sig, `BOOK neutro (imb=${bookImb.toFixed(3)})`, bookImb);
-          activePositions.delete(posId);
-          return;
-        }
-
-        logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
-        logMarketSignal(sig, null, bookImb); // señal que pasó el filtro
 
         // 3) BTC_CONFIRM_WEAK_BOOK — cuando el book es débil, exigir que BTC confirme
         // Datos: book débil (<0.50) + BTC contra = 9W/9L = 50% WR, -$16 PnL (18 trades)
