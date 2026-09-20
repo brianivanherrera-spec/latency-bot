@@ -958,14 +958,11 @@ class PolymarketClient {
   //                                    precio, es una señal efectivamente
   //                                    vencida.
   // ─── Partir la orden en pedazos más chicos ───────────────────────────────
-  // En vez de una sola orden grande, manda ORDER_SPLIT_PIECES pedazos en
-  // paralelo (cada uno con su propio retry-loop de mejora de precio). La
-  // idea: el libro a veces tiene profundidad para absorber pedidos chicos
-  // aunque no alcance para uno grande de una sola vez.
-  //   ORDER_SPLIT=true              → activa esto (además de FILL_RETRY=true)
-  //   ORDER_SPLIT_PIECES=2          → en cuántos pedazos partir
-  // Respeta el mínimo de Polymarket (5 tokens por orden): si el tamaño total
-  // no alcanza para partir sin violarlo, cae a una sola orden entera.
+  // Feature avanzado: parte ORDER_SPLIT_PIECES pedazos en paralelo, cada uno con
+  // retry independiente. Útil cuando el libro tiene profundidad limitada.
+  // SE ACTIVA cuando: ORDER_SPLIT=true + balance suficiente para múltiples órdenes
+  // Actual: ORDER_SPLIT=false (default) + capital=$0.03 < $5+ mínimo → no activo
+  // Respeta mínimo Polymarket (5 tokens/orden): si total < 5*pieces, manda entera.
   async _placeSplitOrders({ rec, tokenId, side, price, size, marketEndTs }) {
     const MIN_ORDER_SIZE = 5; // mínimo de Polymarket
     const pieces = Math.max(2, parseInt(process.env.ORDER_SPLIT_PIECES || '2'));

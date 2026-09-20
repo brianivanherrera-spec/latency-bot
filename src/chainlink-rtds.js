@@ -37,8 +37,9 @@ class ChainlinkRTDS extends EventEmitter {
     this.msgCount = 0;
     this.inFallbackMode = false; // Flag to prevent reconnect loop after fallback
     this.fallbackStartTime = null; // Track when fallback mode started
-    this.fallbackRetryInterval = 5 * 60 * 1000; // Retry every 5 minutes
+    this.fallbackRetryInterval = 2 * 60 * 1000; // Retry every 2 minutes (more aggressive)
     this.fallbackRetryTimeout = null; // Handle to clear retry timeout
+    this.formatRejectCount = {}; // Track rejections per format
     this.subscriptionFormats = [
       {
         name: 'FORMAT_E (assets_ids Polymarket CLOB)',
@@ -55,6 +56,12 @@ class ChainlinkRTDS extends EventEmitter {
             { topic: 'crypto_prices_twap_thirty' },
             { topic: 'crypto_prices_twap_sixty' }
           ]
+        }
+      },
+      {
+        name: 'FORMAT_A (bare topic list)',
+        msg: {
+          subscriptions: ['crypto_prices_twap_thirty', 'crypto_prices_twap_sixty']
         }
       }
     ];
@@ -157,15 +164,17 @@ class ChainlinkRTDS extends EventEmitter {
         this._tryNextFormat();
       } else if (msg.error) {
         this.logger.error(`[CHAINLINK-RTDS] Error: ${msg.error}`);
-      } else if (this.msgCount > 2 && !this.diag.subscription_confirmed) {
-        // After receiving several messages without subscription confirmation, try next format
+        this._tryNextFormat();
+      } else if (this.msgCount > 10 && !this.diag.subscription_confirmed) {
+        // Only switch after 10+ messages without confirmation (more patience)
         this.logger.warn(`[CHAINLINK-RTDS] ⚠ No subscription confirmation after ${this.msgCount} messages for ${this.subscriptionFormat.name}`);
         this.logger.debug(`[CHAINLINK-RTDS] Unrecognized message: ${JSON.stringify(msg).slice(0, 200)}`);
         this._tryNextFormat();
+      } else if (this.msgCount <= 10) {
+        this.logger.debug(`[CHAINLINK-RTDS] Msg ${this.msgCount}: ${JSON.stringify(msg).slice(0, 100)}...`);
       }
     } catch (e) {
       this.logger.warn(`[CHAINLINK-RTDS] Parse error: ${e.message}`);
-      this._tryNextFormat();
     }
   }
 

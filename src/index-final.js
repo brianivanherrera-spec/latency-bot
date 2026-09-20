@@ -1650,9 +1650,11 @@ async function main() {
       return;
     } // límite de posiciones simultáneas
 
-    // DUAL_ENTRY_MODE: permite 2 entradas en el mismo mercado —
-    // una temprana (lógica normal) y una tardía (LATE_ENTRY confirmado).
-    // Sin DUAL_ENTRY_MODE, se mantiene el bloqueo clásico de 1 entrada por mercado.
+    // DUAL_ENTRY_MODE: feature avanzado — permite 2 entradas en el mismo mercado
+    // (una temprana + una tardía confirmada). Deshabilitado por defecto.
+    // SE ACTIVA cuando: DUAL_ENTRY_MODE=true + balance suficiente para 2 posiciones
+    // (MAX_ACTIVE_POSITIONS >= 2 + capital >= 2*ORDER_SIZE_USDC)
+    // Actual: capital=$0.03 < $6 mínimo → esta lógica está en standby.
     const dualEntryMode = process.env.DUAL_ENTRY_MODE === 'true';
     // Fix: antes este bloque completo se salteaba si cachedMarket.conditionId
     // era falsy (ej. durante la transición de un mercado a otro), dejando
