@@ -142,12 +142,12 @@ class SignalEngine {
 
     const zScore = (currentPrice - mean) / stdDev;
 
-    const shortWindow = Math.min(30, Math.floor(n / 3));
+    const shortWindow = Math.min(75, Math.floor(n / 2));
     const priceShortAgo = this.prices[n - shortWindow];
     const movePct = ((currentPrice - priceShortAgo) / priceShortAgo) * 100;
 
-    const timeElapsedSec = (currentTimestamp - this.timestamps[n - shortWindow]) / 1000;
-    const velocity = timeElapsedSec > 0 ? Math.abs(movePct) / timeElapsedSec : 0;
+    const windowTimeSec = (currentTimestamp - this.timestamps[n - shortWindow]) / 1000;
+    const velocity = windowTimeSec > 0 ? Math.abs(movePct) / windowTimeSec : 0;
 
     const recentPressure = this.buyPressure.slice(-50);
     const buyRatio = recentPressure.reduce((a, b) => a + b, 0) / recentPressure.length;
@@ -160,7 +160,7 @@ class SignalEngine {
       return null;
     }
     if (absMoveP < config.MOVE_PCT_THRESHOLD) {
-      logger.info(`[SIGNAL_FILTER] reason=MOVE_PCT_TOO_LOW movePct=${movePct.toFixed(3)} threshold=${config.MOVE_PCT_THRESHOLD} zscore=${zScore.toFixed(2)} velocity=${velocity.toFixed(6)} ts=${currentTimestamp}`);
+      logger.info(`[SIGNAL_FILTER] reason=MOVE_PCT_TOO_LOW movePct=${movePct.toFixed(3)} window=${windowTimeSec.toFixed(1)}s threshold=${config.MOVE_PCT_THRESHOLD} zscore=${zScore.toFixed(2)} velocity=${velocity.toFixed(6)} ts=${currentTimestamp}`);
       return null;
     }
     if (velocity < config.MIN_VELOCITY) {
