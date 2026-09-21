@@ -1901,11 +1901,13 @@ async function main() {
         logger.info(`[BOOK-FILTER-DEBUG] bookImb=${bookImb.toFixed(3)}`);
 
         // SKIP filter if book is essentially empty (no meaningful data)
-        // Empty book (imb ≈ 0) means NO INFORMATION, not "book disagrees"
+        // Empty book (imb ≈ 0) means NO LIQUIDITY — block the order to avoid NO_FILL
         const isEmptyBook = Math.abs(bookImb) < 0.05;
         if (isEmptyBook) {
-          logger.info(`[BOOK-FILTER] ⚠️ Book empty (imb=${bookImb.toFixed(3)} < 0.05), skipping confirmation check`);
-          logMarketSignal(sig, null, bookImb); // señal sin confirmación del book pero tampoco bloqueada
+          logger.info(`[SIGNAL_FILTER] reason=BOOK_DATA_MISSING bookImb=${bookImb.toFixed(3)} direction=${sig.direction} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+          logMarketSignal(sig, `BOOK empty (no liquidity, imb=${bookImb.toFixed(3)})`, bookImb);
+          activePositions.delete(posId);
+          return;
         } else {
           // bookImb está calculado y tiene datos reales
 
