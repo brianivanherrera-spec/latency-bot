@@ -327,7 +327,10 @@ _calcEdge(direction, movePct, absZ) {
         reason: hasEdge ? 'EDGE_FOUND' : 'EDGE_TOO_SMALL',
       };
     } else {
-      const edgePct = (fairNo - this.polyNoPrice) * 100;
+      const effectivePolyNo = (this.polyNoPrice != null && !isNaN(this.polyNoPrice))
+        ? this.polyNoPrice
+        : (1 - this.polyYesPrice);
+      const edgePct = (fairNo - effectivePolyNo) * 100;
       const hasEdge = edgePct >= (config.MIN_EDGE_PCT || 2);
       if (!hasEdge) {
         logger.info(`[SIGNAL_FILTER] reason=EDGE_TOO_SMALL edgePct=${edgePct.toFixed(2)} minRequired=${config.MIN_EDGE_PCT || 2} direction=${direction} zscore=${absZ.toFixed(2)} movePct=${movePct.toFixed(3)} ts=${Date.now()}`);
@@ -337,7 +340,7 @@ _calcEdge(direction, movePct, absZ) {
         fairYes: parseFloat(fairYes.toFixed(3)),
         polyYes: this.polyYesPrice,
         fairNo: parseFloat(fairNo.toFixed(3)),
-        polyNo: this.polyNoPrice,
+        polyNo: effectivePolyNo,
         edgePct: parseFloat(edgePct.toFixed(2)),
         side: 'BUY_NO',
         reason: hasEdge ? 'EDGE_FOUND' : 'EDGE_TOO_SMALL',

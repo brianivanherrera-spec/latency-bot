@@ -348,16 +348,16 @@ class PolymarketWS {
   // Imbalance instantáneo desde best_bid_ask — latencia <100ms vs snapshot 2-5s
   // Usa el precio del mejor bid de YES/NO como proxy del sentimiento del mercado
   // YES_bid alto = más compradores de YES = mercado yendo UP
-  // Menos preciso que la profundidad pero MUCHO más rápido
+  // Reads from _topOfBook which has data from both snapshots and best_bid_ask events
   getInstantImbalance() {
-    const yesBook = this._bookByToken.get(this._yesTokenId);
-    const noBook  = this._bookByToken.get(this._noTokenId);
+    const yesTop = this._topOfBook.get(this._yesTokenId);
+    const noTop  = this._topOfBook.get(this._noTokenId);
 
     // Require both sides to have data — don't fallback to fake 0.50
-    if (!yesBook?.bestBid || !noBook?.bestBid) return null;
+    if (!yesTop?.bestBid || !noTop?.bestBid) return null;
 
-    const yesBid = yesBook.bestBid;
-    const noBid  = noBook.bestBid;
+    const yesBid = yesTop.bestBid;
+    const noBid  = noTop.bestBid;
 
     // Con mercado binario: YES + NO = 1 siempre
     // Si YES_bid = 0.70, implícitamente NO_bid ≈ 0.30
