@@ -45,6 +45,7 @@ const phase2Logger = require('./phase2-logger');
 const { ChainlinkRTDS } = require('./chainlink-rtds');
 const { MarketRecorder } = require('./market-recorder');
 const { DiagnosticsIntegration } = require('./diagnostics-integration');
+const { startValidator } = require('./strike-validator');
 
 const logger = new Logger('MAIN');
 const http = require('http');
@@ -639,6 +640,9 @@ async function main() {
   logger.info('');
 
   alertBotStart({ dryRun: config.DRY_RUN });
+
+  // Start strike price validator (runs every 5 minutes, non-blocking)
+  setImmediate(() => startValidator());
 
   // Historial de precio BTC con timestamp para filtro de tendencia exacto
   const btcPriceHistory = []; // [{price, ts}] — ventana de 1 hora (filtro rápido)
