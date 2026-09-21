@@ -224,7 +224,7 @@ function exportToJsonl(validations) {
 /**
  * Main validation loop
  */
-async function validateStrikes() {
+async function performValidation() {
   logger.info('Starting strike price validation...');
 
   const [klines, markets] = await Promise.all([
@@ -249,19 +249,21 @@ async function validateStrikes() {
  */
 function startValidator() {
   logger.info('Strike Validator initialized');
-  validateStrikes(); // Run immediately on startup
+  performValidation().catch((err) => {
+    logger.error(`Validation startup error: ${err.message}`);
+  });
 
   setInterval(() => {
-    validateStrikes().catch((err) => {
+    performValidation().catch((err) => {
       logger.error(`Validation interval error: ${err.message}`);
     });
   }, 300000); // 5 minutes
 }
 
 // Export for use in index-final.js
-module.exports = { startValidator, validateStrikes };
+module.exports = { startValidator, performValidation };
 
 // Allow standalone execution
 if (require.main === module) {
-  validateStrikes();
+  performValidation().catch(console.error);
 }
