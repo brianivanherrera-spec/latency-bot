@@ -6,6 +6,8 @@
 
 const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
+const { ChainlinkRTDS } = require('./chainlink-rtds');
+const { MarketRecorder } = require('./market-recorder');
 const UserWebSocket = require('./polymarket-user-ws');
 const marketResearch = require('./market-research');
 const RESEARCH_MODE = process.env.RESEARCH_MODE === 'true';
@@ -42,10 +44,6 @@ function getDynamicOrderSize(balance, fallbackSize) {
 const { alertTradeSignal, alertBotStart } = require('./alerts');
 const signalLogger = require('./signal-logger');
 const phase2Logger = require('./phase2-logger');
-const { ChainlinkRTDS } = require('./chainlink-rtds');
-const { MarketRecorder } = require('./market-recorder');
-const { DiagnosticsIntegration } = require('./diagnostics-integration');
-const { startValidator } = require('./strike-validator');
 
 const logger = new Logger('MAIN');
 const http = require('http');
@@ -641,9 +639,6 @@ async function main() {
 
   alertBotStart({ dryRun: config.DRY_RUN });
 
-  // Start strike price validator (runs every 5 minutes, non-blocking)
-  setImmediate(() => startValidator());
-
   // Historial de precio BTC con timestamp para filtro de tendencia exacto
   const btcPriceHistory = []; // [{price, ts}] — ventana de 1 hora (filtro rápido)
   const BTC_TREND_WINDOW_MS = 60 * 60 * 1000; // 1 hora en ms
@@ -667,17 +662,6 @@ async function main() {
   const btcBuyerMakerWindow = []; // [true/false] — true = tick iniciado por comprador
   const BTC_BUYER_MAKER_WINDOW = 20; // últimos N ticks
 
-  // BUG A FIX: Parsear strike price del question/description del mercado
-  // Patrón: "Will BTC be above $75,821 at..." → extrae 75821
-  function extractStrikePrice(text) {
-    if (!text) return null;
-    const match = text.match(/above\s+\$?([\d,]+(?:\.\d{2})?)/i);
-    if (match) {
-      return parseFloat(match[1].replace(/,/g, ''));
-    }
-    return null;
-  }
-
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
   const ws = new BinanceWS();        // Binance primary (bookTicker ~10-15ms)
@@ -685,25 +669,12 @@ async function main() {
   const polyWs = new PolymarketWS();
   poly.setPolyWs(polyWs);
 
-  // Initialize ChainlinkRTDS and MarketRecorder for data instrumentation
-  const clRTDS = new ChainlinkRTDS(logger);
-  const mRecorder = new MarketRecorder('./data/markets', logger);
+  // ─── Instrumentación observacional (NO afecta trading) ────────────────────
+  const clRTDS    = new ChainlinkRTDS();   // TWAP 30s + 60s de Chainlink
+  const mRecorder = new MarketRecorder();  // timeline completo por mercado
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
-
-  // FALLBACK: Handle Chainlink RTDS unavailability
-  global.BINANCE_ONLY_MODE = false;
-  clRTDS.on('fallback', (fallbackInfo) => {
-    global.BINANCE_ONLY_MODE = true;
-    logger.error(`[CHAINLINK-FALLBACK] ${fallbackInfo.reason} - Operating in BINANCE_ONLY_MODE`);
-  });
-
   clRTDS.connect();
-
-  // Initialize DiagnosticsIntegration for non-invasive event tracking
-  const diag = new DiagnosticsIntegration(logger);
-  diag.hookRTDS(clRTDS);
-  diag.hookBinance(ws);
-  diag.hookPolymarket(polyWs);
+  // ─────────────────────────────────────────────────────────────────────────
 
   // PHASE 1: Initialize User WebSocket for real-time fill detection
   if (!config.DRY_RUN) {
@@ -772,10 +743,9 @@ async function main() {
           const btcPriceNow = btcPriceHistory.length > 0
             ? btcPriceHistory[btcPriceHistory.length - 1].price
             : (signal.getStats()?.lastPrice || null);
-          if (!cachedMarket.strikePrice) {
-            const parsedStrike = extractStrikePrice(cachedMarket.question);
-            cachedMarket.market_strike_price_captured_at_open = parsedStrike || btcPriceNow;
-            logger.info(`[POLY] 📍 Strike (de ${parsedStrike ? 'question' : 'captura @open'}): $${(parsedStrike || btcPriceNow)?.toLocaleString()}`);
+          if (btcPriceNow && !cachedMarket.strikePrice) {
+            cachedMarket.market_strike_price_captured_at_open = btcPriceNow;
+            logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
           }
           logger.info(`[POLY] ✅ Mercado pre-cacheado activado: ${cachedMarket.question}`);
           logger.info(`[POLY] yesToken: ${cachedMarket.yesTokenId}`);
@@ -796,19 +766,8 @@ async function main() {
               priceAtOpen: signal.getStats()?.lastPrice || 0,
             });
           }
-          // Record market start for instrumentation
-          const effectiveStrike = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
-          const marketId = cachedMarket.conditionId || cachedMarket.gammaId;
-          mRecorder.startMarket({
-            market_id: marketId,
-            question: cachedMarket.question,
-            start_ts: Date.now(),
-            end_ts: cachedMarket.endDate ? new Date(cachedMarket.endDate).getTime() : null,
-            strike_price: effectiveStrike || null,
-            strike_source: cachedMarket.strikePrice ? 'polymarket_description' : 'binance_at_open',
-          });
-          diag.logMarketStart(marketId, effectiveStrike || null);
           // Mostrar strike price si disponible
+          const effectiveStrike = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
           if (effectiveStrike) {
             const btcNow = signal.getStats()?.lastPrice || 0;
             const diff = btcNow - effectiveStrike;
@@ -816,6 +775,16 @@ async function main() {
             const sourceLabel = cachedMarket.strikePrice ? 'desc' : 'captured@open';
             logger.info(`[POLY] Strike BTC ($${sourceLabel}): $${effectiveStrike.toLocaleString()} | BTC actual: $${btcNow.toLocaleString()} | diff: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} (${pct}%)`);
           }
+          // ── MarketRecorder: inicio del mercado ─────────────────────────
+          mRecorder.startMarket({
+            market_id:     cachedMarket.conditionId || cachedMarket.gammaId,
+            question:      cachedMarket.question,
+            start_ts:      Date.now(),
+            end_ts:        cachedMarket.endDate ? new Date(cachedMarket.endDate).getTime() : null,
+            strike_price:  effectiveStrike || null,
+            strike_source: cachedMarket.strikePrice ? 'polymarket_description' : 'binance_at_open',
+          });
+          // ────────────────────────────────────────────────────────────────
         }
       }
       // Si no hay pre-cache, buscar normalmente
@@ -828,10 +797,9 @@ async function main() {
           const btcPriceNow = btcPriceHistory.length > 0
             ? btcPriceHistory[btcPriceHistory.length - 1].price
             : (signal.getStats()?.lastPrice || null);
-          if (!m.strikePrice) {
-            const parsedStrike = extractStrikePrice(m.question);
-            m.market_strike_price_captured_at_open = parsedStrike || btcPriceNow;
-            logger.info(`[POLY] 📍 Strike (de ${parsedStrike ? 'question' : 'captura @open'}): $${(parsedStrike || btcPriceNow)?.toLocaleString()}`);
+          if (btcPriceNow && !m.strikePrice) {
+            m.market_strike_price_captured_at_open = btcPriceNow;
+            logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
           }
           const marketEndTime = new Date(m.endDate).getTime();
           const marketStartTime = marketEndTime - 300000; // 5 minutos atrás
@@ -874,6 +842,16 @@ async function main() {
               priceAtOpen: signal.getStats()?.lastPrice || 0,
             });
           }
+          // ── MarketRecorder: inicio del mercado (path sin pre-cache) ────────
+          mRecorder.startMarket({
+            market_id:     m.conditionId || m.gammaId,
+            question:      m.question,
+            start_ts:      Date.now(),
+            end_ts:        m.endDate ? new Date(m.endDate).getTime() : null,
+            strike_price:  m.strikePrice || m.market_strike_price_captured_at_open || null,
+            strike_source: m.strikePrice ? 'polymarket_description' : 'binance_at_open',
+          });
+          // ──────────────────────────────────────────────────────────────────
         } else {
           return;
         }
@@ -945,34 +923,19 @@ async function main() {
   let lastLoggedPolyYes = null;
   let lastLoggedPolyAt = 0;
 
-  // PHASE 3: Lag detection — track Polymarket update timestamps and historical prices
-  let lastPolyUpdateMs = Date.now();
-  let polyPriceHistory = []; // Circular buffer of {yes, no, ts_ms}
-  const POLY_HISTORY_SIZE = 5; // Last 5 updates for absorption rate calculation
-
   polyWs.onPrice((yes, no) => {
     signal.updatePolyPrice(yes, no);
     livePolyYes = yes;
     livePolyNo  = no;
-
-    // PHASE 3: Capture timestamp and update history
-    lastPolyUpdateMs = Date.now();
-    polyPriceHistory.push({ yes, no, ts_ms: lastPolyUpdateMs });
-    if (polyPriceHistory.length > POLY_HISTORY_SIZE) {
-      polyPriceHistory.shift(); // Keep only last N updates
-    }
-
-    // Record Polymarket price for instrumentation
+    // ── MarketRecorder: precio Polymarket ──────────────────────────────────
     const bookSnap = polyWs.getBookSnapshot();
     mRecorder.recordPolymarket({
-      yes,
-      no,
-      bid_yes: bookSnap?.yes_bid_depth ?? null,
-      ask_yes: bookSnap?.yes_ask_depth ?? null,
-      bid_no: bookSnap?.no_bid_depth ?? null,
-      ask_no: bookSnap?.no_ask_depth ?? null,
+      yes, no,
+      bid_yes: bookSnap?.yes_bid_depth ?? null, ask_yes: bookSnap?.yes_ask_depth ?? null,
+      bid_no:  bookSnap?.no_bid_depth  ?? null, ask_no:  bookSnap?.no_ask_depth  ?? null,
       received_ts: Date.now(),
     });
+    // ────────────────────────────────────────────────────────────────────────
 
     // PHASE 2: Log raw Polymarket data — CADA update
     // PHASE 2: Log all Polymarket updates (even when no active market)
@@ -1057,6 +1020,12 @@ async function main() {
 
   polyWs.onResolved((winner) => {
     logger.info(`[POLY-WS] Mercado resuelto (${winner}) — esperando transición natural`);
+    // ── MarketRecorder: fin del mercado ──────────────────────────────────────
+    { const tw30 = clRTDS.getLatestTWAP(30); const tw60 = clRTDS.getLatestTWAP(60);
+      mRecorder.endMarket({ resolution: winner, resolution_price: null,
+        resolution_ts: Date.now(), twap_30_final: tw30?.value_num ?? null,
+        twap_60_final: tw60?.value_num ?? null, received_ts: Date.now() }); }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // PHASE 2: Log MARKET_END
     if (cachedMarket?.gammaId) {
@@ -1076,22 +1045,6 @@ async function main() {
           const noFilledPrice = 1.0 - filledPrice;
           position_result = ((noResolutionPrice - noFilledPrice) / noFilledPrice) * 100;
         }
-      }
-
-      // Record market end for instrumentation
-      {
-        const tw30 = clRTDS.getLatestTWAP(30);
-        const tw60 = clRTDS.getLatestTWAP(60);
-        mRecorder.endMarket({
-          resolution: winner,
-          resolution_price: null,
-          resolution_ts: Date.now(),
-          twap_30_final: tw30?.value_num ?? null,
-          twap_60_final: tw60?.value_num ?? null,
-        });
-        signalLogger.logMarketTwapFinal(tw30?.value_num ?? null, tw60?.value_num ?? null);
-        diag.logMarketEnd(cachedMarket?.yesTokenId || cachedMarket?.gammaId);
-        diag.logResolution(cachedMarket?.yesTokenId || cachedMarket?.gammaId, winner);
       }
 
       phase2Logger.logBotEvent('MARKET_END', {
@@ -1288,16 +1241,13 @@ async function main() {
 
     if (btcPriceNow > 0) {
       btcPriceHistory.push({ price: btcPriceNow, ts: nowMs });
-
-      // Record Binance price for instrumentation
+      // ── MarketRecorder: precio Binance ───────────────────────────────────
       mRecorder.recordBinance({
-        price: btcPriceNow,
-        source_ts: priceData?.exchangeTs || priceData?.timestamp || null,
-        received_ts: nowMs,
-        bid: priceData?.bestBid || null,
-        ask: priceData?.bestAsk || null,
-        is_buyer_maker: priceData?.isBuyerMaker ?? null,
+        price: btcPriceNow, source_ts: priceData.exchangeTs || priceData.timestamp || null,
+        received_ts: nowMs, bid: priceData.bestBid || null, ask: priceData.bestAsk || null,
+        is_buyer_maker: priceData.isBuyerMaker ?? null,
       });
+      // ────────────────────────────────────────────────────────────────────
 
       // Ventana de isBuyerMaker — mantener últimos N ticks
       if (priceData.isBuyerMaker !== undefined) {
@@ -1361,66 +1311,30 @@ async function main() {
     const MIN_BUFFER = parseInt(process.env.MIN_BUFFER_SIZE || '100');
     if (sig.bufferSize !== undefined && sig.bufferSize < MIN_BUFFER) return; // warmup
 
-    // PHASE 3: Calculate lag metrics
-    // Metric 1: poly_lag_ms — how long since last Polymarket update
-    const poly_lag_ms = nowMs - lastPolyUpdateMs;
-
-    // Metric 2: poly_absorption_rate — price change per second in last N ticks
-    let poly_absorption_rate = 0;
-    if (polyPriceHistory.length >= 2) {
-      const first = polyPriceHistory[0];
-      const last = polyPriceHistory[polyPriceHistory.length - 1];
-      const elapsedSec = (last.ts_ms - first.ts_ms) / 1000;
-      if (elapsedSec > 0.1) { // only calculate if meaningful time elapsed
-        const direction = sig.direction === 'UP' ? 'yes' : 'no';
-        const priceDiff = Math.abs(last[direction] - first[direction]);
-        poly_absorption_rate = priceDiff / elapsedSec;
-      }
-    }
-
-    // Metric 3: btc_poly_price_gap_pct — implied vs actual price difference
-    let btc_poly_price_gap_pct = null;
-    if (cachedMarket?.strikePrice && btcPriceNow && (livePolyYes || livePolyNo)) {
-      const btcStrike = cachedMarket.strikePrice;
-      const btcMove = (btcPriceNow - btcStrike) / btcStrike;
-      const polyPrice = sig.direction === 'UP' ? livePolyYes : livePolyNo;
-      btc_poly_price_gap_pct = (btcMove - polyPrice);
-    }
-
-    // Store metrics in signal for logging
-    sig._poly_lag_ms = poly_lag_ms;
-    sig._poly_absorption_rate = poly_absorption_rate;
-    sig._btc_poly_price_gap_pct = btc_poly_price_gap_pct;
-
     // PHASE 2: Generar signal_id único para esta señal
     const signal_id = randomUUID();
     sig._signal_id = signal_id;
 
-    // Record signal for instrumentation
+    // ── MarketRecorder: señal generada ──────────────────────────────────────
     {
       const twap30 = clRTDS.getLatestTWAP(30);
       const twap60 = clRTDS.getLatestTWAP(60);
       mRecorder.recordSignal({
         signal_id,
-        direction: sig.direction,
-        zscore: sig.zScore || null,
-        imbalance: sig.imbalance || null,
-        score: sig.signalScore || null,
-        edge_pct: sig.edge?.edgePct || null,
-        binance_price: btcPriceNow,
-        twap_30: twap30?.value_num ?? null,
-        twap_60: twap60?.value_num ?? null,
+        direction:             sig.direction,
+        zscore:                sig.zScore,
+        imbalance:             sig.imbalance,
+        score:                 sig.signalScore,
+        edge_pct:              sig.edge?.edgePct ?? null,
+        binance_price:         btcPriceNow,
+        twap_30:               twap30?.value_num    ?? null,
+        twap_60:               twap60?.value_num    ?? null,
         binance_to_twap_30_ms: twap30 ? nowMs - twap30.received_ts : null,
         binance_to_twap_60_ms: twap60 ? nowMs - twap60.received_ts : null,
-        received_ts: nowMs,
-      });
-      diag.logSignal(cachedMarket?.yesTokenId || cachedMarket?.gammaId, {
-        signal_id,
-        direction: sig.direction,
-        zscore: sig.zScore || null,
-        edge_pct: sig.edge?.edgePct || null,
+        received_ts:           nowMs,
       });
     }
+    // ────────────────────────────────────────────────────────────────────────
 
     // PHASE 2: Log SIGNAL_GENERATED
     if (cachedMarket?.gammaId) {
@@ -1462,10 +1376,6 @@ async function main() {
         move_pct: sig.movePct || null,
         btc_velocity: null, // TODO: calcular desde btcPriceHistory
         volatility_60s: sig.volatility60s || null,
-        // PHASE 3: Polymarket lag metrics
-        poly_lag_ms: sig._poly_lag_ms || null,
-        poly_absorption_rate: sig._poly_absorption_rate != null ? parseFloat(sig._poly_absorption_rate.toFixed(6)) : null,
-        btc_poly_price_gap_pct: sig._btc_poly_price_gap_pct != null ? parseFloat(sig._btc_poly_price_gap_pct.toFixed(6)) : null,
       });
     }
 
@@ -1473,8 +1383,7 @@ async function main() {
     if (config.TRADING_HOURS_ENABLED) {
       const utcHour = new Date().getUTCHours();
       if (config.TRADING_HOURS_BLOCKED_UTC.includes(utcHour)) {
-        logger.info(`[SIGNAL_FILTER] reason=TRADING_HOURS_BLOCKED hour=${utcHour} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
-        return;
+        return; // hora bloqueada — win rate histórico < 45%
       }
     }
 
@@ -1486,7 +1395,7 @@ async function main() {
     if (maxPolyMove > 0) {
       const polyMid = sig.direction === 'UP' ? sig.edge?.polyYes : sig.edge?.polyNo;
       if (polyMid !== undefined && Math.abs(polyMid - 0.5) > maxPolyMove) {
-        logger.info(`[SIGNAL_FILTER] reason=POLY_ALREADY_MOVED polyMid=${polyMid?.toFixed(3)} threshold=${maxPolyMove} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+        logger.warn(`[SKIP] 📊 POLY-MOVIDO: mid $${polyMid?.toFixed(3)} ya absorbió el lag (umbral: ${maxPolyMove})`);
         return;
       }
     }
@@ -1504,7 +1413,7 @@ async function main() {
       // tokenMid > 0.95 = token casi en $1, ídem
       // El umbral bajo es SIMÉTRICO: (1 - extremeThreshold)
       if (tokenMid < (1 - extremeThreshold) || tokenMid > extremeThreshold) {
-        logger.info(`[SIGNAL_FILTER] reason=POLY_EXTREME_PRICE tokenMid=${tokenMid.toFixed(3)} polyYes=${polyYesNow.toFixed(3)} threshold=${extremeThreshold} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+        logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real (umbral: ${(1-extremeThreshold).toFixed(2)}-${extremeThreshold})`);
         return;
       }
     }
@@ -1531,34 +1440,6 @@ async function main() {
 
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
-
-    // ─── Filtro 1: Rechazar signalScore < MIN_SIGNAL_SCORE ────────────────────────────────
-    const signalScoreThreshold = config.MIN_SIGNAL_SCORE || 60;
-    if (sig.signalScore && sig.signalScore < signalScoreThreshold) {
-      logger.warn(`[SKIP] Signal score too low: ${sig.signalScore.toFixed(0)} < ${signalScoreThreshold} threshold`);
-      phase2Logger.logBotEvent('SIGNAL_REJECTED', {
-        event_timestamp_ms: nowMs,
-        market_id: cachedMarket?.yesTokenId,
-        signal_id: sig._signal_id,
-        reject_reason: 'LOW_SCORE',
-        signal_score: sig.signalScore,
-      });
-      return;
-    }
-
-    // ─── Filtro 2: Rechazar UP + RSI overbought (70-80) ────────────────────
-    const isRSIOverbought = sig.direction === 'UP' && sig.rsi && sig.rsi >= 70 && sig.rsi < 80;
-    if (isRSIOverbought) {
-      logger.warn(`[SKIP] Overbought RSI: UP signal with RSI=${sig.rsi.toFixed(2)}`);
-      phase2Logger.logBotEvent('SIGNAL_REJECTED', {
-        event_timestamp_ms: nowMs,
-        market_id: cachedMarket?.yesTokenId,
-        signal_id: sig._signal_id,
-        reject_reason: 'OVERBOUGHT_RSI',
-        rsi: sig.rsi,
-      });
-      return;
-    }
 
     // ─── BOOK_ENTRY_MODE — chequear book ANTES de BTC trend filters ──────
     // Si el book es muy fuerte (≥ umbral), entrar directo salteando filtros BTC.
@@ -1652,28 +1533,20 @@ async function main() {
     } // fin !bookEntryOverride
 
     if (!bookEntryOverride) {
-      if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') {
-        logger.info(`[SIGNAL_FILTER] reason=EDGE_NOT_FOUND edge_reason=${sig.edge?.reason || 'MISSING'} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
-        return;
-      }
+      if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
       const maxEdgePct = parseFloat(process.env.MAX_EDGE_PCT || '15');
-      if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > maxEdgePct) {
-        logger.info(`[SIGNAL_FILTER] reason=EDGE_OUT_OF_RANGE edgePct=${sig.edge.edgePct} min=${config.MIN_EDGE_PCT} max=${maxEdgePct} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
-        return;
-      }
+      if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > maxEdgePct) return;
     }
 
     const maxSlots = parseInt(process.env.MAX_ACTIVE_POSITIONS || '1');
     if (activePositions.size >= maxSlots) {
-      logger.info(`[SIGNAL_FILTER] reason=POSITION_LIMIT_REACHED activePositions=${activePositions.size} maxSlots=${maxSlots} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+      logger.warn(`[SKIP] Slot ocupado (${activePositions.size}/${maxSlots}) — esperando que se libere una posición`);
       return;
-    }
+    } // límite de posiciones simultáneas
 
-    // DUAL_ENTRY_MODE: feature avanzado — permite 2 entradas en el mismo mercado
-    // (una temprana + una tardía confirmada). Deshabilitado por defecto.
-    // SE ACTIVA cuando: DUAL_ENTRY_MODE=true + balance suficiente para 2 posiciones
-    // (MAX_ACTIVE_POSITIONS >= 2 + capital >= 2*ORDER_SIZE_USDC)
-    // Actual: capital=$0.03 < $6 mínimo → esta lógica está en standby.
+    // DUAL_ENTRY_MODE: permite 2 entradas en el mismo mercado —
+    // una temprana (lógica normal) y una tardía (LATE_ENTRY confirmado).
+    // Sin DUAL_ENTRY_MODE, se mantiene el bloqueo clásico de 1 entrada por mercado.
     const dualEntryMode = process.env.DUAL_ENTRY_MODE === 'true';
     // Fix: antes este bloque completo se salteaba si cachedMarket.conditionId
     // era falsy (ej. durante la transición de un mercado a otro), dejando
@@ -1687,7 +1560,7 @@ async function main() {
       : Array.from(activePositions.values());
 
     if (!marketKey && activePositions.size > 0) {
-      logger.info(`[SIGNAL_FILTER] reason=NO_MARKET_KEY_WITH_ACTIVE_POSITIONS activePositions=${activePositions.size} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+      logger.warn(`[SKIP] Sin ID de mercado confiable y ya hay ${activePositions.size} posición(es) activa(s) — bloqueando por seguridad`);
       return;
     }
 
@@ -1695,7 +1568,7 @@ async function main() {
       if (dualEntryMode) {
         const maxPerMarket = parseInt(process.env.MAX_ENTRIES_PER_MARKET || '2');
         if (entriesInThisMarket.length >= maxPerMarket) {
-          logger.info(`[SIGNAL_FILTER] reason=MARKET_ENTRY_LIMIT_REACHED marketEntries=${entriesInThisMarket.length} maxPerMarket=${maxPerMarket} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${marketKey} ts=${Date.now()}`);
+          logger.warn(`[SKIP] Ya hay ${entriesInThisMarket.length} posiciones en este mercado (máx ${maxPerMarket})`);
           return;
         }
         if (entriesInThisMarket.length >= 1 && entriesInThisMarket[0].entryType !== 'late') {
@@ -1706,7 +1579,7 @@ async function main() {
         }
       } else {
         if (entriesInThisMarket.length >= 1) {
-          logger.info(`[SIGNAL_FILTER] reason=MARKET_DUPLICATE_ENTRY marketEntries=${entriesInThisMarket.length} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${marketKey} ts=${Date.now()}`);
+          logger.warn(`[SKIP] Ya hay posición abierta en este mercado — evitando doble entry`);
           return;
         }
       }
@@ -1758,17 +1631,6 @@ async function main() {
       logger.info(`[SIZE] 🏆 MODO ÉLITE: imb=${bookImbForElite.toFixed(2)} Z=${Math.abs(sig.zScore).toFixed(1)} → usando $${finalExposure.toFixed(2)} (${(eliteMax*100).toFixed(0)}% del balance $${balanceForSizing})`);
     }
 
-    // ─── Filtro 3: Priorizar (sizing up) con imbalance < 0.3 ────────────────
-    // Evidencia: 96% win rate vs 80% en imbalance alto
-    const strongImbalanceThreshold = parseFloat(process.env.STRONG_IMBALANCE_THRESHOLD || '0.3');
-    const sizeMultiplier = parseFloat(process.env.STRONG_IMBALANCE_SIZE_MULT || '1.5');
-    const strongImbalance = Math.abs(sig.imbalance || 0) < strongImbalanceThreshold;
-    if (strongImbalance && sizeMultiplier > 1.0) {
-      const originalExposure = finalExposure;
-      finalExposure = parseFloat((finalExposure * sizeMultiplier).toFixed(2));
-      logger.info(`[SIZE-UP] Strong imbalance ${Math.abs(sig.imbalance || 0).toFixed(3)}: sizing up ${sizeMultiplier}x from $${originalExposure} to $${finalExposure}`);
-    }
-
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);
     // maxExposure: usar MAX_TOTAL_EXPOSURE_USDC como tope absoluto
@@ -1776,12 +1638,12 @@ async function main() {
     // cuando el size dinámico es pequeño (ej: $3 × 3 = $9 bloquea la 3ra entrada)
     const maxExposure = parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '100');
     if (totalExposure + finalExposure > maxExposure) {
-      logger.info(`[SIGNAL_FILTER] reason=MAX_EXPOSURE_EXCEEDED totalExposure=${totalExposure} finalExposure=${finalExposure} maxExposure=${maxExposure} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+      logger.warn(`[SKIP] 💰 Exposición total $${(totalExposure + finalExposure).toFixed(2)} supera máximo $${maxExposure} — esperando que cierren posiciones`);
       return;
     }
 
     if (!cachedMarket?.gammaId) {
-      logger.info(`[SIGNAL_FILTER] reason=NO_MARKET_FOUND edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} ts=${Date.now()}`);
+      logger.warn('[SKIP] No hay mercado disponible');
       return;
     }
 
@@ -1790,14 +1652,14 @@ async function main() {
     const segsRestantes = Math.floor(msRestantes / 1000);
 
     if (msRestantes <= 0) {
-      logger.info(`[SIGNAL_FILTER] reason=MARKET_CLOSED secondsAgo=${Math.abs(segsRestantes)} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+      logger.warn(`[SKIP] ⏱️ Mercado YA CERRADO hace ${Math.abs(segsRestantes)}s`);
       cachedMarket = null;
       return;
     }
 
     const MIN_SECS = parseInt(process.env.MIN_SECONDS_REMAINING || '60');
     if (segsRestantes < MIN_SECS) {
-      logger.info(`[SIGNAL_FILTER] reason=MARKET_CLOSING_SOON secondsRemaining=${segsRestantes} minRequired=${MIN_SECS} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+      logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde (mín ${MIN_SECS}s)`);
       return;
     }
 
@@ -1818,7 +1680,7 @@ async function main() {
     if (applyLateEntryFilter) {
       const maxSecs = parseInt(process.env.MAX_SECONDS_REMAINING || '150');
       if (segsRestantes > maxSecs) {
-        logger.info(`[SIGNAL_FILTER] reason=LATE_ENTRY_TOO_EARLY secondsRemaining=${segsRestantes} maxAllowed=${maxSecs} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+        logger.info(`[SKIP] 🕐 LATE_ENTRY: ${segsRestantes}s restantes — muy pronto (máx ${maxSecs}s), esperando confirmación`);
         global.__pendingEntryType = null;
         return;
       }
@@ -1826,14 +1688,14 @@ async function main() {
       const tokenPrice = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo;
       const minConviction = parseFloat(process.env.LATE_ENTRY_MAX_PRICE || '0.30');
       if (tokenPrice > minConviction) {
-        logger.info(`[SIGNAL_FILTER] reason=LATE_ENTRY_LOW_CONVICTION tokenPrice=${tokenPrice.toFixed(3)} maxAllowed=${minConviction} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+        logger.info(`[SKIP] 🕐 LATE_ENTRY: precio $${tokenPrice.toFixed(3)} > $${minConviction} — sin convicción suficiente todavía`);
         global.__pendingEntryType = null;
         return;
       }
       logger.info(`[LATE_ENTRY] ✅ Confirmado: ${segsRestantes}s restantes, precio $${tokenPrice.toFixed(3)} — alta convicción`);
       entryType = 'late';
     }
-    global.__pendingEntryType = null;
+    global.__pendingEntryType = null; // reset — se usa una sola vez por evaluación
 
     // Fix (causa raíz de las "entradas duplicadas"): con DUAL_ENTRY_MODE=true
     // y LATE_ENTRY_MODE=false, la segunda entrada del mismo mercado quedaba
@@ -1843,7 +1705,7 @@ async function main() {
     // simultáneas en el mismo mercado. La regla real es: la segunda entrada
     // SOLO es válida si fue confirmada como 'late'; si no, se bloquea.
     if (isSecondEntry && entryType !== 'late') {
-      logger.info(`[SIGNAL_FILTER] reason=DUAL_ENTRY_NO_CONFIRMATION entryType=${entryType} requiresLateConfirmation=true edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${marketKey} ts=${Date.now()}`);
+      logger.warn(`[SKIP] Segunda entrada en el mismo mercado sin confirmación LATE_ENTRY — bloqueando (DUAL_ENTRY requiere LATE_ENTRY_MODE para la 2da entrada)`);
       return;
     }
 
@@ -1899,8 +1761,19 @@ async function main() {
         const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
         if (depth) {
           // Usar best prices (consistente con getInstantImbalance())
-          const yesBestBid = depth.yesBestBid ?? 0.50;
-          const noBestBid = depth.noBestBid ?? 0.50;
+          let yesBestBid = depth.yesBestBid ?? null;
+          let noBestBid = depth.noBestBid ?? null;
+
+          // Apply binary market property: YES + NO = 1
+          if (yesBestBid != null && noBestBid == null) {
+            noBestBid = 1 - yesBestBid;
+          } else if (noBestBid != null && yesBestBid == null) {
+            yesBestBid = 1 - noBestBid;
+          } else if (yesBestBid == null || noBestBid == null) {
+            yesBestBid = 0.50;
+            noBestBid = 0.50;
+          }
+
           const total = yesBestBid + noBestBid;
           if (total > 0) {
             bookImb = parseFloat(((yesBestBid - noBestBid) / total).toFixed(3));
@@ -1911,41 +1784,30 @@ async function main() {
 
       if (bookImb != null) {
         logger.info(`[BOOK-FILTER-DEBUG] bookImb=${bookImb.toFixed(3)}`);
+        // bookImb está calculado
 
-        // SKIP filter if book is essentially empty (no meaningful data)
-        // Empty book (imb ≈ 0) means NO LIQUIDITY — block the order to avoid NO_FILL
-        const isEmptyBook = bookImb === 0;
-        if (isEmptyBook) {
-          logger.info(`[SIGNAL_FILTER] reason=BOOK_DATA_MISSING bookImb=${bookImb.toFixed(3)} direction=${sig.direction} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
-          logMarketSignal(sig, `BOOK empty (no liquidity, imb=${bookImb.toFixed(3)})`, bookImb);
+        // 1) Bloquear si el book contradice activamente la dirección
+        const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
+                           (sig.direction === 'UP'   && bookImb < -bookMinImb);
+        if (contradice) {
+          logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} contradice ${sig.direction} (umbral: ±${bookMinImb}) — mercado ya absorbió el movimiento`);
+          logMarketSignal(sig, `BOOK contradice (imb=${bookImb.toFixed(3)})`, bookImb);
           activePositions.delete(posId);
           return;
-        } else {
-          // bookImb está calculado y tiene datos reales
-
-          // 1) Bloquear si el book contradice activamente la dirección
-          const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
-                             (sig.direction === 'UP'   && bookImb < -bookMinImb);
-          if (contradice) {
-            logger.info(`[SIGNAL_FILTER] reason=BOOK_FILTER_CONTRADICTS bookImb=${bookImb.toFixed(3)} direction=${sig.direction} threshold=${bookMinImb} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
-            logMarketSignal(sig, `BOOK contradice (imb=${bookImb.toFixed(3)})`, bookImb);
-            activePositions.delete(posId);
-            return;
-          }
-
-          // 2) Bloquear si el book es neutro — no confirma la dirección
-          const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
-                           (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
-          if (!confirma) {
-            logger.info(`[SIGNAL_FILTER] reason=BOOK_FILTER_NO_CONFIRMATION bookImb=${bookImb.toFixed(3)} direction=${sig.direction} required=${sig.direction === 'UP' ? '>=' : '<='} threshold=${bookMinImb} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
-            logMarketSignal(sig, `BOOK neutro (imb=${bookImb.toFixed(3)})`, bookImb);
-            activePositions.delete(posId);
-            return;
-          }
-
-          logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
-          logMarketSignal(sig, null, bookImb); // señal que pasó el filtro
         }
+
+        // 2) Bloquear si el book es neutro — no confirma la dirección
+        const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
+                         (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
+        if (!confirma) {
+          logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} no confirma ${sig.direction} (necesito ${sig.direction === 'UP' ? '>=' : '<='} ${sig.direction === 'UP' ? '' : '-'}${bookMinImb}) — book neutro`);
+          logMarketSignal(sig, `BOOK neutro (imb=${bookImb.toFixed(3)})`, bookImb);
+          activePositions.delete(posId);
+          return;
+        }
+
+        logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
+        logMarketSignal(sig, null, bookImb); // señal que pasó el filtro
 
         // 3) BTC_CONFIRM_WEAK_BOOK — cuando el book es débil, exigir que BTC confirme
         // Datos: book débil (<0.50) + BTC contra = 9W/9L = 50% WR, -$16 PnL (18 trades)
@@ -1958,13 +1820,14 @@ async function main() {
             const btcNow = btcPriceHistory[btcPriceHistory.length - 1].price;
             // Buscar precio de hace ~30s en el historial
             const nowMs = Date.now();
-            const ref30 = btcPriceHistory.find(e => nowMs - e.ts <= 35000 && nowMs - e.ts >= 25000);
+            const ref30 = btcPriceHistory.find(e => nowMs - e.ts <= 35000 && nowMs - e.ts >= 25000)
+                       || btcPriceHistory[0];
             if (ref30 && ref30.price > 0) {
               const btcChg30s = (btcNow - ref30.price) / ref30.price;
               const btcContra = (sig.direction === 'UP'   && btcChg30s < 0) ||
                                 (sig.direction === 'DOWN' && btcChg30s > 0);
               if (btcContra) {
-                logger.info(`[SIGNAL_FILTER] reason=BTC_CONFIRM_WEAK_BOOK bookImb=${bookImb.toFixed(3)} btcChange30s=${(btcChg30s*100).toFixed(3)}% direction=${sig.direction} edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+                logger.warn(`[SKIP] 📖 BTC-CONFIRM: book débil (${bookImb.toFixed(3)}) + BTC contra (${(btcChg30s*100).toFixed(3)}%) — 50% WR histórico, bloqueando`);
                 activePositions.delete(posId);
                 return;
               }
@@ -1973,12 +1836,12 @@ async function main() {
           }
         }
       } else {
-        // bookSnap es null
+        // bookSnap es null - esto es lo que está causando el bloqueo
         logger.error(`[BOOK-FILTER-DEBUG] ❌ NO BOOK DATA AVAILABLE`);
 
         // Si BOOK_FILTER_ENABLED, no entramos sin datos
         if (bookFilterEnabled) {
-          logger.info(`[SIGNAL_FILTER] reason=BOOK_DATA_MISSING bookFilterEnabled=true edge=${sig.edge?.edgePct || 0} zscore=${sig.zScore || 0} market=${cachedMarket?.yesTokenId} ts=${Date.now()}`);
+          logger.warn(`[SKIP] 📖 BOOK-FILTER: No book data available AND BOOK_FILTER_ENABLED=true`);
           activePositions.delete(posId);
           return;
         }
@@ -2047,12 +1910,11 @@ async function main() {
       size = size - 1;
     }
 
-    // MAX_ENTRY_PRICE — filtro sobre bestAskWS (precio actual) o priceRaw de fallback
-    // Señales ÉLITE lo saltean — con 100% WR histórico no importa el precio
+    // MAX_ENTRY_PRICE — filtro sobre priceRaw de la señal (no del order price)
+    // Señales ÉLITE lo saltean — con 100% WR histórico no importa el priceRaw
     const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
-    const priceForEntryCheck = bestAskWS != null ? bestAskWS : priceRaw;
-    if (!isEliteSignal && maxEntryPrice < 0.97 && priceForEntryCheck > maxEntryPrice) {
-      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio $${priceForEntryCheck.toFixed(2)} (${bestAskWS != null ? 'WS' : 'fallback'}) > máximo $${maxEntryPrice}`);
+    if (!isEliteSignal && maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
+      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} > máximo $${maxEntryPrice} — señal vieja`);
       activePositions.delete(posId);
       return;
     }
@@ -2102,10 +1964,6 @@ async function main() {
     const snapshotYesTokenId = cachedMarket?.yesTokenId ?? null;
     const snapshotNoTokenId  = cachedMarket?.noTokenId  ?? null;
 
-    // Capturar TWAP observacionales al momento exacto de la señal
-    const twap30AtSignal = clRTDS.getLatestTWAP(30);
-    const twap60AtSignal = clRTDS.getLatestTWAP(60);
-
     // Registrar señal en volumen persistente
     const utcHour = new Date().getUTCHours();
     const btcPriceAtSignal = sig.currentPrice;
@@ -2118,10 +1976,6 @@ async function main() {
       sig,
       utcHour,
       btcPrice: btcPriceAtSignal,
-      twap30AtSignal: twap30AtSignal?.value_num ?? null,
-      twap60AtSignal: twap60AtSignal?.value_num ?? null,
-      binanceToTwap30Ms: twap30AtSignal ? nowMs - twap30AtSignal.received_ts : null,
-      binanceToTwap60Ms: twap60AtSignal ? nowMs - twap60AtSignal.received_ts : null,
       getPolyPrice: (dir) => {
         // Usar tokenIds capturados al momento de apertura — no cachedMarket
         // que puede ya apuntar al siguiente mercado cuando corran t1/t2/t5
@@ -2263,28 +2117,19 @@ async function main() {
         const t4_order_sent_ms = Date.now();
         signalLogger.recordOrderSent(posId, t4_order_sent_ms);
 
-        // Record order for instrumentation
+        // ── MarketRecorder: orden enviada ──────────────────────────────────
         mRecorder.recordOrder({
           signal_id: sig._signal_id || null,
-          order_id: posId,
+          order_id:  posId,
           order_type: forcedOrderType || 'MARKET',
-          price,
-          size,
+          price, size,
           received_ts: t4_order_sent_ms,
         });
-        diag.logOrder(cachedMarket?.yesTokenId || cachedMarket?.gammaId, {
-          order_id: posId,
-          signal_id: sig._signal_id || null,
-          price,
-          size,
-          direction: sig.direction,
-        });
+        // ───────────────────────────────────────────────────────────────────
 
         // PHASE 2: Log ORDER_SENT
         if (cachedMarket?.gammaId) {
           const bookSnap = polyWs.getBookSnapshot();
-          const strongImbForLogging = Math.abs(sig.imbalance || 0) < strongImbalanceThreshold;
-          const sizeMultiplierLogged = strongImbForLogging && sizeMultiplier > 1.0 ? sizeMultiplier : 1.0;
           phase2Logger.logBotEvent('ORDER_SENT', {
             order_id: posId,
             signal_id: sig._signal_id || null,
@@ -2305,11 +2150,6 @@ async function main() {
             order_price: price,
             order_size: size,
             order_side: 'buy',
-            size_multiplier: sizeMultiplierLogged,
-            // PHASE 3: Polymarket lag metrics (repeated for order timestamp context)
-            poly_lag_ms: sig._poly_lag_ms || null,
-            poly_absorption_rate: sig._poly_absorption_rate != null ? parseFloat(sig._poly_absorption_rate.toFixed(6)) : null,
-            btc_poly_price_gap_pct: sig._btc_poly_price_gap_pct != null ? parseFloat(sig._btc_poly_price_gap_pct.toFixed(6)) : null,
           });
         }
 
@@ -2358,28 +2198,16 @@ async function main() {
            (orderResult.sizeFilled > 0 && orderResult.fillPrice > 0 && orderResult.fillPrice < 1));
         
         if (!orderResult.success || !reallyFilled) {
-          // Calculate order age from signal generation to order attempt
-          const order_age_ms = (t3_ms && t4_order_sent_ms) ? (t4_order_sent_ms - t3_ms) : null;
-
-          // Capture Polymarket price at the moment of order attempt
-          const poly_price_at_attempt = sig.direction === 'UP' ? livePolyYes : livePolyNo;
-
-          // Use signal entry price to check if price moved
-          const poly_price_at_signal = sig.getPolyPrice?.() || sig._initialPolyPrice;
-
-          // Analyze the detailed reason for NO_FILL
-          const noFillAnalysis = signalLogger.analyzeNoFillReason(orderResult, orderStatus, {
-            signalPrice: poly_price_at_signal,
-            currentPolyPrice: poly_price_at_attempt,
-            priceMovedThreshold: 0.02, // 2% threshold
-            marketClosed: false,
-            apiResponseMsg: orderResult.error || '',
-          });
-
-          const rejectionReason = noFillAnalysis.rejection_reason;
-          const rejectionDetail = noFillAnalysis.detail;
-
-          logger.warn(`[LIVE] ⚠️ Orden no llenada [${rejectionReason}] — ${rejectionDetail}`);
+          const reason = orderResult.error === 'gtc_timeout'
+            ? `timeout ${config.GTC_TIMEOUT_SECONDS || 60}s sin fill`
+            : orderResult.error === 'ask_too_high'
+            ? `bestAsk demasiado alto — ganancia insuficiente`
+            : orderResult.error === 'fak_exhausted'
+            ? `FAK agotó ${process.env.FAK_MAX_ATTEMPTS || 10} intentos`
+            : orderStatus === 'live'
+            ? `orden en libro pero sin fill confirmado (status=live)`
+            : (orderResult.error || 'sin liquidez');
+          logger.warn(`[LIVE] ⚠️ Orden no llenada — ${reason}`);
 
           // PHASE 0: Log fill telemetry for analysis
           // PHASE 1: Include latency tracking
@@ -2390,12 +2218,12 @@ async function main() {
             order_status: orderStatus,
             order_price: price,
             best_ask: depthInfo?.bestAsk,
-            rejection_reason: rejectionDetail,
+            rejection_reason: reason,
             time_to_fill_ms: null,
             order_size: size,
             size_filled: 0,
             btc_price_entry: btcPriceAtSignal,
-            poly_price_entry: poly_price_at_signal,
+            poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
             signal_direction: sig.direction,
             market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
             market_start_time: cachedMarket.startTime || null,
@@ -2409,15 +2237,7 @@ async function main() {
             user_ws_fill_detected: false,
           });
 
-          // Record NO_FILL for instrumentation
-          mRecorder.recordNoFill({
-            signal_id: sig._signal_id || null,
-            order_id: posId,
-            reason: rejectionReason || orderResult.error || 'no_fill',
-            received_ts: Date.now(),
-          });
-
-          // PHASE 2: Log NO_FILL with detailed rejection analysis
+          // PHASE 2: Log NO_FILL
           if (cachedMarket?.gammaId) {
             const bookSnap = polyWs.getBookSnapshot();
             phase2Logger.logBotEvent('NO_FILL', {
@@ -2440,28 +2260,21 @@ async function main() {
               order_price: price,
               order_size: size,
               fill_latency_ms: null,
-              // NEW: Rejection reason categorization
-              rejection_reason: rejectionReason,
-              rejection_detail: rejectionDetail,
-              // NEW: Order timing analysis
-              order_age_ms: order_age_ms,
-              poly_price_at_signal: poly_price_at_signal,
-              poly_price_at_attempt: poly_price_at_attempt,
-              price_moved_pct: poly_price_at_signal && poly_price_at_attempt
-                ? Math.abs(poly_price_at_attempt - poly_price_at_signal) / poly_price_at_signal * 100
-                : null,
             });
           }
 
           signalLogger.logSignalClose(posId, 'NO_FILL', 0);
           signalLogger.clearLatencyTracking(posId);
+          // ── MarketRecorder: NO_FILL ──────────────────────────────────────
+          mRecorder.recordNoFill({ signal_id: sig._signal_id, order_id: posId,
+            reason: orderResult.error || 'no_fill', received_ts: Date.now() });
+          // ─────────────────────────────────────────────────────────────────
           activePositions.delete(posId);
           return;
         }
 
         const fillMs = orderResult.fillTimeMs || null;
         // FIX: sizeFilled = shares recibidas (takingAmount en BUY), no USDC
-        // fillPrice = USDC gastado / shares = precio real por share
         const actualSize  = orderResult.sizeFilled > 0 ? Math.round(orderResult.sizeFilled) : size;
         const actualPrice = (orderResult.fillPrice > 0 && orderResult.fillPrice < 1) ? orderResult.fillPrice : price;
         const actualUsdc  = orderResult.usdcSpent  > 0 ? orderResult.usdcSpent : actualPrice * actualSize;
@@ -2472,6 +2285,12 @@ async function main() {
           logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} shares`);
         }
         logger.info(`[LIVE] ✅ Orden llenada: ${actualSize} shares @ $${actualPrice.toFixed(4)} | USDC: $${actualUsdc.toFixed(2)} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
+
+        // ── MarketRecorder: FILL ─────────────────────────────────────────────
+        mRecorder.recordFill({ signal_id: sig._signal_id, order_id: posId,
+          fill_price: actualPrice, size_filled: actualSize, usdc_spent: actualUsdc,
+          fill_time_ms: fillMs, received_ts: Date.now() });
+        // ─────────────────────────────────────────────────────────────────────
 
         // PHASE 1: Update T7 if fill happened (we now know the actual fill time)
         const t7_final_ms = fillMs ? t4_order_sent_ms + fillMs : t5_order_accepted_ms;
@@ -2497,24 +2316,6 @@ async function main() {
           filled_direction: sig.direction,
           filled_timestamp_ms: t7_final_ms,
         };
-
-        // Record FILL for instrumentation
-        mRecorder.recordFill({
-          signal_id: sig._signal_id || null,
-          order_id: posId,
-          fill_price: actualPrice,
-          size_filled: actualSize,
-          usdc_spent: actualUsdc,
-          fill_time_ms: fillMs || null,
-          received_ts: Date.now(),
-        });
-        diag.logFill(cachedMarket?.yesTokenId || cachedMarket?.gammaId, {
-          order_id: posId,
-          signal_id: sig._signal_id || null,
-          fill_price: actualPrice,
-          size_filled: actualSize,
-          fill_latency_ms: fillMs || null,
-        });
 
         // PHASE 2: Log FILL
         if (cachedMarket?.gammaId) {
@@ -2619,9 +2420,6 @@ async function main() {
         // PHASE 1: Include latency tracking (may be partial if error occurred mid-flow)
         const t3_err_ms = signalLogger.getT3Timestamp(posId);
         const latencyDataErr = signalLogger.getLatencyTracking(posId);
-        const t4_err_ms = latencyDataErr?.t4_order_sent_ms || Date.now();
-        const order_age_err_ms = (t3_err_ms && t4_err_ms) ? (t4_err_ms - t3_err_ms) : null;
-
         signalLogger.logFillTelemetry({
           posId,
           fill_result: 'NO_FILL',
@@ -2640,7 +2438,7 @@ async function main() {
           market_end_time: cachedMarket.endTime || null,
           // PHASE 1: Latency tracking (may be partial)
           t3_price_decision_ms: t3_err_ms,
-          t4_order_sent_ms: t4_err_ms,
+          t4_order_sent_ms: latencyDataErr?.t4_order_sent_ms || null,
           t5_order_accepted_ms: latencyDataErr?.t5_order_accepted_ms || null,
           t6_order_resting_ms: null,
           t7_order_filled_ms: null,
@@ -2668,9 +2466,6 @@ async function main() {
 
         // PHASE 0: Log paper mode NO_FILL
         // PHASE 1: Include latency tracking (simulated)
-        const order_age_paper_ms = (t3_paper_ms && t4_paper_ms) ? (t4_paper_ms - t3_paper_ms) : null;
-        const poly_price_paper_signal = sig.getPolyPrice?.() || sig._initialPolyPrice;
-
         signalLogger.logFillTelemetry({
           posId,
           fill_result: 'NO_FILL',
@@ -2682,7 +2477,7 @@ async function main() {
           order_size: size,
           size_filled: 0,
           btc_price_entry: btcPriceAtSignal,
-          poly_price_entry: poly_price_paper_signal,
+          poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
           market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
           market_start_time: cachedMarket.startTime || null,
@@ -2815,6 +2610,7 @@ async function main() {
     logger.info(`  Poly YES: ${sigStats.polyYes ?? 'n/a'} | Poly age: ${sigStats.polyAge}`);
     logger.info(`  Active slots: ${activePositions.size}/10`);
     logger.info(`  Cooldown: ${Math.max(0, Math.ceil((lastTradeTime + COOLDOWN - Date.now()) / 1000))}s`);
+    // ── Diagnóstico ChainlinkRTDS + MarketRecorder ───────────────────────────
     try {
       const clD = clRTDS.getDiag();
       const mrD = mRecorder.getDiag();
@@ -2822,6 +2618,7 @@ async function main() {
       logger.info(`  [RTDS] gaps=${clD.gaps} dupl=${clD.duplicates} stale=${clD.stale} oor=${clD.out_of_range} disc=${clD.disconnections}`);
       logger.info(`  [MKT] markets=${mrD.markets_started}/${mrD.markets_completed} | bin=${mrD.events_binance} cl30=${mrD.events_chainlink_30s} cl60=${mrD.events_chainlink_60s} poly=${mrD.events_polymarket} sig=${mrD.events_signal} ord=${mrD.events_order} fill=${mrD.events_fill} nofill=${mrD.events_nofill}`);
     } catch(e) {}
+    // ─────────────────────────────────────────────────────────────────────────
     logger.info('');
     logger.info('=== BALANCE REAL ===');
     if (config.DRY_RUN) {
@@ -2840,91 +2637,6 @@ async function main() {
     }
     logger.info('─'.repeat(60));
   }, 5 * 60 * 1000);
-
-  // Periodic diagnostics report generation (every 30 minutes)
-  setInterval(() => {
-    try {
-      const reportPath = diag.saveReport();
-      logger.info(`[DIAG] 📊 Reporte guardado: ${reportPath}`);
-    } catch (e) {
-      logger.warn(`[DIAG] ⚠️ Error al guardar reporte: ${e.message}`);
-    }
-  }, 30 * 60 * 1000);
-
-  // ─── DAILY SUMMARY SCHEDULING ─────────────────────────────────────────
-  const scheduleDailySummary = () => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-
-    const msUntilMidnight = tomorrow - now;
-
-    setTimeout(() => {
-      try {
-        const stats = compileSessionStats();
-        logDailySummary(stats);
-      } catch (e) {
-        logger.error(`[DAILY-SUMMARY] Error: ${e.message}`);
-      }
-      scheduleDailySummary(); // Schedule next day
-    }, msUntilMidnight);
-  };
-
-  // Función para compilar estadísticas de la sesión
-  const compileSessionStats = () => {
-    const trackerStats = tracker.getSummary();
-    const volStats = signalLogger.getStats();
-
-    return {
-      tradesExecuted: volStats?.closedTrades || 0,
-      tradesFilled: volStats?.filledTrades || 0,
-      tradesNoFill: (volStats?.closedTrades || 0) - (volStats?.filledTrades || 0),
-      wins: trackerStats.wins || 0,
-      losses: trackerStats.losses || 0,
-      winRate: trackerStats.winRate || 0,
-      pnlNeto: parseFloat(trackerStats.totalPnL?.replace(/[^0-9.-]/g, '') || '0'),
-      pnlGross: volStats?.grossPnL || 0,
-      pnlFees: volStats?.totalFees || 0,
-      noFillRate: volStats?.closedTrades > 0 ?
-        ((volStats?.closedTrades || 0) - (volStats?.filledTrades || 0)) / (volStats?.closedTrades || 0) : 0,
-      avgFillLatencyMs: volStats?.avgFillLatency || 0,
-    };
-  };
-
-  // Función para loguear resumen diario
-  const logDailySummary = (stats) => {
-    const record = {
-      event_type: 'DAILY_SUMMARY',
-      event_timestamp_ms: Date.now(),
-
-      // Trades
-      trades_executed: stats.tradesExecuted,
-      trades_filled: stats.tradesFilled,
-      trades_nofill: stats.tradesNoFill,
-
-      // Win/Loss
-      wins: stats.wins,
-      losses: stats.losses,
-      win_rate: stats.winRate,
-
-      // PnL
-      pnl_neto: stats.pnlNeto,
-      pnl_gross: stats.pnlGross,
-      pnl_fees: stats.pnlFees,
-
-      // Execution
-      no_fill_count: stats.tradesNoFill,
-      no_fill_rate: stats.noFillRate,
-      avg_fill_latency_ms: stats.avgFillLatencyMs,
-    };
-
-    phase2Logger.logBotEvent('DAILY_SUMMARY', record);
-    logger.info(`[DAILY] Executed=${stats.tradesExecuted} Filled=${stats.tradesFilled} NoFill=${stats.tradesNoFill} Wins=${stats.wins} WinRate=${(stats.winRate*100).toFixed(2)}% PnL=$${stats.pnlNeto.toFixed(2)}`);
-  };
-
-  // Iniciar scheduling de resumen diario
-  scheduleDailySummary();
 }
 
 main().catch(err => {

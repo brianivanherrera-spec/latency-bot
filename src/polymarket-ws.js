@@ -122,6 +122,7 @@ class PolymarketWS {
     const bid = bestBid != null && !isNaN(bestBid) && bestBid > 0 && bestBid <= 1
       ? bestBid : prev.bestBid ?? null;
     if (ask == null && bid == null) return;
+    // ALWAYS update updatedAt when data arrives, even if reusing old bid/ask
     this._topOfBook.set(tokenId, {
       bestBid: bid, bestAsk: ask,
       bestBidSize: bestBidSize ?? prev.bestBidSize ?? null,
@@ -348,23 +349,43 @@ class PolymarketWS {
   // Imbalance instantáneo desde best_bid_ask — latencia <100ms vs snapshot 2-5s
   // Usa el precio del mejor bid de YES/NO como proxy del sentimiento del mercado
   // YES_bid alto = más compradores de YES = mercado yendo UP
-  // Reads from _topOfBook which has data from both snapshots and best_bid_ask events
+  // Menos preciso que la profundidad pero MUCHO más rápido
   getInstantImbalance() {
-    const yesTop = this._topOfBook.get(this._yesTokenId);
-    const noTop  = this._topOfBook.get(this._noTokenId);
+    const now = Date.now();
+    const yesBook = this._topOfBook.get(this._yesTokenId);
+    const noBook  = this._topOfBook.get(this._noTokenId);
 
-    // Require both sides to have data — don't fallback to fake 0.50
-    if (!yesTop?.bestBid || !noTop?.bestBid) return null;
+    // Validar TTL: datos con más de 5 segundos son stale, retornar null para trigger fallback HTTP
+    const STALE_MS = 5000;
+    if (yesBook && (now - yesBook.updatedAt) > STALE_MS) {
+      return null; // Force fallback to HTTP
+    }
+    if (noBook && (now - noBook.updatedAt) > STALE_MS) {
+      return null; // Force fallback to HTTP
+    }
 
-    const yesBid = yesTop.bestBid;
-    const noBid  = noTop.bestBid;
+    if (!yesBook?.bestBid && !noBook?.bestBid) return null;
 
-    // Con mercado binario: YES + NO = 1 siempre
-    // Si YES_bid = 0.70, implícitamente NO_bid ≈ 0.30
+    const yesBid = yesBook?.bestBid ?? null;
+    const noBid  = noBook?.bestBid  ?? null;
+
+    // Use binary market property: YES + NO = 1
+    // If YES_bid = 0.70, then NO_bid ≈ 0.30 (not 0.50)
+    let calcYesBid = yesBid;
+    let calcNoBid = noBid;
+
+    if (yesBid != null && noBid == null) {
+      calcNoBid = 1 - yesBid; // Binary market constraint
+    } else if (noBid != null && yesBid == null) {
+      calcYesBid = 1 - noBid; // Binary market constraint
+    } else if (yesBid == null || noBid == null) {
+      return null; // Need at least one valid bid
+    }
+
     // Imbalance = (YES_bid - NO_bid) / (YES_bid + NO_bid)
-    const total = yesBid + noBid;
+    const total = calcYesBid + calcNoBid;
     if (total <= 0) return null;
-    return parseFloat(((yesBid - noBid) / total).toFixed(3));
+    return parseFloat(((calcYesBid - calcNoBid) / total).toFixed(3));
   }
 
   async connect() {
@@ -390,7 +411,10 @@ class PolymarketWS {
     let settled = false;
     let ws;
     try {
+      // maxPayload: limitar tamaño de mensajes para evitar slow consumer
+      // perMessageDeflate: compresión para reducir el volumen de datos
       ws = new WebSocket(WS_URL, {
+        maxPayload: 10 * 1024 * 1024, // 10MB max
         perMessageDeflate: true,
       });
     } catch (err) {
@@ -419,37 +443,21 @@ class PolymarketWS {
     });
 
     ws.on('message', (data) => {
-      const receivedTs = Date.now();
       const raw = data.toString();
       if (raw === 'PONG' || raw === 'pong') {
-        this._lastPongAt = receivedTs;
+        this._lastPongAt = Date.now();
         return;
       }
       // Polymarket a veces responde texto plano a ops inválidas
       if (raw === 'INVALID OPERATION' || raw.startsWith('INVALID')) {
         return; // silencioso — suele ser unsubscribe viejo o subscribe duplicado
       }
+      // setImmediate cede el event loop — evita slow consumer (code=1013)
       setImmediate(() => {
         try {
           const parsed = JSON.parse(raw);
           const events = Array.isArray(parsed) ? parsed : [parsed];
-          for (const msg of events) {
-            // Extraer timestamp de fuente si existe
-            const sourceTs = msg.timestamp ?? msg.ts ?? msg.event_time ?? null;
-            const timestampQuality = sourceTs !== null ? 'source' : 'received_only';
-            const eventLatencyMs = sourceTs !== null ? (receivedTs - sourceTs) : null;
-
-            // Enriquecer payload con metadata de timestamp
-            const enrichedMsg = {
-              ...msg,
-              _event_received_timestamp_ms: receivedTs,
-              _event_source_timestamp_ms: sourceTs,
-              _timestamp_quality: timestampQuality,
-              _event_latency_ms: eventLatencyMs,
-            };
-
-            this._handleMessage(enrichedMsg);
-          }
+          for (const msg of events) this._handleMessage(msg);
         } catch (e) {
           if (raw && raw.length < 120) {
             logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);

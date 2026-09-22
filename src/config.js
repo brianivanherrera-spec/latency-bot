@@ -46,10 +46,10 @@ module.exports = {
   ZSCORE_THRESHOLD: parseFloat(process.env.ZSCORE_THRESHOLD || '1.5'),
 
   // Movimiento mínimo en %
-  MOVE_PCT_THRESHOLD: parseFloat(process.env.MOVE_PCT_THRESHOLD || '0.01'),
+  MOVE_PCT_THRESHOLD: parseFloat(process.env.MOVE_PCT_THRESHOLD || '0.04'),
 
   // Velocidad mínima del movimiento (%/segundo)
-  MIN_VELOCITY: parseFloat(process.env.MIN_VELOCITY || '0.0005'),
+  MIN_VELOCITY: parseFloat(process.env.MIN_VELOCITY || '0.0003'),
 
   // =============================================
   // GESTIÓN DE RIESGO

@@ -1,286 +1,191 @@
+/**
+ * ChainlinkRTDS — Polymarket Real-Time Data Service
+ * Suscribe a wss://ws-live-data.polymarket.com
+ * Recibe TWAP 30s y 60s de Chainlink para BTC/USD sin credenciales.
+ * NO modifica la lógica de trading. Fuente observacional pura.
+ */
+'use strict';
 const WebSocket = require('ws');
-const { EventEmitter } = require('events');
+const { Logger } = require('./logger');
+const logger = new Logger('CHAINLINK-RTDS');
+const RTDS_URL = 'wss://ws-live-data.polymarket.com';
+const PING_MS = 5000;
+const BTC_MIN = 1000, BTC_MAX = 10_000_000;
+const STALE_MS = 10000;
 
-class ChainlinkRTDS extends EventEmitter {
-  constructor(logger = console) {
-    super();
-    this.logger = logger;
+class ChainlinkRTDS {
+  constructor() {
     this.ws = null;
-    this.connected = false;
-    this.url = 'wss://ws-live-data.polymarket.com';
-    this.reconnectDelay = 1000;
-    this.maxReconnectDelay = 32000;
-    this.currentReconnectDelay = this.reconnectDelay;
-    this.pingInterval = null;
-    this.twap_30s = { value_num: null, received_ts: null, event_count: 0 };
-    this.twap_60s = { value_num: null, received_ts: null, event_count: 0 };
+    this._connected = false;
+    this._intentionalClose = false;
+    this._reconnectDelay = 1000;
+    this._pingTimer = null;
+    this._last = { 30: null, 60: null };
+    this._onUpdate = null;
     this.diag = {
-      connected: false,
-      events_30s: 0,
-      events_60s: 0,
-      latest_twap_30s: null,
-      latest_twap_60s: null,
-      age_30s_ms: null,
-      age_60s_ms: null,
-      gaps: 0,
-      duplicates: 0,
-      stale: 0,
-      out_of_range: 0,
-      disconnections: 0,
-      subscription_format_attempts: 0,
-      subscription_confirmed: false,
-      avg_latency_ms: 0,
-      high_latency_events: 0,
+      connected_30s: false, connected_60s: false,
+      events_30s: 0, events_60s: 0,
+      duplicates: 0, gaps: 0, out_of_range: 0, missing_ts: 0, stale: 0,
+      last_received_30s: null, last_received_60s: null, disconnections: 0,
     };
-    this.lastSeq = {};
-    this.lastTs = {};
-    this.msgCount = 0;
-    this.inFallbackMode = false; // Flag to prevent reconnect loop after fallback
-    this.fallbackStartTime = null; // Track when fallback mode started
-    this.fallbackRetryInterval = 2 * 60 * 1000; // Retry every 2 minutes (more aggressive)
-    this.fallbackRetryTimeout = null; // Handle to clear retry timeout
-    this.formatRejectCount = {}; // Track rejections per format
-    this.subscriptionFormats = [
-      {
-        name: 'FORMAT_E (assets_ids Polymarket CLOB)',
-        msg: {
-          assets_ids: ['crypto_prices_twap_thirty', 'crypto_prices_twap_sixty'],
-          type: 'Market'
-        }
-      },
-      {
-        name: 'FORMAT_C (topic only, no filters)',
-        msg: {
-          action: 'subscribe',
-          subscriptions: [
-            { topic: 'crypto_prices_twap_thirty' },
-            { topic: 'crypto_prices_twap_sixty' }
-          ]
-        }
-      },
-      {
-        name: 'FORMAT_A (bare topic list)',
-        msg: {
-          subscriptions: ['crypto_prices_twap_thirty', 'crypto_prices_twap_sixty']
-        }
-      }
-    ];
-    this.currentFormatIndex = 0;
-    this.subscriptionFormat = null;
   }
-
+  onUpdate(cb) { this._onUpdate = cb; }
+  getLatestTWAP(w) { return this._last[w] || null; }
   connect() {
-    if (this.connected) return;
-    try {
-      this.ws = new WebSocket(this.url, { perMessageDeflate: true });
-      this.ws.on('open', () => this._onOpen());
-      this.ws.on('message', (data) => this._onMessage(data));
-      this.ws.on('close', () => this._onClose());
-      this.ws.on('error', (err) => this._onError(err));
-    } catch (e) {
-      this.logger.error(`[CHAINLINK-RTDS] Connection error: ${e.message}`);
-      this._scheduleReconnect();
+    if (this._connected || this._intentionalClose) return;
+    this._connectOnce();
+  }
+  close() {
+    this._intentionalClose = true;
+    if (this._pingTimer) clearInterval(this._pingTimer);
+    if (this.ws) this.ws.terminate();
+  }
+  _connectOnce() {
+    try { this.ws = new WebSocket(RTDS_URL); } catch(e) {
+      logger.error(`[RTDS] WS create error: ${e.message}`);
+      setTimeout(() => this._connectOnce(), this._reconnectDelay);
+      return;
     }
-  }
-
-  _onOpen() {
-    this.connected = true;
-    this.diag.connected = true;
-    this.currentReconnectDelay = this.reconnectDelay;
-    this.logger.info('[CHAINLINK-RTDS] ✓ Connected to Polymarket RTDS');
-    this._subscribe();
-    this._startPing();
-  }
-
-  _subscribe() {
-    if (this.currentFormatIndex >= this.subscriptionFormats.length) {
-      this.logger.error('[CHAINLINK-RTDS] All subscription formats exhausted, giving up');
-      this.logger.warn('[CHAINLINK-RTDS] ⚠️ FALLBACK: Entering BINANCE_ONLY_MODE - Chainlink RTDS unavailable');
-      this.inFallbackMode = true; // Flag to prevent reconnect attempts
-      this.fallbackStartTime = Date.now(); // Track when fallback started
-      this.emit('fallback', { mode: 'BINANCE_ONLY', reason: 'All subscription formats rejected' });
-      this._stopPing();
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.close();
+    this.ws.on('open', () => {
+      logger.info('[RTDS] ✅ Conectado a Polymarket RTDS (Chainlink TWAP 30s+60s)');
+      this._connected = true; this._reconnectDelay = 1000;
+      // Formato correcto según docs oficiales: topic, type="*", filters=JSON string
+      // Los topics crypto_prices_twap_thirty y crypto_prices_twap_sixty están en el SDK oficial
+      const subMsg = JSON.stringify({
+        action: 'subscribe',
+        subscriptions: [
+          { topic: 'crypto_prices_twap_thirty', type: '*', filters: '{"symbol":"btc/usd"}' },
+          { topic: 'crypto_prices_twap_sixty',  type: '*', filters: '{"symbol":"btc/usd"}' },
+        ]
+      });
+      this.ws.send(subMsg);
+      logger.info(`[RTDS] Suscripción enviada: ${subMsg}`);
+      this._pingTimer = setInterval(() => {
+        if (this.ws?.readyState === WebSocket.OPEN) this.ws.send('PING');
+      }, 3000); // 3s — reduce detección de caídas vs 5s original
+    });
+    this.ws.on('message', (data) => {
+      const received_ts = Date.now();
+      const raw = data.toString();
+      if (raw === 'PONG') return;
+      // NO loguear cada MSG — overhead de I/O causaba 1-2s de latencia
+      try { this._handle(JSON.parse(raw), received_ts); } catch(e) {
+        logger.warn(`[RTDS] Parse error: ${e.message}`);
       }
-      // Schedule retry after fallback interval
-      this.fallbackRetryTimeout = setTimeout(() => {
-        this.logger.info('[CHAINLINK-RTDS] Attempting recovery from fallback mode...');
-        this.inFallbackMode = false;
-        this.currentFormatIndex = 0;
-        this.connect();
-      }, this.fallbackRetryInterval);
+    });
+    this.ws.on('close', (code) => {
+      this._connected = false; this.diag.disconnections++;
+      if (this._pingTimer) clearInterval(this._pingTimer);
+      if (!this._intentionalClose) {
+        logger.warn(`[RTDS] Desconectado (${code}). Reconectando...`);
+        this._reconnectDelay = Math.min(this._reconnectDelay * 2, 30000);
+        setTimeout(() => this._connectOnce(), this._reconnectDelay);
+      }
+    });
+    this.ws.on('error', (e) => logger.error(`[RTDS] Error: ${e.message}`));
+  }
+  _handle(msg, received_ts) {
+    const topic = msg.topic || '';
+    const payload = msg.payload;
+    if (!payload) return;
+
+    // Formato real del RTDS: llegan 2 mensajes por segundo (30s y 60s)
+    // sin campo topic en los updates — se identifica por alternancia
+    // MSG de snapshot (type=subscribe): payload.data = array de historico
+    // MSG de update: payload = { full_accuracy_value, symbol, timestamp, value }
+    let window_s = null;
+    if (topic === 'crypto_prices_twap_thirty') window_s = 30;
+    else if (topic === 'crypto_prices_twap_sixty') window_s = 60;
+    else if (!topic && payload.symbol) {
+      // Sin topic — alternar entre 30s y 60s basándonos en el contador de mensajes
+      // Los mensajes llegan en pares: par con mismo timestamp → 30s y 60s
+      // Usamos el _msgPairTracker para identificar cuál es cuál
+      const ts = payload.timestamp;
+      if (!this._pairTs || this._pairTs !== ts) {
+        // Nuevo timestamp → es el primero del par (30s)
+        this._pairTs = ts;
+        window_s = 30;
+      } else {
+        // Mismo timestamp que el anterior → es el segundo del par (60s)
+        this._pairTs = null;
+        window_s = 60;
+      }
+    }
+
+    if (!window_s) return;
+
+    // Snapshot inicial (array de histórico)
+    if (Array.isArray(payload.data)) {
+      if (payload.data.length > 0) {
+        const last = payload.data[payload.data.length - 1];
+        const value_num = parseFloat(String(last.value));
+        if (isNaN(value_num) || value_num < 1000 || value_num > 10_000_000) return;
+        const event = {
+          source: 'chainlink_rtds', symbol: payload.symbol || 'btc/usd',
+          window_s, value: String(last.full_accuracy_value || last.value), value_num,
+          source_ts: last.timestamp || null, received_ts,
+          outer_ts: msg.timestamp || null, type: 'snapshot',
+          timestamp_quality: 'good',
+        };
+        this._last[window_s] = event;
+        if (window_s === 30) { this.diag.events_30s++; this.diag.connected_30s = true; this.diag.last_received_30s = received_ts; }
+        else                 { this.diag.events_60s++; this.diag.connected_60s = true; this.diag.last_received_60s = received_ts; }
+        if (this._onUpdate) this._onUpdate(event);
+      }
       return;
     }
 
-    this.subscriptionFormat = this.subscriptionFormats[this.currentFormatIndex];
-    this.diag.subscription_format_attempts++;
+    // Update individual
+    const source_ts = payload.timestamp || null;
+    if (!source_ts) this.diag.missing_ts++;
 
-    try {
-      const msgStr = JSON.stringify(this.subscriptionFormat.msg);
-      this.logger.info(`[CHAINLINK-RTDS] Attempt ${this.currentFormatIndex + 1}/${this.subscriptionFormats.length}: ${this.subscriptionFormat.name}`);
-      this.logger.info(`[CHAINLINK-RTDS] Subscription message: ${msgStr}`);
-      this.ws.send(msgStr);
-    } catch (e) {
-      this.logger.error(`[CHAINLINK-RTDS] Subscribe error: ${e.message}`);
-    }
-  }
-
-  _tryNextFormat() {
-    this.currentFormatIndex++;
-    this.logger.info(`[CHAINLINK-RTDS] ✗ Current format rejected, trying next format...`);
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this._subscribe();
-    }
-  }
-
-  _startPing() {
-    this.pingInterval = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.ping();
+    // Medir latencia real — loguear solo si supera 500ms
+    if (source_ts) {
+      const latency_ms = received_ts - source_ts;
+      if (latency_ms > 500) {
+        logger.warn(`[RTDS] Alta latencia: ${latency_ms}ms (window=${window_s}s)`);
       }
-    }, 3000);
-  }
-
-  _stopPing() {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-  }
-
-  _onMessage(data) {
-    try {
-      const msg = JSON.parse(data);
-      ++this.msgCount;
-
-      if (msg.type === 'update' && (msg.topic === 'crypto_prices_twap_thirty' || msg.topic === 'crypto_prices_twap_sixty')) {
-        this._processTWAP(msg);
-      } else if (msg.type === 'subscribed' || msg.action === 'subscribe_confirmation' || msg.status === 'subscribed' || msg.subscribed) {
-        this.logger.info(`[CHAINLINK-RTDS] ✓ Subscription confirmed with ${this.subscriptionFormat.name}`);
-        this.diag.subscription_confirmed = true;
-      } else if (msg.message === 'Invalid request body') {
-        this.logger.warn(`[CHAINLINK-RTDS] ⚠ Invalid request body for ${this.subscriptionFormat.name}`);
-        this._tryNextFormat();
-      } else if (msg.error) {
-        this.logger.error(`[CHAINLINK-RTDS] Error: ${msg.error}`);
-        this._tryNextFormat();
-      } else if (this.msgCount > 10 && !this.diag.subscription_confirmed) {
-        // Only switch after 10+ messages without confirmation (more patience)
-        this.logger.warn(`[CHAINLINK-RTDS] ⚠ No subscription confirmation after ${this.msgCount} messages for ${this.subscriptionFormat.name}`);
-        this.logger.debug(`[CHAINLINK-RTDS] Unrecognized message: ${JSON.stringify(msg).slice(0, 200)}`);
-        this._tryNextFormat();
-      } else if (this.msgCount <= 10) {
-        this.logger.debug(`[CHAINLINK-RTDS] Msg ${this.msgCount}: ${JSON.stringify(msg).slice(0, 100)}...`);
-      }
-    } catch (e) {
-      this.logger.warn(`[CHAINLINK-RTDS] Parse error: ${e.message}`);
-    }
-  }
-
-  _processTWAP(msg) {
-    const { topic, payload, timestamp: receivedTs } = msg;
-    if (!payload || !payload.value || !payload.timestamp) return;
-
-    const isThirty = topic === 'crypto_prices_twap_thirty';
-    const key = topic;
-    const ts = payload.timestamp; // already ms epoch
-    const now = Date.now();
-    const age = now - ts;
-
-    if (age > 10000) {
-      this.diag.stale++;
-      return;
     }
 
-    if (age > 3000) {
-      this.logger.warn(`[CHAINLINK-RTDS] High latency: ${age}ms for ${topic}`);
-    }
-
-    const price = parseFloat(payload.value);
-    if (price < 1000 || price > 10000000) {
+    // Preferir full_accuracy_value pero está en wei — usar value (float)
+    const value_num = parseFloat(String(payload.value || 0));
+    if (isNaN(value_num) || value_num < 1000 || value_num > 10_000_000) {
       this.diag.out_of_range++;
+      logger.warn(`[RTDS] Valor fuera de rango: ${payload.value} window=${window_s}s`);
       return;
     }
 
-    if (this.lastTs[key] !== undefined) {
-      const gap = ts - this.lastTs[key];
-      if (gap > 5000) this.diag.gaps++;
+    if (source_ts && (received_ts - source_ts) > 10000) this.diag.stale++;
+
+    const prev = this._last[window_s];
+    if (prev && source_ts && prev.source_ts === source_ts && prev.value_num === value_num) {
+      this.diag.duplicates++; return;
+    }
+    if (prev?.source_ts && source_ts && (source_ts - prev.source_ts) > 5000) {
+      this.diag.gaps++;
+      logger.warn(`[RTDS] Gap ${source_ts - prev.source_ts}ms en TWAP ${window_s}s`);
     }
 
-    this.lastTs[key] = ts;
+    const event = {
+      source: 'chainlink_rtds', symbol: payload.symbol || 'btc/usd',
+      window_s, value: String(payload.full_accuracy_value || payload.value), value_num,
+      source_ts, received_ts, outer_ts: msg.timestamp || null, type: 'update',
+      timestamp_quality: source_ts ? ((received_ts - source_ts) < 2000 ? 'good' : 'stale') : 'no_source_ts',
+    };
 
-    if (age > 3000) this.diag.high_latency_events++;
-    this.diag.avg_latency_ms = Math.round((this.diag.avg_latency_ms + age) / 2);
-
-    if (isThirty) {
-      this.twap_30s = { value_num: price, received_ts: now, event_count: this.twap_30s.event_count + 1 };
-      this.diag.events_30s++;
-      this.diag.latest_twap_30s = `$${price.toFixed(2)}`;
-      this.diag.age_30s_ms = age;
-    } else {
-      this.twap_60s = { value_num: price, received_ts: now, event_count: this.twap_60s.event_count + 1 };
-      this.diag.events_60s++;
-      this.diag.latest_twap_60s = `$${price.toFixed(2)}`;
-      this.diag.age_60s_ms = age;
-    }
-
-    this.emit('update', { event_type: topic, asset_pair: payload.symbol, twap_value: price, twap_timestamp: ts, received_ts: now, age_ms: age });
+    this._last[window_s] = event;
+    if (window_s === 30) { this.diag.events_30s++; this.diag.connected_30s = true; this.diag.last_received_30s = received_ts; }
+    else                 { this.diag.events_60s++; this.diag.connected_60s = true; this.diag.last_received_60s = received_ts; }
+    if (this._onUpdate) this._onUpdate(event);
   }
-
-  _onClose() {
-    this.connected = false;
-    this.diag.connected = false;
-    this._stopPing();
-    this.diag.disconnections++;
-
-    // Don't reconnect if we're in fallback mode (all subscription formats exhausted)
-    if (this.inFallbackMode) {
-      this.logger.warn('[CHAINLINK-RTDS] In BINANCE_ONLY_MODE - not reconnecting to Chainlink');
-      return;
-    }
-
-    this.logger.warn('[CHAINLINK-RTDS] Disconnected, reconnecting...');
-    this._scheduleReconnect();
-  }
-
-  _onError(err) {
-    this.logger.error(`[CHAINLINK-RTDS] WebSocket error: ${err.message}`);
-  }
-
-  _scheduleReconnect() {
-    setTimeout(() => this.connect(), this.currentReconnectDelay);
-    this.currentReconnectDelay = Math.min(this.currentReconnectDelay * 2, this.maxReconnectDelay);
-  }
-
-  getLatestTWAP(seconds) {
-    const target = seconds === 30 ? this.twap_30s : this.twap_60s;
-    return target.value_num ? target : null;
-  }
-
-  onUpdate(callback) {
-    this.on('update', callback);
-  }
-
   getDiag() {
-    return { ...this.diag };
-  }
-
-  disconnect() {
-    this._stopPing();
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    if (this.fallbackRetryTimeout) {
-      clearTimeout(this.fallbackRetryTimeout);
-      this.fallbackRetryTimeout = null;
-    }
-    this.connected = false;
-    this.diag.connected = false;
-    this.inFallbackMode = false; // Reset fallback flag on explicit disconnect
-    this.currentFormatIndex = 0; // Reset format index for potential future reconnect
+    const now = Date.now();
+    return { ...this.diag, connected: this._connected,
+      age_30s_ms: this.diag.last_received_30s ? now - this.diag.last_received_30s : null,
+      age_60s_ms: this.diag.last_received_60s ? now - this.diag.last_received_60s : null,
+      latest_twap_30s: this._last[30]?.value ?? null,
+      latest_twap_60s: this._last[60]?.value ?? null,
+    };
   }
 }
-
 module.exports = { ChainlinkRTDS };
