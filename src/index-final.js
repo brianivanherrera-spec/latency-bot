@@ -1430,6 +1430,14 @@ async function main() {
       const windowElapsedSec = marketStartMs ? Math.floor((nowMs - marketStartMs) / 1000) : null;
       const windowRemainingSec = marketEndMs ? Math.floor((marketEndMs - nowMs) / 1000) : null;
 
+      // Guard: no loguear ni procesar señales en mercados ya cerrados
+      // (evita ruido en bot-events y señales con window_remaining < 0)
+      if (marketEndMs && nowMs >= marketEndMs) {
+        logger.warn(`[SKIP-SIGNAL] ⏱️ Mercado ya cerrado hace ${Math.abs(windowRemainingSec)}s — descartando señal`);
+        cachedMarket = null;
+        return;
+      }
+
       phase2Logger.logBotEvent('SIGNAL_GENERATED', {
         signal_id: signal_id,
         market_id: cachedMarket?.yesTokenId,
