@@ -1227,8 +1227,9 @@ async function main() {
 
     // Contador de ticks — diagnosticar si el callback se invoca correctamente
     ws._tickCount = (ws._tickCount || 0) + 1;
-    if (ws._tickCount <= 3 || ws._tickCount % 1000 === 0) {
-      logger.info(`[BTC-TICK] #${ws._tickCount} price=$${btcPriceNow?.toFixed(2)} isBuyerMaker=${priceData.isBuyerMaker} finite=${Number.isFinite(btcPriceNow)}`);
+    // Only log first tick and every 5000 (reduce spam from 50+ ticks/sec to 1 every 100 sec)
+    if (ws._tickCount === 1 || ws._tickCount % 5000 === 0) {
+      logger.info(`[BTC-TICK] #${ws._tickCount} price=$${btcPriceNow?.toFixed(2)}`);
     }
 
     // Throttle: aggTrade llega 10-50x/seg — procesar máximo 1 tick/seg para signal engine

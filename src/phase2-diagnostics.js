@@ -15,34 +15,28 @@ const BINANCE_RAW_FILE = path.join(DATA_DIR, 'binance-raw.jsonl');
 const POLYMARKET_RAW_FILE = path.join(DATA_DIR, 'polymarket-raw.jsonl');
 const BOT_EVENTS_FILE = path.join(DATA_DIR, 'bot-events.jsonl');
 
-console.log('[PHASE2-DIAG] ════════════════════════════════════════════');
-console.log('[PHASE2-DIAG] PHASE 2 DIAGNOSTICS REPORT');
-console.log('[PHASE2-DIAG] ════════════════════════════════════════════');
-console.log(`[PHASE2-DIAG] Timestamp: ${new Date().toISOString()}`);
-console.log(`[PHASE2-DIAG] DATA_DIR: ${DATA_DIR}`);
-console.log('');
+// REDUCED LOGGING: Only report errors, skip success messages
+const VERBOSE = process.env.PHASE2_VERBOSE === 'true';
+
+if (VERBOSE) {
+  console.log('[PHASE2-DIAG] ════════════════════════════════════════════');
+  console.log('[PHASE2-DIAG] PHASE 2 DIAGNOSTICS REPORT');
+  console.log('[PHASE2-DIAG] ════════════════════════════════════════════');
+}
 
 // 1. Verificar directorio
-console.log('[PHASE2-DIAG] 1️⃣  VERIFICACIÓN DE DIRECTORIO');
 try {
   if (!fs.existsSync(DATA_DIR)) {
-    console.log(`[PHASE2-DIAG] ❌ ${DATA_DIR} NO EXISTE`);
-    console.log('[PHASE2-DIAG] Intentando crear...');
+    console.log(`[PHASE2-DIAG] ❌ ${DATA_DIR} NO EXISTE - Creando...`);
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    console.log(`[PHASE2-DIAG] ✅ ${DATA_DIR} creado`);
-  } else {
-    console.log(`[PHASE2-DIAG] ✅ ${DATA_DIR} existe`);
+  }
+  if (VERBOSE) {
     const stats = fs.statSync(DATA_DIR);
-    console.log(`[PHASE2-DIAG]    Modo: ${stats.mode.toString(8)}`);
-    console.log(`[PHASE2-DIAG]    Propietario: ${stats.uid}:${stats.gid}`);
+    console.log(`[PHASE2-DIAG] ✅ ${DATA_DIR} lista (${stats.uid}:${stats.gid})`);
   }
 } catch (e) {
-  console.log(`[PHASE2-DIAG] ❌ Error: ${e.message}`);
+  console.log(`[PHASE2-DIAG] ❌ Error en DATA_DIR: ${e.message}`);
 }
-console.log('');
-
-// 2. Verificar archivos con streaming
-console.log('[PHASE2-DIAG] 2️⃣  ESTADO DE ARCHIVOS JSONL');
 
 async function checkFileAsync(filePath, name) {
   return new Promise((resolve) => {

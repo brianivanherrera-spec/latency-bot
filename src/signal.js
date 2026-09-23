@@ -156,22 +156,23 @@ class SignalEngine {
     const absMoveP = Math.abs(movePct);
 
     if (absZ < config.ZSCORE_THRESHOLD) {
-      if (absZ >= config.ZSCORE_THRESHOLD * 0.8) {
-        logger.info(`[SIGNAL_FILTER] reason=ZSCORE_TOO_LOW zscore=${zScore.toFixed(2)} threshold=${config.ZSCORE_THRESHOLD} movePct=${movePct.toFixed(3)} velocity=${velocity.toFixed(6)} ts=${currentTimestamp}`);
+      // Only log if very close to threshold (>95%) to reduce spam
+      if (absZ >= config.ZSCORE_THRESHOLD * 0.95) {
+        logger.info(`[SIGNAL_FILTER] reason=ZSCORE_TOO_LOW zscore=${zScore.toFixed(2)} threshold=${config.ZSCORE_THRESHOLD}`);
       }
       return null;
     }
     if (absMoveP < config.MOVE_PCT_THRESHOLD) {
-      if (absMoveP >= config.MOVE_PCT_THRESHOLD * 0.8) {
-        logger.info(`[SIGNAL_FILTER] reason=MOVE_PCT_TOO_LOW movePct=${movePct.toFixed(3)} window=${windowTimeSec.toFixed(1)}s threshold=${config.MOVE_PCT_THRESHOLD} zscore=${zScore.toFixed(2)} velocity=${velocity.toFixed(6)} ts=${currentTimestamp}`);
+      if (absMoveP >= config.MOVE_PCT_THRESHOLD * 0.95) {
+        logger.info(`[SIGNAL_FILTER] reason=MOVE_PCT_TOO_LOW movePct=${movePct.toFixed(3)} threshold=${config.MOVE_PCT_THRESHOLD}`);
       }
       return null;
     }
     // Bypass velocity check for extreme moves: z-score >= 4.0 indicates statistical extreme
     const isExtremeMoveSignal = absZ >= 4.0 && absMoveP >= 0.015;
     if (velocity < config.MIN_VELOCITY && !isExtremeMoveSignal) {
-      if (velocity >= config.MIN_VELOCITY * 0.8) {
-        logger.info(`[SIGNAL_FILTER] reason=VELOCITY_TOO_LOW velocity=${velocity.toFixed(6)} threshold=${config.MIN_VELOCITY} movePct=${movePct.toFixed(3)} zscore=${zScore.toFixed(2)} ts=${currentTimestamp}`);
+      if (velocity >= config.MIN_VELOCITY * 0.95) {
+        logger.info(`[SIGNAL_FILTER] reason=VELOCITY_TOO_LOW velocity=${velocity.toFixed(6)} threshold=${config.MIN_VELOCITY}`);
       }
       return null;
     }

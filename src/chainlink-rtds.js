@@ -139,11 +139,14 @@ class ChainlinkRTDS {
     const source_ts = payload.timestamp || null;
     if (!source_ts) this.diag.missing_ts++;
 
-    // Medir latencia real — loguear solo si supera 500ms
+    // Medir latencia real — loguear solo si supera 2000ms (reduce spam)
     if (source_ts) {
       const latency_ms = received_ts - source_ts;
-      if (latency_ms > 500) {
+      const now = Date.now();
+      const lastLogTime = this._lastLatencyLogTime || 0;
+      if (latency_ms > 2000 && (now - lastLogTime) > 10000) {
         logger.warn(`[RTDS] Alta latencia: ${latency_ms}ms (window=${window_s}s)`);
+        this._lastLatencyLogTime = now;
       }
     }
 
