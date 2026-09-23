@@ -157,7 +157,8 @@ module.exports = {
   // =============================================
   // BOOK_FILTER_ENABLED: activa el filtro de imbalance del book
   // Requiere datos del book disponibles — si está true y no hay datos, BLOQUEA todas las órdenes
-  BOOK_FILTER_ENABLED: process.env.BOOK_FILTER_ENABLED === 'true',
+  // DESACTIVADO: El WS no tiene datos, fallback HTTP = unreliable
+  BOOK_FILTER_ENABLED: false,
   BOOK_FILTER_MIN_IMBALANCE: parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30'),
 
   // BTC_CONFIRM_WEAK_BOOK: si el book es débil (<0.50), exigir que BTC confirme
