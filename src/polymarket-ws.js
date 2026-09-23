@@ -47,8 +47,14 @@ function loadTradeMap() {
   return new Map();
 }
 
-// Guardar trade map en disco (llamar después de cada update)
+// Guardar trade map en disco — throttled a 1 escritura cada 2s.
+// Antes escribía sincrónicamente en CADA last_trade_price, bloqueando el
+// event loop y contribuyendo a desconexiones 1013 "slow consumer".
+let _lastTradeMapSave = 0;
 function saveTradeMap(map) {
+  const now = Date.now();
+  if (now - _lastTradeMapSave < 2000) return;
+  _lastTradeMapSave = now;
   try {
     const obj = {};
     for (const [k, v] of map) obj[k] = v;
@@ -100,6 +106,11 @@ class PolymarketWS {
     this._lastResolvedAt = 0; // debounce
     this._lastPongAt = 0;
     this._msgCount = 0;
+    // Tokens con los que se hizo el handshake inicial en el socket ACTUAL.
+    // Polymarket solo acepta {type:'market'} como PRIMER mensaje de la conexión;
+    // para cambiar de mercado sobre un socket abierto hay que reconectar.
+    this._socketTokensKey = null;
+    this._invalidOpLogged = 0;
   }
 
   onPrice(cb) { this._priceCallback = cb; }
@@ -437,6 +448,7 @@ class PolymarketWS {
     this._connecting = true;
     this._clearPing();
     this._teardownSocket();
+    this._socketTokensKey = null; // socket nuevo → sin handshake todavía
 
     logger.info(`Conectando a ${WS_URL}...`);
     let settled = false;
@@ -481,7 +493,13 @@ class PolymarketWS {
       }
       // Polymarket a veces responde texto plano a ops inválidas
       if (raw === 'INVALID OPERATION' || raw.startsWith('INVALID')) {
-        return; // silencioso — suele ser unsubscribe viejo o subscribe duplicado
+        // Antes era silencioso y escondía que la re-suscripción de mercado fallaba.
+        // Loguear (con límite) para que cualquier rechazo del server sea visible.
+        if (this._invalidOpLogged < 5) {
+          this._invalidOpLogged++;
+          logger.warn(`[POLY-WS] Server respondió "${raw.slice(0, 60)}" — mensaje rechazado`);
+        }
+        return;
       }
       // setImmediate cede el event loop — evita slow consumer (code=1013)
       setImmediate(() => {
@@ -582,9 +600,33 @@ class PolymarketWS {
     }
 
     if (this._connected && yesTokenId && noTokenId) {
-      this._sendSubscribe([yesTokenId, noTokenId]);
-      logger.info(`Suscrito a 2 tokens`);
+      const newKey = `${yesTokenId}|${noTokenId}`;
+      if (this._socketTokensKey === newKey) return; // ya suscripto en este socket
+      if (this._socketTokensKey === null) {
+        // Socket sin handshake todavía — el primer mensaje {type:'market'} es válido
+        this._sendSubscribe([yesTokenId, noTokenId]);
+        logger.info(`Suscrito a 2 tokens`);
+      } else {
+        // Socket ya tiene handshake con el mercado anterior. Re-enviar {type:'market'}
+        // es rechazado por Polymarket → el bot quedaba ciego ~100s hasta que el server
+        // cerraba con "1000 all subscribed assets resolved". Reconectar con handshake nuevo.
+        logger.info(`Mercado nuevo — reconectando WS para suscribir tokens nuevos`);
+        this._forceReconnect();
+      }
     }
+  }
+
+  _forceReconnect() {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    this._clearPing();
+    this._teardownSocket();   // remueve listeners → no dispara el handler de 'close'
+    this._connected = false;
+    this._connecting = false;
+    this._reconnectDelay = RECONNECT_MIN;
+    this._connectOnce({ isInitial: false }); // en 'open' manda handshake con _yesTokenId/_noTokenId
   }
 
   /**
@@ -610,18 +652,17 @@ class PolymarketWS {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     if (!tokenIds?.length) return;
     try {
-      // Canal "market": recibe best_bid_ask y price_change en tiempo real
+      // Handshake del canal "market" — debe ser el PRIMER mensaje del socket.
+      // Entrega book (snapshot con bids/asks), price_change, last_trade_price
+      // y, con custom_feature_enabled, best_bid_ask y market_resolved.
+      // (Se eliminó el segundo mensaje {type:'book'}: no es un canal válido
+      //  y el server lo rechazaba; los eventos 'book' ya llegan por este canal.)
       this.ws.send(JSON.stringify({
         assets_ids: tokenIds,
         type: 'market',
         custom_feature_enabled: true,
       }));
-      // Canal "book": recibe snapshot completo con bids[]/asks[] y su profundidad
-      // Necesario para grabar book_yes_bid, book_no_bid, book_vol_imbalance
-      this.ws.send(JSON.stringify({
-        assets_ids: tokenIds,
-        type: 'book',
-      }));
+      this._socketTokensKey = tokenIds.join('|');
     } catch (e) {
       logger.error(`Error subscribe: ${e.message}`);
     }
