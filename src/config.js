@@ -155,11 +155,12 @@ module.exports = {
   // =============================================
   // BOOK FILTER - Real-time order book analysis
   // =============================================
-  // BOOK_FILTER_ENABLED: activa el filtro de imbalance del book
-  // Requiere datos del book disponibles — si está true y no hay datos, BLOQUEA todas las órdenes
-  // FIJO: Corrected 0.50 fallback bug — now uses binary market constraint (YES+NO=1)
+  // BOOK_FILTER_ENABLED: activa el filtro de movimiento del book
+  // Requiere tracking del movimiento del imbalance — permite entrada si sin historial aún
+  // FIXED: Now uses BOOK MOVEMENT (change in imbalance) instead of absolute imbalance
+  // This prevents false rejections from extreme initial prices (e.g., 0.98)
   BOOK_FILTER_ENABLED: process.env.BOOK_FILTER_ENABLED === 'true',
-  BOOK_FILTER_MIN_IMBALANCE: parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30'),
+  BOOK_FILTER_MIN_MOVEMENT: parseFloat(process.env.BOOK_FILTER_MIN_MOVEMENT || '0.10'),
 
   // BTC_CONFIRM_WEAK_BOOK: si el book es débil (<0.50), exigir que BTC confirme
   // Datos: débil + BTC contra = 50% WR; débil + BTC alineado = 93% WR

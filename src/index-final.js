@@ -1750,69 +1750,43 @@ async function main() {
     logger.info(`[BOOK-FILTER-DEBUG] BOOK_FILTER_ENABLED=${bookFilterEnabled}`);
 
     if (bookFilterEnabled) {
-      const bookMinImb = parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30');
+      const bookMinMovement = parseFloat(process.env.BOOK_FILTER_MIN_MOVEMENT || '0.10');
 
-      // PRIMARY: Usar getInstantImbalance (best_bid/ask precios) — SIEMPRE disponible
-      let bookImb = polyWs.getInstantImbalance?.();
-      logger.info(`[BOOK-FILTER-DEBUG] getInstantImbalance() = ${bookImb != null ? bookImb.toFixed(3) : 'NULL'}`);
+      // Use BOOK MOVEMENT (not absolute imbalance) to detect market consensus
+      // Movement = current imbalance - previous imbalance
+      // Positive = book moved toward UP, Negative = moved toward DOWN
+      const bookMovement = polyWs.getInstantImbalanceMovement?.();
 
-      // Si no hay imbalance instantáneo, intentar fallback HTTP
-      if (bookImb == null && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
-        logger.info(`[BOOK-FILTER-DEBUG] No instant imbalance, attempting HTTP fallback...`);
-        const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
-        if (depth) {
-          // Usar best prices (consistente con getInstantImbalance())
-          let yesBestBid = depth.yesBestBid ?? null;
-          let noBestBid = depth.noBestBid ?? null;
+      if (bookMovement != null) {
+        logger.info(`[BOOK-FILTER] Book movement: ${bookMovement.toFixed(3)} (threshold: ±${bookMinMovement})`);
 
-          // Apply binary market property: YES + NO = 1
-          // BUG FIX: Use binary constraint instead of 0.50 fallback
-          if (yesBestBid != null && noBestBid == null) {
-            noBestBid = 1 - yesBestBid;
-          } else if (noBestBid != null && yesBestBid == null) {
-            yesBestBid = 1 - noBestBid;
-          } else if (yesBestBid == null || noBestBid == null) {
-            // Skip calculation if both are still null — no valid data
-            bookImb = null;
-          }
+        // Bloquear si el book se MOVIÓ contra la dirección de la señal
+        // Si signal es UP pero book se movió DOWN → rechaza (libro está en desacuerdo)
+        // Si signal es DOWN pero book se movió UP → rechaza (libro está en desacuerdo)
+        const movedAgainstSignal = (sig.direction === 'UP'   && bookMovement < -bookMinMovement) ||
+                                   (sig.direction === 'DOWN' && bookMovement > bookMinMovement);
 
-          // Only calculate if we have valid prices after binary constraint application
-          if (yesBestBid != null && noBestBid != null) {
-            const total = yesBestBid + noBestBid;
-            if (total > 0) {
-              bookImb = parseFloat(((yesBestBid - noBestBid) / total).toFixed(3));
-              logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=$${yesBestBid.toFixed(3)} no_bid=$${noBestBid.toFixed(3)} → imb=${bookImb.toFixed(3)}`);
-            }
-          }
+        if (movedAgainstSignal) {
+          logger.warn(`[SKIP] 📖 BOOK-FILTER: movement=${bookMovement.toFixed(3)} contradice ${sig.direction} (umbral: ±${bookMinMovement}) — mercado se movió contra la señal`);
+          logMarketSignal(sig, `BOOK movimiento contra`, bookMovement);
+          activePositions.delete(posId);
+          return;
         }
+
+        // Confirma si el book se MOVIÓ a favor de la dirección
+        const movedWithSignal = (sig.direction === 'UP'   && bookMovement >= bookMinMovement) ||
+                                (sig.direction === 'DOWN' && bookMovement <= -bookMinMovement);
+
+        if (movedWithSignal) {
+          logger.info(`[BOOK-FILTER] ✅ movement=${bookMovement.toFixed(3)} confirma ${sig.direction}`);
+          logMarketSignal(sig, null, bookMovement);
+        } else {
+          logger.info(`[BOOK-FILTER] ℹ️ movement=${bookMovement.toFixed(3)} neutro — permitiendo entrada`);
+          logMarketSignal(sig, `BOOK neutro`, bookMovement);
+        }
+      } else {
+        logger.info(`[BOOK-FILTER] ℹ️ movement=NULL (sin historial aún) — permitiendo entrada`);
       }
-
-      if (bookImb != null) {
-        logger.info(`[BOOK-FILTER-DEBUG] bookImb=${bookImb.toFixed(3)}`);
-        // bookImb está calculado
-
-        // 1) Bloquear si el book contradice activamente la dirección
-        const contradice = (sig.direction === 'DOWN' && bookImb > bookMinImb) ||
-                           (sig.direction === 'UP'   && bookImb < -bookMinImb);
-        if (contradice) {
-          logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} contradice ${sig.direction} (umbral: ±${bookMinImb}) — mercado ya absorbió el movimiento`);
-          logMarketSignal(sig, `BOOK contradice (imb=${bookImb.toFixed(3)})`, bookImb);
-          activePositions.delete(posId);
-          return;
-        }
-
-        // 2) Bloquear si el book es neutro — no confirma la dirección
-        const confirma = (sig.direction === 'UP'   && bookImb >= bookMinImb) ||
-                         (sig.direction === 'DOWN' && bookImb <= -bookMinImb);
-        if (!confirma) {
-          logger.warn(`[SKIP] 📖 BOOK-FILTER: imb=${bookImb.toFixed(3)} no confirma ${sig.direction} (necesito ${sig.direction === 'UP' ? '>=' : '<='} ${sig.direction === 'UP' ? '' : '-'}${bookMinImb}) — book neutro`);
-          logMarketSignal(sig, `BOOK neutro (imb=${bookImb.toFixed(3)})`, bookImb);
-          activePositions.delete(posId);
-          return;
-        }
-
-        logger.info(`[BOOK-FILTER] ✅ imb=${bookImb.toFixed(3)} confirma ${sig.direction}`);
-        logMarketSignal(sig, null, bookImb); // señal que pasó el filtro
 
         // 3) BTC_CONFIRM_WEAK_BOOK — cuando el book es débil, exigir que BTC confirme
         // Datos: book débil (<0.50) + BTC contra = 9W/9L = 50% WR, -$16 PnL (18 trades)

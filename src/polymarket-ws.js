@@ -88,6 +88,13 @@ class PolymarketWS {
     // Estructura: { bid: totalTokens, ask: totalTokens, bids: [{price,size}], asks: [{price,size}] }
     this._bookByToken = new Map();
 
+    // ─── Book Imbalance Movement Tracking ──────────────────────────────────
+    // Track previous imbalance to calculate MOVEMENT (not absolute value)
+    // Movement = current imbalance - previous imbalance
+    // E.g., 0.70 -> 0.90 = +0.20 movement toward UP
+    this._lastImbalance = null;
+    this._lastImbalanceUpdate = 0;
+
     this._priceCallback = null;
     this._resolvedCallback = null;
     this._lastResolvedAt = 0; // debounce
@@ -385,7 +392,32 @@ class PolymarketWS {
     // Imbalance = (YES_bid - NO_bid) / (YES_bid + NO_bid)
     const total = calcYesBid + calcNoBid;
     if (total <= 0) return null;
-    return parseFloat(((calcYesBid - calcNoBid) / total).toFixed(3));
+    const imb = parseFloat(((calcYesBid - calcNoBid) / total).toFixed(3));
+
+    // Track imbalance for movement calculation
+    const now = Date.now();
+    const timeSinceLastUpdate = now - this._lastImbalanceUpdate;
+    // Only update if >1 second has passed (avoid noise from rapid updates)
+    if (timeSinceLastUpdate > 1000) {
+      this._lastImbalance = imb;
+      this._lastImbalanceUpdate = now;
+    }
+
+    return imb;
+  }
+
+  // Get book imbalance MOVEMENT (change since last update)
+  // Returns: movement value (positive = movement toward UP, negative = DOWN)
+  // Or null if not enough history
+  getInstantImbalanceMovement() {
+    const currentImb = this.getInstantImbalance();
+    if (currentImb == null || this._lastImbalance == null) return null;
+
+    // Movement = current - previous
+    // Positive = moved toward YES (UP)
+    // Negative = moved toward NO (DOWN)
+    const movement = parseFloat((currentImb - this._lastImbalance).toFixed(3));
+    return movement;
   }
 
   async connect() {
