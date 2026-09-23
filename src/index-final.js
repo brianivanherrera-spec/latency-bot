@@ -1765,19 +1765,23 @@ async function main() {
           let noBestBid = depth.noBestBid ?? null;
 
           // Apply binary market property: YES + NO = 1
+          // BUG FIX: Use binary constraint instead of 0.50 fallback
           if (yesBestBid != null && noBestBid == null) {
             noBestBid = 1 - yesBestBid;
           } else if (noBestBid != null && yesBestBid == null) {
             yesBestBid = 1 - noBestBid;
           } else if (yesBestBid == null || noBestBid == null) {
-            yesBestBid = 0.50;
-            noBestBid = 0.50;
+            // Skip calculation if both are still null — no valid data
+            bookImb = null;
           }
 
-          const total = yesBestBid + noBestBid;
-          if (total > 0) {
-            bookImb = parseFloat(((yesBestBid - noBestBid) / total).toFixed(3));
-            logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=$${yesBestBid.toFixed(3)} no_bid=$${noBestBid.toFixed(3)} → imb=${bookImb.toFixed(3)}`);
+          // Only calculate if we have valid prices after binary constraint application
+          if (yesBestBid != null && noBestBid != null) {
+            const total = yesBestBid + noBestBid;
+            if (total > 0) {
+              bookImb = parseFloat(((yesBestBid - noBestBid) / total).toFixed(3));
+              logger.info(`[BOOK-FILTER] 📡 Fallback HTTP: yes_bid=$${yesBestBid.toFixed(3)} no_bid=$${noBestBid.toFixed(3)} → imb=${bookImb.toFixed(3)}`);
+            }
           }
         }
       }
