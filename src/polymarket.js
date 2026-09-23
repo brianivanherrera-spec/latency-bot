@@ -549,7 +549,10 @@ class PolymarketClient {
               return { success: false, error: 'trading_disabled', noFill: true };
             }
 
-            await new Promise(r => setTimeout(r, 500));
+            // REMOVIDO: await new Promise(r => setTimeout(r, 500));
+            // Razón: FAK debería llenar instantáneamente (o reportar no fill)
+            // El delay de 500ms hacía que usemos precio VIEJO mientras el mercado se mueve
+            // Ahora chequeamos status inmediatamente
 
             const results = Array.isArray(batchResult) ? batchResult : [batchResult];
             const fakRes = results[0]; const gtcRes = results[1]; const gtdRes = results[2];
@@ -568,17 +571,20 @@ class PolymarketClient {
             if (fakFilled) {
               await cancelOthers(true, false, false);
               const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(fakRes, worstPrice, size);
-              logger.info(`[LIVE] ✅ FAK llenó @ $${fillPrice.toFixed(4)} | ${sizeFilled} shares | $${usdcSpent.toFixed(2)} USDC`);
+              const slippage = fillPrice - worstPrice;
+              logger.info(`[LIVE] ✅ FAK llenó @ $${fillPrice.toFixed(4)} (solicitado: $${worstPrice.toFixed(4)}) | slippage: $${slippage.toFixed(4)} | ${sizeFilled} shares | $${usdcSpent.toFixed(2)} USDC`);
               return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
             } else if (gtcFilled) {
               await cancelOthers(false, true, false);
               const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(gtcRes, worstPrice, size);
-              logger.info(`[LIVE] ✅ GTC llenó primero @ $${fillPrice.toFixed(4)} | ${sizeFilled} shares`);
+              const slippage = fillPrice - worstPrice;
+              logger.info(`[LIVE] ✅ GTC llenó primero @ $${fillPrice.toFixed(4)} (solicitado: $${worstPrice.toFixed(4)}) | slippage: $${slippage.toFixed(4)} | ${sizeFilled} shares`);
               return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
             } else if (gtdFilled) {
               await cancelOthers(false, false, true);
               const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(gtdRes, worstPrice, size);
-              logger.info(`[LIVE] ✅ GTD llenó primero @ $${fillPrice.toFixed(4)} | ${sizeFilled} shares`);
+              const slippage = fillPrice - worstPrice;
+              logger.info(`[LIVE] ✅ GTD llenó primero @ $${fillPrice.toFixed(4)} (solicitado: $${worstPrice.toFixed(4)}) | slippage: $${slippage.toFixed(4)} | ${sizeFilled} shares`);
               return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
             } else if (dualGtcOrderId || tripleGtdOrderId) {
               // Ninguno llenó instantáneo — GTC y GTD quedan vivos en el libro

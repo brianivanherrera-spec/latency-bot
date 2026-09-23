@@ -1862,7 +1862,7 @@ async function main() {
     const MAX_ORDER_PRICE = isEliteSignal
       ? parseFloat(process.env.ELITE_MAX_ASK || '0.97')
       : parseFloat(process.env.MAX_GTC_ENTRY_ASK || process.env.MAX_ENTRY_PRICE || '0.85');
-    const tick = 0.01;
+    const tick = 0.005;  // Reducido de 0.01 → 0.005 para reducir slippage
     const round2 = v => parseFloat((Math.round(v * 100) / 100).toFixed(2));
 
     const bestAskWS = polyWs.getBestAskForToken?.(tokenId) ?? null;
