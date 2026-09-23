@@ -1118,9 +1118,14 @@ async function main() {
   // HTTP polling cada 2s como fallback si el WS falla
   setInterval(actualizarPrecioPolymarket, 2000);
 
+  // 5s: solo consulta Gamma para posiciones cuyo mercado ya cerró.
+  // Con 60s el resultado llegaba 60-130s después del cierre.
+  let checkingPositions = false;
   setInterval(async () => {
-    await tracker.checkClosedPositions();
-  }, 60000);
+    if (checkingPositions) return;
+    checkingPositions = true;
+    try { await tracker.checkClosedPositions(); } finally { checkingPositions = false; }
+  }, 5000);
 
   // ─── Position Monitor: SL / TP / Lock-in ─────────────────────────────────
   // Revisa cada 3 segundos todas las posiciones abiertas. Si el precio actual
@@ -2361,9 +2366,11 @@ async function main() {
           },
         });
 
-        // Fallback de seguridad: si el tracker no llama onClose en 10 minutos
-        // (ej. error de red al verificar resolución), liberar el slot igual
-        // para no bloquear el bot indefinidamente.
+        // Liberar el slot al cierre del mercado: la posición ya no puede cambiar de
+        // resultado, y esperar la resolución de Gamma bloqueaba la apertura del siguiente.
+        const msToMarketEnd = new Date(cachedMarket.endDate).getTime() - Date.now();
+        setTimeout(() => activePositions.delete(posId), Math.max(0, msToMarketEnd));
+        // Fallback de seguridad por si endDate fuera inválido
         setTimeout(() => activePositions.delete(posId), 10 * 60 * 1000);
 
       } catch (err) {
@@ -2412,10 +2419,15 @@ async function main() {
       const t5_paper_ms = t4_paper_ms + Math.random() * 50; // Simulate 0-50ms acceptance latency
 
       const paperFillRate = parseFloat(process.env.PAPER_FILL_RATE || '0.75');
-      const filled = Math.random() < paperFillRate;
+      // Una orden límite de compra no llena si el ask real está por encima del precio
+      // (pasaba con el tope 0.97: se "llenaba" a $0.97 con el ask en $0.99-$1.00).
+      const askAbovePrice = bestAskWS != null && bestAskWS > price;
+      const filled = !askAbovePrice && Math.random() < paperFillRate;
 
       if (!filled) {
-        logger.warn(`[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);
+        logger.warn(askAbovePrice
+          ? `[PAPER] ⚠️ Sin fill: ask $${bestAskWS.toFixed(2)} > precio de orden $${price}`
+          : `[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);
 
         // PHASE 0: Log paper mode NO_FILL
         // PHASE 1: Include latency tracking (simulated)
@@ -2497,9 +2509,14 @@ async function main() {
         direction: sig.direction,
         mode: 'paper',
         entryType,
+        onClose: () => activePositions.delete(posId),
       });
 
-      setTimeout(() => activePositions.delete(posId), 8 * 60 * 1000);
+      // Antes el slot se liberaba a los 8 min fijos: con MAX_ACTIVE_POSITIONS=1
+      // bloqueaba el mercado siguiente entero. Ahora se libera al cierre del mercado.
+      const msToMarketEnd = new Date(cachedMarket.endDate).getTime() - Date.now();
+      setTimeout(() => activePositions.delete(posId), Math.max(0, msToMarketEnd));
+      setTimeout(() => activePositions.delete(posId), 10 * 60 * 1000);
     }
   });
 

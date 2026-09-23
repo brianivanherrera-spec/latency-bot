@@ -747,11 +747,7 @@ class PolymarketWS {
           }
         }
 
-        if (price >= 0.995 || price <= 0.005) {
-          this._emitPair({ allowExtreme: true });
-        } else {
-          this._emitPair();
-        }
+        this._emitPair();
       }
       return;
     }
@@ -866,7 +862,7 @@ class PolymarketWS {
       const price = ask >= 0.99 ? 0.999 : ask;
       this._lastPriceByToken.set(tokenId, price);
       this._marketPriceByToken.set(tokenId, price);
-      this._emitPair({ allowExtreme: true });
+      this._emitPair();
       return;
     }
     if (bid <= 0 || ask <= 0 || ask > 1) return;
@@ -901,7 +897,7 @@ class PolymarketWS {
    * para que el bot los vea, pero NO disparan onResolved.
    * La resolución real viene solo de event market_resolved (o del poll Gamma).
    */
-  _emitPair({ allowExtreme = false } = {}) {
+  _emitPair() {
     if (!this._priceCallback) return;
     const yesId = this._yesTokenId;
     const noId = this._noTokenId;
@@ -925,13 +921,10 @@ class PolymarketWS {
       return;
     }
 
-    // Rango de trading normal
-    if (yes >= 0.05 && yes <= 0.95) {
-      this._priceCallback(yes, no);
-      return;
-    }
-    // Extremos: actualizar precio pero NO resolver
-    if (allowExtreme && (yes > 0 && yes < 1)) {
+    // Extremos incluidos: si se cortaban, la señal quedaba sin precio del WS y a
+    // los 5s pasaba a usar el de Gamma (minutos de atraso, ~$0.50), generando
+    // edges falsos en mercados que ya estaban en $0.97+.
+    if (yes > 0 && yes < 1) {
       this._priceCallback(yes, no);
     }
   }

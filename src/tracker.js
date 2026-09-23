@@ -88,14 +88,19 @@ class PnLTracker {
  
   async checkClosedPositions() {
     const now = new Date();
-    // Chequear TODAS las posiciones abiertas — Polymarket puede resolver antes del endDate
-    const toCheck = this.positions.filter(p => p.status === 'OPEN');
- 
+    // Solo posiciones cuyo mercado ya cerró. Antes se chequeaban todas y un
+    // outcomePrices >= 0.95 a mitad de ventana (precio en juego, no resultado)
+    // cerraba la posición como WIN/LOSS antes de tiempo.
+    const toCheck = this.positions.filter(p => p.status === 'OPEN' && new Date(p.endDate) <= now);
+
     for (const pos of toCheck) {
       try {
         const result = await this._getMarketResult(pos.marketId, pos.gammaId);
         if (result === null) {
-          logger.info(`Mercado ${pos.id} aun no resuelto, esperando...`);
+          if (!pos._pendingLogged) {
+            logger.info(`Mercado ${pos.id} cerrado, esperando resolución en Gamma...`);
+            pos._pendingLogged = true;
+          }
           continue;
         }
         this._closePosition(pos, result);
@@ -114,9 +119,6 @@ class PnLTracker {
         return null;
       }
       const market = await res.json();
-
-      // Log completo para diagnostico
-      logger.info(`Market raw fields: resolved=${market.resolved} closed=${market.closed} active=${market.active} winner=${market.winner} resolutionPrice=${market.resolutionPrice} outcomePrices=${market.outcomePrices} winnerIndex=${market.winnerIndex}`);
 
       // PRIORITARIO: outcomePrices — Polymarket los actualiza antes que closed/resolved
       // ["1","0"] = YES ganó | ["0","1"] = NO ganó
