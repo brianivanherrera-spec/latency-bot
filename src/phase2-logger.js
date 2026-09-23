@@ -264,6 +264,7 @@ function logBotEvent(eventType, data) {
       move_pct: data.move_pct || null,
       btc_velocity: data.btc_velocity || null,
       volatility_60s: data.volatility_60s || null,
+      fair: data.fair ?? null, // probabilidad justa (modo sombra)
 
       // ===== SIGNAL_REJECTED =====
       rejection_reasons: data.rejection_reasons || null,

@@ -115,6 +115,22 @@ class SignalEngine {
     return 100 - (100 / (1 + rs));
   }
 
+  // ─── Volatilidad realizada: desvío de log-retornos por √segundo ─────
+  // Usada para la probabilidad justa (modo sombra). null si no hay datos.
+  realizedVolPerSec(windowTicks = 120) {
+    const n = this.prices.length;
+    if (n < 20) return null;
+    const start = Math.max(1, n - windowTicks);
+    let sumSq = 0;
+    for (let i = start; i < n; i++) {
+      const r = Math.log(this.prices[i] / this.prices[i - 1]);
+      if (Number.isFinite(r)) sumSq += r * r;
+    }
+    const elapsedSec = (this.timestamps[n - 1] - this.timestamps[start - 1]) / 1000;
+    if (!(elapsedSec > 0) || sumSq === 0) return null;
+    return Math.sqrt(sumSq / elapsedSec);
+  }
+
   // ─── Tendencia macro: precio hace N ticks vs ahora ─────────────────
   // Retorna 'UP', 'DOWN' o 'FLAT' según la dirección dominante
   // Configurable via:

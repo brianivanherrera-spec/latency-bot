@@ -84,8 +84,11 @@ class BinanceWS {
               bestBid: price,
               bestAsk: price,
               spread: 0,
+              // aggTrade no trae tamaños del book: 0/0 → imbalance neutro.
+              // Antes bidQty=0 y askQty=q daban imbalance -1.00 fijo, que sumaba
+              // +8 al score de toda señal DOWN y podía marcar señales como ÉLITE.
               bidQty: 0,
-              askQty: parseFloat(msg.q) || 0,
+              askQty: 0,
               isBuyerMaker: msg.m === true,
             });
           }

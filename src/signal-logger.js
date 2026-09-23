@@ -86,6 +86,13 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     tickFreq:         sig?.tickFreq || 0,
     rsi:              parseFloat(sig?.rsi?.toFixed(1) || 50),
     signalScore:      sig?.signalScore || null,
+    // Probabilidad justa (modo sombra) — ver computeFair en index-final.js
+    fair_up:          sig?._fair?.fair_up ?? null,
+    fair_side:        sig?._fair?.fair_side ?? null,
+    fair_ask:         sig?._fair?.fair_ask ?? null,
+    fair_edge:        sig?._fair?.fair_edge ?? null,
+    fair_sigma_ps:    sig?._fair?.fair_sigma_ps ?? null,
+    fair_t_rem_s:     sig?._fair?.fair_t_rem_s ?? null,
     fill_time_ms:     null,
     bufferSize:       sig?.bufferSize || 0,
     // Estado del bot al momento de la señal

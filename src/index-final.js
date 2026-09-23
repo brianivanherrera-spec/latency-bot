@@ -41,6 +41,13 @@ function getDynamicOrderSize(balance, fallbackSize) {
     return fallbackSize;
   }
 }
+// Normal estándar acumulada (Abramowitz-Stegun 7.1.26, error < 1.5e-7)
+function normCdf(x) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2);
+  const erf = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(x * x) / 2);
+  return x >= 0 ? (1 + erf) / 2 : (1 - erf) / 2;
+}
+
 const { alertTradeSignal, alertBotStart } = require('./alerts');
 const signalLogger = require('./signal-logger');
 const phase2Logger = require('./phase2-logger');
@@ -730,6 +737,13 @@ async function main() {
     // en el mercado viejo 1-107s después de la apertura del nuevo.
     if (cachedMarket?.endDate && Date.now() >= new Date(cachedMarket.endDate).getTime()) {
       logger.info(`[POLY] ⏱️ Mercado cerrado por horario — activando el siguiente`);
+      // Resultado aproximado (Binance; Polymarket resuelve con Chainlink) para
+      // evaluar la probabilidad justa también en señales no operadas.
+      const strikeClose = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
+      const btcClose = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : signal.getStats()?.lastPrice;
+      if (strikeClose && btcClose) {
+        logger.info(`[MARKET-RESULT] ${cachedMarket.question?.slice(-22) || ''} | strike=$${strikeClose.toFixed(2)} close=$${btcClose.toFixed(2)} (${btcClose - strikeClose >= 0 ? '+' : ''}${(btcClose - strikeClose).toFixed(2)}) → ${btcClose >= strikeClose ? 'UP' : 'DOWN'} (aprox.)`);
+      }
       if (RESEARCH_MODE && marketResearch.isActive()) {
         marketResearch.closeMarket({
           finalPrice: signal.getStats()?.lastPrice,
@@ -1004,6 +1018,32 @@ async function main() {
   const marketSignalLog = []; // señales del mercado actual
   let marketStartTs = null;
   let marketFillData = null; // { filled_price, filled_direction } for position_result calculation
+
+  // Probabilidad justa (MODO SOMBRA — solo se registra, no decide entradas):
+  // P(UP) = Φ( ln(BTC/strike) / (σ·√T) ), σ = volatilidad realizada por √s,
+  // T = segundos restantes. fair_edge = prob. justa del lado de la señal − ask real.
+  const computeFair = (sig, btcNow, nowMs) => {
+    const strike = cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open;
+    const endMs = cachedMarket?.endDate ? new Date(cachedMarket.endDate).getTime() : null;
+    const sigma = signal.realizedVolPerSec();
+    if (!strike || !endMs || !sigma || !btcNow) return null;
+    const tRem = (endMs - nowMs) / 1000;
+    if (tRem <= 0) return null;
+    const fairUp = normCdf(Math.log(btcNow / strike) / (sigma * Math.sqrt(tRem)));
+    const fairSide = sig.direction === 'UP' ? fairUp : 1 - fairUp;
+    const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
+    const ask = polyWs.getBestAskForToken?.(tokenId) ?? null;
+    const r3 = v => parseFloat(v.toFixed(3));
+    return {
+      fair_up: r3(fairUp),
+      fair_side: r3(fairSide),
+      fair_ask: ask,
+      fair_edge: ask != null ? r3(fairSide - ask) : null,
+      fair_sigma_ps: parseFloat(sigma.toExponential(3)),
+      fair_t_rem_s: Math.round(tRem),
+      fair_strike: strike,
+    };
+  };
 
   // Guardar señal en el log del mercado actual
   const logMarketSignal = (sig, skipReason, bookImb) => {
@@ -1338,6 +1378,7 @@ async function main() {
     // PHASE 2: Generar signal_id único para esta señal
     const signal_id = randomUUID();
     sig._signal_id = signal_id;
+    sig._fair = computeFair(sig, btcPriceNow, nowMs);
 
     // ── MarketRecorder: señal generada ──────────────────────────────────────
     {
@@ -1400,6 +1441,7 @@ async function main() {
         move_pct: sig.movePct || null,
         btc_velocity: null, // TODO: calcular desde btcPriceHistory
         volatility_60s: sig.volatility60s || null,
+        fair: sig._fair,
       });
     }
 
@@ -1463,7 +1505,9 @@ async function main() {
     }
 
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
-    logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%`);
+    const f = sig._fair;
+    const fairTag = f ? ` | FAIR ${f.fair_side} ask=${f.fair_ask ?? 'n/a'} fEdge=${f.fair_edge ?? 'n/a'} T=${f.fair_t_rem_s}s` : ' | FAIR n/a';
+    logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%${fairTag}`);
 
     // ─── BOOK_ENTRY_MODE — chequear book ANTES de BTC trend filters ──────
     // Si el book es muy fuerte (≥ umbral), entrar directo salteando filtros BTC.
