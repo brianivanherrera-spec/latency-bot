@@ -56,7 +56,8 @@ module.exports = {
   // =============================================
 
   // USDC por orden (en modo live)
-  ORDER_SIZE_USDC: parseFloat(process.env.ORDER_SIZE_USDC || '4'),
+  // Mínimo de Polymarket: $5
+  ORDER_SIZE_USDC: parseFloat(process.env.ORDER_SIZE_USDC || '5'),
 
   // Límites de posiciones y capital
   MAX_POSITIONS: parseInt(process.env.MAX_POSITIONS || '10'),
