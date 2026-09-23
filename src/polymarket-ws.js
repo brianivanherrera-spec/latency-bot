@@ -394,8 +394,7 @@ class PolymarketWS {
     if (total <= 0) return null;
     const imb = parseFloat(((calcYesBid - calcNoBid) / total).toFixed(3));
 
-    // Track imbalance for movement calculation
-    const now = Date.now();
+    // Track imbalance for movement calculation (now already declared at line 361)
     const timeSinceLastUpdate = now - this._lastImbalanceUpdate;
     // Only update if >1 second has passed (avoid noise from rapid updates)
     if (timeSinceLastUpdate > 1000) {
