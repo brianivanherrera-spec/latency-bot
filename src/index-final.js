@@ -1412,8 +1412,9 @@ async function main() {
       // Guard: no loguear ni procesar señales en mercados ya cerrados
       // (evita ruido en bot-events y señales con window_remaining < 0)
       if (marketEndMs && nowMs >= marketEndMs) {
+        // No soltar cachedMarket acá: el cambio por horario (cada 2s) lo hace y
+        // registra [MARKET-RESULT]; soltarlo antes hacía que se perdiera esa línea.
         logger.warn(`[SKIP-SIGNAL] ⏱️ Mercado ya cerrado hace ${Math.abs(windowRemainingSec)}s — descartando señal`);
-        cachedMarket = null;
         return;
       }
 
@@ -1721,7 +1722,6 @@ async function main() {
 
     if (msRestantes <= 0) {
       logger.warn(`[SKIP] ⏱️ Mercado YA CERRADO hace ${Math.abs(segsRestantes)}s`);
-      cachedMarket = null;
       return;
     }
 
