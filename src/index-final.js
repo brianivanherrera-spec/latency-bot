@@ -725,6 +725,21 @@ async function main() {
   }
 
   async function actualizarPrecioPolymarket() {
+    // Cambio de mercado por horario. Antes solo se soltaba el mercado cuando Gamma
+    // lo marcaba resuelto o cuando llegaba una señal post-cierre, y el bot seguía
+    // en el mercado viejo 1-107s después de la apertura del nuevo.
+    if (cachedMarket?.endDate && Date.now() >= new Date(cachedMarket.endDate).getTime()) {
+      logger.info(`[POLY] ⏱️ Mercado cerrado por horario — activando el siguiente`);
+      if (RESEARCH_MODE && marketResearch.isActive()) {
+        marketResearch.closeMarket({
+          finalPrice: signal.getStats()?.lastPrice,
+          winner: (livePolyYes ?? 0.5) >= 0.5 ? 'UP' : 'DOWN',
+        });
+      }
+      cachedMarket = null;
+      lastPolyPrice = '';
+    }
+
     // Si no hay mercado activo, usar el pre-cacheado si está disponible
     if (!cachedMarket?.gammaId) {
       if (nextMarketCache) {
@@ -905,18 +920,10 @@ async function main() {
           if (msRestantes < 60000 && msRestantes > 0 && !nextMarketCache) {
             preFetchNextMarket();
           }
-        } else {
-          logger.info(`[POLY] Mercado resuelto (YES=${yes}), activando pre-cache...`);
-          if (RESEARCH_MODE && marketResearch.isActive()) {
-            marketResearch.closeMarket({
-              finalPrice: signal.getStats()?.lastPrice,
-              winner: yes >= 0.95 ? 'UP' : 'DOWN',
-            });
-          }
-          cachedMarket = null;
-          lastPolyPrice = '';
-          preFetchScheduled = false;
         }
+        // Precio extremo en Gamma ya no suelta el mercado: el cambio es por horario
+        // (arriba). Soltarlo antes del cierre hacía que findBTCMarket re-tomara el
+        // mismo mercado cada 2s y re-capturara el strike "de apertura" a mitad de ventana.
       }
     } catch (err) {
       logger.warn(`[POLY] Error actualizando precio: ${err.message}`);
@@ -1860,11 +1867,14 @@ async function main() {
       size = size - 1;
     }
 
-    // MAX_ENTRY_PRICE — filtro sobre priceRaw de la señal (no del order price)
+    // MAX_ENTRY_PRICE — se compara contra el mayor entre priceRaw y el bestAsk real.
+    // Solo con priceRaw, un precio de señal viejo (fallback Gamma ~$0.50) dejaba
+    // pasar compras a $0.97 con el ask real en $0.99-$1.00.
     // Señales ÉLITE lo saltean — con 100% WR histórico no importa el priceRaw
     const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
-    if (!isEliteSignal && maxEntryPrice < 0.97 && priceRaw > maxEntryPrice) {
-      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} > máximo $${maxEntryPrice} — señal vieja`);
+    const entryPriceCheck = Math.max(priceRaw ?? 0, bestAskWS ?? 0);
+    if (!isEliteSignal && maxEntryPrice < 0.97 && entryPriceCheck > maxEntryPrice) {
+      logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio $${entryPriceCheck.toFixed(2)} (raw $${priceRaw?.toFixed(2)} ask ${bestAskWS != null ? '$' + bestAskWS.toFixed(2) : 'n/a'}) > máximo $${maxEntryPrice} — señal vieja`);
       activePositions.delete(posId);
       return;
     }
@@ -1985,12 +1995,6 @@ async function main() {
           ]);
           const spread = spreadRes.status === 'fulfilled' ? parseFloat(spreadRes.value?.spread || 0) : null;
           if (spreadRes.status === 'rejected') logger.warn(`[CLOB-SNAP] getSpread error: ${spreadRes.reason?.message}`);
-          // Log raw la primera vez para verificar formato
-          if (tradesRes.status === 'fulfilled' && tradesRes.value && !global._clobTradeFormatLogged) {
-            global._clobTradeFormatLogged = true;
-            const sample = Array.isArray(tradesRes.value) ? tradesRes.value[0] : tradesRes.value;
-            logger.info(`[CLOB-SNAP] Formato trades: ${JSON.stringify(sample).slice(0, 200)}`);
-          }
 
           let vol60s_yes = 0, vol60s_no = 0, trades60s_count = 0;
           if (tradesRes.status === 'fulfilled') {
