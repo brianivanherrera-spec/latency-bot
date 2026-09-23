@@ -7,6 +7,7 @@
 const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
 const { ChainlinkRTDS } = require('./chainlink-rtds');
+const { ChainlinkSpot } = require('./chainlink-spot');
 const { MarketRecorder } = require('./market-recorder');
 const UserWebSocket = require('./polymarket-user-ws');
 const marketResearch = require('./market-research');
@@ -681,6 +682,15 @@ async function main() {
   const mRecorder = new MarketRecorder();  // timeline completo por mercado
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
   clRTDS.connect();
+  // Precio spot Chainlink BTC/USD — la fuente con la que resuelve Polymarket
+  const clSpot = new ChainlinkSpot();
+  clSpot.connect();
+  // "Price to Beat" según Chainlink: precio en el inicio de la ventana (lazy, se cachea)
+  const chainlinkStrike = (market) => {
+    if (!market?.startTime) return null;
+    if (market.strike_chainlink == null) market.strike_chainlink = clSpot.getPriceAt(market.startTime, 10000);
+    return market.strike_chainlink;
+  };
   // ─────────────────────────────────────────────────────────────────────────
 
   // PHASE 1: Initialize User WebSocket for real-time fill detection
@@ -737,13 +747,18 @@ async function main() {
     // en el mercado viejo 1-107s después de la apertura del nuevo.
     if (cachedMarket?.endDate && Date.now() >= new Date(cachedMarket.endDate).getTime()) {
       logger.info(`[POLY] ⏱️ Mercado cerrado por horario — activando el siguiente`);
-      // Resultado aproximado (Binance; Polymarket resuelve con Chainlink) para
-      // evaluar la probabilidad justa también en señales no operadas.
-      const strikeClose = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
-      const btcClose = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : signal.getStats()?.lastPrice;
-      if (strikeClose && btcClose) {
-        logger.info(`[MARKET-RESULT] ${cachedMarket.question?.slice(-22) || ''} | strike=$${strikeClose.toFixed(2)} close=$${btcClose.toFixed(2)} (${btcClose - strikeClose >= 0 ? '+' : ''}${(btcClose - strikeClose).toFixed(2)}) → ${btcClose >= strikeClose ? 'UP' : 'DOWN'} (aprox.)`);
-      }
+      // Resultado del mercado para evaluar la probabilidad justa también en señales
+      // no operadas. Chainlink = fuente de resolución de Polymarket (UP si cierre >= inicio);
+      // Binance queda como comparación.
+      const fmtRes = (s, c) => `strike=$${s.toFixed(2)} close=$${c.toFixed(2)} (${c - s >= 0 ? '+' : ''}${(c - s).toFixed(2)}) → ${c >= s ? 'UP' : 'DOWN'}`;
+      const clS = chainlinkStrike(cachedMarket);
+      const clC = clSpot.getPriceAt(new Date(cachedMarket.endDate).getTime(), 10000);
+      const bnS = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
+      const bnC = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : signal.getStats()?.lastPrice;
+      const parts = [];
+      if (clS != null && clC != null) parts.push(`CL ${fmtRes(clS, clC)}`);
+      if (bnS && bnC) parts.push(`BN ${fmtRes(bnS, bnC)} (aprox.)`);
+      if (parts.length) logger.info(`[MARKET-RESULT] ${cachedMarket.question?.slice(-22) || ''} | ${parts.join(' | ')}`);
       if (RESEARCH_MODE && marketResearch.isActive()) {
         marketResearch.closeMarket({
           finalPrice: signal.getStats()?.lastPrice,
@@ -1022,8 +1037,13 @@ async function main() {
   // Probabilidad justa (MODO SOMBRA — solo se registra, no decide entradas):
   // P(UP) = Φ( ln(BTC/strike) / (σ·√T) ), σ = volatilidad realizada por √s,
   // T = segundos restantes. fair_edge = prob. justa del lado de la señal − ask real.
-  const computeFair = (sig, btcNow, nowMs) => {
-    const strike = cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open;
+  const computeFair = (sig, btcNowBinance, nowMs) => {
+    // Preferir Chainlink (fuente de resolución); Binance como respaldo
+    const clStrike = chainlinkStrike(cachedMarket);
+    const clNow = clSpot.getLatest(5000);
+    const useCl = clStrike != null && clNow != null;
+    const strike = useCl ? clStrike : (cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open);
+    const btcNow = useCl ? clNow : btcNowBinance;
     const endMs = cachedMarket?.endDate ? new Date(cachedMarket.endDate).getTime() : null;
     const sigma = signal.realizedVolPerSec();
     if (!strike || !endMs || !sigma || !btcNow) return null;
@@ -1042,6 +1062,7 @@ async function main() {
       fair_sigma_ps: parseFloat(sigma.toExponential(3)),
       fair_t_rem_s: Math.round(tRem),
       fair_strike: strike,
+      fair_src: useCl ? 'chainlink' : 'binance',
     };
   };
 
@@ -1507,7 +1528,7 @@ async function main() {
 
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     const f = sig._fair;
-    const fairTag = f ? ` | FAIR ${f.fair_side} ask=${f.fair_ask ?? 'n/a'} fEdge=${f.fair_edge ?? 'n/a'} T=${f.fair_t_rem_s}s` : ' | FAIR n/a';
+    const fairTag = f ? ` | FAIR(${f.fair_src === 'chainlink' ? 'cl' : 'bn'}) ${f.fair_side} ask=${f.fair_ask ?? 'n/a'} fEdge=${f.fair_edge ?? 'n/a'} T=${f.fair_t_rem_s}s` : ' | FAIR n/a';
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%${fairTag}`);
 
     // ─── BOOK_ENTRY_MODE — chequear book ANTES de BTC trend filters ──────

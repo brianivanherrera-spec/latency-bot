@@ -93,6 +93,7 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     fair_edge:        sig?._fair?.fair_edge ?? null,
     fair_sigma_ps:    sig?._fair?.fair_sigma_ps ?? null,
     fair_t_rem_s:     sig?._fair?.fair_t_rem_s ?? null,
+    fair_src:         sig?._fair?.fair_src ?? null,
     fill_time_ms:     null,
     bufferSize:       sig?.bufferSize || 0,
     // Estado del bot al momento de la señal
