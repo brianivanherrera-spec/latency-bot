@@ -2029,13 +2029,12 @@ async function main() {
         try {
           const [spreadRes, tradesRes] = await Promise.allSettled([
             poly.clobClient.getSpread(tokenId),
-            fetch(`https://data-api.polymarket.com/activity?asset_id=${tokenId}&limit=50&offset=0`)
-              .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-              .then(data => Array.isArray(data) ? data : data?.data || []),
+            // Skip getTrades API call — it keeps returning HTTP 400
+            // Instead derive from book imbalance and timestamp
+            Promise.resolve([]),
           ]);
           const spread = spreadRes.status === 'fulfilled' ? parseFloat(spreadRes.value?.spread || 0) : null;
           if (spreadRes.status === 'rejected') logger.warn(`[CLOB-SNAP] getSpread error: ${spreadRes.reason?.message}`);
-          if (tradesRes.status === 'rejected') logger.warn(`[CLOB-SNAP] getTrades error: ${tradesRes.reason?.message}`);
           // Log raw la primera vez para verificar formato
           if (tradesRes.status === 'fulfilled' && tradesRes.value && !global._clobTradeFormatLogged) {
             global._clobTradeFormatLogged = true;
