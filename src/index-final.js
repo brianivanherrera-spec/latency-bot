@@ -753,6 +753,8 @@ async function main() {
           // Fix B: suscribir al nuevo mercado via WS
           polyWs.unsubscribeAll();
           polyWs.subscribe(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+          // Mercado nuevo: descartar precio WS del mercado anterior
+          lastWsPriceAt = 0; livePolyYes = null; livePolyNo = null;
           // Bootstrap topOfBook con REST una vez — siembra el dato antes del primer tick WS
           if (poly.clobClient) {
             polyWs.bootstrapTopOfBook(cachedMarket.yesTokenId, poly.clobClient).catch(() => {});
@@ -830,6 +832,8 @@ async function main() {
           // Fix B: suscribir al WS de Polymarket para precio en tiempo real
           polyWs.unsubscribeAll();
           polyWs.subscribe(m.yesTokenId, m.noTokenId);
+          // Mercado nuevo: descartar precio WS del mercado anterior
+          lastWsPriceAt = 0; livePolyYes = null; livePolyNo = null;
           if (poly.clobClient) {
             polyWs.bootstrapTopOfBook(m.yesTokenId, poly.clobClient).catch(() => {});
             polyWs.bootstrapTopOfBook(m.noTokenId, poly.clobClient).catch(() => {});
@@ -878,7 +882,12 @@ async function main() {
         const yes = parseFloat(prices[0]);
         const no = parseFloat(prices[1]);
         if (yes >= 0.05 && yes <= 0.95) {
-          signal.updatePolyPrice(yes, no);
+          // Gamma outcomePrices llega con minutos de atraso. Antes pisaba el precio
+          // del WS cada 2s y además reseteaba polyUpdatedAt, así que el chequeo
+          // POLY_PRICE_STALE (3s) nunca saltaba y señales/filtros usaban precios viejos.
+          // Ahora Gamma solo alimenta la señal si el WS no mandó nada en 5s.
+          const wsFresh = lastWsPriceAt && (Date.now() - lastWsPriceAt) < 5000;
+          if (!wsFresh) signal.updatePolyPrice(yes, no);
           const tag = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
           if (tag !== lastPolyPrice) {
             logger.info(`[POLY] ${tag}`);
@@ -920,6 +929,7 @@ async function main() {
   // del objeto de señal que quedaba estático desde el momento de la señal.
   let livePolyYes = null;
   let livePolyNo  = null;
+  let lastWsPriceAt = 0; // último precio recibido por WS — Gamma solo es fallback
   let lastLoggedPolyYes = null;
   let lastLoggedPolyAt = 0;
 
@@ -927,6 +937,7 @@ async function main() {
     signal.updatePolyPrice(yes, no);
     livePolyYes = yes;
     livePolyNo  = no;
+    lastWsPriceAt = Date.now();
     // ── MarketRecorder: precio Polymarket ──────────────────────────────────
     const bookSnap = polyWs.getBookSnapshot();
     mRecorder.recordPolymarket({
