@@ -687,6 +687,7 @@ async function main() {
   const clSpot = new ChainlinkSpot();
   clSpot.connect();
   const priceToBeat = new PriceToBeat();
+  let lastEarlySkipLog = 0; // throttle del log [SKIP] muy pronto
   // "Price to Beat" según Chainlink: precio en el inicio de la ventana (lazy, se cachea)
   const chainlinkStrike = (market) => {
     if (!market?.startTime) return null;
@@ -1829,6 +1830,18 @@ async function main() {
     const MIN_SECS = parseInt(process.env.MIN_SECONDS_REMAINING || '60');
     if (segsRestantes < MIN_SECS) {
       logger.warn(`[SKIP] ⏱️ Solo ${segsRestantes}s restantes — muy tarde (mín ${MIN_SECS}s)`);
+      return;
+    }
+
+    // No entrar al principio del mercado: con 4-5 min por delante el precio se da vuelta
+    // seguido y el token ya cuesta ~0.60. En 18 h: mismo P&L con la mitad de entradas
+    // (25 vs 53) y más aciertos (72% vs 66%). 0 = desactivado.
+    const MAX_ENTRY_SECS = parseInt(process.env.MAX_ENTRY_SECONDS_REMAINING || '270');
+    if (MAX_ENTRY_SECS > 0 && segsRestantes > MAX_ENTRY_SECS) {
+      if (Date.now() - lastEarlySkipLog > 10000) {
+        lastEarlySkipLog = Date.now();
+        logger.info(`[SKIP] ⏱️ ${segsRestantes}s restantes — muy pronto (máx ${MAX_ENTRY_SECS}s)`);
+      }
       return;
     }
 
