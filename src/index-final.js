@@ -433,6 +433,14 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
   
+  if (url.pathname === '/open-snaps' && url.searchParams.get('key') === SECRET) {
+    const file = path.join(process.env.DATA_DIR || '/data', 'open-snaps.jsonl');
+    if (!fs.existsSync(file)) { res.writeHead(404); res.end('No open-snaps file yet'); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename=open-snaps.jsonl' });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
+
   if (url.pathname === '/signals' && url.searchParams.get('key') === SECRET) {
     const file = path.join(process.env.DATA_DIR || '/data', 'signals.jsonl');
     if (!fs.existsSync(file)) {
@@ -850,6 +858,7 @@ async function main() {
         const rtC = clRTDS.getTwapAt(60, mktEndMs);
         const parts = [];
         if (twS != null && twC != null) parts.push(`TWAP60 ${fmtRes(twS, twC)}`);
+        saveOpenSnaps(mkt, rtS != null && rtC != null ? (rtC >= rtS ? 'UP' : 'DOWN') : null, rtS, rtC);
         if (rtS != null && rtC != null) parts.push(`RTDS-TWAP60 ${fmtRes(rtS, rtC)}`);
         if (clS != null && clC != null) parts.push(`CL spot ${fmtRes(clS, clC)}`);
         if (bnS && bnC) parts.push(`BN ${fmtRes(bnS, bnC)} (aprox.)`);
@@ -1197,6 +1206,60 @@ async function main() {
     if (!strike || !btcNowBinance || tRem <= 0) return null;
     const fairUp = normCdf(Math.log(btcNowBinance / strike) / (sigma * Math.sqrt(tRem)));
     return out(fairUp, { fair_t_rem_s: Math.round(tRem), fair_strike: strike, fair_src: 'binance' });
+  };
+
+  // ─── OPEN-SNAP (sombra): ¿el mercado abre mal valuado? ─────────────────────
+  // El strike es el TWAP 60 s del minuto previo a la apertura, así que desde el segundo 0
+  // el precio actual puede estar arriba/abajo del strike y P(UP) ya no es 0.50. Se registra
+  // FAIR y el book de Polymarket en los primeros segundos de cada mercado; al cierre se
+  // agrega el resultado (TWAP publicado) y se guarda en open-snaps.jsonl.
+  const OPEN_SNAP_OFFSETS_S = [1, 3, 5, 10, 20, 30];
+  const OPEN_SNAPS_FILE = path.join(process.env.DATA_DIR || '/data', 'open-snaps.jsonl');
+  const takeOpenSnap = (mkt, offsetS) => {
+    if (cachedMarket !== mkt) return; // ya cambió de mercado
+    const top = tok => (tok ? polyWs._topOfBook?.get(tok) : null) || {};
+    const yes = top(mkt.yesTokenId), no = top(mkt.noTokenId);
+    const f = computeFair({ direction: 'UP' }, btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null, Date.now());
+    const P = chainlinkNowcast();
+    const r3 = v => (v == null ? null : parseFloat(Number(v).toFixed(3)));
+    const snap = {
+      t: offsetS,
+      fair_up: f?.fair_up ?? null,
+      fair_src: f?.fair_src ?? null,
+      strike: f?.fair_strike ?? null,
+      spot_cl: P != null ? parseFloat(P.toFixed(2)) : null,
+      yes_bid: r3(yes.bestBid), yes_ask: r3(yes.bestAsk),
+      no_bid: r3(no.bestBid), no_ask: r3(no.bestAsk),
+    };
+    snap.edge_up = snap.fair_up != null && snap.yes_ask != null ? r3(snap.fair_up - snap.yes_ask) : null;
+    snap.edge_down = snap.fair_up != null && snap.no_ask != null ? r3(1 - snap.fair_up - snap.no_ask) : null;
+    (mkt._openSnaps = mkt._openSnaps || []).push(snap);
+    const diff = snap.spot_cl != null && snap.strike != null ? (snap.spot_cl - snap.strike).toFixed(1) : 'n/a';
+    logger.info(`[OPEN-SNAP] +${offsetS}s | spot−strike=${diff} | FAIR up=${snap.fair_up ?? 'n/a'} (${snap.fair_src ?? '-'}) | YES ${snap.yes_bid ?? '-'}/${snap.yes_ask ?? '-'} NO ${snap.no_bid ?? '-'}/${snap.no_ask ?? '-'} | edge UP=${snap.edge_up ?? 'n/a'} DOWN=${snap.edge_down ?? 'n/a'}`);
+  };
+  setInterval(() => {
+    const mkt = cachedMarket;
+    if (!mkt?.startTime || mkt._openSnapScheduled) return;
+    const since = Date.now() - mkt.startTime;
+    if (since < 0 || since > 5000) { mkt._openSnapScheduled = true; return; } // solo mercados tomados al abrir
+    mkt._openSnapScheduled = true;
+    for (const s of OPEN_SNAP_OFFSETS_S) {
+      setTimeout(() => { try { takeOpenSnap(mkt, s); } catch (e) { logger.warn(`[OPEN-SNAP] error: ${e.message}`); } },
+        Math.max(0, s * 1000 - since));
+    }
+  }, 250);
+  // Al cierre: resultado por TWAP publicado y registro completo
+  const saveOpenSnaps = (mkt, outcome, twS, twC) => {
+    if (!mkt?._openSnaps?.length) return;
+    const best = mkt._openSnaps.reduce((b, s) => {
+      for (const [side, e] of [['UP', s.edge_up], ['DOWN', s.edge_down]]) {
+        if (e != null && (b == null || e > b.edge)) b = { t: s.t, side, edge: e };
+      }
+      return b;
+    }, null);
+    const rec = { market: mkt.question || null, start_ms: mkt.startTime, outcome, strike_twap: twS, close_twap: twC, snaps: mkt._openSnaps };
+    try { fs.appendFileSync(OPEN_SNAPS_FILE, JSON.stringify(rec) + '\n'); } catch (e) { logger.warn(`[OPEN-SNAP] no se pudo guardar: ${e.message}`); }
+    logger.info(`[OPEN-RESULT] ${(mkt.question || '').slice(-22)} | resultado=${outcome ?? 'n/a'} | mayor edge en apertura: ${best ? `${best.side} ${best.edge} (+${best.t}s) → ${best.side === outcome ? 'GANA' : 'PIERDE'}` : 'n/a'}`);
   };
 
   // Guardar señal en el log del mercado actual
