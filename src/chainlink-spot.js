@@ -20,7 +20,10 @@ class ChainlinkSpot {
     this._reconnectDelay = 1000;
     this._history = []; // [{ ts (ms, fuente), value, received }] ordenado por ts
     this._firstLogged = false;
+    this._onUpdate = null;
   }
+
+  onUpdate(cb) { this._onUpdate = cb; }
 
   connect() {
     try { this.ws = new WebSocket(RTDS_URL); } catch (e) {
@@ -81,9 +84,15 @@ class ChainlinkSpot {
       h.splice(i === -1 ? h.length : i, 0, { ts, value, received: Date.now() });
     } else {
       h.push({ ts, value, received: Date.now() });
+      if (this._onUpdate) this._onUpdate(h[h.length - 1]);
     }
     const cutoff = Date.now() - HISTORY_MS;
     while (h.length && h[0].ts < cutoff) h.shift();
+  }
+
+  // Último punto publicado { ts, value, received } o null
+  getLast() {
+    return this._history[this._history.length - 1] || null;
   }
 
   // Último precio si su timestamp de fuente no tiene más de maxAgeMs

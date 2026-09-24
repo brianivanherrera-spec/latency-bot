@@ -691,6 +691,61 @@ async function main() {
     if (market.strike_chainlink == null) market.strike_chainlink = clSpot.getPriceAt(market.startTime, 10000);
     return market.strike_chainlink;
   };
+
+  // Ticks crudos de Binance (90 s) — resolución fina para comparar con Chainlink
+  const bnTape = []; // [{ ts (recepción local), price }]
+  const bnPriceAt = (ts) => {
+    for (let i = bnTape.length - 1; i >= 0; i--) if (bnTape[i].ts <= ts) return bnTape[i].price;
+    return null;
+  };
+  // Chainlink refleja a Binance con un desfase (lagEstimateMs, medido abajo):
+  // CL(t) ≈ BN(t − desfase) − base. Proyección = último CL + movimiento de Binance
+  // desde (t_CL − desfase) hasta ahora ≈ el valor que Chainlink va a publicar dentro
+  // de ~desfase ms. La base USDT/USD se cancela al usar solo el delta.
+  let lagEstimateMs = 0; // 0 hasta la primera medición
+  const chainlinkNowcast = () => {
+    const last = clSpot.getLast();
+    if (!last || Date.now() - last.ts > 10000) return null;
+    const bnThen = bnPriceAt(last.ts - lagEstimateMs);
+    const bnNow = bnTape.length ? bnTape[bnTape.length - 1].price : null;
+    return bnThen != null && bnNow != null ? last.value + (bnNow - bnThen) : last.value;
+  };
+
+  // Medición del atraso de Chainlink vs Binance, resumen cada 5 min:
+  // - llegada: recepción − timestamp de origen de Chainlink
+  // - desfase: el k que mejor alinea cada cambio de Chainlink con el de Binance k ms antes
+  const LAG_OFFSETS = [0, 250, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000];
+  const lag = { n: 0, arrival: [], sqErr: LAG_OFFSETS.map(() => 0), basisSum: 0, basisN: 0, prev: null };
+  clSpot.onUpdate((pt) => {
+    const arrival = pt.received - pt.ts;
+    if (arrival < 0 || arrival > 10000) return; // snapshot histórico
+    lag.arrival.push(arrival);
+    const bnAtTs = bnPriceAt(pt.ts);
+    if (bnAtTs != null) { lag.basisSum += bnAtTs - pt.value; lag.basisN++; }
+    const prev = lag.prev;
+    lag.prev = pt;
+    if (!prev || pt.ts - prev.ts > 5000) return;
+    const dCl = pt.value - prev.value;
+    const errs = [];
+    for (const k of LAG_OFFSETS) {
+      const a = bnPriceAt(pt.ts - k), b = bnPriceAt(prev.ts - k);
+      if (a == null || b == null) return;
+      errs.push((dCl - (a - b)) ** 2);
+    }
+    errs.forEach((e, i) => { lag.sqErr[i] += e; });
+    lag.n++;
+  });
+  setInterval(() => {
+    if (lag.n < 20 || !lag.arrival.length) return;
+    const arr = [...lag.arrival].sort((x, y) => x - y);
+    const pct = q => arr[Math.min(arr.length - 1, Math.floor(q * arr.length))];
+    const rmse = lag.sqErr.map(s => Math.sqrt(s / lag.n));
+    const best = rmse.indexOf(Math.min(...rmse));
+    const basis = lag.basisN ? (lag.basisSum / lag.basisN).toFixed(2) : 'n/a';
+    lagEstimateMs = LAG_OFFSETS[best];
+    logger.info(`[CL-LAG] n=${lag.n} | llegada p50=${pct(0.5)}ms p90=${pct(0.9)}ms | desfase vs Binance=${LAG_OFFSETS[best]}ms (rmse $${rmse[best].toFixed(2)} vs $${rmse[0].toFixed(2)} sin desfase) | base BN−CL=$${basis}`);
+    lag.n = 0; lag.arrival = []; lag.sqErr = LAG_OFFSETS.map(() => 0); lag.basisSum = 0; lag.basisN = 0;
+  }, 5 * 60 * 1000);
   // ─────────────────────────────────────────────────────────────────────────
 
   // PHASE 1: Initialize User WebSocket for real-time fill detection
@@ -1040,14 +1095,15 @@ async function main() {
   const computeFair = (sig, btcNowBinance, nowMs) => {
     // Preferir Chainlink (fuente de resolución); Binance como respaldo
     const clStrike = chainlinkStrike(cachedMarket);
-    const clNow = clSpot.getLatest(5000);
+    const clNow = chainlinkNowcast();
     const useCl = clStrike != null && clNow != null;
     const strike = useCl ? clStrike : (cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open);
     const btcNow = useCl ? clNow : btcNowBinance;
     const endMs = cachedMarket?.endDate ? new Date(cachedMarket.endDate).getTime() : null;
     const sigma = signal.realizedVolPerSec();
     if (!strike || !endMs || !sigma || !btcNow) return null;
-    const tRem = (endMs - nowMs) / 1000;
+    // La proyección Chainlink ya adelanta lagEstimateMs: queda menos tiempo por delante
+    const tRem = (endMs - nowMs - (useCl ? lagEstimateMs : 0)) / 1000;
     if (tRem <= 0) return null;
     const fairUp = normCdf(Math.log(btcNow / strike) / (sigma * Math.sqrt(tRem)));
     const fairSide = sig.direction === 'UP' ? fairUp : 1 - fairUp;
@@ -1308,6 +1364,12 @@ async function main() {
 
     const btcPriceNow = priceData.price || priceData.currentPrice || priceData.lastPrice || 0;
     const nowMs = t1_ms;
+
+    // Cinta de ticks crudos (antes del throttle), solo Binance
+    if (btcPriceNow > 0 && priceData.source !== 'coinbase') {
+      bnTape.push({ ts: t1_ms, price: btcPriceNow });
+      while (bnTape.length && t1_ms - bnTape[0].ts > 90000) bnTape.shift();
+    }
 
     // Contador de ticks — diagnosticar si el callback se invoca correctamente
     ws._tickCount = (ws._tickCount || 0) + 1;
@@ -2595,7 +2657,7 @@ async function main() {
     // Solo procesar si Binance no actualizó en los últimos 500ms
     const lastBinance = ws.getLastPrice();
     if (lastBinance.timestamp && Date.now() - lastBinance.timestamp < 500) return;
-    if (ws.priceCallback) await ws.priceCallback(priceData);
+    if (ws.priceCallback) await ws.priceCallback({ ...priceData, source: 'coinbase' });
   });
   wsCoinbase.connect().catch(e => logger.warn(`Coinbase WS no disponible: ${e.message}`));
   logger.info('✓ Conectado\n');
