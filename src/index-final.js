@@ -687,6 +687,12 @@ async function main() {
   const clSpot = new ChainlinkSpot();
   clSpot.connect();
   const priceToBeat = new PriceToBeat();
+  // Diagnóstico al arrancar: ¿Polymarket resuelve contra openPrice (Chainlink) o contra priceToBeat?
+  const ptbBackfillHours = parseFloat(process.env.PTB_BACKFILL_HOURS || '24');
+  if (ptbBackfillHours > 0) {
+    setTimeout(() => priceToBeat.backfill(ptbBackfillHours)
+      .catch(e => logger.warn(`[PTB-BACKFILL] error: ${e.message}`)), 30000);
+  }
   let lastEarlySkipLog = 0; // throttle del log [SKIP] muy pronto
   // "Price to Beat" según Chainlink: precio en el inicio de la ventana (lazy, se cachea)
   const chainlinkStrike = (market) => {
