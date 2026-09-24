@@ -80,8 +80,15 @@ class PriceToBeat {
   }
 
   // Loguea lo oficial junto al strike/cierre Chainlink del bot. Se llama al cierre del mercado.
-  async report(label, startMs, ours) {
+  async report(label, startMs, ours, retry = true) {
     const found = await this.fetch(startMs);
+    // Gamma publica eventMetadata.priceToBeat recién al resolver (a veces después de los 90 s):
+    // si todavía no está, reintentar una vez 5 min más tarde.
+    if (retry && !/priceToBeat/.test(String(found['gamma.eventMetadata'] ?? ''))) {
+      setTimeout(() => this.report(label, startMs, ours, false)
+        .catch(e => logger.warn(`[PTB] reintento: ${e.message}`)), 5 * 60000);
+      return;
+    }
     const fmt = Object.entries(found).map(([k, v]) => `${k}=${v}`).join(' ');
     const f2 = v => (v == null ? 'n/a' : v.toFixed(2));
     logger.info(`[PTB] ${label} | oficial: ${fmt || 'sin campos de precio'} | bot CL spot strike=${f2(ours.strike)} close=${f2(ours.close)} | bot TWAP60 strike=${f2(ours.twapStrike)} close=${f2(ours.twapClose)} | RTDS TWAP60 strike=${f2(ours.rtdsStrike)} close=${f2(ours.rtdsClose)}`);
