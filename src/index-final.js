@@ -8,6 +8,7 @@ const { BinanceWS } = require('./binance');
 const { PolymarketWS } = require('./polymarket-ws');
 const { ChainlinkRTDS } = require('./chainlink-rtds');
 const { ChainlinkSpot } = require('./chainlink-spot');
+const { PriceToBeat } = require('./price-to-beat');
 const { MarketRecorder } = require('./market-recorder');
 const UserWebSocket = require('./polymarket-user-ws');
 const marketResearch = require('./market-research');
@@ -685,11 +686,16 @@ async function main() {
   // Precio spot Chainlink BTC/USD — la fuente con la que resuelve Polymarket
   const clSpot = new ChainlinkSpot();
   clSpot.connect();
+  const priceToBeat = new PriceToBeat();
   // "Price to Beat" según Chainlink: precio en el inicio de la ventana (lazy, se cachea)
   const chainlinkStrike = (market) => {
     if (!market?.startTime) return null;
-    if (market.strike_chainlink == null) market.strike_chainlink = clSpot.getPriceAt(market.startTime, 10000);
-    return market.strike_chainlink;
+    if (market.strike_chainlink != null) return market.strike_chainlink;
+    const px = clSpot.getPriceAt(market.startTime, 10000);
+    // Fijarlo solo cuando ya llegó el precio del instante de apertura (llega ~1.5 s tarde);
+    // antes, usar el último disponible como provisorio.
+    if (px != null && (clSpot.getLast()?.ts ?? 0) >= market.startTime) market.strike_chainlink = px;
+    return px;
   };
 
   // Ticks crudos de Binance (90 s) — resolución fina para comparar con Chainlink
@@ -806,14 +812,26 @@ async function main() {
       // no operadas. Chainlink = fuente de resolución de Polymarket (UP si cierre >= inicio);
       // Binance queda como comparación.
       const fmtRes = (s, c) => `strike=$${s.toFixed(2)} close=$${c.toFixed(2)} (${c - s >= 0 ? '+' : ''}${(c - s).toFixed(2)}) → ${c >= s ? 'UP' : 'DOWN'}`;
-      const clS = chainlinkStrike(cachedMarket);
-      const clC = clSpot.getPriceAt(new Date(cachedMarket.endDate).getTime(), 10000);
-      const bnS = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
+      const mkt = cachedMarket;
+      const mktEndMs = new Date(mkt.endDate).getTime();
+      const bnS = mkt.strikePrice || mkt.market_strike_price_captured_at_open;
       const bnC = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : signal.getStats()?.lastPrice;
-      const parts = [];
-      if (clS != null && clC != null) parts.push(`CL ${fmtRes(clS, clC)}`);
-      if (bnS && bnC) parts.push(`BN ${fmtRes(bnS, bnC)} (aprox.)`);
-      if (parts.length) logger.info(`[MARKET-RESULT] ${cachedMarket.question?.slice(-22) || ''} | ${parts.join(' | ')}`);
+      // El precio de Chainlink del instante de cierre llega ~1.5 s tarde: esperar 3 s para
+      // no tomar el del segundo anterior.
+      setTimeout(() => {
+        const clS = chainlinkStrike(mkt);
+        const clC = clSpot.getPriceAt(mktEndMs, 10000);
+        const parts = [];
+        if (clS != null && clC != null) parts.push(`CL ${fmtRes(clS, clC)}`);
+        if (bnS && bnC) parts.push(`BN ${fmtRes(bnS, bnC)} (aprox.)`);
+        const label = mkt.question?.slice(-22) || '';
+        if (parts.length) logger.info(`[MARKET-RESULT] ${label} | ${parts.join(' | ')}`);
+        // Precio de referencia oficial de Polymarket, cuando ya resolvió
+        setTimeout(() => {
+          priceToBeat.report(label, mkt.startTime, { strike: clS, close: clC })
+            .catch(e => logger.warn(`[PTB] error: ${e.message}`));
+        }, 90000);
+      }, 3000);
       if (RESEARCH_MODE && marketResearch.isActive()) {
         marketResearch.closeMarket({
           finalPrice: signal.getStats()?.lastPrice,
