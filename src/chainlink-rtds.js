@@ -21,6 +21,7 @@ class ChainlinkRTDS {
     this._reconnectDelay = 1000;
     this._pingTimer = null;
     this._last = { 30: null, 60: null };
+    this._hist = { 30: [], 60: [] }; // [{ ts (fuente, ms), value }] últimos 15 min
     this._onUpdate = null;
     this.diag = {
       connected_30s: false, connected_60s: false,
@@ -31,6 +32,22 @@ class ChainlinkRTDS {
   }
   onUpdate(cb) { this._onUpdate = cb; }
   getLatestTWAP(w) { return this._last[w] || null; }
+  // TWAP publicado por Chainlink con timestamp de fuente <= tsMs (máx. maxGapMs antes)
+  getTwapAt(w, tsMs, maxGapMs = 5000) {
+    const h = this._hist[w] || [];
+    for (let i = h.length - 1; i >= 0; i--) {
+      if (h[i].ts <= tsMs) return tsMs - h[i].ts <= maxGapMs ? h[i].value : null;
+    }
+    return null;
+  }
+  _record(w, tsMs, value) {
+    if (!tsMs) return;
+    const ts = tsMs > 1e12 ? tsMs : tsMs * 1000;
+    const h = this._hist[w];
+    if (h.length && ts <= h[h.length - 1].ts) return;
+    h.push({ ts, value });
+    while (h.length && h[0].ts < ts - 15 * 60000) h.shift();
+  }
   connect() {
     if (this._connected || this._intentionalClose) return;
     this._connectOnce();
@@ -116,6 +133,10 @@ class ChainlinkRTDS {
 
     // Snapshot inicial (array de histórico)
     if (Array.isArray(payload.data)) {
+      for (const pt of payload.data) {
+        const v = parseFloat(String(pt.value));
+        if (!isNaN(v) && v > BTC_MIN && v < BTC_MAX) this._record(window_s, Number(pt.timestamp), v);
+      }
       if (payload.data.length > 0) {
         const last = payload.data[payload.data.length - 1];
         const value_num = parseFloat(String(last.value));
@@ -177,6 +198,7 @@ class ChainlinkRTDS {
     };
 
     this._last[window_s] = event;
+    this._record(window_s, Number(source_ts), value_num);
     if (window_s === 30) { this.diag.events_30s++; this.diag.connected_30s = true; this.diag.last_received_30s = received_ts; }
     else                 { this.diag.events_60s++; this.diag.connected_60s = true; this.diag.last_received_60s = received_ts; }
     if (this._onUpdate) this._onUpdate(event);

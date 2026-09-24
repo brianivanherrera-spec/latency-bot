@@ -704,6 +704,18 @@ async function main() {
     if (px != null && (clSpot.getLast()?.ts ?? 0) >= market.startTime) market.strike_chainlink = px;
     return px;
   };
+  // Los mercados resuelven con el TWAP de 60 s de Chainlink (reglas del mercado y
+  // cryptoMarketConfig twapLookbackSeconds=60): UP si el TWAP al cierre >= precio de inicio.
+  // Strike TWAP = promedio de Chainlink en el minuto previo a la apertura (se fija cuando llegó
+  // el punto de la apertura).
+  const TWAP_WINDOW_MS = 60000;
+  const twapStrike = (market) => {
+    if (!market?.startTime) return null;
+    if (market.strike_twap != null) return market.strike_twap;
+    const tw = clSpot.getTwap(market.startTime, TWAP_WINDOW_MS);
+    if (tw && (clSpot.getLast()?.ts ?? 0) >= market.startTime) market.strike_twap = tw.value;
+    return tw?.value ?? null;
+  };
 
   // Ticks crudos de Binance (90 s) — resolución fina para comparar con Chainlink
   const bnTape = []; // [{ ts (recepción local), price }]
@@ -828,14 +840,20 @@ async function main() {
       setTimeout(() => {
         const clS = chainlinkStrike(mkt);
         const clC = clSpot.getPriceAt(mktEndMs, 10000);
+        const twS = twapStrike(mkt);
+        const twC = clSpot.getTwap(mktEndMs, TWAP_WINDOW_MS)?.value ?? null;
+        const rtS = clRTDS.getTwapAt(60, mkt.startTime);
+        const rtC = clRTDS.getTwapAt(60, mktEndMs);
         const parts = [];
-        if (clS != null && clC != null) parts.push(`CL ${fmtRes(clS, clC)}`);
+        if (twS != null && twC != null) parts.push(`TWAP60 ${fmtRes(twS, twC)}`);
+        if (rtS != null && rtC != null) parts.push(`RTDS-TWAP60 ${fmtRes(rtS, rtC)}`);
+        if (clS != null && clC != null) parts.push(`CL spot ${fmtRes(clS, clC)}`);
         if (bnS && bnC) parts.push(`BN ${fmtRes(bnS, bnC)} (aprox.)`);
         const label = mkt.question?.slice(-22) || '';
         if (parts.length) logger.info(`[MARKET-RESULT] ${label} | ${parts.join(' | ')}`);
         // Precio de referencia oficial de Polymarket, cuando ya resolvió
         setTimeout(() => {
-          priceToBeat.report(label, mkt.startTime, { strike: clS, close: clC })
+          priceToBeat.report(label, mkt.startTime, { strike: clS, close: clC, twapStrike: twS, twapClose: twC, rtdsStrike: rtS, rtdsClose: rtC })
             .catch(e => logger.warn(`[PTB] error: ${e.message}`));
         }, 90000);
       }, 3000);
@@ -1118,33 +1136,63 @@ async function main() {
   // P(UP) = Φ( ln(BTC/strike) / (σ·√T) ), σ = volatilidad realizada por √s,
   // T = segundos restantes. fair_edge = prob. justa del lado de la señal − ask real.
   const computeFair = (sig, btcNowBinance, nowMs) => {
-    // Preferir Chainlink (fuente de resolución); Binance como respaldo
-    const clStrike = chainlinkStrike(cachedMarket);
-    const clNow = chainlinkNowcast();
-    const useCl = clStrike != null && clNow != null;
-    const strike = useCl ? clStrike : (cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open);
-    const btcNow = useCl ? clNow : btcNowBinance;
     const endMs = cachedMarket?.endDate ? new Date(cachedMarket.endDate).getTime() : null;
-    const sigma = signal.realizedVolPerSec();
-    if (!strike || !endMs || !sigma || !btcNow) return null;
-    // La proyección Chainlink ya adelanta lagEstimateMs: queda menos tiempo por delante
-    const tRem = (endMs - nowMs - (useCl ? lagEstimateMs : 0)) / 1000;
-    if (tRem <= 0) return null;
-    const fairUp = normCdf(Math.log(btcNow / strike) / (sigma * Math.sqrt(tRem)));
-    const fairSide = sig.direction === 'UP' ? fairUp : 1 - fairUp;
+    const sigma = signal.realizedVolPerSec(); // σ de retornos log por √s
+    if (!endMs || !sigma) return null;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
     const ask = polyWs.getBestAskForToken?.(tokenId) ?? null;
     const r3 = v => parseFloat(v.toFixed(3));
-    return {
-      fair_up: r3(fairUp),
-      fair_side: r3(fairSide),
-      fair_ask: ask,
-      fair_edge: ask != null ? r3(fairSide - ask) : null,
-      fair_sigma_ps: parseFloat(sigma.toExponential(3)),
-      fair_t_rem_s: Math.round(tRem),
-      fair_strike: strike,
-      fair_src: useCl ? 'chainlink' : 'binance',
+    const out = (fairUp, extra) => {
+      const fairSide = sig.direction === 'UP' ? fairUp : 1 - fairUp;
+      return {
+        fair_up: r3(fairUp),
+        fair_side: r3(fairSide),
+        fair_ask: ask,
+        fair_edge: ask != null ? r3(fairSide - ask) : null,
+        fair_sigma_ps: parseFloat(sigma.toExponential(3)),
+        ...extra,
+      };
     };
+
+    // Modelo TWAP (cómo resuelve Polymarket): A = promedio de Chainlink en [fin−60s, fin].
+    // Con P = proyección Chainlink, T = segundos desde el último dato Chainlink hasta el fin
+    // y σp = σ·P (movimiento browniano):
+    //  - T >= 60: E[A] = P, Var = σp²·(T − 40)            (parte futura + promedio de 60 s)
+    //  - T <  60: ya pasaron e = 60 − T s de la ventana con promedio m:
+    //             E[A] = (e·m + T·P)/60, Var = σp²·T³/(3·60²)
+    const K = twapStrike(cachedMarket);
+    const last = clSpot.getLast();
+    const P = chainlinkNowcast();
+    if (K != null && last && P != null) {
+      const W = TWAP_WINDOW_MS / 1000;
+      const T = Math.max(0, (endMs - last.ts) / 1000);
+      if (T <= 0) return null;
+      const sp = sigma * P;
+      let mean, sd;
+      if (T >= W) {
+        mean = P;
+        sd = sp * Math.sqrt(T - (2 * W) / 3);
+      } else {
+        const realized = clSpot.getTwap(last.ts, (W - T) * 1000, 0.5);
+        const e = W - T;
+        mean = realized ? (e * realized.value + T * P) / W : P;
+        sd = sp * Math.sqrt((T ** 3) / (3 * W * W));
+      }
+      const fairUp = sd > 0 ? normCdf((mean - K) / sd) : (mean >= K ? 1 : 0);
+      return out(fairUp, {
+        fair_t_rem_s: Math.round(T),
+        fair_strike: parseFloat(K.toFixed(2)),
+        fair_twap_mean: parseFloat(mean.toFixed(2)),
+        fair_src: 'chainlink_twap',
+      });
+    }
+
+    // Respaldo (sin historial Chainlink suficiente): spot de Binance contra el strike capturado
+    const strike = cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open;
+    const tRem = (endMs - nowMs) / 1000;
+    if (!strike || !btcNowBinance || tRem <= 0) return null;
+    const fairUp = normCdf(Math.log(btcNowBinance / strike) / (sigma * Math.sqrt(tRem)));
+    return out(fairUp, { fair_t_rem_s: Math.round(tRem), fair_strike: strike, fair_src: 'binance' });
   };
 
   // Guardar señal en el log del mercado actual
@@ -1615,7 +1663,7 @@ async function main() {
 
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     const f = sig._fair;
-    const fairTag = f ? ` | FAIR(${f.fair_src === 'chainlink' ? 'cl' : 'bn'}) ${f.fair_side} ask=${f.fair_ask ?? 'n/a'} fEdge=${f.fair_edge ?? 'n/a'} T=${f.fair_t_rem_s}s` : ' | FAIR n/a';
+    const fairTag = f ? ` | FAIR(${f.fair_src === 'chainlink_twap' ? 'twap' : 'bn'}) ${f.fair_side} ask=${f.fair_ask ?? 'n/a'} fEdge=${f.fair_edge ?? 'n/a'} T=${f.fair_t_rem_s}s` : ' | FAIR n/a';
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%${fairTag}`);
 
     // ─── BOOK_ENTRY_MODE — chequear book ANTES de BTC trend filters ──────

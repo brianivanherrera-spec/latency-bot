@@ -102,6 +102,22 @@ class ChainlinkSpot {
     return last.value;
   }
 
+  // Promedio simple de los precios publicados en (endTsMs - windowMs, endTsMs], y cuántos
+  // puntos lo forman. Chainlink publica ~1 punto/s, así que aproxima el TWAP de esa ventana.
+  // null si hay menos de minCoverage de los puntos esperados.
+  getTwap(endTsMs, windowMs = 60000, minCoverage = 0.8) {
+    const h = this._history;
+    let sum = 0, n = 0;
+    for (let i = h.length - 1; i >= 0; i--) {
+      const ts = h[i].ts;
+      if (ts > endTsMs) continue;
+      if (ts <= endTsMs - windowMs) break;
+      sum += h[i].value; n++;
+    }
+    if (n < (windowMs / 1000) * minCoverage) return null;
+    return { value: sum / n, n };
+  }
+
   // Último precio publicado en o antes de tsMs (máx. maxGapMs antes)
   getPriceAt(tsMs, maxGapMs = 5000) {
     const h = this._history;

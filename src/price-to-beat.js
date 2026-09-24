@@ -83,7 +83,19 @@ class PriceToBeat {
   async report(label, startMs, ours) {
     const found = await this.fetch(startMs);
     const fmt = Object.entries(found).map(([k, v]) => `${k}=${v}`).join(' ');
-    logger.info(`[PTB] ${label} | oficial: ${fmt || 'sin campos de precio'} | bot CL strike=${ours.strike?.toFixed(2) ?? 'n/a'} close=${ours.close?.toFixed(2) ?? 'n/a'}`);
+    const f2 = v => (v == null ? 'n/a' : v.toFixed(2));
+    logger.info(`[PTB] ${label} | oficial: ${fmt || 'sin campos de precio'} | bot CL spot strike=${f2(ours.strike)} close=${f2(ours.close)} | bot TWAP60 strike=${f2(ours.twapStrike)} close=${f2(ours.twapClose)} | RTDS TWAP60 strike=${f2(ours.rtdsStrike)} close=${f2(ours.rtdsClose)}`);
+    // Comparación directa: priceToBeat oficial vs los strikes que calcula el bot
+    const m = /priceToBeat"?\s*:\s*([0-9.]+)/.exec(String(found['gamma.eventMetadata'] ?? ''));
+    const ptb = m ? Number(m[1]) : null;
+    let op = found['gamma.markets.0.outcomePrices'];
+    try { op = typeof op === 'string' ? JSON.parse(op) : op; } catch (_) { op = null; }
+    const real = Array.isArray(op) ? (Number(op[0]) >= 0.99 ? 'UP' : Number(op[0]) <= 0.01 ? 'DOWN' : 'sin resolver') : 'n/a';
+    if (ptb != null) {
+      const d = v => (v == null ? 'n/a' : (v - ptb >= 0 ? '+' : '') + (v - ptb).toFixed(2));
+      const res = (k, c) => (k == null || c == null ? 'n/a' : c >= k ? 'UP' : 'DOWN');
+      logger.info(`[PTB-CHECK] ${label} | real=${real} | priceToBeat=${ptb.toFixed(2)} | Δ vs spot=${d(ours.strike)} TWAP60=${d(ours.twapStrike)} RTDS=${d(ours.rtdsStrike)} | predice: spot=${res(ours.strike, ours.close)} TWAP60=${res(ours.twapStrike, ours.twapClose)} RTDS=${res(ours.rtdsStrike, ours.rtdsClose)} ptb+TWAP=${res(ptb, ours.twapClose)} ptb+RTDS=${res(ptb, ours.rtdsClose)}`);
+    }
   }
   /**
    * Revisa mercados ya resueltos de las últimas `hours` horas y compara la resolución real
