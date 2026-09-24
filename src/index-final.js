@@ -712,6 +712,10 @@ async function main() {
   const twapStrike = (market) => {
     if (!market?.startTime) return null;
     if (market.strike_twap != null) return market.strike_twap;
+    // Verificado con [PTB-CHECK]: priceToBeat oficial == TWAP 60 s publicado por Chainlink (RTDS)
+    // en el instante de apertura (Δ $0.00). Usarlo cuando está; si no, el promedio propio.
+    const rt = clRTDS.getTwapAt(60, market.startTime, 1000);
+    if (rt != null) { market.strike_twap = rt; return rt; }
     const tw = clSpot.getTwap(market.startTime, TWAP_WINDOW_MS);
     if (tw && (clSpot.getLast()?.ts ?? 0) >= market.startTime) market.strike_twap = tw.value;
     return tw?.value ?? null;
@@ -840,7 +844,7 @@ async function main() {
       setTimeout(() => {
         const clS = chainlinkStrike(mkt);
         const clC = clSpot.getPriceAt(mktEndMs, 10000);
-        const twS = twapStrike(mkt);
+        const twS = clSpot.getTwap(mkt.startTime, TWAP_WINDOW_MS)?.value ?? null;
         const twC = clSpot.getTwap(mktEndMs, TWAP_WINDOW_MS)?.value ?? null;
         const rtS = clRTDS.getTwapAt(60, mkt.startTime);
         const rtC = clRTDS.getTwapAt(60, mktEndMs);
