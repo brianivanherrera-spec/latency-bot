@@ -9,6 +9,8 @@ const { PolymarketWS } = require('./polymarket-ws');
 const { ChainlinkRTDS } = require('./chainlink-rtds');
 const { ChainlinkSpot } = require('./chainlink-spot');
 const { PriceToBeat } = require('./price-to-beat');
+const { FairValue } = require('./fair-value');
+const { Shadow, MARKETS_FILE: SHADOW_MARKETS_FILE, TICKS_FILE: SHADOW_TICKS_FILE } = require('./shadow');
 const { MarketRecorder } = require('./market-recorder');
 const UserWebSocket = require('./polymarket-user-ws');
 const marketResearch = require('./market-research');
@@ -62,6 +64,7 @@ const path = require('path');
 // ─── Servidor HTTP para descargar signals.jsonl desde el browser ──────────
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.DOWNLOAD_SECRET || 'latency2026';
+let shadowRef = null; // modo sombra (se crea en main)
 
 // ─── Dashboard HTML ────────────────────────────────────────────────────────────
 function getDashboardHTML(key) {
@@ -481,6 +484,32 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
+  // ─── Modo sombra: descargas y reporte ───────────────────────────────────
+  if ((url.pathname === '/shadow-markets' || url.pathname === '/shadow-ticks') && url.searchParams.get('key') === SECRET) {
+    const file = url.pathname === '/shadow-markets' ? SHADOW_MARKETS_FILE : SHADOW_TICKS_FILE;
+    if (!fs.existsSync(file)) { res.writeHead(404); res.end('Todavía no hay datos del modo sombra'); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename=${path.basename(file)}` });
+    fs.createReadStream(file).pipe(res);
+    return;
+  }
+  if (url.pathname === '/shadow-report' && url.searchParams.get('key') === SECRET) {
+    // Corre el reporte en un proceso aparte para no frenar el bot
+    const { execFile } = require('child_process');
+    const script = path.join(__dirname, '..', 'scripts', 'shadow-report.js');
+    const args = [script, SHADOW_MARKETS_FILE, SHADOW_TICKS_FILE];
+    if (url.searchParams.get('since')) args.push(`--since=${url.searchParams.get('since')}`);
+    execFile(process.execPath, args, { timeout: 60000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
+      res.writeHead(err ? 500 : 200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end(err ? `Error: ${err.message}\n${stderr}` : stdout);
+    });
+    return;
+  }
+  if (url.pathname === '/shadow-status' && url.searchParams.get('key') === SECRET) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(shadowRef ? shadowRef.getStats() : { enabled: false }));
+    return;
+  }
+
   if (url.pathname === '/stats' && url.searchParams.get('key') === SECRET) {
     // Resumen liviano sin bajar el log completo: /stats?key=X&days=1
     const days = parseInt(url.searchParams.get('days') || '1');
@@ -689,6 +718,10 @@ async function main() {
 
   // ─── Instrumentación observacional (NO afecta trading) ────────────────────
   const clRTDS    = new ChainlinkRTDS();   // TWAP 30s + 60s de Chainlink
+  // Modo sombra: modelo de valor justo que solo observa y registra (SHADOW_MODE=false lo apaga)
+  const fairValue = new FairValue();
+  const shadow = process.env.SHADOW_MODE === 'false' ? null : new Shadow({ fairValue, polyWs, rtds: clRTDS });
+  if (shadow) { shadowRef = shadow; shadow.start(); }
   const mRecorder = new MarketRecorder();  // timeline completo por mercado
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
   clRTDS.connect();
@@ -909,6 +942,12 @@ async function main() {
           // Fix B: suscribir al nuevo mercado via WS
           polyWs.unsubscribeAll();
           polyWs.subscribe(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+          shadow?.startMarket({
+            marketId: cachedMarket.conditionId, gammaId: cachedMarket.gammaId, question: cachedMarket.question,
+            endTs: new Date(cachedMarket.endDate).getTime(),
+            yesTokenId: cachedMarket.yesTokenId, noTokenId: cachedMarket.noTokenId,
+            botStrike: cachedMarket.market_strike_price_captured_at_open || null,
+          });
           // Mercado nuevo: descartar precio WS del mercado anterior
           lastWsPriceAt = 0; livePolyYes = null; livePolyNo = null;
           // Bootstrap topOfBook con REST una vez — siembra el dato antes del primer tick WS
@@ -988,6 +1027,12 @@ async function main() {
           // Fix B: suscribir al WS de Polymarket para precio en tiempo real
           polyWs.unsubscribeAll();
           polyWs.subscribe(m.yesTokenId, m.noTokenId);
+          shadow?.startMarket({
+            marketId: m.conditionId, gammaId: m.gammaId, question: m.question,
+            endTs: new Date(m.endDate).getTime(),
+            yesTokenId: m.yesTokenId, noTokenId: m.noTokenId,
+            botStrike: m.market_strike_price_captured_at_open || null,
+          });
           // Mercado nuevo: descartar precio WS del mercado anterior
           lastWsPriceAt = 0; livePolyYes = null; livePolyNo = null;
           if (poly.clobClient) {
@@ -1509,6 +1554,7 @@ async function main() {
 
     const btcPriceNow = priceData.price || priceData.currentPrice || priceData.lastPrice || 0;
     const nowMs = t1_ms;
+    if (btcPriceNow > 0) fairValue.onTick(btcPriceNow, t1_ms); // modo sombra: todos los ticks
 
     // Cinta de ticks crudos (antes del throttle), solo Binance
     if (btcPriceNow > 0 && priceData.source !== 'coinbase') {
@@ -1737,6 +1783,7 @@ async function main() {
     const f = sig._fair;
     const fairTag = f ? ` | FAIR(${f.fair_src === 'chainlink_twap' ? 'twap' : 'bn'}) ${f.fair_side} ask=${f.fair_ask ?? 'n/a'} fEdge=${f.fair_edge ?? 'n/a'} T=${f.fair_t_rem_s}s` : ' | FAIR n/a';
     logger.info(`[SIG] ${sig.direction} | Z:${sig.zScore.toFixed(2)} Move:${sig.movePct.toFixed(3)}% | ${sig.edge?.reason} ${sig.edge?.edgePct ?? 'n/a'}%${fairTag}`);
+    shadow?.recordBotSignal(sig.direction);
 
     // ─── BOOK_ENTRY_MODE — chequear book ANTES de BTC trend filters ──────
     // Si el book es muy fuerte (≥ umbral), entrar directo salteando filtros BTC.
@@ -2198,6 +2245,7 @@ async function main() {
     }).catch(e => logger.warn(`Discord alert failed: ${e.message}`));
 
     logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
+    shadow?.recordBotTrade({ direction: sig.direction, price, zScore: sig.zScore, posId });
     logger.info(`  Exposure: $${finalExposure}${isEliteSignal ? ' 🏆 ÉLITE' : ''} | Size: ${size} | Token: ${tokenId}`);
 
     // Completar la reserva con el exposure real (ya sabíamos marketId/entryType desde antes)
