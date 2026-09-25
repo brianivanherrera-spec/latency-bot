@@ -17,6 +17,20 @@ const path = require('path');
 const readline = require('readline');
 const { normCdf } = require('../src/fair-value');
 
+// Inversa de Φ (Acklam, error relativo < 1.2e-9). Sirve para cualquier modelo que dé
+// p = Φ(algo/σ): escalar σ por k equivale a z/k con z = Φ⁻¹(p).
+function normInv(p) {
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.3577518672690, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  const pl = 0.02425;
+  if (p < pl) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p > 1 - pl) { const q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  const q = p - 0.5, r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const args = process.argv.slice(2);
 const pos = args.filter(a => !a.startsWith('--'));
@@ -72,8 +86,11 @@ const fmtStats = s => s.n
   P(`   Mercados resueltos: ${markets.length}  | fuente del ganador: ${Object.entries(bySrc).map(([k, v]) => `${k}=${v}`).join(', ')}`);
   const official = markets.filter(m => m.winner_source === 'gamma' && m.btc_winner);
   const agree = official.filter(m => m.btc_winner === m.winner).length;
-  P(`   BTC (Binance) apertura→cierre coincide con la resolución oficial: ${agree}/${official.length} (${pct(agree / official.length)})`);
-  P(`     → si es <97%, la apertura/cierre de Binance difiere de Chainlink y el modelo se equivoca en mercados muy parejos`);
+  const srcTw = markets.reduce((s, m) => s + (m.model_src?.chainlink_twap || 0), 0), srcBn = markets.reduce((s, m) => s + (m.model_src?.binance || 0), 0);
+  P(`   Modelo usado: FAIR con TWAP de Chainlink en ${pct(srcTw / ((srcTw + srcBn) || 1))} de los segundos, respaldo Binance en el resto`);
+  if (official.length) {
+    P(`   (Mercados con strike de Binance) spot apertura→cierre coincide con la resolución oficial: ${agree}/${official.length} (${pct(agree / official.length)})`);
+  }
   P(`   Activación del mercado (mediana): ${median(markets.map(m => m.activation_delay_s))} s tarde | apertura desde: ${[...new Set(markets.map(m => m.strike_source))].join(', ')}`);
 
   // Filas utilizables: [t, secs_left, btc, p_up, yes_bid, yes_ask, no_bid, no_ask, sigma_e6, book_imb]
@@ -81,15 +98,16 @@ const fmtStats = s => s.n
   for (const tk of ticks) {
     const winner = winnerById.get(tk.gamma_id);
     if (!winner || !tk.strike) continue;
-    const rows = tk.rows.filter(r => r[2] && r[8] && r[1] > 0);
+    const rows = tk.rows.filter(r => r[3] != null && r[1] > 0);
     if (rows.length) series.push({ id: tk.gamma_id, K: tk.strike, up: winner === 'UP' ? 1 : 0, rows });
   }
-  const zOf = (r, K) => Math.log(r[2] / K) / (r[8] * 1e-6 * Math.sqrt(r[1]));
+  // z del modelo a partir de la probabilidad grabada (vale para FAIR-TWAP y para el respaldo Binance)
+  const zOf = (r) => normInv(Math.min(0.9995, Math.max(0.0005, r[3])));
 
   // ── 2. Calibración ───────────────────────────────────────────────────────
   P('\n2) CALIBRACIÓN (una muestra cada 10 s)');
   const samples = [];
-  for (const s of series) for (const r of s.rows) if (r[0] % 10 === 0) samples.push({ z: zOf(r, s.K), up: s.up, r, id: s.id });
+  for (const s of series) for (const r of s.rows) if (r[0] % 10 === 0) samples.push({ z: zOf(r), up: s.up, r, id: s.id });
   // σ × k: elegir el k que mejor predice (log-loss)
   let bestK = 1, bestLL = Infinity;
   const ll = k => {
@@ -129,7 +147,7 @@ const fmtStats = s => s.n
     for (const s of series) {
       for (const r of s.rows) {
         if (r[1] < lo || r[1] > hi) continue;
-        const p = normCdf(zOf(r, s.K) / k);
+        const p = normCdf(zOf(r) / k);
         const eU = r[5] != null ? p - r[5] : -1, eD = r[7] != null ? (1 - p) - r[7] : -1;
         const side = eU >= eD ? 'UP' : 'DOWN', e = Math.max(eU, eD);
         if (e >= thr) { const price = side === 'UP' ? r[5] : r[7]; out.push({ price, win: (side === 'UP') === (s.up === 1) }); break; }
@@ -169,7 +187,7 @@ const fmtStats = s => s.n
     for (const r of s.rows) {
       const prev = byT.get(r[0] - 1);
       if (!prev || r[1] < 20) continue;
-      const dp = normCdf(zOf(r, s.K)) - normCdf(zOf(prev, s.K));
+      const dp = normCdf(zOf(r)) - normCdf(zOf(prev));
       for (let lag = 0; lag <= maxLag; lag++) {
         const a = byT.get(r[0] + lag), b = byT.get(r[0] + lag - 1);
         if (!a || !b || a[4] == null || a[5] == null || b[4] == null || b[5] == null) continue;
@@ -190,7 +208,7 @@ const fmtStats = s => s.n
   for (const s of series) {
     let startT = null;
     for (const r of s.rows) {
-      const p = normCdf(zOf(r, s.K));
+      const p = normCdf(zOf(r));
       const e = Math.max(r[5] != null ? p - r[5] : -1, r[7] != null ? (1 - p) - r[7] : -1);
       if (startT == null && e >= 0.05 && r[1] >= 10) startT = r[0];
       else if (startT != null && e < 0.02) { dur.push(r[0] - startT); startT = null; }

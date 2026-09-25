@@ -27,7 +27,8 @@ const GAMMA = 'https://gamma-api.polymarket.com';
 const THRESHOLDS = [0.03, 0.05, 0.08, 0.12];                         // ventajas a evaluar (fracción = puntos/100)
 const DECISION_EDGE = parseFloat(process.env.SHADOW_EDGE || '0.05');  // umbral "el modelo entraría"
 const MIN_SECS = parseInt(process.env.SHADOW_MIN_SECS || '10');       // no contar oportunidades con <10s
-const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb'];
+// src: 1 = FAIR del bot con TWAP de Chainlink (cómo resuelve Polymarket), 0 = respaldo con spot de Binance
+const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src'];
 
 const rnd = (v, d) => (v == null || !Number.isFinite(v)) ? null : Math.round(v * 10 ** d) / 10 ** d;
 const pnl = (win, price) => win == null || price == null ? null : rnd(win ? 1 - price : -price, 4);
@@ -41,9 +42,13 @@ class Shadow {
     this.cur = null;
     this.pending = new Map();
     this.timer = null;
+    this.fairFn = null; // modelo principal inyectado desde index (FAIR con TWAP de Chainlink)
     this.stats = { markets: 0, written: 0, resolved_gamma: 0, resolved_fallback: 0, errors: 0 };
     try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
   }
+
+  // fn(gammaId, nowMs) → { p, strike, src, sigma } | null. Si no hay, se usa el modelo propio (Binance).
+  setFairFn(fn) { this.fairFn = typeof fn === 'function' ? fn : null; }
 
   start() {
     if (this.timer) return;
@@ -66,7 +71,7 @@ class Shadow {
       rtdsAtStart: this.rtds?.getLatestTWAP?.(30)?.value_num ?? null,
       rows: [], first: {}, maxEdge: { UP: null, DOWN: null }, path: {},
       signals: { UP: 0, DOWN: 0 }, firstSignal: { UP: null, DOWN: null }, trades: [],
-      sigmaSum: 0, sigmaN: 0, closed: false,
+      sigmaSum: 0, sigmaN: 0, closed: false, srcCount: [0, 0],
     };
   }
 
@@ -120,12 +125,26 @@ class Shadow {
     return { bid: row.bestBid ?? null, ask: row.bestAsk ?? null };
   }
 
-  _pNow(m, now) {
-    const K = this._strike(m);
+  // Probabilidad del modelo: primero el FAIR del bot (TWAP Chainlink); si no hay dato, spot de Binance
+  _fair(m, now) {
+    if (this.fairFn) {
+      try {
+        const r = this.fairFn(m.gammaId, now);
+        if (r && r.p != null && Number.isFinite(r.p)) {
+          if (r.src === 'chainlink_twap' && r.strike) { m.strike = r.strike; m.strikeSource = 'chainlink_twap_60s'; }
+          return { p: r.p, sigma: r.sigma ?? null, src: r.src === 'chainlink_twap' ? 1 : 0 };
+        }
+      } catch (e) { this.stats.errors++; }
+    }
+    const K = m.strikeSource === 'chainlink_twap_60s' ? null : this._strike(m);
     const fresh = this.fv.lastPrice && now - this.fv.lastTs < 5000;
     if (!K || !fresh) return null;
-    return probUp(this.fv.lastPrice, K, (m.endTs - now) / 1000, this.fv.sigma(now));
+    const sigma = this.fv.sigma(now);
+    const p = probUp(this.fv.lastPrice, K, (m.endTs - now) / 1000, sigma);
+    return p == null ? null : { p, sigma, src: 0 };
   }
+
+  _pNow(m, now) { return this._fair(m, now)?.p ?? null; }
 
   _sample() {
     const m = this.cur;
@@ -134,12 +153,13 @@ class Shadow {
     if (now > m.endTs + 1500) { this._close(m); this.cur = null; return; }
     if (now < m.startTs || now > m.endTs) return;
 
-    const K = this._strike(m);
+    if (m.strike == null) this._strike(m); // respaldo hasta que haya strike TWAP
     const fresh = this.fv.lastPrice && now - this.fv.lastTs < 5000;
     const S = fresh ? this.fv.lastPrice : null;
     const T = (m.endTs - now) / 1000;
-    const sigma = this.fv.sigma(now);
-    const p = S && K ? probUp(S, K, T, sigma) : null;
+    const F = this._fair(m, now);
+    const p = F?.p ?? null, sigma = F?.sigma ?? null;
+    const K = m.strike;
 
     // Book: solo si el WS está conectado y en los tokens de ESTE mercado
     const same = this.poly?._yesTokenId === m.yesTokenId;
@@ -150,13 +170,16 @@ class Shadow {
     const imb = same ? (this.poly.getDepthImbalance?.()?.imb ?? null) : null;
 
     const t = Math.round((now - m.startTs) / 1000);
-    m.rows.push([t, rnd(T, 1), rnd(S, 2), rnd(p, 4), yesBid, yesAsk, noBid, noAsk, rnd(sigma == null ? null : sigma * 1e6, 3), imb]);
+    m.rows.push([t, rnd(T, 1), rnd(S, 2), rnd(p, 4), yesBid, yesAsk, noBid, noAsk, rnd(sigma == null ? null : sigma * 1e6, 3), imb, F ? F.src : null]);
+    if (F) m.srcCount[F.src]++;
     if (sigma) { m.sigmaSum += sigma; m.sigmaN++; }
 
     // Foto cada 30s: cómo se movió el mercado
     const bucket = Math.floor(t / 30) * 30;
-    if (!m.path[bucket] && S && K) {
-      m.path[bucket] = { t, btc_move_pct: rnd((S / K - 1) * 100, 4), p_up: rnd(p, 4), yes_bid: yesBid, yes_ask: yesAsk, no_bid: noBid, no_ask: noAsk };
+    if (!m.path[bucket] && S) {
+      // btc_move_pct solo si el strike es de Binance (el TWAP de Chainlink está en otra escala: USD vs USDT)
+      const move = K && String(m.strikeSource).startsWith('binance') ? rnd((S / K - 1) * 100, 4) : null;
+      m.path[bucket] = { t, btc: rnd(S, 2), btc_move_pct: move, p_up: rnd(p, 4), yes_bid: yesBid, yes_ask: yesAsk, no_bid: noBid, no_ask: noAsk };
     }
 
     if (p == null) return;
@@ -187,7 +210,8 @@ class Shadow {
     if (m.closed) return;
     m.closed = true;
     m.btcClose = this.fv.priceAt(m.endTs);
-    const K = this._strike(m);
+    // Chequeo spot-vs-spot solo con strike de Binance (con strike TWAP no es comparable)
+    const K = String(m.strikeSource).startsWith('binance') ? m.strike : null;
     m.btcWinner = m.btcClose && K ? (m.btcClose >= K ? 'UP' : 'DOWN') : null;
     this.pending.set(m.gammaId, m);
     setTimeout(() => this._resolve(m, 0), 30000);
@@ -235,6 +259,7 @@ class Shadow {
       winner, winner_source: source,
       sigma_avg_e6: m.sigmaN ? rnd(m.sigmaSum / m.sigmaN * 1e6, 3) : null,
       samples: m.rows.length,
+      model_src: { chainlink_twap: m.srcCount[1], binance: m.srcCount[0] },
       path: Object.keys(m.path).map(Number).sort((a, b) => a - b).map(k => m.path[k]),
       model: {
         decision_edge: DECISION_EDGE,

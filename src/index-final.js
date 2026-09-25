@@ -1258,6 +1258,15 @@ async function main() {
     return out(fairUp, { fair_t_rem_s: Math.round(tRem), fair_strike: strike, fair_src: 'binance' });
   };
 
+  // Modo sombra: usar este FAIR (TWAP de Chainlink, σ × FAIR_VOL_MULT) como modelo principal.
+  // El modelo propio de shadow.js (spot de Binance) queda solo como respaldo.
+  shadow?.setFairFn((gammaId, nowMs) => {
+    if (!cachedMarket || cachedMarket.gammaId !== gammaId) return null;
+    const bn = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null;
+    const f = computeFair({ direction: 'UP' }, bn, nowMs);
+    return f ? { p: f.fair_up, strike: f.fair_strike, src: f.fair_src, sigma: f.fair_sigma_ps } : null;
+  });
+
   // ─── OPEN-SNAP (sombra): ¿el mercado abre mal valuado? ─────────────────────
   // El strike es el TWAP 60 s del minuto previo a la apertura, así que desde el segundo 0
   // el precio actual puede estar arriba/abajo del strike y P(UP) ya no es 0.50. Se registra
