@@ -4,8 +4,7 @@
  */
 
 const config = require('./config');
-const fs = require('fs');
-const path = require('path');
+const { append } = require('./async-append');
 
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 const currentLevel = LEVELS[config.LOG_LEVEL] ?? 1;
@@ -27,15 +26,8 @@ class Logger {
     }
 
     // Escribir a archivo si está configurado
-    if (config.LOG_FILE) {
-      try {
-        const dir = path.dirname(config.LOG_FILE);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.appendFileSync(config.LOG_FILE, msg + '\n');
-      } catch (e) {
-        // ignorar errores de escritura en log file
-      }
-    }
+    // (en segundo plano: appendFileSync en cada línea bloqueaba el event loop)
+    if (config.LOG_FILE) append(config.LOG_FILE, msg);
   }
 
   debug(...args) { this._log('debug', ...args); }

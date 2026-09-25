@@ -6,6 +6,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { append } = require('./async-append');
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const MARKETS_DIR = path.join(DATA_DIR, 'markets');
 const BINANCE_MIN_CHANGE = 0.5;
@@ -105,7 +106,7 @@ class MarketRecorder {
   _append(data) {
     if (!this._file) return;
     try {
-      fs.appendFileSync(this._file, JSON.stringify({ seq: ++this._seq, market_id: this._market?.market_id ?? null, ...data }) + '\n');
+      append(this._file, JSON.stringify({ seq: ++this._seq, market_id: this._market?.market_id ?? null, ...data }));
     } catch(e) {}
   }
 }

@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { append } = require('./async-append');
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const BINANCE_RAW_FILE = path.join(DATA_DIR, 'binance-raw.jsonl');
@@ -28,26 +29,11 @@ function ensureDir() {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   } catch (e) {}
 }
+ensureDir();
 
-// Rotar archivo si supera 50MB
-function checkAndRotateFile(filePath, baseName) {
-  try {
-    if (!fs.existsSync(filePath)) return;
-    const stats = fs.statSync(filePath);
-    if (stats.size > MAX_FILE_SIZE) {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const dir = path.dirname(filePath);
-      const ext = path.extname(filePath);
-      const name = path.basename(filePath, ext);
-      const rotatedPath = path.join(dir, `${name}.${timestamp}${ext}`);
-      fs.renameSync(filePath, rotatedPath);
-      return rotatedPath;
-    }
-  } catch (e) {
-    console.error(`[PHASE2] Error rotating ${baseName}: ${e.message}`);
-  }
-  return null;
-}
+// Escritura en segundo plano; rota el archivo al superar 50MB (ver async-append.js)
+const write = (file, record) => append(file, JSON.stringify(record), { maxBytes: MAX_FILE_SIZE });
+
 
 // ─── BINANCE RAW ──────────────────────────────────────────────────────────
 /**
@@ -62,7 +48,6 @@ function checkAndRotateFile(filePath, baseName) {
  * @param {Object} strikes - { official, captured, source, timestamp }
  */
 function logBinanceRaw(data, market, strikes) {
-  ensureDir();
   try {
     const record = {
       // Identificación del mercado
@@ -110,8 +95,7 @@ function logBinanceRaw(data, market, strikes) {
       isBuyerMaker: data.isBuyerMaker !== undefined ? data.isBuyerMaker : null,
     };
 
-    checkAndRotateFile(BINANCE_RAW_FILE, 'binance-raw');
-    fs.appendFileSync(BINANCE_RAW_FILE, JSON.stringify(record) + '\n');
+    write(BINANCE_RAW_FILE, record);
     incrementCounter('binanceRaw');
   } catch (e) {
     console.error(`[PHASE2] Error logging binance raw: ${e.message}`);
@@ -127,7 +111,6 @@ function logBinanceRaw(data, market, strikes) {
  * @param {string} eventId - ID único del evento
  */
 function logPolymarketRaw(data, market, eventId) {
-  ensureDir();
   try {
     const marketId = market?.tokenId;
     if (!marketId) return;
@@ -211,8 +194,7 @@ function logPolymarketRaw(data, market, eventId) {
       window_remaining_sec: data.window_remaining_sec || null,
     };
 
-    checkAndRotateFile(POLYMARKET_RAW_FILE, 'polymarket-raw');
-    fs.appendFileSync(POLYMARKET_RAW_FILE, JSON.stringify(record) + '\n');
+    write(POLYMARKET_RAW_FILE, record);
     incrementCounter('polymarketRaw');
   } catch (e) {
     console.error(`[PHASE2] Error logging polymarket raw: ${e.message}`);
@@ -226,7 +208,6 @@ function logPolymarketRaw(data, market, eventId) {
  * @param {Object} data - datos del evento
  */
 function logBotEvent(eventType, data) {
-  ensureDir();
   try {
     const record = {
       // Identificación del evento
@@ -289,8 +270,7 @@ function logBotEvent(eventType, data) {
       edge_at_resolution_pct: data.edge_at_resolution_pct || null,
     };
 
-    checkAndRotateFile(BOT_EVENTS_FILE, 'bot-events');
-    fs.appendFileSync(BOT_EVENTS_FILE, JSON.stringify(record) + '\n');
+    write(BOT_EVENTS_FILE, record);
     incrementCounter(`botEvents_${eventType}`);
   } catch (e) {
     console.error(`[PHASE2] Error logging bot event: ${e.message}`);

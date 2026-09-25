@@ -897,7 +897,15 @@ class PolymarketWS {
    * para que el bot los vea, pero NO disparan onResolved.
    * La resolución real viene solo de event market_resolved (o del poll Gamma).
    */
+  // Coalesce: una ráfaga de mensajes WS produce una sola emisión en la siguiente
+  // vuelta del event loop, en vez de correr el callback (logs, grabación) por cada uno.
   _emitPair() {
+    if (this._emitPending) return;
+    this._emitPending = true;
+    setImmediate(() => { this._emitPending = false; this._emitPairNow(); });
+  }
+
+  _emitPairNow() {
     if (!this._priceCallback) return;
     const yesId = this._yesTokenId;
     const noId = this._noTokenId;
