@@ -103,8 +103,8 @@ module.exports = {
   // Imbalance máximo permitido — datos reales: imb>0.3 tiene 42% WR
   IMBALANCE_MAX: parseFloat(process.env.IMBALANCE_MAX || '0.3'),
 
-  // Fill rate simulado en paper — 0.75 = 75% de órdenes se llenan (refleja GTC real)
-  PAPER_FILL_RATE: parseFloat(process.env.PAPER_FILL_RATE || '0.75'),
+  // Fill rate simulado en paper — 1.0 = toda orden con ask <= precio de orden se llena
+  PAPER_FILL_RATE: parseFloat(process.env.PAPER_FILL_RATE || '1.0'),
 
   // Buffer mínimo de ticks antes de operar (warmup)
   // 100 ticks @ 56 ticks/10s = ~18s warmup vs 35s con 200 ticks

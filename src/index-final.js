@@ -632,6 +632,7 @@ async function main() {
   logger.info(`├─ ORDER_TYPE: ${config.ORDER_TYPE}`);
   logger.info(`├─ PRICE_TOLERANCE: ${config.PRICE_TOLERANCE}`);
   logger.info(`├─ PAPER_FILL_RATE: ${config.PAPER_FILL_RATE * 100}%`);
+  logger.info(`├─ FAIR_VOL_MULT: ${process.env.FAIR_VOL_MULT || '1.4'}`);
   logger.info(`└─ ORDER_SIZE_USDC: ${config.ORDER_SIZE_USDC} USDC`);
   logger.info('');
 
@@ -1148,10 +1149,14 @@ async function main() {
   // Probabilidad justa (MODO SOMBRA — solo se registra, no decide entradas):
   // P(UP) = Φ( ln(BTC/strike) / (σ·√T) ), σ = volatilidad realizada por √s,
   // T = segundos restantes. fair_edge = prob. justa del lado de la señal − ask real.
+  const FAIR_VOL_MULT = parseFloat(process.env.FAIR_VOL_MULT || '1.4');
   const computeFair = (sig, btcNowBinance, nowMs) => {
     const endMs = cachedMarket?.endDate ? new Date(cachedMarket.endDate).getTime() : null;
-    const sigma = signal.realizedVolPerSec(); // σ de retornos log por √s
-    if (!endMs || !sigma) return null;
+    // σ de retornos log por √s, inflada por FAIR_VOL_MULT: con σ realizada sola FAIR salía
+    // sobreconfiado (calibración contra 207 aperturas: escala óptima 0.71 → σ × 1.4).
+    const rawSigma = signal.realizedVolPerSec();
+    if (!endMs || !rawSigma) return null;
+    const sigma = rawSigma * FAIR_VOL_MULT;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
     const ask = polyWs.getBestAskForToken?.(tokenId) ?? null;
     const r3 = v => parseFloat(v.toFixed(3));
@@ -2697,7 +2702,7 @@ async function main() {
       const t4_paper_ms = Date.now();
       const t5_paper_ms = t4_paper_ms + Math.random() * 50; // Simulate 0-50ms acceptance latency
 
-      const paperFillRate = parseFloat(process.env.PAPER_FILL_RATE || '0.75');
+      const paperFillRate = config.PAPER_FILL_RATE;
       // Una orden límite de compra no llena si el ask real está por encima del precio
       // (pasaba con el tope 0.97: se "llenaba" a $0.97 con el ask en $0.99-$1.00).
       const askAbovePrice = bestAskWS != null && bestAskWS > price;
