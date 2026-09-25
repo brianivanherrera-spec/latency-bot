@@ -1,0 +1,16 @@
+{
+  "name": "latency-bot-v2",
+  "version": "0.1.0",
+  "description": "Bot v2 (desde cero) para Polymarket BTC Up/Down 5m — paper trading con la regla real de resolución (TWAP 60 s de Chainlink), comisiones y fills contra el libro",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node test/run-all.js",
+    "report": "node src/report.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
