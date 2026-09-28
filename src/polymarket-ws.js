@@ -17,6 +17,7 @@ const WebSocket = require('ws');
 const fs   = require('fs');
 const path = require('path');
 const { Logger } = require('./logger');
+const loopMonitor = require('./loop-monitor');
 
 const logger = new Logger('POLY-WS');
 const WS_URL = 'wss://ws-subscriptions-clob.polymarket.com/ws/market';
@@ -502,11 +503,15 @@ class PolymarketWS {
         return;
       }
       // setImmediate cede el event loop — evita slow consumer (code=1013)
+      loopMonitor.count('poly_msgs');
+      loopMonitor.count('poly_kb', raw.length / 1024);
       setImmediate(() => {
         try {
-          const parsed = JSON.parse(raw);
-          const events = Array.isArray(parsed) ? parsed : [parsed];
-          for (const msg of events) this._handleMessage(msg);
+          loopMonitor.time('poly_msg', () => {
+            const parsed = JSON.parse(raw);
+            const events = Array.isArray(parsed) ? parsed : [parsed];
+            for (const msg of events) this._handleMessage(msg);
+          });
         } catch (e) {
           if (raw && raw.length < 120) {
             logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);
@@ -530,6 +535,8 @@ class PolymarketWS {
       this._connected = false;
       this._clearPing();
       if (was) logger.warn(`Desconectado (code=${code}${reason ? ` ${reason}` : ''})`);
+      // Estado del event loop en el minuto del corte — para saber qué lo trabó
+      if (code === 1013) loopMonitor.log(`corte 1013 | ${loopMonitor.snapshot().text}`);
       if (!settled && isInitial && reject) {
         settled = true;
         reject(new Error(`WS closed before open (code=${code})`));
@@ -933,7 +940,7 @@ class PolymarketWS {
     // los 5s pasaba a usar el de Gamma (minutos de atraso, ~$0.50), generando
     // edges falsos en mercados que ya estaban en $0.97+.
     if (yes > 0 && yes < 1) {
-      this._priceCallback(yes, no);
+      loopMonitor.time('poly_cb', () => this._priceCallback(yes, no));
     }
   }
 

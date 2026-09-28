@@ -19,6 +19,7 @@ const { SignalEngine } = require('./signal');
 const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
+const loopMonitor = require('./loop-monitor');
 const config = require('./config');
 const { randomUUID } = require('crypto');
 
@@ -1573,6 +1574,7 @@ async function main() {
 
     // Contador de ticks — diagnosticar si el callback se invoca correctamente
     ws._tickCount = (ws._tickCount || 0) + 1;
+    loopMonitor.count('bn_ticks');
     // Only log first tick and every 5000 (reduce spam from 50+ ticks/sec to 1 every 100 sec)
     if (ws._tickCount === 1 || ws._tickCount % 5000 === 0) {
       logger.info(`[BTC-TICK] #${ws._tickCount} price=$${btcPriceNow?.toFixed(2)}`);
@@ -1646,7 +1648,7 @@ async function main() {
       );
     }
 
-    const sig = signal.process(priceData);
+    const sig = loopMonitor.time('signal', () => signal.process(priceData));
     if (!sig || sig.direction === 'NEUTRAL') return;
     // T2: cuándo se generó la señal
     const t2_signal = process.hrtime.bigint();

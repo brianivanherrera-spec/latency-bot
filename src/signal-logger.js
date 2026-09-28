@@ -5,6 +5,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const loopMonitor = require('./loop-monitor');
 
 const DATA_DIR    = process.env.DATA_DIR || '/data';
 const SIGNAL_FILE = path.join(DATA_DIR, 'signals.jsonl');
@@ -234,8 +235,8 @@ function logSignalClose(posId, result, pnl, btcPriceNow) {
     close_timestamp: Date.now(),
   }, true); // true = calcular duración
 
-  // Actualizar stats
-  updateStats();
+  // Actualizar stats (relee todo signals.jsonl — se mide)
+  loopMonitor.time('siglog_io', updateStats);
 }
 
 // ─── Cache en memoria de registros abiertos ───────────────────────────────────
@@ -254,13 +255,13 @@ function updateRecord(posId, fields, calcDuration = false) {
     }
     // Si ya está cerrado, escribir al disco de forma asíncrona
     if (fields.result !== undefined) {
-      setImmediate(() => _flushRecordToDisk(posId, r));
+      setImmediate(() => loopMonitor.time('siglog_io', () => _flushRecordToDisk(posId, r)));
     }
     return;
   }
 
   // 2. Fallback: actualizar en disco (para registros de sesiones anteriores)
-  setImmediate(() => {
+  setImmediate(() => loopMonitor.time('siglog_io', () => {
     try {
       if (!fs.existsSync(SIGNAL_FILE)) return;
       const lines = fs.readFileSync(SIGNAL_FILE, 'utf8').trim().split('\n');
@@ -277,7 +278,7 @@ function updateRecord(posId, fields, calcDuration = false) {
       });
       fs.writeFileSync(SIGNAL_FILE, updated.join('\n') + '\n');
     } catch(e) {}
-  });
+  }));
 }
 
 // Escribir un registro cerrado al disco actualizando su línea en el archivo
@@ -478,6 +479,10 @@ function getDailySummary(daysBack = 1) {
 function getConsecutiveLosses() { return consecutiveLosses; }
 
 function updateFillTime(posId, fillTimeMs) {
+  loopMonitor.time('siglog_io', () => _updateFillTime(posId, fillTimeMs));
+}
+
+function _updateFillTime(posId, fillTimeMs) {
   try {
     const raw = fs.readFileSync(SIGNALS_FILE, 'utf8');
     const lines = raw.split('\n');

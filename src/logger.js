@@ -5,6 +5,7 @@
 
 const config = require('./config');
 const { append } = require('./async-append');
+const loopMonitor = require('./loop-monitor');
 
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 const currentLevel = LEVELS[config.LOG_LEVEL] ?? 1;
@@ -19,11 +20,12 @@ class Logger {
     const ts = new Date().toISOString();
     const msg = `[${ts}] [${level.toUpperCase()}] [${this.prefix}] ${args.join(' ')}`;
 
-    if (level === 'error') {
-      console.error(msg);
-    } else {
-      console.log(msg);
-    }
+    // stdout hacia un pipe (Railway) es sincrónico en Linux: se mide cuánto bloquea
+    loopMonitor.count('log_lines');
+    loopMonitor.time('stdout', () => {
+      if (level === 'error') console.error(msg);
+      else console.log(msg);
+    });
 
     // Escribir a archivo si está configurado
     // (en segundo plano: appendFileSync en cada línea bloqueaba el event loop)

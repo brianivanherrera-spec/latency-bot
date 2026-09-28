@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const { Logger } = require('./logger');
 const { probUp } = require('./fair-value');
+const loopMonitor = require('./loop-monitor');
 
 const logger = new Logger('SHADOW');
 const DATA_DIR = process.env.DATA_DIR || '/data';
@@ -27,6 +28,12 @@ const GAMMA = 'https://gamma-api.polymarket.com';
 const THRESHOLDS = [0.03, 0.05, 0.08, 0.12];                         // ventajas a evaluar (fracción = puntos/100)
 const DECISION_EDGE = parseFloat(process.env.SHADOW_EDGE || '0.05');  // umbral "el modelo entraría"
 const MIN_SECS = parseInt(process.env.SHADOW_MIN_SECS || '10');       // no contar oportunidades con <10s
+// Con P(UP) ≈ 0.50 el modelo no sabe nada (spot ≈ strike al abrir) y la "ventaja" es solo la
+// inclinación del mercado, que resultó informada: en 200 mercados esas entradas acertaron 19%.
+// Variantes que se registran aparte del modelo base (para comparar sin perder el histórico):
+//   first_conf:  exige |P − 0.5| ≥ SHADOW_MIN_CONF
+//   first_agree: además, solo el lado que el mercado ya favorece (ask ≥ 0.50)
+const MIN_CONF = parseFloat(process.env.SHADOW_MIN_CONF || '0.03');
 // src: 1 = FAIR del bot con TWAP de Chainlink (cómo resuelve Polymarket), 0 = respaldo con spot de Binance
 const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src'];
 
@@ -53,7 +60,7 @@ class Shadow {
   start() {
     if (this.timer) return;
     this.timer = setInterval(() => {
-      try { this._sample(); } catch (e) { this.stats.errors++; logger.warn(`sample error: ${e.message}`); }
+      try { loopMonitor.time('shadow', () => this._sample()); } catch (e) { this.stats.errors++; logger.warn(`sample error: ${e.message}`); }
     }, this.sampleMs);
     logger.info(`[SHADOW] ✅ Modo sombra activo — muestreo ${this.sampleMs}ms, umbral de decisión ${(DECISION_EDGE * 100).toFixed(0)} pts`);
   }
@@ -69,7 +76,7 @@ class Shadow {
       botStrike: botStrike || null, activatedAt: Date.now(),
       strike: null, strikeSource: null,
       rtdsAtStart: this.rtds?.getLatestTWAP?.(30)?.value_num ?? null,
-      rows: [], first: {}, maxEdge: { UP: null, DOWN: null }, path: {},
+      rows: [], first: {}, firstConf: {}, firstAgree: {}, maxEdge: { UP: null, DOWN: null }, path: {},
       signals: { UP: 0, DOWN: 0 }, firstSignal: { UP: null, DOWN: null }, trades: [],
       sigmaSum: 0, sigmaN: 0, closed: false, srcCount: [0, 0],
     };
@@ -197,10 +204,14 @@ class Shadow {
       const best = [edges.UP && { side: 'UP', ...edges.UP }, edges.DOWN && { side: 'DOWN', ...edges.DOWN }]
         .filter(Boolean).sort((a, b) => b.edge - a.edge)[0];
       if (best) {
+        const entry = { side: best.side, t, secs_left: Math.round(T), ask: best.ask, p: rnd(best.p, 4), edge: rnd(best.edge, 4) };
+        const confident = Math.abs(p - 0.5) >= MIN_CONF;
+        const agrees = confident && best.ask >= 0.5;
         for (const thr of THRESHOLDS) {
-          if (!m.first[thr] && best.edge >= thr) {
-            m.first[thr] = { side: best.side, t, secs_left: Math.round(T), ask: best.ask, p: rnd(best.p, 4), edge: rnd(best.edge, 4) };
-          }
+          if (best.edge < thr) continue;
+          if (!m.first[thr]) m.first[thr] = entry;
+          if (confident && !m.firstConf[thr]) m.firstConf[thr] = entry;
+          if (agrees && !m.firstAgree[thr]) m.firstAgree[thr] = entry;
         }
       }
     }
@@ -248,6 +259,12 @@ class Shadow {
 
   _write(m, winner, source) {
     const W = (side) => winner ? side === winner : null;
+    const firsts = (map) => THRESHOLDS.map(thr => {
+      const f = map[thr];
+      if (!f) return { thr, side: null };
+      const win = W(f.side);
+      return { thr, ...f, win, pnl_token: pnl(win, f.ask) };
+    });
     const summary = {
       v: 1,
       market_id: m.marketId, gamma_id: m.gammaId, question: m.question,
@@ -263,12 +280,10 @@ class Shadow {
       path: Object.keys(m.path).map(Number).sort((a, b) => a - b).map(k => m.path[k]),
       model: {
         decision_edge: DECISION_EDGE,
-        first: THRESHOLDS.map(thr => {
-          const f = m.first[thr];
-          if (!f) return { thr, side: null };
-          const win = W(f.side);
-          return { thr, ...f, win, pnl_token: pnl(win, f.ask) };
-        }),
+        min_conf: MIN_CONF,
+        first: firsts(m.first),
+        first_conf: firsts(m.firstConf),
+        first_agree: firsts(m.firstAgree),
         max_edge_up: m.maxEdge.UP, max_edge_down: m.maxEdge.DOWN,
       },
       bot: {
@@ -284,10 +299,11 @@ class Shadow {
 
     // Línea legible para leer desde los logs de Railway
     const hhmm = new Date(m.startTs).toISOString().slice(11, 16);
-    const f = summary.model.first.find(x => x.thr === DECISION_EDGE) || summary.model.first[1];
-    const modelTxt = f?.side
+    const pick = arr => arr.find(x => x.thr === DECISION_EDGE) || arr[1];
+    const fmt = f => f?.side
       ? `${f.side}@$${f.ask} P=${(f.p * 100).toFixed(0)}% +${(f.edge * 100).toFixed(1)}pts a ${f.secs_left}s → ${f.win == null ? '?' : f.win ? 'GANA' : 'PIERDE'}`
       : 'no entraba';
+    const modelTxt = `${fmt(pick(summary.model.first))} | con confianza: ${fmt(pick(summary.model.first_conf))} | a favor del mercado: ${fmt(pick(summary.model.first_agree))}`;
     const botTxt = summary.bot.trades.length
       ? summary.bot.trades.map(tr => `${tr.dir}@$${tr.price} (modelo ${tr.model_edge == null ? 'n/a' : (tr.model_edge >= 0 ? '+' : '') + (tr.model_edge * 100).toFixed(1) + 'pts'}) → ${tr.win == null ? '?' : tr.win ? 'GANA' : 'PIERDE'}`).join(', ')
       : 'sin trade';
