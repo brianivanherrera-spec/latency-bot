@@ -2226,11 +2226,15 @@ async function main() {
       return;
     }
 
-    // MIN_ENTRY_PRICE — no entrar cuando el token ya perdió casi todo su valor
-    // Señales ÉLITE también lo saltean
-    const minEntryPrice = parseFloat(process.env.MIN_ENTRY_PRICE || '0.20');
-    if (!isEliteSignal && priceRaw < minEntryPrice) {
-      logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: precio raw $${priceRaw.toFixed(2)} < mínimo $${minEntryPrice} — token casi sin valor`);
+    // MIN_ENTRY_PRICE — no comprar el lado barato (contra el mercado).
+    // En 137 mercados con ganador oficial (25-28/09), la primera señal con ask < $0.35
+    // acertó 1 de 10 (y 1 de 25 contando los inferidos); en el paper, 3 de 4 trades a
+    // $0.23-0.30 perdieron. Se compara contra el ask real (priceRaw puede ser viejo) y
+    // aplica también a las señales ÉLITE.
+    const minEntryPrice = parseFloat(process.env.MIN_ENTRY_PRICE || '0.35');
+    const entryPriceMin = bestAskWS ?? priceRaw;
+    if (entryPriceMin != null && entryPriceMin < minEntryPrice) {
+      logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: ${bestAskWS != null ? 'ask' : 'precio raw'} $${entryPriceMin.toFixed(2)} < mínimo $${minEntryPrice} — lado barato (contra el mercado)${isEliteSignal ? ' (ÉLITE)' : ''}`);
       activePositions.delete(posId);
       return;
     }
