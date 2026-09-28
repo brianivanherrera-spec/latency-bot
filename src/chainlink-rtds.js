@@ -12,6 +12,7 @@ const RTDS_URL = 'wss://ws-live-data.polymarket.com';
 const PING_MS = 5000;
 const BTC_MIN = 1000, BTC_MAX = 10_000_000;
 const STALE_MS = 10000;
+const RTDS_LATENCY_WARN_MS = parseInt(process.env.RTDS_LATENCY_WARN_MS || '3000');
 
 class ChainlinkRTDS {
   constructor() {
@@ -160,12 +161,13 @@ class ChainlinkRTDS {
     const source_ts = payload.timestamp || null;
     if (!source_ts) this.diag.missing_ts++;
 
-    // Medir latencia real — loguear solo si supera 2000ms (reduce spam)
+    // Medir latencia real — loguear solo si supera RTDS_LATENCY_WARN_MS (default 3000).
+    // Con 2000ms avisaba cada ~10s: la llegada normal de Chainlink es p50 ~1.4s, p90 ~1.9s.
     if (source_ts) {
       const latency_ms = received_ts - source_ts;
       const now = Date.now();
       const lastLogTime = this._lastLatencyLogTime || 0;
-      if (latency_ms > 2000 && (now - lastLogTime) > 10000) {
+      if (latency_ms > RTDS_LATENCY_WARN_MS && (now - lastLogTime) > 10000) {
         logger.warn(`[RTDS] Alta latencia: ${latency_ms}ms (window=${window_s}s)`);
         this._lastLatencyLogTime = now;
       }

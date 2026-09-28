@@ -111,6 +111,24 @@ class Shadow {
     logger.info(`[SHADOW] bot ${direction} @ $${price?.toFixed(3)} — modelo: P=${pSide == null ? 'n/a' : (pSide * 100).toFixed(1) + '%'} ventaja=${edge == null ? 'n/a' : (edge * 100).toFixed(1) + ' pts'} → ${edge == null ? 'sin dato' : edge >= DECISION_EDGE ? 'también entraría' : 'NO entraría'}`);
   }
 
+  // Filtro FAIR para las entradas del bot: ¿el modelo también entraría en este lado a este ask?
+  //   'edge':  ventaja (P del lado − ask) ≥ SHADOW_EDGE
+  //   'agree': además ask ≥ 0.50 (solo el lado que el mercado ya favorece; variante first_agree)
+  // Sin dato del modelo, o con el shadow en otro mercado, no deja entrar.
+  evaluateEntry({ gammaId, direction, ask, mode = 'agree' }) {
+    const m = this.cur;
+    if (!m || m.closed || (gammaId && m.gammaId !== gammaId)) return { ok: false, reason: 'modelo en otro mercado' };
+    if (ask == null || !Number.isFinite(ask)) return { ok: false, reason: 'sin ask' };
+    const p = this._pNow(m, Date.now());
+    if (p == null) return { ok: false, reason: 'modelo sin dato' };
+    const pSide = direction === 'UP' ? p : 1 - p;
+    const edge = pSide - ask;
+    const txt = `P=${(pSide * 100).toFixed(1)}% ventaja=${(edge * 100).toFixed(1)} pts`;
+    if (edge < DECISION_EDGE) return { ok: false, p: pSide, edge, reason: `${txt} < ${(DECISION_EDGE * 100).toFixed(0)} pts` };
+    if (mode === 'agree' && ask < 0.5) return { ok: false, p: pSide, edge, reason: `${txt} pero ask $${ask.toFixed(2)} < 0.50 (lado que el mercado no favorece)` };
+    return { ok: true, p: pSide, edge, reason: txt };
+  }
+
   getStats() { return { ...this.stats, pending: this.pending.size, current: this.cur?.question || null }; }
 
   // ───────────────────────────────────────────────────────────────────────

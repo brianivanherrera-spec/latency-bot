@@ -1767,7 +1767,12 @@ async function main() {
       // tokenMid > 0.95 = token casi en $1, ídem
       // El umbral bajo es SIMÉTRICO: (1 - extremeThreshold)
       if (tokenMid < (1 - extremeThreshold) || tokenMid > extremeThreshold) {
-        logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real (umbral: ${(1-extremeThreshold).toFixed(2)}-${extremeThreshold})`);
+        // Una vez por mercado: al final de cada ventana se repetía ~2 veces por segundo
+        const extremeKey = cachedMarket?.gammaId || cachedMarket?.conditionId || 'n/a';
+        if (global._polyExtremeLoggedFor !== extremeKey) {
+          global._polyExtremeLoggedFor = extremeKey;
+          logger.warn(`[SKIP] 🚫 POLY-EXTREMO: token @ $${tokenMid.toFixed(3)} (polyYes=$${polyYesNow.toFixed(3)}) — sin edge real (umbral: ${(1-extremeThreshold).toFixed(2)}-${extremeThreshold}) — no se repite en este mercado`);
+        }
         return;
       }
     }
@@ -2249,6 +2254,28 @@ async function main() {
       logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: ${bestAskWS != null ? 'ask' : 'precio raw'} $${entryPriceMin.toFixed(2)} < mínimo $${minEntryPrice} — lado barato (contra el mercado)${isEliteSignal ? ' (ÉLITE)' : ''}`);
       activePositions.delete(posId);
       return;
+    }
+
+    // FAIR_GATE — entrar solo si el modelo FAIR (TWAP de Chainlink) también entraría.
+    // 28/09 13:30-16:20: las entradas del bot contra el modelo ganaron 3 de 9, mientras la
+    // variante "a favor del mercado" del shadow acertó 13 de 18. off | edge | agree (default).
+    const fairGate = (process.env.FAIR_GATE || 'agree').toLowerCase();
+    if (fairGate !== 'off') {
+      if (!shadow) {
+        if (!global._fairGateWarned) { logger.warn('[FAIR-GATE] SHADOW_MODE=false — sin modelo, el filtro no se aplica'); global._fairGateWarned = true; }
+      } else {
+        const g = shadow.evaluateEntry({ gammaId: cachedMarket?.gammaId, direction: sig.direction, ask: bestAskWS ?? priceRaw, mode: fairGate });
+        if (!g.ok) {
+          // Máximo un log cada 10s (las señales se repiten cada 500ms)
+          if (now - (global._fairGateLogTs || 0) > 10000) {
+            global._fairGateLogTs = now;
+            logger.warn(`[SKIP] 🚫 FAIR-GATE (${fairGate}): ${sig.direction} — ${g.reason}`);
+          }
+          activePositions.delete(posId);
+          return;
+        }
+        logger.info(`[FAIR-GATE] ✅ ${sig.direction} — ${g.reason}`);
+      }
     }
 
     // Fix 1: size check ANTES del Discord alert — no alertar órdenes que no van a ejecutarse
