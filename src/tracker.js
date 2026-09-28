@@ -9,7 +9,13 @@ const logger = new Logger('TRACKER');
 const GAMMA_API = 'https://gamma-api.polymarket.com';
  
 const fs = require('fs');
+const config = require('./config');
 const POSITIONS_FILE = process.env.POSITIONS_FILE || '/data/positions.json';
+
+// Comisión simulada en paper: % sobre el monto de cada compra/venta (taker).
+// 0 = sin comisión. Poner la tasa real de Polymarket para estos mercados.
+const PAPER_FEE = config.DRY_RUN ? (parseFloat(process.env.PAPER_FEE_PCT || '0') || 0) / 100 : 0;
+const fee = (notional) => parseFloat((notional * PAPER_FEE).toFixed(4));
 
 class PnLTracker {
   constructor() {
@@ -176,12 +182,14 @@ class PnLTracker {
     // Para determinar qué token compró, usamos pos.tokenOutcome que se guarda al abrir
     const won = pos.tokenOutcome === winner;
  
+    // Comisión de entrada (paper); cobrar al resolver no paga comisión
+    const entryFee = fee(pos.entryPrice * pos.size);
     let pnl;
     if (won) {
-      pnl = parseFloat(((1 - pos.entryPrice) * pos.size).toFixed(2));
+      pnl = parseFloat(((1 - pos.entryPrice) * pos.size - entryFee).toFixed(2));
       this.wins++;
     } else {
-      pnl = parseFloat((-pos.entryPrice * pos.size).toFixed(2));
+      pnl = parseFloat((-pos.entryPrice * pos.size - entryFee).toFixed(2));
       this.losses++;
     }
  
@@ -214,9 +222,11 @@ class PnLTracker {
   }
 
   // Cierre forzado por SL/TP — registra el PnL real de la venta anticipada
-  forceClosePosition(posId, pnl, reason) {
+  // exitNotional: monto de la venta, para la comisión simulada de salida (paper)
+  forceClosePosition(posId, pnl, reason, exitNotional = 0) {
     const pos = this.positions.find(p => p.id === posId);
     if (!pos) return;
+    if (PAPER_FEE) pnl = parseFloat((pnl - fee(pos.entryPrice * pos.size) - fee(exitNotional)).toFixed(2));
     pos.status = 'CLOSED';
     pos.pnl = pnl;
     pos.closedAt = new Date();

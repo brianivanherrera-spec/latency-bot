@@ -1516,10 +1516,12 @@ async function main() {
 
         try {
           if (config.DRY_RUN) {
-            const exitPrice = tokenCurrentPrice;
+            // Vender es pegarle al bid, no al mid: el mid inflaba el P&L de los cierres anticipados
+            const top = polyWs._topOfBook?.get(pos.tokenId);
+            const exitPrice = top?.bestBid > 0 ? top.bestBid : tokenCurrentPrice;
             const pnl = parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2));
-            logger.info(`[POSITION-MONITOR] 📋 PAPER — cerrando ${pos.id} @ $${exitPrice.toFixed(3)} | PnL simulado: $${pnl.toFixed(2)}`);
-            tracker.forceClosePosition(pos.id, pnl, reason);
+            logger.info(`[POSITION-MONITOR] 📋 PAPER — cerrando ${pos.id} @ $${exitPrice.toFixed(3)} (${top?.bestBid > 0 ? 'bid' : 'mid, sin bid'}) | PnL simulado: $${pnl.toFixed(2)}`);
+            tracker.forceClosePosition(pos.id, pnl, reason, exitPrice * pos.size);
             closingPositions.delete(pos.id);
           } else {
             const exitResult = await poly.sellPosition({
@@ -1780,7 +1782,15 @@ async function main() {
     const CIRCUIT_BREAKER_PAUSE_MS = parseInt(process.env.CIRCUIT_BREAKER_PAUSE_MIN || '10') * 60 * 1000;
     const consecLosses = signalLogger.getConsecutiveLosses();
     if (consecLosses >= CIRCUIT_BREAKER_LOSSES) {
-      if (!global._lastCircuitBreakTime) global._lastCircuitBreakTime = now;
+      // Pausa al llegar a N pérdidas seguidas y de nuevo cada N pérdidas más (2N, 3N…).
+      // Antes, pasada la primera pausa, la racha podía seguir sin volver a frenar
+      // hasta que una ganancia reiniciara el contador.
+      const lossesAtPause = global._cbLossesAtPause || 0;
+      if (!global._lastCircuitBreakTime || consecLosses >= lossesAtPause + CIRCUIT_BREAKER_LOSSES) {
+        global._lastCircuitBreakTime = now;
+        global._cbLossesAtPause = consecLosses;
+        logger.warn(`[CIRCUIT BREAKER] ${consecLosses} losses seguidos — pausa de ${CIRCUIT_BREAKER_PAUSE_MS / 60000}min`);
+      }
       const pauseRemaining = Math.max(0, CIRCUIT_BREAKER_PAUSE_MS - (now - global._lastCircuitBreakTime));
       if (pauseRemaining > 0) {
         logger.warn(`[CIRCUIT BREAKER] ${consecLosses} losses seguidos — pausa ${Math.ceil(pauseRemaining/60000)}min restantes`);
@@ -1788,6 +1798,7 @@ async function main() {
       }
     } else {
       global._lastCircuitBreakTime = null;
+      global._cbLossesAtPause = 0;
     }
 
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
@@ -2081,7 +2092,8 @@ async function main() {
     // donde dos señales casi simultáneas podían pasar los mismos chequeos
     // y terminar abriendo 2 posiciones en el mismo mercado (visto en logs
     // del 24/07: entradas duplicadas con 2-54ms de diferencia).
-    lastTradeTime = now;
+    // El cooldown (lastTradeTime) NO se arranca acá: si la entrada se descarta más
+    // abajo (precio, tamaño), antes igual bloqueaba 30s de señales sin haber operado.
     const posId = `POS_${Date.now()}`;
     activePositions.set(posId, {
       exposure: 0, openTime: now,
@@ -2245,6 +2257,9 @@ async function main() {
       activePositions.delete(posId); // liberar la reserva — esta entrada no va a ejecutarse
       return;
     }
+
+    // Entrada confirmada (pasó todos los filtros): recién ahora corre el cooldown
+    lastTradeTime = now;
 
     // Fire-and-forget — no bloquea la ejecución de la orden
     alertTradeSignal({
