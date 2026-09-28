@@ -43,8 +43,20 @@ function stopTickRecorder(posId) {
   if (interval) { clearInterval(interval); activeTickRecorders.delete(posId); }
 }
 
-// Contador de losses consecutivos (en memoria, se resetea al reiniciar)
-let consecutiveLosses = 0;
+// Contador de losses consecutivos (circuit breaker). Al arrancar se recalcula desde
+// signals.jsonl: antes empezaba en 0 en cada redeploy y cortaba la racha.
+let consecutiveLosses = (() => {
+  try {
+    if (!fs.existsSync(SIGNAL_FILE)) return 0;
+    const closed = fs.readFileSync(SIGNAL_FILE, 'utf8').split('\n').filter(Boolean)
+      .map(l => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(r => r && (r.result === 'WIN' || r.result === 'LOSS'))
+      .sort((a, b) => (a.close_timestamp || Date.parse(a.timestamp) || 0) - (b.close_timestamp || Date.parse(b.timestamp) || 0));
+    let n = 0;
+    for (let i = closed.length - 1; i >= 0 && closed[i].result === 'LOSS'; i--) n++;
+    return n;
+  } catch { return 0; }
+})();
 
 // Mapa de snapshots pendientes: posId → { record, btcPrice, getPolyPrice }
 const pendingSnapshots = new Map();

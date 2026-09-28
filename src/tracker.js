@@ -35,17 +35,32 @@ class PnLTracker {
         // Solo restaurar posiciones que aún no vencieron
         const now = new Date();
         const active = (data.positions || []).filter(p => new Date(p.endDate) > now);
+        // Totales siempre (antes solo si quedaban posiciones abiertas: el balance
+        // de paper y el W/L volvían a cero en cada redeploy)
+        this.totalPnL = data.totalPnL || 0;
+        this.wins = data.wins || 0;
+        this.losses = data.losses || 0;
         if (active.length > 0) {
           // Convertir endDate a Date object
           this.positions = active.map(p => ({ ...p, endDate: new Date(p.endDate) }));
-          this.totalPnL = data.totalPnL || 0;
-          this.wins = data.wins || 0;
-          this.losses = data.losses || 0;
           logger.info(`[TRACKER] ✅ Restauradas ${this.positions.length} posiciones desde disco`);
         }
       }
     } catch (e) {
       logger.warn(`[TRACKER] No se pudo restaurar posiciones: ${e.message}`);
+    }
+    // signals.jsonl (en el volumen) tiene todos los trades cerrados: si registra más que
+    // positions.json (sobrescrito por un proceso que arrancó de cero), manda ese
+    try {
+      const st = signalLogger.getStats();
+      if (st && st.closedTrades > this.wins + this.losses) {
+        this.wins = st.wins || 0;
+        this.losses = st.losses || 0;
+        this.totalPnL = parseFloat(st.totalPnL) || 0;
+      }
+    } catch (_) {}
+    if (this.wins + this.losses > 0) {
+      logger.info(`✅ Historial restaurado: W:${this.wins} L:${this.losses} | P&L ${this.totalPnL >= 0 ? '+' : ''}$${this.totalPnL.toFixed(2)}`);
     }
   }
 
