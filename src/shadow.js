@@ -111,7 +111,8 @@ class Shadow {
     logger.info(`[SHADOW] bot ${direction} @ $${price?.toFixed(3)} — modelo: P=${pSide == null ? 'n/a' : (pSide * 100).toFixed(1) + '%'} ventaja=${edge == null ? 'n/a' : (edge * 100).toFixed(1) + ' pts'} → ${edge == null ? 'sin dato' : edge >= DECISION_EDGE ? 'también entraría' : 'NO entraría'}`);
   }
 
-  // Filtro FAIR para las entradas del bot: ¿el modelo también entraría en este lado a este ask?
+  // Filtro FAIR para las entradas del bot: ¿el modelo también entraría en este lado a este precio?
+  // (ask = precio al que se compraría; el bot pasa el precio real de la orden)
   //   'edge':  ventaja (P del lado − ask) ≥ SHADOW_EDGE
   //   'agree': además ask ≥ 0.50 (solo el lado que el mercado ya favorece; variante first_agree)
   // Sin dato del modelo, o con el shadow en otro mercado, no deja entrar.
@@ -125,7 +126,7 @@ class Shadow {
     const edge = pSide - ask;
     const txt = `P=${(pSide * 100).toFixed(1)}% ventaja=${(edge * 100).toFixed(1)} pts`;
     if (edge < DECISION_EDGE) return { ok: false, p: pSide, edge, reason: `${txt} < ${(DECISION_EDGE * 100).toFixed(0)} pts` };
-    if (mode === 'agree' && ask < 0.5) return { ok: false, p: pSide, edge, reason: `${txt} pero ask $${ask.toFixed(2)} < 0.50 (lado que el mercado no favorece)` };
+    if (mode === 'agree' && ask < 0.5) return { ok: false, p: pSide, edge, reason: `${txt} pero precio $${ask.toFixed(3)} < 0.50 (lado que el mercado no favorece)` };
     return { ok: true, p: pSide, edge, reason: txt };
   }
 

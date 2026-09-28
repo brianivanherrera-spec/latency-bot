@@ -2257,6 +2257,8 @@ async function main() {
     }
 
     // FAIR_GATE — entrar solo si el modelo FAIR (TWAP de Chainlink) también entraría.
+    // La ventaja se mide contra el precio real de la orden (ask + tick), no contra el ask:
+    // con el ask, entradas de 4.3-4.8 pts reales pasaban como ≥5.
     // 28/09 13:30-16:20: las entradas del bot contra el modelo ganaron 3 de 9, mientras la
     // variante "a favor del mercado" del shadow acertó 13 de 18. off | edge | agree (default).
     const fairGate = (process.env.FAIR_GATE || 'agree').toLowerCase();
@@ -2264,7 +2266,7 @@ async function main() {
       if (!shadow) {
         if (!global._fairGateWarned) { logger.warn('[FAIR-GATE] SHADOW_MODE=false — sin modelo, el filtro no se aplica'); global._fairGateWarned = true; }
       } else {
-        const g = shadow.evaluateEntry({ gammaId: cachedMarket?.gammaId, direction: sig.direction, ask: bestAskWS ?? priceRaw, mode: fairGate });
+        const g = shadow.evaluateEntry({ gammaId: cachedMarket?.gammaId, direction: sig.direction, ask: price ?? bestAskWS ?? priceRaw, mode: fairGate });
         if (!g.ok) {
           // Máximo un log cada 10s (las señales se repiten cada 500ms)
           if (now - (global._fairGateLogTs || 0) > 10000) {
