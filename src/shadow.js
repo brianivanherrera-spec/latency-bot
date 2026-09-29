@@ -27,6 +27,10 @@ const GAMMA = 'https://gamma-api.polymarket.com';
 
 const THRESHOLDS = [0.03, 0.05, 0.08, 0.12];                         // ventajas a evaluar (fracción = puntos/100)
 const DECISION_EDGE = parseFloat(process.env.SHADOW_EDGE || '0.05');  // umbral "el modelo entraría"
+// Umbral del filtro FAIR para las entradas reales del bot (aparte del de la sombra).
+// 8 pts: en 29/09 (180 mercados, ~6.300 señales) mejoró a 5 pts en los tres tramos del día;
+// el modelo sobreestima ~5-10 pts su probabilidad, con 5 pts la ventaja era casi toda ruido.
+const GATE_EDGE = parseFloat(process.env.FAIR_GATE_EDGE || '0.08');
 const MIN_SECS = parseInt(process.env.SHADOW_MIN_SECS || '10');       // no contar oportunidades con <10s
 // Con P(UP) ≈ 0.50 el modelo no sabe nada (spot ≈ strike al abrir) y la "ventaja" es solo la
 // inclinación del mercado, que resultó informada: en 200 mercados esas entradas acertaron 19%.
@@ -113,7 +117,7 @@ class Shadow {
 
   // Filtro FAIR para las entradas del bot: ¿el modelo también entraría en este lado a este precio?
   // (ask = precio al que se compraría; el bot pasa el precio real de la orden)
-  //   'edge':  ventaja (P del lado − ask) ≥ SHADOW_EDGE
+  //   'edge':  ventaja (P del lado − ask) ≥ FAIR_GATE_EDGE (8 pts)
   //   'agree': además ask ≥ 0.50 (solo el lado que el mercado ya favorece; variante first_agree)
   // Sin dato del modelo, o con el shadow en otro mercado, no deja entrar.
   evaluateEntry({ gammaId, direction, ask, mode = 'agree' }) {
@@ -129,7 +133,7 @@ class Shadow {
     const pSide = direction === 'UP' ? p : 1 - p;
     const edge = pSide - ask;
     const txt = `P=${(pSide * 100).toFixed(1)}% ventaja=${(edge * 100).toFixed(1)} pts`;
-    if (edge < DECISION_EDGE) return { ok: false, p: pSide, edge, reason: `${txt} < ${(DECISION_EDGE * 100).toFixed(0)} pts` };
+    if (edge < GATE_EDGE) return { ok: false, p: pSide, edge, reason: `${txt} < ${(GATE_EDGE * 100).toFixed(0)} pts` };
     if (mode === 'agree' && ask < 0.5) return { ok: false, p: pSide, edge, reason: `${txt} pero precio $${ask.toFixed(3)} < 0.50 (lado que el mercado no favorece)` };
     return { ok: true, p: pSide, edge, reason: txt };
   }
