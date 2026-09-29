@@ -120,8 +120,12 @@ class Shadow {
     const m = this.cur;
     if (!m || m.closed || (gammaId && m.gammaId !== gammaId)) return { ok: false, reason: 'modelo en otro mercado' };
     if (ask == null || !Number.isFinite(ask)) return { ok: false, reason: 'sin ask' };
-    const p = this._pNow(m, Date.now());
+    const F = this._fair(m, Date.now());
+    const p = F?.p ?? null;
     if (p == null) return { ok: false, reason: 'modelo sin dato' };
+    // Con Chainlink caído el modelo usa Binance (strike/spot con ~$25 de base USDT):
+    // la probabilidad sale sesgada, así que el filtro no deja entrar.
+    if (F.src !== 1 && process.env.FAIR_GATE_ALLOW_BINANCE !== 'true') return { ok: false, reason: 'modelo sin Chainlink (usando Binance)' };
     const pSide = direction === 'UP' ? p : 1 - p;
     const edge = pSide - ask;
     const txt = `P=${(pSide * 100).toFixed(1)}% ventaja=${(edge * 100).toFixed(1)} pts`;

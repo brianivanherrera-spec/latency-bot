@@ -12,6 +12,8 @@ const logger = new Logger('CHAINLINK-SPOT');
 
 const RTDS_URL = 'wss://ws-live-data.polymarket.com';
 const HISTORY_MS = 15 * 60 * 1000;
+// Sin precios en este tiempo con el socket "abierto" → se corta y reconecta
+const STALE_RECONNECT_MS = parseInt(process.env.CHAINLINK_STALE_MS || '30000');
 
 class ChainlinkSpot {
   constructor() {
@@ -38,8 +40,15 @@ class ChainlinkSpot {
         subscriptions: [{ topic: 'crypto_prices_chainlink', type: '*', filters: '{"symbol":"btc/usd"}' }],
       }));
       logger.info('[SPOT] ✅ Conectado — suscripto a crypto_prices_chainlink btc/usd');
+      this._lastDataTs = Date.now();
       this._pingTimer = setInterval(() => {
-        if (this.ws?.readyState === WebSocket.OPEN) this.ws.send('PING');
+        if (this.ws?.readyState !== WebSocket.OPEN) return;
+        if (Date.now() - this._lastDataTs > STALE_RECONNECT_MS) {
+          logger.warn(`[SPOT] ⚠️ Sin precios hace ${((Date.now() - this._lastDataTs) / 1000).toFixed(0)}s con el socket abierto — reconectando`);
+          this.ws.terminate(); // dispara 'close' → reconexión
+          return;
+        }
+        this.ws.send('PING');
       }, 5000);
     });
     this.ws.on('message', (data) => {
@@ -67,6 +76,7 @@ class ChainlinkSpot {
       const ts = Number(pt.timestamp);
       if (!(value > 1000 && value < 10_000_000) || !Number.isFinite(ts)) continue;
       this._push(ts > 1e12 ? ts : ts * 1000, value);
+      this._lastDataTs = Date.now();
     }
     if (!this._firstLogged && this._history.length) {
       this._firstLogged = true;

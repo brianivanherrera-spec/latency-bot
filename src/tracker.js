@@ -7,6 +7,8 @@ const signalLogger = require('./signal-logger');
 const logger = new Logger('TRACKER');
  
 const GAMMA_API = 'https://gamma-api.polymarket.com';
+// Minutos tras el fin del mercado sin 'closed' oficial antes de resolver con precios >= 0.95
+const RESOLVE_GRACE_MIN = parseFloat(process.env.RESOLVE_GRACE_MIN || '20');
  
 const fs = require('fs');
 const config = require('./config');
@@ -49,6 +51,12 @@ class PnLTracker {
     } catch (e) {
       logger.warn(`[TRACKER] No se pudo restaurar posiciones: ${e.message}`);
     }
+    // Correcciones de trades mal resueltos aplicadas en este arranque (ver signal-logger)
+    const cd = signalLogger.correctionDelta;
+    if (cd && cd.applied.length) {
+      this.totalPnL += cd.pnl; this.wins += cd.wins; this.losses += cd.losses;
+      logger.warn(`Correcciones aplicadas: ${cd.applied.join('; ')} | ajuste P&L ${cd.pnl >= 0 ? '+' : ''}$${cd.pnl.toFixed(2)}`);
+    }
     // signals.jsonl (en el volumen) tiene todos los trades cerrados: si registra más que
     // positions.json (sobrescrito por un proceso que arrancó de cero), manda ese
     try {
@@ -59,6 +67,7 @@ class PnLTracker {
         this.totalPnL = parseFloat(st.totalPnL) || 0;
       }
     } catch (_) {}
+    if (cd && cd.applied.length) this._saveToDisk();
     if (this.wins + this.losses > 0) {
       logger.info(`✅ Historial restaurado: W:${this.wins} L:${this.losses} | P&L ${this.totalPnL >= 0 ? '+' : ''}$${this.totalPnL.toFixed(2)}`);
     }
@@ -116,7 +125,7 @@ class PnLTracker {
 
     for (const pos of toCheck) {
       try {
-        const result = await this._getMarketResult(pos.marketId, pos.gammaId);
+        const result = await this._getMarketResult(pos.marketId, pos.gammaId, pos.endDate);
         if (result === null) {
           if (!pos._pendingLogged) {
             logger.info(`Mercado ${pos.id} cerrado, esperando resolución en Gamma...`);
@@ -131,7 +140,7 @@ class PnLTracker {
     }
   }
  
-  async _getMarketResult(marketId, gammaId) {
+  async _getMarketResult(marketId, gammaId, endDate) {
     try {
       const id = gammaId || marketId;
       const res = await fetch(`${GAMMA_API}/markets/${id}`);
@@ -141,21 +150,32 @@ class PnLTracker {
       }
       const market = await res.json();
 
-      // PRIORITARIO: outcomePrices — Polymarket los actualiza antes que closed/resolved
-      // ["1","0"] = YES ganó | ["0","1"] = NO ganó
+      // outcomePrices ["1","0"] = YES ganó | ["0","1"] = NO ganó. Solo vale con el
+      // mercado cerrado: antes se aceptaba >= 0.95 con el mercado abierto, que es el
+      // precio en juego en el segundo del cierre y no el resultado (29/09 07:15: se
+      // contó WIN un trade que resolvió LOSS). Mismo criterio que el shadow.
+      const closed = market.closed === true || market.resolved === true;
+      let prices = null;
       if (market.outcomePrices) {
         try {
-          const prices = typeof market.outcomePrices === 'string'
+          prices = typeof market.outcomePrices === 'string'
             ? JSON.parse(market.outcomePrices)
             : market.outcomePrices;
-          if (parseFloat(prices[0]) >= 0.95) return 'YES';
-          if (parseFloat(prices[1]) >= 0.95) return 'NO';
         } catch (_) {}
       }
-
-      // Fallback: campos estándar de resolución
-      const isResolved = market.resolved === true || market.closed === true || market.active === false;
-      if (!isResolved) return null;
+      const pYes = parseFloat(prices?.[0]), pNo = parseFloat(prices?.[1]);
+      if (closed) {
+        if (pYes >= 0.99) return 'YES';
+        if (pNo >= 0.99) return 'NO';
+      } else {
+        // Sin cierre oficial pasados RESOLVE_GRACE_MIN: mejor dato disponible, avisado
+        const lateMin = endDate ? (Date.now() - new Date(endDate).getTime()) / 60000 : 0;
+        if (lateMin > RESOLVE_GRACE_MIN && (pYes >= 0.95 || pNo >= 0.95)) {
+          logger.warn(`Mercado ${id} sin cerrar a ${lateMin.toFixed(0)} min del fin — resuelvo con precios (${prices[0]}/${prices[1]})`);
+          return pYes >= 0.95 ? 'YES' : 'NO';
+        }
+        return null;
+      }
 
       // Forma 1: campo winner directo
       if (market.winner === 'YES' || market.winner === 'NO') {

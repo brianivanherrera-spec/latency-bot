@@ -43,6 +43,38 @@ function stopTickRecorder(posId) {
   if (interval) { clearInterval(interval); activeTickRecorders.delete(posId); }
 }
 
+// Correcciones de trades mal resueltos (el tracker aceptaba precios >= 0.95 con el
+// mercado todavía abierto). Se aplican una sola vez al arrancar: si el registro ya
+// tiene el resultado corregido no se toca. correctionDelta lo usa el tracker para
+// ajustar su balance/W-L persistidos en positions.json.
+const CORRECTIONS = [
+  // 29/09 07:15 UTC UP @0.76 x6: cerrado WIN +1.44 en el cierre con el mercado abierto; resolvió DOWN
+  { posId: 'POS_1790666143172', result: 'LOSS', pnl: -4.56 },
+];
+const correctionDelta = (() => {
+  const d = { pnl: 0, wins: 0, losses: 0, applied: [] };
+  try {
+    if (!fs.existsSync(SIGNAL_FILE)) return d;
+    const lines = fs.readFileSync(SIGNAL_FILE, 'utf8').split('\n');
+    const out = lines.map(line => {
+      if (!line) return line;
+      let r; try { r = JSON.parse(line); } catch { return line; }
+      const c = CORRECTIONS.find(c => c.posId === r.posId);
+      if (!c || !r.result || r.result === c.result) return line;
+      d.pnl += c.pnl - (r.pnl || 0);
+      if (r.result === 'WIN') d.wins--; else if (r.result === 'LOSS') d.losses--;
+      if (c.result === 'WIN') d.wins++; else d.losses++;
+      d.applied.push(`${c.posId} ${r.result} ${r.pnl} → ${c.result} ${c.pnl}`);
+      return JSON.stringify({ ...r, result: c.result, pnl: c.pnl, corrected_from: { result: r.result, pnl: r.pnl } });
+    });
+    if (d.applied.length) {
+      fs.writeFileSync(SIGNAL_FILE, out.join('\n'));
+      updateStats();
+    }
+  } catch (_) {}
+  return d;
+})();
+
 // Contador de losses consecutivos (circuit breaker). Al arrancar se recalcula desde
 // signals.jsonl: antes empezaba en 0 en cada redeploy y cortaba la racha.
 let consecutiveLosses = (() => {
@@ -772,5 +804,5 @@ module.exports = {
   getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder,
   logFillTelemetry, getT3Timestamp, recordOrderSent, recordOrderAccepted,
   recordOrderResting, recordOrderFilled, getLatencyTracking, clearLatencyTracking,
-  logMarketTwapFinal, analyzeNoFillReason
+  logMarketTwapFinal, analyzeNoFillReason, correctionDelta
 };

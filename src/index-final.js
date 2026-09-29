@@ -615,6 +615,7 @@ httpServer.listen(PORT, () => {
 
 const tracker = new PnLTracker();
 const activePositions = new Map();
+require('./retention').start(); // borra grabaciones/crudos viejos del volumen cada hora
 
 let lastTradeTime = 0;
 const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // configurable via Railway

@@ -12,6 +12,9 @@ const RTDS_URL = 'wss://ws-live-data.polymarket.com';
 const PING_MS = 5000;
 const BTC_MIN = 1000, BTC_MAX = 10_000_000;
 const STALE_MS = 10000;
+// Sin datos de precio en este tiempo con el socket "abierto" → se corta y reconecta.
+// Antes un socket colgado (abierto pero sin mensajes) dejaba el TWAP congelado sin aviso.
+const STALE_RECONNECT_MS = parseInt(process.env.CHAINLINK_STALE_MS || '30000');
 const RTDS_LATENCY_WARN_MS = parseInt(process.env.RTDS_LATENCY_WARN_MS || '3000');
 
 class ChainlinkRTDS {
@@ -78,8 +81,17 @@ class ChainlinkRTDS {
       });
       this.ws.send(subMsg);
       logger.info(`[RTDS] Suscripción enviada: ${subMsg}`);
+      this._openedAt = Date.now();
       this._pingTimer = setInterval(() => {
-        if (this.ws?.readyState === WebSocket.OPEN) this.ws.send('PING');
+        if (this.ws?.readyState !== WebSocket.OPEN) return;
+        const lastData = Math.max(this._openedAt, this.diag.last_received_30s || 0, this.diag.last_received_60s || 0);
+        if (Date.now() - lastData > STALE_RECONNECT_MS) {
+          logger.warn(`[RTDS] ⚠️ Sin datos hace ${((Date.now() - lastData) / 1000).toFixed(0)}s con el socket abierto — reconectando`);
+          this.diag.stale_reconnects = (this.diag.stale_reconnects || 0) + 1;
+          this.ws.terminate(); // dispara 'close' → reconexión
+          return;
+        }
+        this.ws.send('PING');
       }, 3000); // 3s — reduce detección de caídas vs 5s original
     });
     this.ws.on('message', (data) => {
