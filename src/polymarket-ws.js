@@ -101,6 +101,10 @@ class PolymarketWS {
     // E.g., 0.70 -> 0.90 = +0.20 movement toward UP
     this._lastImbalance = null;
     this._lastImbalanceUpdate = 0;
+    // Muestras del imbalance cada 1s (últimos 2 min) para medir cuánto se movió
+    // el book en una ventana fija. Solo registro — no lo usa ningún filtro.
+    this._imbSamples = [];
+    this._imbSampler = null;
 
     this._priceCallback = null;
     this._resolvedCallback = null;
@@ -370,6 +374,23 @@ class PolymarketWS {
   // YES_bid alto = más compradores de YES = mercado yendo UP
   // Menos preciso que la profundidad pero MUCHO más rápido
   getInstantImbalance() {
+    const imb = this._computeImbalance();
+    if (imb == null) return null;
+
+    // Track imbalance for movement calculation (now already declared at line 361)
+    const now = Date.now();
+    const timeSinceLastUpdate = now - this._lastImbalanceUpdate;
+    // Only update if >1 second has passed (avoid noise from rapid updates)
+    if (timeSinceLastUpdate > 1000) {
+      this._lastImbalance = imb;
+      this._lastImbalanceUpdate = now;
+    }
+
+    return imb;
+  }
+
+  // Cálculo puro del imbalance (sin tocar _lastImbalance)
+  _computeImbalance() {
     const now = Date.now();
     const yesBook = this._topOfBook.get(this._yesTokenId);
     const noBook  = this._topOfBook.get(this._noTokenId);
@@ -404,17 +425,37 @@ class PolymarketWS {
     // Imbalance = (YES_bid - NO_bid) / (YES_bid + NO_bid)
     const total = calcYesBid + calcNoBid;
     if (total <= 0) return null;
-    const imb = parseFloat(((calcYesBid - calcNoBid) / total).toFixed(3));
+    return parseFloat(((calcYesBid - calcNoBid) / total).toFixed(3));
+  }
 
-    // Track imbalance for movement calculation (now already declared at line 361)
-    const timeSinceLastUpdate = now - this._lastImbalanceUpdate;
-    // Only update if >1 second has passed (avoid noise from rapid updates)
-    if (timeSinceLastUpdate > 1000) {
-      this._lastImbalance = imb;
-      this._lastImbalanceUpdate = now;
+  // Muestrea el imbalance cada segundo; las muestras llevan el par de tokens
+  // para no comparar contra el mercado anterior.
+  startImbalanceSampler(everyMs = 1000) {
+    if (this._imbSampler) return;
+    this._imbSampler = setInterval(() => {
+      const imb = this._computeImbalance();
+      if (imb == null) return;
+      const now = Date.now();
+      this._imbSamples.push({ ts: now, imb, key: `${this._yesTokenId}|${this._noTokenId}` });
+      while (this._imbSamples.length && now - this._imbSamples[0].ts > 120000) this._imbSamples.shift();
+    }, everyMs);
+    this._imbSampler.unref?.();
+  }
+
+  // Cambio del imbalance en los últimos windowMs (positivo = hacia UP).
+  // null si no hay muestra de ese momento para el mercado actual.
+  getImbalanceChange(windowMs) {
+    const current = this._computeImbalance();
+    if (current == null) return null;
+    const key = `${this._yesTokenId}|${this._noTokenId}`;
+    const target = Date.now() - windowMs;
+    let ref = null;
+    for (const s of this._imbSamples) {
+      if (s.ts > target) break;
+      if (s.key === key) ref = s;
     }
-
-    return imb;
+    if (!ref || target - ref.ts > 5000) return null;
+    return parseFloat((current - ref.imb).toFixed(3));
   }
 
   // Get book imbalance MOVEMENT (change since last update)

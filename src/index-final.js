@@ -717,6 +717,7 @@ async function main() {
   const wsCoinbase = new BinanceWS(); // Coinbase fallback (ticker ~50-80ms)
   const polyWs = new PolymarketWS();
   poly.setPolyWs(polyWs);
+  polyWs.startImbalanceSampler(); // para registrar el movimiento del book en cada entrada
 
   // ─── Instrumentación observacional (NO afecta trading) ────────────────────
   const clRTDS    = new ChainlinkRTDS();   // TWAP 30s + 60s de Chainlink
@@ -2132,6 +2133,32 @@ async function main() {
     const bookFilterEnabled = process.env.BOOK_FILTER_ENABLED === 'true';
     logger.info(`[BOOK-FILTER-DEBUG] BOOK_FILTER_ENABLED=${bookFilterEnabled}`);
 
+    // Registro del book en cada entrada (solo datos, no bloquea nada), para
+    // evaluar el filtro contra los resultados reales:
+    //  - imb: imbalance de precios, lo que usaba el filtro hasta el 23/09 (±0.30)
+    //  - mov10s/mov30s: cuánto se movió el book en esa ventana (umbral ±0.10)
+    // getInstantImbalanceMovement() no sirve para esto: compara contra la
+    // llamada anterior y, con llamadas separadas por más de 1s, devuelve 0.
+    const bookShadow = (() => {
+      const imb = polyWs._computeImbalance?.() ?? null;
+      const mov10s = polyWs.getImbalanceChange?.(10000) ?? null;
+      const mov30s = polyWs.getImbalanceChange?.(30000) ?? null;
+      const imbThr = parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30');
+      const movThr = parseFloat(process.env.BOOK_FILTER_MIN_MOVEMENT || '0.10');
+      const against = (v, thr) => v == null ? null
+        : (sig.direction === 'UP' ? v < -thr : v > thr);
+      return {
+        imb, mov10s, mov30s,
+        imbBlock: against(imb, imbThr),
+        movBlock: against(mov30s, movThr),
+      };
+    })();
+    {
+      const f = v => v == null ? 'n/a' : (v >= 0 ? '+' : '') + v.toFixed(3);
+      const verdict = b => b == null ? 'sin dato' : (b ? 'BLOQUEARÍA' : 'deja pasar');
+      logger.info(`[BOOK-SHADOW] ${sig.direction} imb=${f(bookShadow.imb)} (filtro viejo: ${verdict(bookShadow.imbBlock)}) | mov10s=${f(bookShadow.mov10s)} mov30s=${f(bookShadow.mov30s)} (filtro movimiento: ${verdict(bookShadow.movBlock)})`);
+    }
+
     if (bookFilterEnabled) {
       const bookMinMovement = parseFloat(process.env.BOOK_FILTER_MIN_MOVEMENT || '0.10');
 
@@ -2333,6 +2360,7 @@ async function main() {
       sig,
       utcHour,
       btcPrice: btcPriceAtSignal,
+      bookShadow,
       getPolyPrice: (dir) => {
         // Usar tokenIds capturados al momento de apertura — no cachedMarket
         // que puede ya apuntar al siguiente mercado cuando corran t1/t2/t5

@@ -94,7 +94,7 @@ let consecutiveLosses = (() => {
 const pendingSnapshots = new Map();
 
 // ─── Abrir trade ─────────────────────────────────────────────────────────────
-async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, getPolyPrice, getBookSnapshot, getLastTradeSnapshot, btcBuyerMakerRatio, getClobSnapshot, twap30AtSignal, twap60AtSignal, binanceToTwap30Ms, binanceToTwap60Ms }) {
+async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, bookShadow, getPolyPrice, getBookSnapshot, getLastTradeSnapshot, btcBuyerMakerRatio, getClobSnapshot, twap30AtSignal, twap60AtSignal, binanceToTwap30Ms, binanceToTwap60Ms }) {
   ensureDir();
 
   // Capturar snapshot del book al momento exacto de la señal
@@ -153,6 +153,12 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     book_no_bid:      bookSnap?.no_bid_size  ?? null,
     book_no_ask:      bookSnap?.no_ask_size  ?? null,
     book_vol_imbalance: bookSnap?.vol_imbalance ?? null,
+    // Book al entrar, para evaluar el filtro de libro (ver [BOOK-SHADOW])
+    book_imb_instant:   bookShadow?.imb ?? null,
+    book_mov_10s:       bookShadow?.mov10s ?? null,
+    book_mov_30s:       bookShadow?.mov30s ?? null,
+    book_imb_would_block: bookShadow?.imbBlock ?? null,
+    book_mov_would_block: bookShadow?.movBlock ?? null,
     // Último trade ejecutado en Polymarket al momento de la señal
     poly_last_trade_token:     tradeSnap?.latest_token      ?? null,
     poly_last_trade_side:      tradeSnap?.latest_trade_side ?? null,
