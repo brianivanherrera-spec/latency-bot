@@ -2152,11 +2152,6 @@ async function main() {
         movBlock: against(movWin, movThr),
       };
     })();
-    {
-      const f = v => v == null ? 'n/a' : (v >= 0 ? '+' : '') + v.toFixed(3);
-      const verdict = b => b == null ? 'sin dato' : (b ? 'BLOQUEARÍA' : 'deja pasar');
-      logger.info(`[BOOK-SHADOW] ${sig.direction} imb=${f(bookShadow.imb)} (filtro viejo: ${verdict(bookShadow.imbBlock)}) | mov10s=${f(bookShadow.mov10s)} mov30s=${f(bookShadow.mov30s)} (filtro movimiento: ${verdict(bookShadow.movBlock)})`);
-    }
 
     if (bookFilterEnabled) {
       const bookMinMovement = parseFloat(process.env.BOOK_FILTER_MIN_MOVEMENT || '0.10');
@@ -2331,6 +2326,12 @@ async function main() {
     }).catch(e => logger.warn(`Discord alert failed: ${e.message}`));
 
     logger.info(`[OPEN] ${sig.direction} @ $${price.toFixed(3)} | Edge: ${sig.edge.edgePct.toFixed(2)}% | Move: ${sig.movePct.toFixed(3)}%`);
+    {
+      // Book al momento de la señal (calculado arriba); se loguea solo si se entra
+      const f = v => v == null ? 'n/a' : (v >= 0 ? '+' : '') + v.toFixed(3);
+      const verdict = b => b == null ? 'sin dato' : (b ? 'BLOQUEARÍA' : 'deja pasar');
+      logger.info(`[BOOK-SHADOW] ${sig.direction} imb=${f(bookShadow.imb)} (filtro viejo: ${verdict(bookShadow.imbBlock)}) | mov10s=${f(bookShadow.mov10s)} mov30s=${f(bookShadow.mov30s)} (filtro movimiento: ${verdict(bookShadow.movBlock)})`);
+    }
     shadow?.recordBotTrade({ direction: sig.direction, price, zScore: sig.zScore, posId });
     logger.info(`  Exposure: $${finalExposure}${isEliteSignal ? ' 🏆 ÉLITE' : ''} | Size: ${size} | Token: ${tokenId}`);
 
