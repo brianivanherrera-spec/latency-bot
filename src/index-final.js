@@ -2137,12 +2137,11 @@ async function main() {
     // evaluar el filtro contra los resultados reales:
     //  - imb: imbalance de precios, lo que usaba el filtro hasta el 23/09 (±0.30)
     //  - mov10s/mov30s: cuánto se movió el book en esa ventana (umbral ±0.10)
-    // getInstantImbalanceMovement() no sirve para esto: compara contra la
-    // llamada anterior y, con llamadas separadas por más de 1s, devuelve 0.
     const bookShadow = (() => {
       const imb = polyWs._computeImbalance?.() ?? null;
       const mov10s = polyWs.getImbalanceChange?.(10000) ?? null;
       const mov30s = polyWs.getImbalanceChange?.(30000) ?? null;
+      const movWin = polyWs.getInstantImbalanceMovement?.() ?? null; // lo que usa BOOK_FILTER
       const imbThr = parseFloat(process.env.BOOK_FILTER_MIN_IMBALANCE || '0.30');
       const movThr = parseFloat(process.env.BOOK_FILTER_MIN_MOVEMENT || '0.10');
       const against = (v, thr) => v == null ? null
@@ -2150,7 +2149,7 @@ async function main() {
       return {
         imb, mov10s, mov30s,
         imbBlock: against(imb, imbThr),
-        movBlock: against(mov30s, movThr),
+        movBlock: against(movWin, movThr),
       };
     })();
     {
@@ -2163,7 +2162,7 @@ async function main() {
       const bookMinMovement = parseFloat(process.env.BOOK_FILTER_MIN_MOVEMENT || '0.10');
 
       // Use BOOK MOVEMENT (not absolute imbalance) to detect market consensus
-      // Movement = current imbalance - previous imbalance
+      // Movement = cambio del imbalance en BOOK_FILTER_MOVEMENT_WINDOW_MS (30s)
       // Positive = book moved toward UP, Negative = moved toward DOWN
       const bookMovement = polyWs.getInstantImbalanceMovement?.();
 
@@ -2195,7 +2194,7 @@ async function main() {
           logMarketSignal(sig, `BOOK neutro`, bookMovement);
         }
       } else {
-        logger.info(`[BOOK-FILTER] ℹ️ movement=NULL (sin historial aún) — permitiendo entrada`);
+        logger.info(`[BOOK-FILTER] ℹ️ movement=NULL (sin muestras de la ventana todavía) — permitiendo entrada`);
       }
     }
 

@@ -461,15 +461,13 @@ class PolymarketWS {
   // Get book imbalance MOVEMENT (change since last update)
   // Returns: movement value (positive = movement toward UP, negative = DOWN)
   // Or null if not enough history
+  // Cambio en los últimos BOOK_FILTER_MOVEMENT_WINDOW_MS (default 30s), de las
+  // muestras de startImbalanceSampler. Antes comparaba contra la llamada
+  // anterior, pero getInstantImbalance() pisaba esa referencia antes de restar
+  // y con llamadas separadas por más de 1s el resultado era siempre 0.
   getInstantImbalanceMovement() {
-    const currentImb = this.getInstantImbalance();
-    if (currentImb == null || this._lastImbalance == null) return null;
-
-    // Movement = current - previous
-    // Positive = moved toward YES (UP)
-    // Negative = moved toward NO (DOWN)
-    const movement = parseFloat((currentImb - this._lastImbalance).toFixed(3));
-    return movement;
+    const windowMs = parseInt(process.env.BOOK_FILTER_MOVEMENT_WINDOW_MS || '30000');
+    return this.getImbalanceChange(windowMs);
   }
 
   async connect() {
