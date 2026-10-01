@@ -438,7 +438,6 @@ class PolymarketClient {
 
         let preFilledFromFak = 0;
         const hasMarketOrderMethod = typeof this.clobClient?.createAndPostMarketOrder === 'function';
-        const hasPostOrders = typeof this.clobClient?.postOrders === 'function';
 
         // FAK AGRESIVO: reintenta subiendo el precio de a $0.01 hasta MAX_GTC_ENTRY_ASK
         // Objetivo: maximizar ganancia real — solo entrar cuando el token cuesta ≤ MAX_GTC_ENTRY_ASK
@@ -501,106 +500,87 @@ class PolymarketClient {
         // DUAL ORDER: FAK instantáneo + GTC como backup
         // La primera que llena cancela la otra — una sola posición por señal
         const DUAL_ORDER = process.env.DUAL_FILL_ORDER === 'true';
-        let dualGtcOrderId = null;
-        let tripleGtdOrderId = null;
 
-        if (DUAL_ORDER && hasPostOrders) {
-          // GTD expiry — mínimo 181s en el futuro
+        if (DUAL_ORDER) {
+          // Asegurar el fill sin duplicar la posición. Antes se mandaban FAK + GTC + GTD juntas
+          // al mismo precio: las tres cruzaban el libro y podían llenarse dos o tres a la vez
+          // (el bot registraba una), y si ninguna llenaba al instante la GTC se cancelaba pero
+          // la GTD quedaba viva sin seguimiento mientras arrancaba otro retry-loop. Ahora:
+          //   1) FAK a worstPrice: toma lo que haya en el libro en ese momento.
+          //   2) Si falta, UNA sola GTD por el remanente al mismo precio, que vence al cierre
+          //      del mercado. El polling de abajo la sigue hasta que llena o llega el cierre;
+          //      ahí se cancela y se suma lo que haya llenado.
           const minExpiry = Math.floor((Date.now() + 181 * 1000) / 1000);
           const marketExpiry = marketEndTs ? Math.floor(marketEndTs / 1000) : minExpiry;
           const gtdExpiry = Math.max(minExpiry, marketExpiry);
-
-          logger.info(`[LIVE] 🔀 TRIPLE ORDER: FAK + GTC + GTD @ $${worstPrice}`);
-          // Garantizar precisión decimal: makerAmount (USDC) máx 2 decimales
-          // Ajustar size para que price × size sea exactamente 2 decimales
+          // makerAmount (USDC) con 2 decimales como máximo
           const safeSize = Math.floor(parseFloat((size * worstPrice).toFixed(2)) / worstPrice);
-          const safeSizeFinal = safeSize > 0 ? safeSize : size;
-          logger.debug(`[PRICE] size=${size} → safeSize=${safeSizeFinal} (makerAmount=$${(safeSizeFinal * worstPrice).toFixed(2)})`);
+          const orderSize = safeSize > 0 ? safeSize : size;
+          const sideEnum = side === 'BUY' ? Side.BUY : Side.SELL;
+          const opts = { tickSize: '0.01', negRisk: false };
+
+          let fakShares = 0, fakUsdc = 0;
           try {
-            const [fakOrder, gtcOrder, gtdOrder] = await Promise.all([
-              this.clobClient.createOrder(
-                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                  price: worstPrice, size: safeSizeFinal, orderType: firstOrderType },
-                { tickSize: '0.01', negRisk: false }
-              ),
-              this.clobClient.createOrder(
-                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                  price: worstPrice, size: safeSizeFinal, orderType: OrderType.GTC },
-                { tickSize: '0.01', negRisk: false }
-              ),
-              this.clobClient.createOrder(
-                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                  price: worstPrice, size: safeSizeFinal, orderType: OrderType.GTD, expiration: gtdExpiry },
-                { tickSize: '0.01', negRisk: false }
-              ),
-            ]);
-
-            const batchResult = await this.clobClient.postOrders(
-              [{ order: fakOrder, orderType: firstOrderType },
-               { order: gtcOrder, orderType: OrderType.GTC },
-               { order: gtdOrder, orderType: OrderType.GTD }]
-            );
-            logger.info(`[LIVE] TRIPLE ORDER response: ${JSON.stringify(batchResult)}`);
-
-            // Detectar trading disabled
-            const batchError = Array.isArray(batchResult) ? batchResult[0]?.error : batchResult?.error;
-            if ((batchError || '').includes('trading is disabled')) {
-              logger.warn(`[LIVE] ⛔ TRIPLE ORDER: trading disabled → NO_FILL inmediato`);
+            logger.info(`[LIVE] 🔀 FAK + GTD de respaldo @ $${worstPrice} (${orderSize} tokens)`);
+            const fakAmount = parseFloat((Math.round(orderSize * worstPrice * 100) / 100).toFixed(2));
+            const fakRes = hasMarketOrderMethod
+              ? await this.clobClient.createAndPostMarketOrder(
+                  { tokenID: tokenId, side: sideEnum, amount: fakAmount, price: worstPrice, orderType: OrderType.FAK },
+                  opts, OrderType.FAK)
+              : await this.clobClient.createAndPostOrder({ tokenID: tokenId, side: sideEnum, price: worstPrice, size: orderSize, orderType: OrderType.FAK });
+            logger.info(`[LIVE] FAK response: ${JSON.stringify(fakRes)}`);
+            const fakErr = String(fakRes?.error || fakRes?.errorMsg || '').toLowerCase();
+            if (fakErr.includes('trading is disabled')) {
+              logger.warn(`[LIVE] ⛔ trading disabled → NO_FILL inmediato`);
               return { success: false, error: 'trading_disabled', noFill: true };
             }
-
-            // REMOVIDO: await new Promise(r => setTimeout(r, 500));
-            // Razón: FAK debería llenar instantáneamente (o reportar no fill)
-            // El delay de 500ms hacía que usemos precio VIEJO mientras el mercado se mueve
-            // Ahora chequeamos status inmediatamente
-
-            const results = Array.isArray(batchResult) ? batchResult : [batchResult];
-            const fakRes = results[0]; const gtcRes = results[1]; const gtdRes = results[2];
-            const fakFilled = (String(fakRes?.status || '')).toLowerCase() === 'matched';
-            const gtcFilled = (String(gtcRes?.status || '')).toLowerCase() === 'matched';
-            const gtdFilled = (String(gtdRes?.status || '')).toLowerCase() === 'matched';
-            dualGtcOrderId = gtcRes?.orderID || gtcRes?.orderId;
-            tripleGtdOrderId = gtdRes?.orderID || gtdRes?.orderId;
-
-            // La primera que llenó gana — cancelar las otras 2
-            const cancelOthers = async (keepFak, keepGtc, keepGtd) => {
-              if (!keepGtc && dualGtcOrderId) await this.clobClient.cancelOrder({ orderID: dualGtcOrderId }).catch(() => {});
-              if (!keepGtd && tripleGtdOrderId) await this.clobClient.cancelOrder({ orderID: tripleGtdOrderId }).catch(() => {});
-            };
-
-            if (fakFilled) {
-              await cancelOthers(true, false, false);
-              const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(fakRes, worstPrice, size);
-              const slippage = fillPrice - worstPrice;
-              logger.info(`[LIVE] ✅ FAK llenó @ $${fillPrice.toFixed(4)} (solicitado: $${worstPrice.toFixed(4)}) | slippage: $${slippage.toFixed(4)} | ${sizeFilled} shares | $${usdcSpent.toFixed(2)} USDC`);
-              return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
-            } else if (gtcFilled) {
-              await cancelOthers(false, true, false);
-              const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(gtcRes, worstPrice, size);
-              const slippage = fillPrice - worstPrice;
-              logger.info(`[LIVE] ✅ GTC llenó primero @ $${fillPrice.toFixed(4)} (solicitado: $${worstPrice.toFixed(4)}) | slippage: $${slippage.toFixed(4)} | ${sizeFilled} shares`);
-              return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
-            } else if (gtdFilled) {
-              await cancelOthers(false, false, true);
-              const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(gtdRes, worstPrice, size);
-              const slippage = fillPrice - worstPrice;
-              logger.info(`[LIVE] ✅ GTD llenó primero @ $${fillPrice.toFixed(4)} (solicitado: $${worstPrice.toFixed(4)}) | slippage: $${slippage.toFixed(4)} | ${sizeFilled} shares`);
-              return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
-            } else if (dualGtcOrderId || tripleGtdOrderId) {
-              // Ninguno llenó instantáneo — GTC y GTD quedan vivos en el libro
-              logger.info(`[LIVE] 🔀 FAK sin liquidez — GTC+GTD vivos @ $${worstPrice} (GTD expira en ${Math.round((gtdExpiry * 1000 - Date.now()) / 1000)}s)`);
-              result = {
-                success: true, status: 'live',
-                orderID: dualGtcOrderId || tripleGtdOrderId,
-                _isDualGtc: true,
-                _tripleGtcId: dualGtcOrderId,
-                _tripleGtdId: tripleGtdOrderId,
-              };
-            }
-          } catch (dualErr) {
-            logger.warn(`[LIVE] TRIPLE ORDER falló (${dualErr.message}) — cayendo a FAK individual`);
-            result = null;
+            const usdc = parseFloat(fakRes?.makingAmount || 0);
+            const shares = parseFloat(fakRes?.takingAmount || 0);
+            if (shares > 0 && usdc > 0) { fakShares = shares; fakUsdc = usdc; }
+          } catch (fakErr) {
+            logger.warn(`[LIVE] FAK error: ${fakErr.message}`);
           }
+
+          const remaining = Math.floor(orderSize - fakShares);
+          const fakFillPrice = fakShares > 0 ? parseFloat((fakUsdc / fakShares).toFixed(4)) : worstPrice;
+          if (fakShares > 0 && remaining < 5) {
+            // Llenó todo, o lo que falta está por debajo del mínimo de Polymarket (5 tokens)
+            logger.info(`[LIVE] ✅ FAK llenó ${fakShares} tokens @ $${fakFillPrice}${remaining > 0 ? ` (remanente ${remaining} < 5, se acepta parcial)` : ''}`);
+            return { success: true, status: 'matched', fillPrice: fakFillPrice, sizeFilled: fakShares,
+              usdcSpent: fakUsdc, partial: remaining > 0, requestedSize: orderSize };
+          }
+
+          try {
+            const gtdRes = await this.clobClient.createAndPostOrder(
+              { tokenID: tokenId, side: sideEnum, price: worstPrice, size: remaining, expiration: gtdExpiry },
+              opts, OrderType.GTD);
+            logger.info(`[LIVE] GTD response: ${JSON.stringify(gtdRes)}`);
+            const gtdId = gtdRes?.orderID || gtdRes?.orderId;
+            const gtdStatus = String(gtdRes?.status || '').toLowerCase();
+            if (gtdRes?.success !== false && gtdId) {
+              logger.info(`[LIVE] 📋 GTD ${remaining} tokens @ $${worstPrice} en el libro hasta el cierre (status=${gtdStatus})${fakShares > 0 ? ` | FAK ya llenó ${fakShares}` : ''}`);
+              result = {
+                success: true, status: gtdStatus || 'live', orderID: gtdId,
+                _restingGtd: true,
+                _restDeadlineMs: marketEndTs || null,
+                _restSize: remaining,
+                _restPrice: worstPrice,
+                _preFilledShares: fakShares,
+                _preFilledUsdc: fakUsdc,
+              };
+            } else {
+              logger.warn(`[LIVE] GTD rechazada: ${gtdRes?.errorMsg || gtdRes?.error || 'sin orderID'}`);
+            }
+          } catch (gtdErr) {
+            logger.warn(`[LIVE] GTD error: ${gtdErr.message}`);
+          }
+
+          if (!result && fakShares > 0) {
+            // La GTD no quedó en el libro: devolver lo que llenó la FAK, sin abrir otra orden
+            return { success: true, status: 'matched', fillPrice: fakFillPrice, sizeFilled: fakShares,
+              usdcSpent: fakUsdc, partial: true, requestedSize: orderSize };
+          }
+          // Sin nada llenado ni GTD en el libro: sigue el camino FAK/FOK normal de abajo
         }
         // Camino normal FAK/FOK si no hay DUAL o falló
         if (!result) {
@@ -723,7 +703,9 @@ class PolymarketClient {
 
       // MARKET_RETRY: si los N intentos de FOK fallaron, caer a GTC como red de seguridad
       const fokConfirmedMatch = result?.success && (String(result?.status || '')).toLowerCase() === 'matched';
-      if (!fokConfirmedMatch && isMarket && marketRetryEnabled) {
+      // La GTD de respaldo (DUAL_FILL_ORDER) queda en el libro a propósito: no cancelarla
+      // ni abrir otro retry-loop; la sigue el polling de abajo hasta el cierre.
+      if (!fokConfirmedMatch && isMarket && marketRetryEnabled && !result?._restingGtd) {
         // FIX CRÍTICO (detectado en el primer log de live, 03/08): un FOK que
         // no llena instantáneo puede volver con status "live" — es decir,
         // Polymarket lo dejó viva en el libro en vez de matarla. Si no la
@@ -822,47 +804,70 @@ class PolymarketClient {
 
       // Orden en el book ('live') → polling hasta fill o timeout
       if (orderStatus === 'live') {
-        logger.info(`[LIVE] 📋 Orden en book — esperando fill (timeout: ${GTC_TIMEOUT_MS/1000}s)`);
-        const deadline = Date.now() + GTC_TIMEOUT_MS;
-        const POLL_INTERVAL_MS = 5000;
+        // GTD de respaldo (DUAL_FILL_ORDER): se sigue hasta el cierre del mercado, no 60 s
+        const resting = !!result?._restingGtd;
+        const preShares = resting ? (result._preFilledShares || 0) : 0;
+        const preUsdc = resting ? (result._preFilledUsdc || 0) : 0;
+        const restPrice = resting ? result._restPrice : price;
+        const deadline = resting && result._restDeadlineMs ? result._restDeadlineMs : Date.now() + GTC_TIMEOUT_MS;
+        const POLL_INTERVAL_MS = resting ? 2000 : 5000;
+        logger.info(`[LIVE] 📋 Orden en book — esperando fill (hasta ${Math.round((deadline - Date.now()) / 1000)}s)`);
 
+        // Fill total = lo que llenó la FAK + lo que llenó esta orden
+        const withPreFill = (shares) => {
+          const total = preShares + shares;
+          const usdc = preUsdc + shares * restPrice;
+          return { sizeFilled: total, usdcSpent: parseFloat(usdc.toFixed(2)),
+            fillPrice: total > 0 ? parseFloat((usdc / total).toFixed(4)) : restPrice };
+        };
+
+        let lastMatched = 0;
         while (Date.now() < deadline) {
-          await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+          await new Promise(r => setTimeout(r, Math.min(POLL_INTERVAL_MS, Math.max(0, deadline - Date.now()))));
           try {
             const orderData = await this.clobClient.getOrder(orderId);
             const rawStatus = orderData?.status || orderStatus;
             orderStatus = String(rawStatus).toLowerCase(); // normalizar a minúsculas
-            const sizeFilled = orderData?.size_matched || orderData?.sizeFilled || 0;
-            logger.info(`[LIVE] 🔄 Poll: status=${rawStatus} filled=${sizeFilled}/${size}`);
+            lastMatched = parseFloat(orderData?.size_matched || orderData?.sizeFilled || 0) || 0;
+            logger.info(`[LIVE] 🔄 Poll: status=${rawStatus} filled=${lastMatched}/${resting ? result._restSize : size}`);
 
             if (orderStatus === 'matched') {
               const fillTimeMs = Date.now() - orderPlacedAt;
-              logger.info(`[LIVE] ✅ Orden llenada (GTC poll) en ${fillTimeMs}ms`);
+              logger.info(`[LIVE] ✅ Orden llenada (poll) en ${fillTimeMs}ms`);
+              if (resting) {
+                const restSize = lastMatched > 0 ? lastMatched : result._restSize;
+                return { success: true, orderId, status: 'matched', fillTimeMs, ...withPreFill(restSize) };
+              }
               return { success: true, orderId, status: 'matched', fillTimeMs };
             }
-            if (orderStatus === 'cancelled' || orderStatus === 'canceled') {
-              logger.warn(`[LIVE] ⚠️ Orden cancelada durante poll`);
-              return { success: false, error: 'cancelled', orderId };
+            if (orderStatus === 'cancelled' || orderStatus === 'canceled' || orderStatus === 'expired') {
+              logger.warn(`[LIVE] ⚠️ Orden ${orderStatus} durante poll (llenado ${lastMatched})`);
+              break;
             }
           } catch (pollErr) {
             logger.warn(`[LIVE] Poll error: ${pollErr.message}`);
           }
         }
 
-        // Timeout — cancelar la orden para no quedar expuesto
-        logger.warn(`[LIVE] ⏱️ Timeout GTC (${GTC_TIMEOUT_MS/1000}s) — cancelando orden ${orderId}`);
-        try {
-          await this.clobClient.cancelOrder({ orderID: orderId });
-          logger.info(`[LIVE] 🚫 Orden GTC cancelada por timeout`);
-        } catch (cancelErr) {
-          logger.error(`[LIVE] Error cancelando orden: ${cancelErr.message}`);
-        }
-        // Cancelar también el GTC del TRIPLE ORDER si estaba vivo
-        if (rec._tripleGtcId && rec._tripleGtcId !== orderId) {
+        // Cierre o timeout: cancelar lo que quede y contar lo que haya llenado (total o parcial)
+        if (orderStatus !== 'cancelled' && orderStatus !== 'canceled' && orderStatus !== 'expired') {
+          logger.warn(`[LIVE] ⏱️ ${resting ? 'Cierre del mercado' : `Timeout GTC (${GTC_TIMEOUT_MS/1000}s)`} — cancelando orden ${orderId}`);
           try {
-            await this.clobClient.cancelOrder({ orderID: rec._tripleGtcId }).catch(() => {});
-            logger.info(`[LIVE] 🚫 GTC del TRIPLE ORDER cancelado por timeout`);
-          } catch (e) {}
+            await this.clobClient.cancelOrder({ orderID: orderId });
+            logger.info(`[LIVE] 🚫 Orden cancelada`);
+          } catch (cancelErr) {
+            logger.error(`[LIVE] Error cancelando orden ${orderId}: ${cancelErr.message}`);
+          }
+        }
+        try {
+          const finalData = await this.clobClient.getOrder(orderId);
+          lastMatched = parseFloat(finalData?.size_matched || finalData?.sizeFilled || 0) || lastMatched;
+        } catch (_) {}
+
+        const fill = withPreFill(lastMatched);
+        if (fill.sizeFilled > 0) {
+          logger.info(`[LIVE] 🔶 Fill parcial: ${fill.sizeFilled} tokens @ $${fill.fillPrice}`);
+          return { success: true, orderId, status: 'matched', partial: true, ...fill };
         }
         return { success: false, error: 'gtc_timeout', orderId };
       }
