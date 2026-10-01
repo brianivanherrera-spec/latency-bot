@@ -55,7 +55,12 @@ Seguirían requiriendo confirmación explícita del usuario en el chat:
 
 - Liquidez en paper (desde 01/10 ~15:45): cuántas entradas quedan sin fill por falta de tokens en el mejor ask (`[PAPER-LIQ] … NO alcanza`).
 
-- Trades que entran con 6–8 pts de ventaja (desde 01/10 11:53): 2G 0P.
+- Saltos del modelo en la apertura (visto 01/10 20:35, 21:00, 21:05): con σ muy baja (~15e-6),
+  FAIR pasa a 0.98–1.0 o 0.095 en los primeros 30–60 s sin que BTC se mueva y marca ventajas
+  falsas de 30–47 pts. En 1.696 mercados, con σ < 25e-6 las señales del modelo con ≥ 8 pts
+  aciertan 54% a $0.61 (pierden), contra 70% con σ 25–40. Los trades reales del bot con σ baja
+  van bien (28, 82%). Propuesta pendiente de OK: piso de σ o tope a |z| al abrir, probado
+  antes en shadow.
 - Rechazos por `MIN_ENTRY_PRICE` (desde 01/10 12:52): anotar el resultado de cada mercado.
 - Trades con más de 20 pts de ventaja del modelo: 4G 3P desde 28/09 (el modelo prometía ~88%).
   Candidato a filtro si se sostiene con más casos.
