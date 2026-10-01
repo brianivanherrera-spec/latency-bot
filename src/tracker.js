@@ -16,6 +16,11 @@ const POSITIONS_FILE = process.env.POSITIONS_FILE || '/data/positions.json';
 
 // Comisión simulada en paper: % sobre el monto de cada compra/venta (taker).
 // 0 = sin comisión. Poner la tasa real de Polymarket para estos mercados.
+// 01/10 16:24: POS_1790870794783 (−$4.83) se contó dos veces — por la corrección y por la
+// resolución normal al restaurarse. Se devuelve una de las dos.
+const ADJUSTMENTS = [
+  { id: 'dup-POS_1790870794783', pnl: 4.83, losses: -1 },
+];
 // Posiciones vencidas hace menos de esto se restauran al arrancar para resolverlas
 const RESTORE_MAX_AGE_MIN = parseInt(process.env.RESTORE_MAX_AGE_MIN || '120');
 const PAPER_FEE = config.DRY_RUN ? (parseFloat(process.env.PAPER_FEE_PCT || '0') || 0) / 100 : 0;
@@ -53,7 +58,9 @@ class PnLTracker {
         // antes solo las no vencidas, y un redeploy entre el cierre y la resolución
         // descartaba la posición sin contarla (01/10 16:14, una pérdida de $4.83)
         const cutoff = Date.now() - RESTORE_MAX_AGE_MIN * 60000;
-        const active = (data.positions || []).filter(p => p.status !== 'CLOSED' && new Date(p.endDate).getTime() > cutoff);
+        const closedIds = signalLogger.closedPosIds();
+        const active = (data.positions || []).filter(p => p.status !== 'CLOSED'
+          && new Date(p.endDate).getTime() > cutoff && !closedIds.has(p.posId || p.id));
         // Totales siempre (antes solo si quedaban posiciones abiertas: el balance
         // de paper y el W/L volvían a cero en cada redeploy)
         this.totalPnL = data.totalPnL || 0;
@@ -61,6 +68,7 @@ class PnLTracker {
         this.losses = data.losses || 0;
         this.dailyKey = data.dailyKey || null;
         this.dailyPnL = data.dailyPnL || 0;
+        this._appliedAdjustments = data.appliedAdjustments || [];
         if (active.length > 0) {
           // Convertir endDate a Date object
           this.positions = active.map(p => ({ ...p, endDate: new Date(p.endDate) }));
@@ -69,6 +77,16 @@ class PnLTracker {
       }
     } catch (e) {
       logger.warn(`[TRACKER] No se pudo restaurar posiciones: ${e.message}`);
+    }
+    // Ajustes únicos del balance persistido (se aplican una vez; quedan anotados en disco)
+    const done = new Set(this._appliedAdjustments || []);
+    for (const adj of ADJUSTMENTS) {
+      if (done.has(adj.id)) continue;
+      this.totalPnL += adj.pnl; this.wins += adj.wins || 0; this.losses += adj.losses || 0;
+      done.add(adj.id);
+      logger.warn(`Ajuste aplicado: ${adj.id} | P&L ${adj.pnl >= 0 ? '+' : ''}$${adj.pnl.toFixed(2)} W${adj.wins || 0} L${adj.losses || 0}`);
+      this._appliedAdjustments = [...done];
+      this._saveToDisk();
     }
     // Correcciones de trades mal resueltos aplicadas en este arranque (ver signal-logger)
     const cd = signalLogger.correctionDelta;
@@ -102,6 +120,7 @@ class PnLTracker {
         losses: this.losses,
         dailyKey: this.dailyKey,
         dailyPnL: this.dailyPnL,
+        appliedAdjustments: this._appliedAdjustments || [],
         updatedAt: new Date().toISOString(),
       };
       fs.writeFileSync(POSITIONS_FILE, JSON.stringify(data, null, 2));

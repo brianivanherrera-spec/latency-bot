@@ -79,6 +79,20 @@ const correctionDelta = (() => {
   return d;
 })();
 
+// IDs de posiciones que ya tienen resultado en signals.jsonl: el tracker no las vuelve a
+// resolver al restaurar (si no, una corrección y la resolución normal la contaban dos veces)
+function closedPosIds() {
+  const ids = new Set();
+  try {
+    if (!fs.existsSync(SIGNAL_FILE)) return ids;
+    for (const line of fs.readFileSync(SIGNAL_FILE, 'utf8').split('\n')) {
+      if (!line) continue;
+      try { const r = JSON.parse(line); if (r.posId && (r.result === 'WIN' || r.result === 'LOSS')) ids.add(r.posId); } catch (_) {}
+    }
+  } catch (_) {}
+  return ids;
+}
+
 // Contador de losses consecutivos (circuit breaker). Al arrancar se recalcula desde
 // signals.jsonl: antes empezaba en 0 en cada redeploy y cortaba la racha.
 let consecutiveLosses = (() => {
@@ -814,5 +828,5 @@ module.exports = {
   getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder,
   logFillTelemetry, getT3Timestamp, recordOrderSent, recordOrderAccepted,
   recordOrderResting, recordOrderFilled, getLatencyTracking, clearLatencyTracking,
-  logMarketTwapFinal, analyzeNoFillReason, correctionDelta
+  logMarketTwapFinal, analyzeNoFillReason, correctionDelta, closedPosIds
 };
