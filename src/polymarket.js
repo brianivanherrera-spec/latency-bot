@@ -736,7 +736,7 @@ class PolymarketClient {
         if (staleOrderId && staleStatus !== 'matched' && staleStatus !== 'cancelled' && staleStatus !== 'canceled') {
           logger.warn(`[LIVE] ⚠️ FOK quedó con estado "${staleStatus}" (no killed) — cancelando orden ${staleOrderId} antes de reintentar`);
           try {
-            await this.clobClient.cancelOrder({ orderId: staleOrderId });
+            await this.clobClient.cancelOrder({ orderID: staleOrderId });
             // Verificar que no se haya llenado (total o parcial) en el instante entre el check y el cancel
             const check = await this.clobClient.getOrder(staleOrderId).catch(() => null);
             if ((String(check?.status || '')).toLowerCase() === 'matched') {
@@ -852,7 +852,7 @@ class PolymarketClient {
         // Timeout — cancelar la orden para no quedar expuesto
         logger.warn(`[LIVE] ⏱️ Timeout GTC (${GTC_TIMEOUT_MS/1000}s) — cancelando orden ${orderId}`);
         try {
-          await this.clobClient.cancelOrder({ orderId });
+          await this.clobClient.cancelOrder({ orderID: orderId });
           logger.info(`[LIVE] 🚫 Orden GTC cancelada por timeout`);
         } catch (cancelErr) {
           logger.error(`[LIVE] Error cancelando orden: ${cancelErr.message}`);
@@ -1152,7 +1152,7 @@ class PolymarketClient {
         // reintentar (crítico: nunca dejar dos órdenes vivas al mismo tiempo)
         if (orderStatus !== 'matched' && orderStatus !== 'cancelled' && orderStatus !== 'canceled') {
           try {
-            await this.clobClient.cancelOrder({ orderId });
+            await this.clobClient.cancelOrder({ orderID: orderId });
             logger.info(`[RETRY] 🚫 intento ${attempt} cancelado (sin fill completo en ${ATTEMPT_MS/1000}s)`);
           } catch (cancelErr) {
             logger.error(`[RETRY] error cancelando intento ${attempt}: ${cancelErr.message}`);

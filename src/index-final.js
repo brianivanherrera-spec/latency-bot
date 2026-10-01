@@ -677,7 +677,19 @@ async function main() {
     'BTC_TREND_FILTER_10M',
     'MAX_PRICE_AGE_MS',
     'DYNAMIC_SIZE_SCALE',
-    'RESEARCH_MODE'
+    'RESEARCH_MODE',
+    // Cómo se mandan las órdenes reales (solo aplican con DRY_RUN=false)
+    'DUAL_FILL_ORDER',
+    'USE_FAK',
+    'FAK_MAX_ATTEMPTS',
+    'FAK_RETRY_MS',
+    'MARKET_RETRY_ATTEMPTS',
+    'FILL_RETRY',
+    'ORDER_SPLIT',
+    'MAX_ACTIVE_POSITIONS',
+    'MAX_ENTRIES_PER_MARKET',
+    'MAX_DAILY_LOSS_USDC',
+    'TRADING_PAUSED'
   ];
   for (const varName of relevantEnvVars) {
     const val = process.env[varName];
@@ -2098,7 +2110,11 @@ async function main() {
     // simultáneas en el mismo mercado. La regla real es: la segunda entrada
     // SOLO es válida si fue confirmada como 'late'; si no, se bloquea.
     if (isSecondEntry && entryType !== 'late') {
-      logger.warn(`[SKIP] Segunda entrada en el mismo mercado sin confirmación LATE_ENTRY — bloqueando (DUAL_ENTRY requiere LATE_ENTRY_MODE para la 2da entrada)`);
+      // Una vez por mercado: se repetía en cada señal (~100 líneas por hora)
+      if (global._secondEntryLoggedFor !== marketKey) {
+        global._secondEntryLoggedFor = marketKey;
+        logger.warn(`[SKIP] Segunda entrada en el mismo mercado sin confirmación LATE_ENTRY — bloqueando (DUAL_ENTRY requiere LATE_ENTRY_MODE para la 2da entrada)`);
+      }
       return;
     }
 
