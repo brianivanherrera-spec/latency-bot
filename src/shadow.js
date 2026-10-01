@@ -38,6 +38,10 @@ const MIN_SECS = parseInt(process.env.SHADOW_MIN_SECS || '10');       // no cont
 //   first_conf:  exige |P − 0.5| ≥ SHADOW_MIN_CONF
 //   first_agree: además, solo el lado que el mercado ya favorece (ask ≥ 0.50)
 const MIN_CONF = parseFloat(process.env.SHADOW_MIN_CONF || '0.03');
+// Estrategia "ventana" (solo registro): segundos del mercado y ventaja mínima
+const WINDOW_FROM = parseInt(process.env.SHADOW_WINDOW_FROM || '60');
+const WINDOW_TO = parseInt(process.env.SHADOW_WINDOW_TO || '120');
+const WINDOW_EDGE = parseFloat(process.env.SHADOW_WINDOW_EDGE || '0.05');
 // src: 1 = FAIR del bot con TWAP de Chainlink (cómo resuelve Polymarket), 0 = respaldo con spot de Binance
 const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src'];
 
@@ -80,7 +84,7 @@ class Shadow {
       botStrike: botStrike || null, activatedAt: Date.now(),
       strike: null, strikeSource: null,
       rtdsAtStart: this.rtds?.getLatestTWAP?.(30)?.value_num ?? null,
-      rows: [], first: {}, firstConf: {}, firstAgree: {}, maxEdge: { UP: null, DOWN: null }, path: {},
+      rows: [], first: {}, firstConf: {}, firstAgree: {}, firstWindow: null, maxEdge: { UP: null, DOWN: null }, path: {},
       signals: { UP: 0, DOWN: 0 }, firstSignal: { UP: null, DOWN: null }, trades: [],
       sigmaSum: 0, sigmaN: 0, closed: false, srcCount: [0, 0],
     };
@@ -240,6 +244,13 @@ class Shadow {
           if (confident && !m.firstConf[thr]) m.firstConf[thr] = entry;
           if (agrees && !m.firstAgree[thr]) m.firstAgree[thr] = entry;
         }
+        // Estrategia "ventana": primera oportunidad a favor del mercado con ≥ WINDOW_EDGE entre
+        // los segundos WINDOW_FROM y WINDOW_TO del mercado, a precio ≤ $0.80. En 1.706 mercados
+        // (25/09-01/10) la primera entrada a favor con ≥ 5 pts que cayó entre 60 y 120 s acertó
+        // 76% a $0.63 promedio (91 casos). Solo se registra, no opera.
+        if (!m.firstWindow && agrees && best.edge >= WINDOW_EDGE && t >= WINDOW_FROM && t <= WINDOW_TO && best.ask <= 0.80) {
+          m.firstWindow = entry;
+        }
       }
     }
   }
@@ -311,6 +322,7 @@ class Shadow {
         first: firsts(m.first),
         first_conf: firsts(m.firstConf),
         first_agree: firsts(m.firstAgree),
+        window: m.firstWindow ? (() => { const win = W(m.firstWindow.side); return { ...m.firstWindow, from: WINDOW_FROM, to: WINDOW_TO, min_edge: WINDOW_EDGE, win, pnl_token: pnl(win, m.firstWindow.ask) }; })() : null,
         max_edge_up: m.maxEdge.UP, max_edge_down: m.maxEdge.DOWN,
       },
       bot: {
@@ -330,7 +342,7 @@ class Shadow {
     const fmt = f => f?.side
       ? `${f.side}@$${f.ask} P=${(f.p * 100).toFixed(0)}% +${(f.edge * 100).toFixed(1)}pts a ${f.secs_left}s → ${f.win == null ? '?' : f.win ? 'GANA' : 'PIERDE'}`
       : 'no entraba';
-    const modelTxt = `${fmt(pick(summary.model.first))} | con confianza: ${fmt(pick(summary.model.first_conf))} | a favor del mercado: ${fmt(pick(summary.model.first_agree))}`;
+    const modelTxt = `${fmt(pick(summary.model.first))} | con confianza: ${fmt(pick(summary.model.first_conf))} | a favor del mercado: ${fmt(pick(summary.model.first_agree))} | ventana ${WINDOW_FROM}-${WINDOW_TO}s: ${fmt(summary.model.window)}`;
     const botTxt = summary.bot.trades.length
       ? summary.bot.trades.map(tr => `${tr.dir}@$${tr.price} (modelo ${tr.model_edge == null ? 'n/a' : (tr.model_edge >= 0 ? '+' : '') + (tr.model_edge * 100).toFixed(1) + 'pts'}) → ${tr.win == null ? '?' : tr.win ? 'GANA' : 'PIERDE'}`).join(', ')
       : 'sin trade';

@@ -45,6 +45,8 @@ Seguirían requiriendo confirmación explícita del usuario en el chat:
 |---|---|---|---|
 | 01/10 11:53 | `FAIR_GATE_EDGE` 0.08 → 0.06 | Rechazos con 5–8 pts: 18 de 20 habrían ganado (≈ +$16) | Tras 30 trades que entraron con 6–8 pts, P&L negativo o acierto por debajo del precio promedio |
 | 01/10 12:52 | `MIN_ENTRY_PRICE` 0.35 → 0.59 | Entradas < $0.60: 3G 6P, −$16.26 (9 trades) | Tras 20 señales rechazadas por el mínimo con resultado conocido, P&L hipotético positivo |
+| 01/10 18:40 | `FAIR_GATE_EDGE` 0.06 → 0.08 (vuelta atrás, OK del usuario) | Trades con 6–8 pts desde 11:53: 4G 5P, −$16.91; con ≥ 8 pts siguieron bien | — |
+| 01/10 18:40 | Shadow: estrategia "ventana 60–120 s" (solo registro, `window` en SHADOW-JSON) | Backtest 1.706 mercados: 76% a $0.63, +13 ¢/token (91 casos) | Evaluar con ≥ 60 casos nuevos |
 | 01/10 13:00 | `FAIR_VOL_MULT` se mantiene en 1.4 | 1.636 mercados: en 60–90% el modelo está calibrado; con 1.6 el filtro habría sacado 61 trades (50 ganados) | — |
 | 01/10 13:45 | `watchPatterns` en `railway.toml` | Que la bitácora no reinicie el bot | Si un deploy necesario no se dispara |
 | 01/10 14:45 | Etapa 0 aprobada por el usuario: `ELITE_MODE=false` (y apagado por defecto en el código); `MAX_DAILY_LOSS_USDC` y `TRADING_PAUSED` nuevos, sin definir (no cambian nada en paper) | Protecciones para dinero real | — |
