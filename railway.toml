@@ -1,5 +1,8 @@
 [build]
 builder = "NIXPACKS"
+# Solo redeployar cuando cambia lo que corre el bot. Los cambios en docs/ (bitácora,
+# reportes) no reinician el bot.
+watchPatterns = ["src/**", "scripts/**", "package.json", "package-lock.json", "railway.toml"]
 
 [deploy]
 startCommand = "node src/index-final.js"
