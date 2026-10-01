@@ -50,6 +50,9 @@ function stopTickRecorder(posId) {
 const CORRECTIONS = [
   // 29/09 07:15 UTC UP @0.76 x6: cerrado WIN +1.44 en el cierre con el mercado abierto; resolvió DOWN
   { posId: 'POS_1790666143172', result: 'LOSS', pnl: -4.56 },
+  // 01/10 16:06 UTC UP @0.69 x7 (mercado 16:05-16:10, resolvió DOWN): el redeploy de las
+  // 16:14 la descartó antes de resolverse (solo se restauraban posiciones sin vencer)
+  { posId: 'POS_1790870794783', result: 'LOSS', pnl: -4.83 },
 ];
 const correctionDelta = (() => {
   const d = { pnl: 0, wins: 0, losses: 0, applied: [] };
@@ -60,8 +63,9 @@ const correctionDelta = (() => {
       if (!line) return line;
       let r; try { r = JSON.parse(line); } catch { return line; }
       const c = CORRECTIONS.find(c => c.posId === r.posId);
-      if (!c || !r.result || r.result === c.result) return line;
-      d.pnl += c.pnl - (r.pnl || 0);
+      // Sin resultado = posición que se perdió antes de resolverse: se cierra acá
+      if (!c || r.result === c.result) return line;
+      d.pnl += c.pnl - (r.result ? (r.pnl || 0) : 0);
       if (r.result === 'WIN') d.wins--; else if (r.result === 'LOSS') d.losses--;
       if (c.result === 'WIN') d.wins++; else d.losses++;
       d.applied.push(`${c.posId} ${r.result} ${r.pnl} → ${c.result} ${c.pnl}`);

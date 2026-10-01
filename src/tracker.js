@@ -16,6 +16,8 @@ const POSITIONS_FILE = process.env.POSITIONS_FILE || '/data/positions.json';
 
 // Comisión simulada en paper: % sobre el monto de cada compra/venta (taker).
 // 0 = sin comisión. Poner la tasa real de Polymarket para estos mercados.
+// Posiciones vencidas hace menos de esto se restauran al arrancar para resolverlas
+const RESTORE_MAX_AGE_MIN = parseInt(process.env.RESTORE_MAX_AGE_MIN || '120');
 const PAPER_FEE = config.DRY_RUN ? (parseFloat(process.env.PAPER_FEE_PCT || '0') || 0) / 100 : 0;
 const fee = (notional) => parseFloat((notional * PAPER_FEE).toFixed(4));
 
@@ -47,9 +49,11 @@ class PnLTracker {
     try {
       if (fs.existsSync(POSITIONS_FILE)) {
         const data = JSON.parse(fs.readFileSync(POSITIONS_FILE, 'utf8'));
-        // Solo restaurar posiciones que aún no vencieron
-        const now = new Date();
-        const active = (data.positions || []).filter(p => new Date(p.endDate) > now);
+        // Restaurar también las que vencieron hace poco y esperan el resultado en Gamma:
+        // antes solo las no vencidas, y un redeploy entre el cierre y la resolución
+        // descartaba la posición sin contarla (01/10 16:14, una pérdida de $4.83)
+        const cutoff = Date.now() - RESTORE_MAX_AGE_MIN * 60000;
+        const active = (data.positions || []).filter(p => p.status !== 'CLOSED' && new Date(p.endDate).getTime() > cutoff);
         // Totales siempre (antes solo si quedaban posiciones abiertas: el balance
         // de paper y el W/L volvían a cero en cada redeploy)
         this.totalPnL = data.totalPnL || 0;
