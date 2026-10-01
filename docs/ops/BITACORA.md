@@ -5,9 +5,13 @@ revierte. Lo leen y actualizan las rutinas automáticas (análisis por hora y re
 así una sesión nueva sabe en qué estado está el bot sin depender del historial del chat.
 Los cambios en `docs/` no reinician el bot (`watchPatterns` en `railway.toml`).
 
-## Reglas de autonomía (autorizadas por el usuario el 01/10/2026)
+## Reglas de autonomía propuestas (pendientes de aprobación del usuario)
 
-Se pueden aplicar sin preguntar:
+Propuesta del 01/10/2026. Todavía no están vigentes: hasta que el usuario las apruebe
+explícitamente, cada cambio se propone y se aplica solo con su OK, salvo un error claro que
+rompa el bot.
+
+Se aplicarían sin preguntar:
 - Arreglos de errores que rompen o degradan el bot.
 - Cambios de parámetros o de código respaldados por datos: al menos 30 casos relevantes y
   mejora esperada clara, o un error evidente. Uno por vez, con criterio de reversión anotado
@@ -17,7 +21,7 @@ Se pueden aplicar sin preguntar:
   `node --check` de los archivos tocados y los tests que existan. Después: verificar que el
   deploy quede en SUCCESS y que el bot arranque sin errores; si no, revertir el commit.
 
-Siempre con confirmación explícita del usuario en el chat:
+Seguirían requiriendo confirmación explícita del usuario en el chat:
 - Pasar a dinero real (`DRY_RUN=false`) o volver a paper desde real.
 - Subir el tamaño de las órdenes o la exposición (`ORDER_SIZE_USDC`, `DYNAMIC_SIZE_SCALE`,
   `MAX_TOTAL_EXPOSURE_USDC`), activar `ELITE_MODE`, o desactivar límites de pérdida.
