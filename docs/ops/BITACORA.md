@@ -69,6 +69,8 @@ riesgo principal.
 - [x] Modo ÉLITE eliminado del código (apostaba hasta el 80% del saldo con tope $0.97). Hecho 01/10, a pedido del usuario: siempre tamaño normal.
 - [x] Paper exige liquidez: el mejor ask debe tener al menos los tokens de la orden (`PAPER_REQUIRE_DEPTH`, por defecto activo). Log `[PAPER-LIQ]` en cada intento. Hecho 01/10.
 - [x] Límite de pérdida diaria (`MAX_DAILY_LOSS_USDC`, día UTC, sobrevive reinicios) y pausa manual (`TRADING_PAUSED=true`). Hecho 01/10; se definen al pasar a real.
+- [x] `cancelOrder` recibía `{ orderId }` en 3 lugares (la API pide `orderID`): el cancel por timeout, el de la FOK residual y el del retry-loop no cancelaban. Corregido 01/10.
+- [ ] **Envío de órdenes reales (decisión del usuario pendiente).** Config actual: `DUAL_FILL_ORDER=true`, `USE_FAK=true`, `FILL_RETRY=true`, `FAK_MAX_ATTEMPTS=15`, `FAK_RETRY_MS=1500`, `MARKET_RETRY_ATTEMPTS=2`. Con eso cada señal manda FAK + GTC + GTD juntas al mismo precio (cruzan el libro). Riesgos: (1) pueden llenarse dos o tres a la vez y el bot registra una; (2) si ninguna llena al instante, se cancela la GTC pero la GTD queda viva hasta el cierre y además se abre un retry-loop GTC nuevo → posible doble posición sin registrar; (3) errores de cancelación silenciados. Propuesta: una sola FAK a ask + 1 centavo, sin órdenes en reposo (`DUAL_FILL_ORDER=false`, `FAK_MAX_ATTEMPTS=2`).
 - [ ] Cobro automático de posiciones ganadoras (redeem vía `builder-relayer-client`; necesita
       credenciales del relayer) o, mientras tanto, cobro manual diario en Polymarket.
 - [ ] Registro de ejecución real: llenado, precio obtenido contra precio esperado, y el
