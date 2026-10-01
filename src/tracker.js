@@ -26,7 +26,20 @@ class PnLTracker {
     this.totalPnL = 0;
     this.wins = 0;
     this.losses = 0;
+    // P&L del día UTC en curso, para MAX_DAILY_LOSS_USDC (se guarda en disco: sobrevive redeploys)
+    this.dailyKey = null;
+    this.dailyPnL = 0;
     this._loadFromDisk();
+  }
+
+  _addDaily(pnl) {
+    const key = new Date().toISOString().slice(0, 10);
+    if (key !== this.dailyKey) { this.dailyKey = key; this.dailyPnL = 0; }
+    this.dailyPnL = parseFloat((this.dailyPnL + pnl).toFixed(2));
+  }
+
+  getDailyPnL() {
+    return this.dailyKey === new Date().toISOString().slice(0, 10) ? this.dailyPnL : 0;
   }
 
   // Cargar posiciones abiertas desde disco (sobrevive redeploys)
@@ -42,6 +55,8 @@ class PnLTracker {
         this.totalPnL = data.totalPnL || 0;
         this.wins = data.wins || 0;
         this.losses = data.losses || 0;
+        this.dailyKey = data.dailyKey || null;
+        this.dailyPnL = data.dailyPnL || 0;
         if (active.length > 0) {
           // Convertir endDate a Date object
           this.positions = active.map(p => ({ ...p, endDate: new Date(p.endDate) }));
@@ -81,6 +96,8 @@ class PnLTracker {
         totalPnL: this.totalPnL,
         wins: this.wins,
         losses: this.losses,
+        dailyKey: this.dailyKey,
+        dailyPnL: this.dailyPnL,
         updatedAt: new Date().toISOString(),
       };
       fs.writeFileSync(POSITIONS_FILE, JSON.stringify(data, null, 2));
@@ -229,6 +246,7 @@ class PnLTracker {
     }
  
     this.totalPnL += pnl;
+    this._addDaily(pnl);
     pos.status = 'CLOSED';
     pos.winner = winner;
     pos.pnl = pnl;
@@ -267,6 +285,7 @@ class PnLTracker {
     pos.closedAt = new Date();
     pos.closeReason = reason;
     this.totalPnL += pnl;
+    this._addDaily(pnl);
     if (pnl >= 0) this.wins++; else this.losses++;
     this.closed.push(pos);
     this.positions = this.positions.filter(p => p.id !== posId);

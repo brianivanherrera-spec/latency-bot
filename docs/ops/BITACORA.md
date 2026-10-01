@@ -47,6 +47,7 @@ Seguirían requiriendo confirmación explícita del usuario en el chat:
 | 01/10 12:52 | `MIN_ENTRY_PRICE` 0.35 → 0.59 | Entradas < $0.60: 3G 6P, −$16.26 (9 trades) | Tras 20 señales rechazadas por el mínimo con resultado conocido, P&L hipotético positivo |
 | 01/10 13:00 | `FAIR_VOL_MULT` se mantiene en 1.4 | 1.636 mercados: en 60–90% el modelo está calibrado; con 1.6 el filtro habría sacado 61 trades (50 ganados) | — |
 | 01/10 13:45 | `watchPatterns` en `railway.toml` | Que la bitácora no reinicie el bot | Si un deploy necesario no se dispara |
+| 01/10 14:45 | Etapa 0 aprobada por el usuario: `ELITE_MODE=false` (y apagado por defecto en el código); `MAX_DAILY_LOSS_USDC` y `TRADING_PAUSED` nuevos, sin definir (no cambian nada en paper) | Protecciones para dinero real | — |
 
 ## En observación
 
@@ -63,8 +64,8 @@ llenaron 29% de las veces; en septiembre el 72.8% de las órdenes no se llenó. 
 supone que toda orden se llena al precio de venta del libro, así que la ejecución real es el
 riesgo principal.
 
-- [ ] Desactivar `ELITE_MODE` (apuesta hasta el 80% del saldo en una señal).
-- [ ] Límite de pérdida diaria y pausa manual (kill switch) por variable.
+- [x] Desactivar `ELITE_MODE` (apuesta hasta el 80% del saldo en una señal). Hecho 01/10.
+- [x] Límite de pérdida diaria (`MAX_DAILY_LOSS_USDC`, día UTC, sobrevive reinicios) y pausa manual (`TRADING_PAUSED=true`). Hecho 01/10; se definen al pasar a real.
 - [ ] Cobro automático de posiciones ganadoras (redeem vía `builder-relayer-client`; necesita
       credenciales del relayer) o, mientras tanto, cobro manual diario en Polymarket.
 - [ ] Registro de ejecución real: llenado, precio obtenido contra precio esperado, y el

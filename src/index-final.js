@@ -1808,6 +1808,30 @@ async function main() {
       global._cbLossesAtPause = 0;
     }
 
+    // ─── Pausa manual y límite de pérdida diaria ──────────────────────────
+    // TRADING_PAUSED=true: no abre posiciones nuevas (las abiertas se resuelven igual).
+    // MAX_DAILY_LOSS_USDC: con el P&L cerrado del día UTC ≤ −límite, no entra hasta las
+    // 00:00 UTC. Sin estas variables no cambia nada.
+    if (process.env.TRADING_PAUSED === 'true') {
+      if (!global._pausedLogged) {
+        global._pausedLogged = true;
+        logger.warn('[PAUSA] TRADING_PAUSED=true — no se abren posiciones nuevas');
+      }
+      return;
+    }
+    const maxDailyLoss = parseFloat(process.env.MAX_DAILY_LOSS_USDC || '0');
+    if (maxDailyLoss > 0) {
+      const dailyPnL = tracker.getDailyPnL();
+      if (dailyPnL <= -maxDailyLoss) {
+        const day = new Date().toISOString().slice(0, 10);
+        if (global._dailyLossLoggedFor !== day) {
+          global._dailyLossLoggedFor = day;
+          logger.warn(`[LÍMITE DIARIO] P&L del día $${dailyPnL.toFixed(2)} ≤ −$${maxDailyLoss} — sin entradas hasta las 00:00 UTC`);
+        }
+        return;
+      }
+    }
+
     // ✅ LOG DE DIAGNÓSTICO - ver qué pasa con cada señal
     const f = sig._fair;
     const fairTag = f ? ` | FAIR(${f.fair_src === 'chainlink_twap' ? 'twap' : 'bn'}) ${f.fair_side} ask=${f.fair_ask ?? 'n/a'} fEdge=${f.fair_edge ?? 'n/a'} T=${f.fair_t_rem_s}s` : ' | FAIR n/a';
@@ -1988,7 +2012,8 @@ async function main() {
     // Usa el balance disponible completo en vez del size normal
     const eliteImbThreshold = parseFloat(process.env.ELITE_IMB_THRESHOLD || '0.80');
     const eliteZscoreThreshold = parseFloat(process.env.ELITE_ZSCORE_THRESHOLD || '2.0');
-    const eliteEnabled = process.env.ELITE_MODE !== 'false';
+    // Apagado salvo ELITE_MODE=true: apuesta hasta el 80% del saldo en una sola señal
+    const eliteEnabled = process.env.ELITE_MODE === 'true';
     // sig.imbalance es el campo correcto — sig.edge no tiene bookImbalance
     const bookImbForElite = Math.abs(sig.imbalance || 0);
     const isEliteSignal = eliteEnabled &&
