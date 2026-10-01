@@ -2008,26 +2008,10 @@ async function main() {
       logger.info(`[SIZE] 📊 Balance $${balanceForSizing} → order size dinámico: $${exposure}`);
     }
 
-    // MODO ÉLITE — cuando imb≥0.80 + Z≥2.0 históricamente 100% WR (183W/0L)
-    // Usa el balance disponible completo en vez del size normal
-    const eliteImbThreshold = parseFloat(process.env.ELITE_IMB_THRESHOLD || '0.80');
-    const eliteZscoreThreshold = parseFloat(process.env.ELITE_ZSCORE_THRESHOLD || '2.0');
-    // Apagado salvo ELITE_MODE=true: apuesta hasta el 80% del saldo en una sola señal
-    const eliteEnabled = process.env.ELITE_MODE === 'true';
-    // sig.imbalance es el campo correcto — sig.edge no tiene bookImbalance
-    const bookImbForElite = Math.abs(sig.imbalance || 0);
-    const isEliteSignal = eliteEnabled &&
-      bookImbForElite >= eliteImbThreshold &&
-      Math.abs(sig.zScore || 0) >= eliteZscoreThreshold;
-
-    let finalExposure = exposure;
-    if (isEliteSignal && balanceForSizing > exposure) {
-      // Usar hasta el 80% del balance disponible (reservar 20% de margen)
-      const eliteMax = parseFloat(process.env.ELITE_MAX_PCT || '0.80');
-      const eliteExposure = parseFloat((balanceForSizing * eliteMax).toFixed(2));
-      finalExposure = Math.max(exposure, eliteExposure);
-      logger.info(`[SIZE] 🏆 MODO ÉLITE: imb=${bookImbForElite.toFixed(2)} Z=${Math.abs(sig.zScore).toFixed(1)} → usando $${finalExposure.toFixed(2)} (${(eliteMax*100).toFixed(0)}% del balance $${balanceForSizing})`);
-    }
+    // Siempre el tamaño normal. El modo ÉLITE (hasta el 80% del saldo en una señal, con
+    // tope de precio $0.97) se eliminó el 01/10: con $5 por orden ya dependemos de la
+    // liquidez del libro, y una sola pérdida grande se llevaba casi todo el capital.
+    const finalExposure = exposure;
 
     const totalExposure = Array.from(activePositions.values())
       .reduce((sum, p) => sum + p.exposure, 0);
@@ -2226,10 +2210,7 @@ async function main() {
     const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo; // solo para filtros y logs
 
     // PRECIO DE ORDEN = siempre del book real (bestAsk del WS, 0ms latencia)
-    // Señales ÉLITE tienen umbral más permisivo — con 100% WR histórico vale pagar más
-    const MAX_ORDER_PRICE = isEliteSignal
-      ? parseFloat(process.env.ELITE_MAX_ASK || '0.97')
-      : parseFloat(process.env.MAX_GTC_ENTRY_ASK || process.env.MAX_ENTRY_PRICE || '0.85');
+    const MAX_ORDER_PRICE = parseFloat(process.env.MAX_GTC_ENTRY_ASK || process.env.MAX_ENTRY_PRICE || '0.85');
     const tick = 0.005;  // Reducido de 0.01 → 0.005 para reducir slippage
     const round2 = v => parseFloat((Math.round(v * 100) / 100).toFixed(2));
 
@@ -2259,12 +2240,12 @@ async function main() {
     const orderPrice = orderPriceFromWS;
 
     if (bestAskWS != null && orderPrice > MAX_ORDER_PRICE) {
-      logger.warn(`[SKIP] 🚫 ask demasiado caro: bestAsk=$${bestAskWS.toFixed(2)} orderPx=$${orderPrice} > MAX=$${MAX_ORDER_PRICE}${isEliteSignal ? ' (ÉLITE)' : ''} → NO_FILL conceptual`);
+      logger.warn(`[SKIP] 🚫 ask demasiado caro: bestAsk=$${bestAskWS.toFixed(2)} orderPx=$${orderPrice} > MAX=$${MAX_ORDER_PRICE} → NO_FILL conceptual`);
       activePositions.delete(posId);
       return;
     }
 
-    logger.info(`[PRICE] ${bestAskWS != null ? `bestAsk=$${bestAskWS.toFixed(2)} (WS)` : `priceRaw=$${priceRaw?.toFixed(2)} (fallback)`} → orderPrice=$${orderPrice} (MAX=${MAX_ORDER_PRICE}${isEliteSignal ? ' ÉLITE' : ''})`);
+    logger.info(`[PRICE] ${bestAskWS != null ? `bestAsk=$${bestAskWS.toFixed(2)} (WS)` : `priceRaw=$${priceRaw?.toFixed(2)} (fallback)`} → orderPrice=$${orderPrice} (MAX=${MAX_ORDER_PRICE})`);
 
     const price = orderPrice;
     // FIX: Garantizar precisión de 2 decimales en makerAmount (price × size)
@@ -2281,10 +2262,9 @@ async function main() {
     // MAX_ENTRY_PRICE — se compara contra el mayor entre priceRaw y el bestAsk real.
     // Solo con priceRaw, un precio de señal viejo (fallback Gamma ~$0.50) dejaba
     // pasar compras a $0.97 con el ask real en $0.99-$1.00.
-    // Señales ÉLITE lo saltean — con 100% WR histórico no importa el priceRaw
     const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
     const entryPriceCheck = Math.max(priceRaw ?? 0, bestAskWS ?? 0);
-    if (!isEliteSignal && maxEntryPrice < 0.97 && entryPriceCheck > maxEntryPrice) {
+    if (maxEntryPrice < 0.97 && entryPriceCheck > maxEntryPrice) {
       logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio $${entryPriceCheck.toFixed(2)} (raw $${priceRaw?.toFixed(2)} ask ${bestAskWS != null ? '$' + bestAskWS.toFixed(2) : 'n/a'}) > máximo $${maxEntryPrice} — señal vieja`);
       activePositions.delete(posId);
       return;
@@ -2293,12 +2273,11 @@ async function main() {
     // MIN_ENTRY_PRICE — no comprar el lado barato (contra el mercado).
     // En 137 mercados con ganador oficial (25-28/09), la primera señal con ask < $0.35
     // acertó 1 de 10 (y 1 de 25 contando los inferidos); en el paper, 3 de 4 trades a
-    // $0.23-0.30 perdieron. Se compara contra el ask real (priceRaw puede ser viejo) y
-    // aplica también a las señales ÉLITE.
+    // $0.23-0.30 perdieron. Se compara contra el ask real (priceRaw puede ser viejo).
     const minEntryPrice = parseFloat(process.env.MIN_ENTRY_PRICE || '0.35');
     const entryPriceMin = bestAskWS ?? priceRaw;
     if (entryPriceMin != null && entryPriceMin < minEntryPrice) {
-      logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: ${bestAskWS != null ? 'ask' : 'precio raw'} $${entryPriceMin.toFixed(2)} < mínimo $${minEntryPrice} — lado barato (contra el mercado)${isEliteSignal ? ' (ÉLITE)' : ''}`);
+      logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: ${bestAskWS != null ? 'ask' : 'precio raw'} $${entryPriceMin.toFixed(2)} < mínimo $${minEntryPrice} — lado barato (contra el mercado)`);
       activePositions.delete(posId);
       return;
     }
@@ -2358,7 +2337,7 @@ async function main() {
       logger.info(`[BOOK-SHADOW] ${sig.direction} imb=${f(bookShadow.imb)} (filtro viejo: ${verdict(bookShadow.imbBlock)}) | mov10s=${f(bookShadow.mov10s)} mov30s=${f(bookShadow.mov30s)} (filtro movimiento: ${verdict(bookShadow.movBlock)})`);
     }
     shadow?.recordBotTrade({ direction: sig.direction, price, zScore: sig.zScore, posId });
-    logger.info(`  Exposure: $${finalExposure}${isEliteSignal ? ' 🏆 ÉLITE' : ''} | Size: ${size} | Token: ${tokenId}`);
+    logger.info(`  Exposure: $${finalExposure} | Size: ${size} | Token: ${tokenId}`);
 
     // Completar la reserva con el exposure real (ya sabíamos marketId/entryType desde antes)
     activePositions.set(posId, {
@@ -2867,12 +2846,21 @@ async function main() {
       // Una orden límite de compra no llena si el ask real está por encima del precio
       // (pasaba con el tope 0.97: se "llenaba" a $0.97 con el ask en $0.99-$1.00).
       const askAbovePrice = bestAskWS != null && bestAskWS > price;
-      const filled = !askAbovePrice && Math.random() < paperFillRate;
+      // Liquidez: en real solo se compra lo publicado en el libro. Se exige que el mejor
+      // ask tenga al menos el tamaño de la orden (conservador: no cuenta el nivel siguiente,
+      // que la orden a ask + tick también podría tomar). Sin dato de tamaño no se bloquea.
+      // PAPER_REQUIRE_DEPTH=false vuelve al fill sin mirar el tamaño.
+      const askSize = polyWs.getBestAskSize?.(tokenId) ?? null;
+      const thinBook = process.env.PAPER_REQUIRE_DEPTH !== 'false' && askSize != null && askSize < size;
+      const filled = !askAbovePrice && !thinBook && Math.random() < paperFillRate;
+      logger.info(`[PAPER-LIQ] mejor ask $${bestAskWS?.toFixed(2) ?? 'n/a'} con ${askSize ?? 'n/a'} tokens | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
 
       if (!filled) {
         logger.warn(askAbovePrice
           ? `[PAPER] ⚠️ Sin fill: ask $${bestAskWS.toFixed(2)} > precio de orden $${price}`
-          : `[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);
+          : thinBook
+            ? `[PAPER] ⚠️ Sin fill: el mejor ask tiene ${askSize} tokens y la orden pide ${size}`
+            : `[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);
 
         // PHASE 0: Log paper mode NO_FILL
         // PHASE 1: Include latency tracking (simulated)

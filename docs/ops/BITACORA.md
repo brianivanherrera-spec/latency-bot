@@ -51,6 +51,8 @@ Seguirían requiriendo confirmación explícita del usuario en el chat:
 
 ## En observación
 
+- Liquidez en paper (desde 01/10 ~15:45): cuántas entradas quedan sin fill por falta de tokens en el mejor ask (`[PAPER-LIQ] … NO alcanza`).
+
 - Trades que entran con 6–8 pts de ventaja (desde 01/10 11:53): 2G 0P.
 - Rechazos por `MIN_ENTRY_PRICE` (desde 01/10 12:52): anotar el resultado de cada mercado.
 - Trades con más de 20 pts de ventaja del modelo: 4G 3P desde 28/09 (el modelo prometía ~88%).
@@ -64,7 +66,8 @@ llenaron 29% de las veces; en septiembre el 72.8% de las órdenes no se llenó. 
 supone que toda orden se llena al precio de venta del libro, así que la ejecución real es el
 riesgo principal.
 
-- [x] Desactivar `ELITE_MODE` (apuesta hasta el 80% del saldo en una señal). Hecho 01/10.
+- [x] Modo ÉLITE eliminado del código (apostaba hasta el 80% del saldo con tope $0.97). Hecho 01/10, a pedido del usuario: siempre tamaño normal.
+- [x] Paper exige liquidez: el mejor ask debe tener al menos los tokens de la orden (`PAPER_REQUIRE_DEPTH`, por defecto activo). Log `[PAPER-LIQ]` en cada intento. Hecho 01/10.
 - [x] Límite de pérdida diaria (`MAX_DAILY_LOSS_USDC`, día UTC, sobrevive reinicios) y pausa manual (`TRADING_PAUSED=true`). Hecho 01/10; se definen al pasar a real.
 - [ ] Cobro automático de posiciones ganadoras (redeem vía `builder-relayer-client`; necesita
       credenciales del relayer) o, mientras tanto, cobro manual diario en Polymarket.
