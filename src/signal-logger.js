@@ -112,14 +112,22 @@ let consecutiveLosses = (() => {
 const pendingSnapshots = new Map();
 
 // ─── Abrir trade ─────────────────────────────────────────────────────────────
-async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, bookShadow, getPolyPrice, getBookSnapshot, getLastTradeSnapshot, btcBuyerMakerRatio, getClobSnapshot, twap30AtSignal, twap60AtSignal, binanceToTwap30Ms, binanceToTwap60Ms }) {
+// Corre en el camino de la orden: no espera nada de red. T3 se graba al entrar; el book
+// sale del snapshot del WS (sincrónico) y los pedidos HTTP (getClobSnapshot, book por
+// HTTP si el WS no tiene) se hacen en segundo plano DESPUÉS de mandar la orden y se
+// agregan al registro con updateRecord. Antes se esperaban acá (getSpread ~100-500 ms).
+const BACKGROUND_HTTP_DELAY_MS = 1500;
+async function logSignalOpen({ posId, direction, price, size, market, sig, utcHour, btcPrice, bookShadow, getPolyPrice, getBookSnapshot, getBookSnapshotHttp, getLastTradeSnapshot, btcBuyerMakerRatio, getClobSnapshot, twap30AtSignal, twap60AtSignal, binanceToTwap30Ms, binanceToTwap60Ms }) {
+  // T3 (decisión de precio) antes de cualquier espera
+  if (!global.signal_t3_times) global.signal_t3_times = {};
+  global.signal_t3_times[posId] = Date.now();
   ensureDir();
 
-  // Capturar snapshot del book al momento exacto de la señal
-  // getBookSnapshot puede ser async (fallback HTTP) o sync (WS)
-  const bookSnap = getBookSnapshot ? (await getBookSnapshot()) : null;
+  // Snapshot del book del WS (sincrónico). Si viniera una promesa no se espera.
+  let bookSnap = null;
+  try { const b = getBookSnapshot ? getBookSnapshot() : null; bookSnap = (b && typeof b.then !== 'function') ? b : null; } catch (_) {}
   const tradeSnap = getLastTradeSnapshot ? getLastTradeSnapshot() : null;
-  const clobSnap  = getClobSnapshot ? await getClobSnapshot() : null;
+  const clobSnap  = null; // se completa en segundo plano
 
   // Precio de Polymarket al momento exacto de la señal:
   // Usar sig.edge?.polyYes (el precio que usó el bot para calcular el edge)
@@ -227,10 +235,31 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
   try { fs.appendFileSync(SIGNAL_FILE, JSON.stringify(record) + '\n'); } catch(e) {}
   openRecordsCache.set(posId, record); // cache para updates rápidos sin I/O
 
-  // PHASE 1: Store T3 timestamp (price decision) for latency tracking
-  // This is used when logFillTelemetry is called later
-  if (!global.signal_t3_times) global.signal_t3_times = {};
-  global.signal_t3_times[posId] = Date.now();
+  // HTTP en segundo plano, después de que salió la orden
+  if (getClobSnapshot || (!bookSnap && getBookSnapshotHttp)) {
+    setTimeout(async () => {
+      try {
+        const fields = {};
+        if (getClobSnapshot) {
+          const c = await getClobSnapshot().catch(() => null);
+          if (c) Object.assign(fields, {
+            clob_spread: c.spread ?? null, clob_vol60s_yes: c.vol60s_yes ?? null,
+            clob_vol60s_no: c.vol60s_no ?? null, clob_vol60s_total: c.vol60s_total ?? null,
+            clob_vol60s_imbalance: c.vol60s_imbalance ?? null, clob_trades60s_count: c.trades60s_count ?? null,
+          });
+        }
+        if (!bookSnap && getBookSnapshotHttp) {
+          const b = await getBookSnapshotHttp().catch(() => null);
+          if (b) Object.assign(fields, {
+            book_yes_bid: b.yes_bid_size ?? null, book_yes_ask: b.yes_ask_size ?? null,
+            book_no_bid: b.no_bid_size ?? null, book_no_ask: b.no_ask_size ?? null,
+            book_vol_imbalance: b.vol_imbalance ?? null, book_source: 'http_post_orden',
+          });
+        }
+        if (Object.keys(fields).length) updateRecord(posId, fields);
+      } catch (_) {}
+    }, BACKGROUND_HTTP_DELAY_MS);
+  }
 
   // Programar snapshots de precio Polymarket si tenemos la función
   if (getPolyPrice || polyT0 !== null) {

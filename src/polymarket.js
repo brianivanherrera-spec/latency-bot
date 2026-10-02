@@ -262,14 +262,15 @@ class PolymarketClient {
       const yesBook = yesRes?.ok ? await yesRes.json().catch(() => null) : null;
       const noBook  = noRes?.ok  ? await noRes.json().catch(() => null)  : null;
 
-      const parsePrice = (l) => parseFloat(l?.price ?? 0) || 0;
-      const parseSize = (l) => parseFloat(l?.size ?? l?.amount ?? 0) || 0;
+      const { parseSize, bestOfBook } = require('./book-utils');
 
-      // BEST prices (primer nivel del book)
-      const yesBestPrice = parsePrice(yesBook?.bids?.[0]);
-      const yesAskPrice = parsePrice(yesBook?.asks?.[0]);
-      const noBestPrice = parsePrice(noBook?.bids?.[0]);
-      const noAskPrice = parsePrice(noBook?.asks?.[0]);
+      // Mejores precios = max(bids) / min(asks). Antes se tomaba el primer nivel del
+      // array, que en el REST del CLOB es el PEOR (bids ascendentes, asks descendentes).
+      const yesTop = bestOfBook(yesBook), noTop = bestOfBook(noBook);
+      const yesBestPrice = yesTop.crossed ? null : yesTop.bestBid;
+      const yesAskPrice = yesTop.crossed ? null : yesTop.bestAsk;
+      const noBestPrice = noTop.crossed ? null : noTop.bestBid;
+      const noAskPrice = noTop.crossed ? null : noTop.bestAsk;
 
       // TOTAL depth (suma de todos los levels) — para compatibilidad
       const yesBid = (yesBook?.bids || []).reduce((s,l) => s+parseSize(l), 0);
@@ -899,8 +900,10 @@ class PolymarketClient {
       await this._init();
       const book = await this.clobClient.getOrderBook(tokenId);
       if (!book) return null;
-      const bestBid = parseFloat(book.bids?.[0]?.price || 0);
-      const bestAsk = parseFloat(book.asks?.[0]?.price || 1);
+      const top = require('./book-utils').bestOfBook(book);
+      if (top.crossed) return null;
+      const bestBid = top.bestBid || 0;
+      const bestAsk = top.bestAsk || 0;
       if (!bestBid && !bestAsk) return null;
       // mid price — si no hay bid, usar ask; si no hay ask, usar bid
       if (!bestBid) return bestAsk;
@@ -927,7 +930,7 @@ class PolymarketClient {
       const exitSide = 'SELL';
       const book = await this.clobClient.getOrderBook(tokenId);
       // Vendemos al best bid (el mejor precio que alguien paga por nuestro token)
-      const exitPrice = parseFloat(book?.bids?.[0]?.price || 0);
+      const exitPrice = require('./book-utils').bestOfBook(book).bestBid || 0; // max(bids)
       if (!exitPrice) return { success: false, error: 'sin liquidez para salir' };
 
       logger.info(`[POSITION-MONITOR] 🚪 Cerrando ${posId} — ${exitSide} ${size}t @ $${exitPrice.toFixed(3)}`);

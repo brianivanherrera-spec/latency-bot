@@ -751,7 +751,7 @@ async function main() {
   const signal = new SignalEngine();
   const poly = new PolymarketClient();
   const ws = new BinanceWS();        // Binance primary (bookTicker ~10-15ms)
-  const wsCoinbase = new BinanceWS(); // Coinbase fallback (ticker ~50-80ms)
+  const wsCoinbase = new BinanceWS({ source: 'coinbase' }); // referencia BTC-USD (no entra a la señal)
   const polyWs = new PolymarketWS();
   poly.setPolyWs(polyWs);
   polyWs.startImbalanceSampler(); // para registrar el movimiento del book en cada entrada
@@ -1069,7 +1069,7 @@ async function main() {
           logger.info(`[POLY] noToken: ${cachedMarket.noTokenId}`);
           // Fix B: suscribir al nuevo mercado via WS
           polyWs.unsubscribeAll();
-          polyWs.subscribe(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+          polyWs.subscribe(cachedMarket.yesTokenId, cachedMarket.noTokenId, new Date(cachedMarket.endDate).getTime());
           shadow?.startMarket({
             marketId: cachedMarket.conditionId, gammaId: cachedMarket.gammaId, question: cachedMarket.question,
             endTs: new Date(cachedMarket.endDate).getTime(),
@@ -1144,7 +1144,7 @@ async function main() {
           logger.info(`[POLY] noToken: ${m.noTokenId}`);
           // Fix B: suscribir al WS de Polymarket para precio en tiempo real
           polyWs.unsubscribeAll();
-          polyWs.subscribe(m.yesTokenId, m.noTokenId);
+          polyWs.subscribe(m.yesTokenId, m.noTokenId, new Date(m.endDate).getTime());
           shadow?.startMarket({
             marketId: m.conditionId, gammaId: m.gammaId, question: m.question,
             endTs: new Date(m.endDate).getTime(),
@@ -1697,6 +1697,7 @@ async function main() {
   }
 
   ws.onPrice(async (priceData) => {
+    if (priceData.source && priceData.source !== 'binance') return; // solo USDT de Binance
     // ─── Telemetría de latencia ──────────────────────────────────────────
     // T1: cuándo Node.js recibió y procesó este tick
     const t1_receive = process.hrtime.bigint();
@@ -2279,6 +2280,16 @@ async function main() {
       yesTokenId: cachedMarket.yesTokenId, noTokenId: cachedMarket.noTokenId,
       marketSlug: cachedMarket.marketSlug,
     };
+    // Strike que no es el TWAP de Chainlink de la apertura (reinicio a mitad de mercado,
+    // RTDS caído): binance_ajustado puede errar $1-20 y binance crudo ~$17, así que ese
+    // mercado no se opera. REQUIRE_CHAINLINK_STRIKE=false vuelve a permitirlo.
+    if (mkt.strike_source !== 'chainlink_twap' && process.env.REQUIRE_CHAINLINK_STRIKE !== 'false') {
+      if (global._noClStrikeLoggedFor !== mkt.gammaId) {
+        global._noClStrikeLoggedFor = mkt.gammaId;
+        logger.warn(`[SKIP] 🚫 Strike sin TWAP de Chainlink (strike_source=${mkt.strike_source || 'n/a'}) — este mercado no se opera`);
+      }
+      return;
+    }
     const posId = `POS_${Date.now()}`;
     activePositions.set(posId, {
       exposure: 0, openTime: now,
@@ -2553,9 +2564,11 @@ async function main() {
       // getBookSnapshot: captura la profundidad del book al momento exacto
       // de la señal — yes_bid_size, yes_ask_size, no_bid_size, no_ask_size,
       // vol_imbalance — para analizar si el order flow confirma la dirección.
-      getBookSnapshot: async () => {        let snap = polyWs.getBookSnapshot();
-        if (!snap && mkt?.yesTokenId && mkt?.noTokenId) {
-          // WS no tiene el book todavía — pedir via HTTP como fallback
+      // Solo el snapshot del WS en el camino de la orden; el HTTP va en segundo plano
+      getBookSnapshot: () => polyWs.getBookSnapshot(),
+      getBookSnapshotHttp: async () => {
+        let snap = null;
+        if (mkt?.yesTokenId && mkt?.noTokenId) {
           const depth = await poly.fetchBookDepth(mkt.yesTokenId, mkt.noTokenId);
           if (depth) {
             const totalBid = depth.yesBid + depth.noBid;
@@ -2569,7 +2582,7 @@ async function main() {
                 : 0,
               source: 'http',
             };
-            logger.info(`[BOOK] Fallback HTTP: yes_bid=${depth.yesBid} no_bid=${depth.noBid} imb=${snap.vol_imbalance}`);
+            logger.info(`[BOOK] HTTP (post orden): yes_bid=${depth.yesBid} no_bid=${depth.noBid} imb=${snap.vol_imbalance}`);
           }
         }
         return snap;
@@ -3147,15 +3160,19 @@ async function main() {
 
   ws.onError((err) => logger.error(`WS error: ${err.message}`));
 
-  logger.info('Conectando a Coinbase WebSocket...');
+  logger.info('Conectando a Binance WebSocket...');
   await ws.connect();
-  // Coinbase en paralelo — mismo callback de precio, race pattern
-  // El primero que llega actualiza el signal, el otro es redundante pero inofensivo
-  wsCoinbase.onPrice(async (priceData) => {
-    // Solo procesar si Binance no actualizó en los últimos 500ms
+  // Coinbase (BTC-USD) queda solo como referencia: antes, con Binance callado >500 ms, sus
+  // ticks (~$17 abajo de USDT) entraban a la señal, a FairValue y a la base BN−CL. Sin
+  // Binance la señal se frena (no hay trades) hasta que el watchdog lo reconecta.
+  let _cbStaleWarnAt = 0;
+  wsCoinbase.onPrice(() => {
     const lastBinance = ws.getLastPrice();
-    if (lastBinance.timestamp && Date.now() - lastBinance.timestamp < 500) return;
-    if (ws.priceCallback) await ws.priceCallback({ ...priceData, source: 'coinbase' });
+    const bnAge = lastBinance.timestamp ? Date.now() - lastBinance.timestamp : Infinity;
+    if (bnAge > 10000 && Date.now() - _cbStaleWarnAt > 60000) {
+      _cbStaleWarnAt = Date.now();
+      logger.warn(`[FEED] Binance sin datos hace ${Number.isFinite(bnAge) ? Math.round(bnAge / 1000) + 's' : 'siempre'} — Coinbase vivo pero no se usa en la señal (USD vs USDT)`);
+    }
   });
   wsCoinbase.connect().catch(e => logger.warn(`Coinbase WS no disponible: ${e.message}`));
   logger.info('✓ Conectado\n');

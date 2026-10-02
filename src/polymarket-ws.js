@@ -15,6 +15,7 @@
 
 const WebSocket = require('ws');
 const fs   = require('fs');
+const { parseSize: _parseSize } = require('./book-utils');
 const path = require('path');
 const { Logger } = require('./logger');
 const loopMonitor = require('./loop-monitor');
@@ -51,19 +52,22 @@ function loadTradeMap() {
 // Guardar trade map en disco — throttled a 1 escritura cada 2s.
 // Antes escribía sincrónicamente en CADA last_trade_price, bloqueando el
 // event loop y contribuyendo a desconexiones 1013 "slow consumer".
+// Además: se podan los trades de más de 5 min (el Map crecía con cada token de cada
+// mercado) y se escribe con fs.promises (antes writeFileSync cada 2 s en el hot path).
+const TRADE_MAP_MAX_AGE_MS = 5 * 60 * 1000;
 let _lastTradeMapSave = 0;
+let _tradeMapWriting = false;
 function saveTradeMap(map) {
   const now = Date.now();
-  if (now - _lastTradeMapSave < 2000) return;
+  if (now - _lastTradeMapSave < 2000 || _tradeMapWriting) return;
   _lastTradeMapSave = now;
-  try {
-    const obj = {};
-    for (const [k, v] of map) obj[k] = v;
-    fs.writeFileSync(TRADE_MAP_FILE, JSON.stringify(obj));
-  } catch (e) {
-    // No crítico — solo logging
-    logger.warn(`[TRADE-MAP] Error al guardar: ${e.message}`);
-  }
+  for (const [k, v] of map) if (!v?.timestamp || now - v.timestamp > TRADE_MAP_MAX_AGE_MS) map.delete(k);
+  const obj = {};
+  for (const [k, v] of map) obj[k] = v;
+  _tradeMapWriting = true;
+  fs.promises.writeFile(TRADE_MAP_FILE, JSON.stringify(obj))
+    .catch(e => logger.warn(`[TRADE-MAP] Error al guardar: ${e.message}`)) // no crítico
+    .finally(() => { _tradeMapWriting = false; });
 }
 
 class PolymarketWS {
@@ -94,6 +98,20 @@ class PolymarketWS {
     // Se actualiza con cada evento 'book' (snapshot) del WS.
     // Estructura: { bid: totalTokens, ask: totalTokens, bids: [{price,size}], asks: [{price,size}] }
     this._bookByToken = new Map();
+    // Libro completo por token y lado: tokenId -> { bids: Map<precio,tamaño>, asks: Map }.
+    // Se arma con el snapshot 'book' y se actualiza con los deltas de 'price_change'
+    // (tamaño 0 borra el nivel). Antes los deltas se ignoraban y el top se armaba con
+    // el primer nivel del array.
+    this._levels = new Map();
+    // Watchdog de datos (antes solo se miraba el PONG): handshake sin 'book' en 5 s o
+    // 15 s sin datos de los tokens actuales con el mercado abierto → reconectar
+    this._lastDataAt = 0;
+    this._handshakeAt = 0;
+    this._gotBookSinceHandshake = false;
+    this._marketEndTs = null;
+    this._lastWatchdogReconnect = 0;
+    this._dataWatchdog = null;
+    this._crossedLogged = 0;
 
     // ─── Book Imbalance Movement Tracking ──────────────────────────────────
     // Track previous imbalance to calculate MOVEMENT (not absolute value)
@@ -135,24 +153,82 @@ class PolymarketWS {
     });
   }
 
-  // Helper: actualizar _topOfBook de forma segura — merge con valores previos
-  // Solo actualiza si el nuevo valor es válido (0 < x <= 1)
+  // Actualiza el top of book con valores explícitos. Un lado sin precio válido queda en
+  // null (antes conservaba el precio viejo con updatedAt fresco) y el tamaño solo se
+  // hereda si el precio no cambió (antes arrastraba el tamaño del nivel viejo). Un top
+  // cruzado (bid >= ask) se descarta.
   _setTopOfBook(tokenId, { bestBid, bestAsk, bestBidSize, bestAskSize }) {
-    if (!tokenId) return;
+    if (!tokenId) return false;
     const prev = this._topOfBook.get(tokenId) || {};
-    const ask = bestAsk != null && !isNaN(bestAsk) && bestAsk > 0 && bestAsk <= 1
-      ? bestAsk : prev.bestAsk ?? null;
-    const bid = bestBid != null && !isNaN(bestBid) && bestBid > 0 && bestBid <= 1
-      ? bestBid : prev.bestBid ?? null;
-    if (ask == null && bid == null) return;
-    // ALWAYS update updatedAt when data arrives, even if reusing old bid/ask
+    const valid = (x) => x != null && !isNaN(x) && x > 0 && x <= 1;
+    const ask = valid(bestAsk) ? bestAsk : null;
+    const bid = valid(bestBid) ? bestBid : null;
+    if (ask == null && bid == null) return false;
+    if (ask != null && bid != null && bid >= ask) { this._logCrossed(tokenId, bid, ask); return false; }
+    const lv = this._levels.get(tokenId);
+    const sizeFor = (px, given, prevPx, prevSize, map) => {
+      if (px == null) return null;
+      if (given != null && !isNaN(given)) return given;
+      if (map?.has(px)) return map.get(px);
+      return px === prevPx ? (prevSize ?? null) : null;
+    };
     this._topOfBook.set(tokenId, {
       bestBid: bid, bestAsk: ask,
-      bestBidSize: bestBidSize ?? prev.bestBidSize ?? null,
-      bestAskSize: bestAskSize ?? prev.bestAskSize ?? null,
+      bestBidSize: sizeFor(bid, bestBidSize, prev.bestBid, prev.bestBidSize, lv?.bids),
+      bestAskSize: sizeFor(ask, bestAskSize, prev.bestAsk, prev.bestAskSize, lv?.asks),
       updatedAt: Date.now(),
     });
     if (ask != null) this._bestAskByToken.set(tokenId, ask);
+    else this._bestAskByToken.delete(tokenId);
+    return true;
+  }
+
+  _logCrossed(tokenId, bid, ask) {
+    if (this._crossedLogged >= 20) return;
+    this._crossedLogged++;
+    logger.warn(`[POLY-WS] Libro cruzado descartado ${tokenId?.slice(0, 8)}: bid=${bid} >= ask=${ask}`);
+  }
+
+  // Top y profundidad desde el libro por niveles. override = best_bid/best_ask que manda
+  // el server en price_change (si el libro local no coincide, manda el del server).
+  _publishBook(tokenId, override = null) {
+    const lv = this._levels.get(tokenId);
+    if (!lv) return null;
+    let bestBid = null, bestAsk = null;
+    for (const p of lv.bids.keys()) if (bestBid == null || p > bestBid) bestBid = p;
+    for (const p of lv.asks.keys()) if (bestAsk == null || p < bestAsk) bestAsk = p;
+    if (override) {
+      const ob = parseFloat(override.best_bid), oa = parseFloat(override.best_ask);
+      if (ob > 0 && ob <= 1 && ob !== bestBid) { this._bookMismatch = (this._bookMismatch || 0) + 1; bestBid = ob; }
+      if (oa > 0 && oa <= 1 && oa !== bestAsk) { this._bookMismatch = (this._bookMismatch || 0) + 1; bestAsk = oa; }
+    }
+    const ok = this._setTopOfBook(tokenId, {
+      bestBid, bestAsk,
+      bestBidSize: bestBid != null ? lv.bids.get(bestBid) ?? null : null,
+      bestAskSize: bestAsk != null ? lv.asks.get(bestAsk) ?? null : null,
+    });
+    if (!ok) return null;
+    const mid = (bestBid != null && bestAsk != null) ? (bestBid + bestAsk) / 2 : (bestAsk ?? bestBid);
+    if (mid != null) this._lastPriceByToken.set(tokenId, mid);
+    const sorted = (map, side) => [...map.entries()]
+      .sort((a, b) => side === 'bid' ? b[0] - a[0] : a[0] - b[0])
+      .map(([price, size]) => ({ price: String(price), size: String(size) }));
+    const sum = (map) => { let t = 0; for (const v of map.values()) t += v; return t; };
+    const prevBook = this._bookByToken.get(tokenId) || {};
+    this._bookByToken.set(tokenId, {
+      ...prevBook,
+      bid: parseFloat(sum(lv.bids).toFixed(2)),
+      ask: parseFloat(sum(lv.asks).toFixed(2)),
+      bids: sorted(lv.bids, 'bid').slice(0, 5), // mejores 5, del mejor al peor
+      asks: sorted(lv.asks, 'ask').slice(0, 5),
+      bestBid, bestAsk,
+      updatedAt: Date.now(),
+    });
+    return mid;
+  }
+
+  _markData(tokenId) {
+    if (tokenId && this._subscribedTokens.has(tokenId)) this._lastDataAt = Date.now();
   }
 
   // Helper: encontrar el mejor precio de un array de niveles (puede venir desordenado)
@@ -522,6 +598,7 @@ class PolymarketWS {
         this._sendSubscribe([...this._subscribedTokens]);
       }
       this._startPing();
+      this._startDataWatchdog();
       if (!settled && resolve) { settled = true; resolve(); }
     });
 
@@ -537,8 +614,10 @@ class PolymarketWS {
         // Loguear (con límite) para que cualquier rechazo del server sea visible.
         if (this._invalidOpLogged < 5) {
           this._invalidOpLogged++;
-          logger.warn(`[POLY-WS] Server respondió "${raw.slice(0, 60)}" — mensaje rechazado`);
+          logger.warn(`[POLY-WS] Server respondió "${raw.slice(0, 60)}" — mensaje rechazado, reconectando`);
         }
+        // El socket queda sin suscripción válida: reconectar con handshake nuevo
+        this._watchdogReconnect('INVALID OPERATION');
         return;
       }
       // setImmediate cede el event loop — evita slow consumer (code=1013)
@@ -596,6 +675,31 @@ class PolymarketWS {
     }, delay);
   }
 
+  _startDataWatchdog() {
+    if (this._dataWatchdog) return;
+    this._dataWatchdog = setInterval(() => {
+      if (!this._connected || !this._socketTokensKey || this._intentionalClose) return;
+      const now = Date.now();
+      if (this._marketEndTs && now >= this._marketEndTs) return; // mercado cerrado
+      if (!this._gotBookSinceHandshake && now - this._handshakeAt > 5000) {
+        this._watchdogReconnect(`sin 'book' ${Math.round((now - this._handshakeAt) / 1000)} s después del handshake`);
+      } else if (now - this._lastDataAt > 15000) {
+        this._watchdogReconnect(`sin datos de los tokens hace ${Math.round((now - this._lastDataAt) / 1000)} s`);
+      }
+    }, 1000);
+    this._dataWatchdog.unref?.();
+  }
+
+  // Reconexión por watchdog, como mucho una cada 10 s
+  _watchdogReconnect(reason) {
+    const now = Date.now();
+    if (now - this._lastWatchdogReconnect < 10000) return;
+    this._lastWatchdogReconnect = now;
+    logger.warn(`[POLY-WS] [WATCHDOG] ${reason} — reconectando`);
+    this._handshakeAt = now; this._lastDataAt = now; this._gotBookSinceHandshake = false;
+    this._forceReconnect();
+  }
+
   _startPing() {
     this._clearPing();
     this._pingInterval = setInterval(() => {
@@ -626,8 +730,11 @@ class PolymarketWS {
     this.ws = null;
   }
 
-  subscribe(yesTokenId, noTokenId) {
+  // endTs (opcional): cierre del mercado, para que el watchdog no reconecte cuando el
+  // mercado ya cerró y el server deja de mandar datos
+  subscribe(yesTokenId, noTokenId, endTs = null) {
     const same = this._yesTokenId === yesTokenId && this._noTokenId === noTokenId;
+    if (endTs) this._marketEndTs = endTs;
     this._yesTokenId = yesTokenId || null;
     this._noTokenId = noTokenId || null;
     this._subscribedTokens.clear();
@@ -638,6 +745,7 @@ class PolymarketWS {
       this._lastPriceByToken.clear();
       this._marketPriceByToken.clear();
       this._bookByToken.clear();
+      this._levels.clear();
       this._topOfBook.clear();
       this._bestAskByToken.clear();
       // NO limpiar _lastTradeByToken — los trades del mercado anterior
@@ -686,9 +794,11 @@ class PolymarketWS {
     this._lastPriceByToken.clear();
     this._marketPriceByToken.clear();
     this._bookByToken.clear();
+    this._levels.clear();
     this._topOfBook.clear();
     this._bestAskByToken.clear();
     this._lastBootstrapAttempt.clear();
+    this._marketEndTs = null;
     // NO limpiar _lastTradeByToken — igual que en subscribe(),
     // los trades expiran solos en 30s. Limpiarlos acá deja en null
     // las señales del mercado siguiente.
@@ -709,6 +819,9 @@ class PolymarketWS {
         custom_feature_enabled: true,
       }));
       this._socketTokensKey = tokenIds.join('|');
+      this._handshakeAt = Date.now();
+      this._lastDataAt = this._handshakeAt;
+      this._gotBookSinceHandshake = false;
     } catch (e) {
       logger.error(`Error subscribe: ${e.message}`);
     }
@@ -753,6 +866,7 @@ class PolymarketWS {
       const price = parseFloat(msg.price);
       const size  = parseFloat(msg.size || msg.amount || 0);
       const tokenId = msg.asset_id;
+      this._markData(tokenId);
 
       if (!isNaN(price) && price > 0 && tokenId) {
         // Actualizar precio con el último trade ejecutado
@@ -817,52 +931,21 @@ class PolymarketWS {
   _onBook(msg) {
     const tokenId = msg.asset_id;
     if (!tokenId) return;
-    const bids = msg.bids || [];
-    const asks = msg.asks || [];
-
-    // Usar _bestFromLevels para manejar arrays desordenados
-    const { price: topBid } = this._bestFromLevels(bids, 'bid');
-    const { price: topAsk } = this._bestFromLevels(asks, 'ask');
-
-    // Calcular mid si hay ambos; si solo hay uno, usar ese
-    let mid = null;
-    if (topBid != null && topAsk != null) mid = (topBid + topAsk) / 2;
-    else if (topAsk != null) mid = topAsk;
-    else if (topBid != null) mid = topBid;
-
-    // No descartar si solo hay ask (mercado decidido al 99%) — actualizar _topOfBook igual
-    if (mid != null) this._lastPriceByToken.set(tokenId, mid);
-
-    // Calcular profundidad total del book (suma de tokens en todos los niveles)
-    // Polymarket puede mandar size como string o número
-    const parseSize = (s) => parseFloat(s?.size ?? s?.amount ?? 0) || 0;
-    const bidDepth = bids.reduce((s, l) => s + parseSize(l), 0);
-    const askDepth = asks.reduce((s, l) => s + parseSize(l), 0);
-
+    // Snapshot: reemplaza el libro de este token
+    const lv = { bids: new Map(), asks: new Map() };
+    for (const l of msg.bids || []) { const p = parseFloat(l?.price), z = _parseSize(l); if (p > 0 && p <= 1 && z > 0) lv.bids.set(p, z); }
+    for (const l of msg.asks || []) { const p = parseFloat(l?.price), z = _parseSize(l); if (p > 0 && p <= 1 && z > 0) lv.asks.set(p, z); }
     const hadDepth = this._bookByToken.has(tokenId);
-    this._bookByToken.set(tokenId, {
-      bid: parseFloat(bidDepth.toFixed(2)),
-      ask: parseFloat(askDepth.toFixed(2)),
-      bids: bids.slice(0, 5),
-      asks: asks.slice(0, 5),
-      updatedAt: Date.now(),
-    });
-
-    // Alimentar _topOfBook desde snapshot
-    // Actualizar aunque solo haya ask (o solo bid) — no exigir ambos
-    const { size: topBidSize } = this._bestFromLevels(bids, 'bid');
-    const { size: topAskSize } = this._bestFromLevels(asks, 'ask');
-    if (topAsk != null || topBid != null) {
-      this._setTopOfBook(tokenId, {
-        bestBid: topBid, bestAsk: topAsk,
-        bestBidSize: topBidSize, bestAskSize: topAskSize,
-      });
-    }
+    this._levels.set(tokenId, lv);
+    this._markData(tokenId);
+    if (this._subscribedTokens.has(tokenId)) this._gotBookSinceHandshake = true;
+    this._publishBook(tokenId);
 
     // Loguear solo la primera vez que recibimos depth real para este token
-    if (!hadDepth && (bidDepth > 0 || askDepth > 0)) {
+    const b = this._bookByToken.get(tokenId);
+    if (!hadDepth && b && (b.bid > 0 || b.ask > 0)) {
       const isYes = tokenId === this._yesTokenId;
-      logger.info(`[POLY-WS] 📊 Book depth ${isYes ? 'YES' : 'NO'}: bid=${bidDepth.toFixed(0)} ask=${askDepth.toFixed(0)} tokens`);
+      logger.info(`[POLY-WS] 📊 Book depth ${isYes ? 'YES' : 'NO'}: bid=${b.bid.toFixed(0)} ask=${b.ask.toFixed(0)} tokens`);
     }
 
     this._emitPair();
@@ -871,29 +954,35 @@ class PolymarketWS {
   _onPriceChange(msg) {
     const changes = msg.price_changes;
     if (!Array.isArray(changes)) return;
+    const touched = new Map(); // tokenId -> último cambio (trae best_bid/best_ask del server)
     for (const ch of changes) {
       const tokenId = ch.asset_id;
       if (!tokenId) continue;
-      const bid = parseFloat(ch.best_bid);
-      const ask = parseFloat(ch.best_ask);
+      this._markData(tokenId);
+      const lv = this._levels.get(tokenId);
+      const p = parseFloat(ch.price), z = parseFloat(ch.size);
+      const side = String(ch.side || '').toUpperCase();
+      if (lv && p > 0 && p <= 1 && !isNaN(z) && (side === 'BUY' || side === 'SELL')) {
+        const map = side === 'BUY' ? lv.bids : lv.asks;
+        if (z > 0) map.set(p, z); else map.delete(p); // tamaño 0 borra el nivel
+        touched.set(tokenId, ch);
+        continue;
+      }
+      // Sin snapshot todavía: usar el top que manda el server
+      const bid = parseFloat(ch.best_bid), ask = parseFloat(ch.best_ask);
       let mid = null;
       if (!isNaN(bid) && !isNaN(ask) && bid > 0 && ask > 0) {
-        mid = (bid + ask) / 2;
-        // Actualizar topOfBook SIEMPRE desde price_change — canal de deltas más frecuente
-        this._setTopOfBook(tokenId, {
-          bestBid: bid, bestAsk: ask,
-          bestBidSize: null, bestAskSize: null,
-        });
-      } else {
-        const p = parseFloat(ch.price);
-        if (!isNaN(p) && p > 0) mid = p;
-      }
+        if (this._setTopOfBook(tokenId, { bestBid: bid, bestAsk: ask })) mid = (bid + ask) / 2;
+      } else if (p > 0) mid = p;
       if (mid != null) {
         this._lastPriceByToken.set(tokenId, mid);
-        // También actualizar el precio de mercado real (canal market)
-        // Este es el precio que usan los snapshots t1/t2/t5
         this._marketPriceByToken.set(tokenId, mid);
       }
+    }
+    for (const [tokenId, ch] of touched) {
+      const mid = this._publishBook(tokenId, ch);
+      // Precio de mercado (snapshots t1/t2/t5)
+      if (mid != null) this._marketPriceByToken.set(tokenId, mid);
     }
     this._emitPair();
   }
@@ -901,6 +990,7 @@ class PolymarketWS {
   _onBestBidAsk(msg) {
     const tokenId = msg.asset_id;
     if (!tokenId) return;
+    this._markData(tokenId);
     const bid = parseFloat(msg.best_bid);
     const ask = parseFloat(msg.best_ask);
     if (isNaN(bid) || isNaN(ask)) return;
@@ -912,9 +1002,9 @@ class PolymarketWS {
       return;
     }
     if (bid <= 0 || ask <= 0 || ask > 1) return;
+    if (bid >= ask) { this._logCrossed(tokenId, bid, ask); return; }
     const mid = (bid + ask) / 2;
     this._lastPriceByToken.set(tokenId, mid);
-    // Usar _setTopOfBook para mantener consistencia y merge con valores previos
     this._setTopOfBook(tokenId, {
       bestBid: bid, bestAsk: ask,
       bestBidSize: msg.bid_size ? parseFloat(msg.bid_size) : null,
@@ -985,6 +1075,7 @@ class PolymarketWS {
 
   close() {
     this._intentionalClose = true;
+    if (this._dataWatchdog) { clearInterval(this._dataWatchdog); this._dataWatchdog = null; }
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);
       this._reconnectTimer = null;
