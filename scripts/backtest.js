@@ -113,6 +113,38 @@ function calibration(markets) {
   return Object.entries(bins).sort().map(([k, b]) => ({ k, n: b.n, pred: +(b.sum / b.n).toFixed(3), real: +(b.up / b.n).toFixed(3) }));
 }
 
+// EV real por franja de ask (0.05) × tiempo restante: comprar el lado a su ask en ese
+// momento, sin ninguna condición del modelo. Una muestra por mercado y celda. Con el ask
+// del segundo siguiente (1 s de latencia en contra) y comisión.
+const T_BUCKETS = [[270, 240], [240, 180], [180, 120], [120, 60], [60, 30], [30, 10]];
+function evGrid(markets) {
+  const cells = {};
+  for (const mk of markets) {
+    for (const [hiT, loT] of T_BUCKETS) {
+      const mid = (hiT + loT) / 2;
+      let i = mk.rows.findIndex(x => x && x.sl <= mid);
+      if (i < 0) continue;
+      const r = mk.rows[i], nx = mk.rows[i + 1];
+      for (const side of ['UP', 'DOWN']) {
+        let a = side === 'UP' ? r.ya : r.na;
+        const a2 = nx ? (side === 'UP' ? nx.ya : nx.na) : null;
+        if (a == null) continue;
+        a = Math.max(a, a2 ?? a);
+        if (a <= 0.02 || a >= 0.98) continue;
+        const pb = Math.min(19, Math.floor(a / 0.05));
+        const k = `${hiT}-${loT}|${(pb * 0.05).toFixed(2)}`;
+        const ev = (side === mk.winner ? 1 : 0) - a - fee(a);
+        const c = (cells[k] ||= { n: 0, s: 0, s2: 0, w: 0, a: 0 });
+        c.n++; c.s += ev; c.s2 += ev * ev; c.w += side === mk.winner ? 1 : 0; c.a += a;
+      }
+    }
+  }
+  return Object.entries(cells).map(([k, c]) => {
+    const m = c.s / c.n, sd = Math.sqrt(Math.max(0, c.s2 / c.n - m * m));
+    return { k, n: c.n, ask: +(c.a / c.n).toFixed(3), wr: +(c.w / c.n).toFixed(3), ev: +m.toFixed(4), se: +(sd / Math.sqrt(c.n)).toFixed(4) };
+  }).sort((x, y) => x.k < y.k ? -1 : 1);
+}
+
 (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
@@ -137,6 +169,7 @@ function calibration(markets) {
     baseline: { cfg: baseline, train: evaluate(train, baseline), test: evaluate(test, baseline), all: evaluate(markets, baseline) },
     top,
     calibration: calibration(markets),
+    evGrid: { train: evGrid(train), test: evGrid(test) },
   };
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
