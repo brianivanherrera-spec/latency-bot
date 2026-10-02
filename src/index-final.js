@@ -3204,31 +3204,33 @@ async function main() {
       // en cripto ~150 ms antes de casarla y los makers pueden retirar el precio. Con N > 0
       // se espera N ms y recién ahí se mira el mejor ask y su tamaño en el WS.
       const paperDelayMs = Math.max(0, parseInt(process.env.PAPER_FILL_DELAY_MS || '0') || 0);
+      // Tamaño disponible: todo lo ofrecido hasta el precio límite de la orden (antes solo
+      // el mejor nivel, y 5 acciones a $0.60 con más a $0.61 daban "sin fill" a una orden de 8 a $0.61)
+      const sizeUpTo = () => polyWs.getAskSizeUpTo?.(tokenId, price) ?? polyWs.getBestAskSize?.(tokenId) ?? null;
       let fillAsk = bestAskWS;
-      let askSize = polyWs.getBestAskSize?.(tokenId) ?? null;
+      let askSize = sizeUpTo();
       if (paperDelayMs > 0) {
         await new Promise(r => setTimeout(r, paperDelayMs));
         fillAsk = polyWs.getBestAskForToken?.(tokenId) ?? null;
-        askSize = polyWs.getBestAskSize?.(tokenId) ?? null;
+        askSize = sizeUpTo();
       }
       // Con demora y sin ask fresco no se puede confirmar el fill: sin fill
       const askAbovePrice = fillAsk != null ? fillAsk > price : paperDelayMs > 0;
-      // Liquidez: en real solo se compra lo publicado en el libro. Se exige que el mejor
-      // ask tenga al menos el tamaño de la orden (conservador: no cuenta el nivel siguiente,
-      // que la orden a ask + tick también podría tomar). Sin dato de tamaño no se bloquea.
-      // PAPER_REQUIRE_DEPTH=false vuelve al fill sin mirar el tamaño.
+      // Liquidez: en real solo se compra lo publicado en el libro. Se exige que lo ofrecido
+      // hasta el precio de la orden alcance para el tamaño completo (sin fills parciales).
+      // Sin dato de tamaño no se bloquea. PAPER_REQUIRE_DEPTH=false no mira el tamaño.
       const thinBook = process.env.PAPER_REQUIRE_DEPTH !== 'false' && askSize != null && askSize < size;
       const filled = !askAbovePrice && !thinBook && Math.random() < paperFillRate;
       if (paperDelayMs > 0) {
         logger.info(`[PAPER-DELAY] ask decisión=$${bestAskWS?.toFixed(2) ?? 'n/a'} → ask a +${paperDelayMs}ms=$${fillAsk?.toFixed(2) ?? 'n/a'} (${askSize ?? 'n/a'} tokens) | orden ${size} a $${price} | ${filled ? 'lleno' : 'no'}`);
       }
-      logger.info(`[PAPER-LIQ] mejor ask $${fillAsk?.toFixed(2) ?? 'n/a'} con ${askSize ?? 'n/a'} tokens | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
+      logger.info(`[PAPER-LIQ] mejor ask $${fillAsk?.toFixed(2) ?? 'n/a'}, ${askSize ?? 'n/a'} tokens hasta $${price} | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
 
       if (!filled) {
         logger.warn(askAbovePrice
           ? `[PAPER] ⚠️ Sin fill: ask ${fillAsk != null ? '$' + fillAsk.toFixed(2) : 'sin dato'} > precio de orden $${price}`
           : thinBook
-            ? `[PAPER] ⚠️ Sin fill: el mejor ask tiene ${askSize} tokens y la orden pide ${size}`
+            ? `[PAPER] ⚠️ Sin fill: hay ${askSize} tokens hasta $${price} y la orden pide ${size}`
             : `[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);
 
         // PHASE 0: Log paper mode NO_FILL

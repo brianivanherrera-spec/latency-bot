@@ -313,6 +313,20 @@ class PolymarketWS {
     return row.bestAskSize;
   }
 
+  // Síncrono — acciones en venta a precio <= limitPx (lo que una orden de compra con ese
+  // límite podría tomar). Usa el libro por niveles; sin libro fresco, el tamaño del best ask
+  // si está dentro del límite. null = sin dato.
+  getAskSizeUpTo(tokenId, limitPx, maxAgeMs = 3000) {
+    const row = this._topOfBook.get(tokenId);
+    if (!row || Date.now() - row.updatedAt > maxAgeMs || row.bestAsk == null) return null;
+    if (row.bestAsk > limitPx + 1e-9) return 0;
+    const lv = this._levels.get(tokenId);
+    if (!lv || !lv.asks.size) return row.bestAskSize ?? null;
+    let total = 0;
+    for (const [p, z] of lv.asks) if (p >= row.bestAsk - 1e-9 && p <= limitPx + 1e-9) total += z;
+    return total;
+  }
+
   // Profundidad real del libro — calcula VWAP y disponibilidad hasta N ticks
   // Usa los primeros 5 niveles del book snapshot para estimar el fill price real
   // Retorna: { bestAsk, availableAt1Tick, availableAt2Ticks, vwap, expectedSlippage }
