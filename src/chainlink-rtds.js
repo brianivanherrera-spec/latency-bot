@@ -44,6 +44,12 @@ class ChainlinkRTDS {
     }
     return null;
   }
+  // true si ya llegó un TWAP con timestamp de fuente >= tsMs: recién ahí el valor de
+  // getTwapAt(w, tsMs) es el del segundo exacto y no el del segundo anterior.
+  hasTwapAfter(w, tsMs) {
+    const h = this._hist[w] || [];
+    return h.length > 0 && h[h.length - 1].ts >= tsMs;
+  }
   _record(w, tsMs, value) {
     if (!tsMs) return;
     const ts = tsMs > 1e12 ? tsMs : tsMs * 1000;

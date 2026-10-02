@@ -771,11 +771,19 @@ async function main() {
     if (market.strike_twap != null) return market.strike_twap;
     // Verificado con [PTB-CHECK]: priceToBeat oficial == TWAP 60 s publicado por Chainlink (RTDS)
     // en el instante de apertura (Δ $0.00). Usarlo cuando está; si no, el promedio propio.
+    // Se fija solo cuando llegó el punto del segundo exacto de la apertura (~1-2 s tarde);
+    // antes devuelve el último valor como provisorio.
     const rt = clRTDS.getTwapAt(60, market.startTime, 1000);
-    if (rt != null) { market.strike_twap = rt; return rt; }
+    if (rt != null && clRTDS.hasTwapAfter(60, market.startTime)) {
+      market.strike_twap = rt; market.strike_twap_origin = 'rtds'; return rt;
+    }
+    // Promedio propio del spot de Chainlink: solo si el RTDS no está publicando.
     const tw = clSpot.getTwap(market.startTime, TWAP_WINDOW_MS);
-    if (tw && (clSpot.getLast()?.ts ?? 0) >= market.startTime) market.strike_twap = tw.value;
-    return tw?.value ?? null;
+    const rtdsAlive = Date.now() - (clRTDS.getLatestTWAP(60)?.received_ts ?? 0) < 10000;
+    if (tw && !rtdsAlive && (clSpot.getLast()?.ts ?? 0) >= market.startTime) {
+      market.strike_twap = tw.value; market.strike_twap_origin = 'promedio_spot'; return tw.value;
+    }
+    return rt ?? tw?.value ?? null;
   };
 
   // Ticks crudos de Binance (90 s) — resolución fina para comparar con Chainlink
@@ -802,12 +810,16 @@ async function main() {
   // - desfase: el k que mejor alinea cada cambio de Chainlink con el de Binance k ms antes
   const LAG_OFFSETS = [0, 250, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000];
   const lag = { n: 0, arrival: [], sqErr: LAG_OFFSETS.map(() => 0), basisSum: 0, basisN: 0, prev: null };
+  const basisSamples = []; // [{ ts (recepción), d = Binance − Chainlink }] para binanceClBasis()
   clSpot.onUpdate((pt) => {
     const arrival = pt.received - pt.ts;
     if (arrival < 0 || arrival > 10000) return; // snapshot histórico
     lag.arrival.push(arrival);
     const bnAtTs = bnPriceAt(pt.ts);
-    if (bnAtTs != null) { lag.basisSum += bnAtTs - pt.value; lag.basisN++; }
+    if (bnAtTs != null) {
+      lag.basisSum += bnAtTs - pt.value; lag.basisN++;
+      basisSamples.push({ ts: pt.received, d: bnAtTs - pt.value });
+    }
     const prev = lag.prev;
     lag.prev = pt;
     if (!prev || pt.ts - prev.ts > 5000) return;
@@ -832,6 +844,68 @@ async function main() {
     logger.info(`[CL-LAG] n=${lag.n} | llegada p50=${pct(0.5)}ms p90=${pct(0.9)}ms | desfase vs Binance=${LAG_OFFSETS[best]}ms (rmse $${rmse[best].toFixed(2)} vs $${rmse[0].toFixed(2)} sin desfase) | base BN−CL=$${basis}`);
     lag.n = 0; lag.arrival = []; lag.sqErr = LAG_OFFSETS.map(() => 0); lag.basisSum = 0; lag.basisN = 0;
   }, 5 * 60 * 1000);
+
+  // Base Binance − Chainlink (BTCUSDT cotiza ~$17 arriba de BTC/USD): promedio móvil de
+  // los últimos 10 min de las mismas muestras que usa [CL-LAG]. null con menos de 20.
+  const BASIS_WINDOW_MS = 10 * 60000;
+  function binanceClBasis() {
+    const cut = Date.now() - BASIS_WINDOW_MS;
+    while (basisSamples.length && basisSamples[0].ts < cut) basisSamples.shift();
+    if (basisSamples.length < 20) return null;
+    return basisSamples.reduce((s, x) => s + x.d, 0) / basisSamples.length;
+  }
+  // Precio de Binance llevado a la escala del strike del mercado: si el strike es de
+  // Chainlink (o Binance ya ajustado) se resta la base; si es Binance crudo, no.
+  function bnVsStrike(market, bnPrice) {
+    if (bnPrice == null) return null;
+    if (market?.strike_source === 'binance') return bnPrice;
+    const b = binanceClBasis();
+    return b != null ? bnPrice - b : bnPrice;
+  }
+
+  // Strike del mercado = TWAP 60 s de Chainlink en el segundo exacto de la apertura (con lo
+  // que resuelve Polymarket; Gamma publica priceToBeat recién al cierre). El punto llega
+  // ~1-2 s tarde: se reintenta cada 500 ms y mientras tanto el mercado no genera señales.
+  // A los 10 s sin TWAP: Binance en la apertura menos la base medida.
+  const STRIKE_RETRY_MS = 500, STRIKE_WAIT_MAX_MS = 10000;
+  function captureOpenStrike(m, bnAtOpen) {
+    if (m.strikePrice) return; // strike explícito en la descripción del mercado
+    m.binance_at_open = bnAtOpen ?? null;
+    m.strike_pending = true;
+    const t0 = Date.now();
+    const finish = (strike, source) => {
+      m.strike_pending = false;
+      m.market_strike_price_captured_at_open = strike;
+      m.strike_source = source;
+      m.strike_basis = binanceClBasis();
+      const f2 = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
+      const diff = strike != null && m.binance_at_open != null ? m.binance_at_open - strike : null;
+      const origin = source === 'chainlink_twap' ? ` (${m.strike_twap_origin})` : '';
+      const msg = `[STRIKE] ${m.question?.slice(-22) || ''} | strike_source=${source}${origin} | strike TWAP=${f2(m.strike_twap)} | Binance@apertura=${f2(m.binance_at_open)} | diferencia=${diff == null ? 'n/a' : (diff >= 0 ? '+' : '') + diff.toFixed(2)} | base BN−CL=${f2(m.strike_basis)} | strike=${f2(strike)} | espera=${((Date.now() - t0) / 1000).toFixed(1)}s`;
+      if (source === 'chainlink_twap') logger.info(msg); else logger.warn(msg);
+      if (cachedMarket === m) {
+        const btcNow = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null;
+        const adj = bnVsStrike(m, btcNow);
+        if (strike != null && adj != null) {
+          const d = adj - strike;
+          logger.info(`[POLY] Strike BTC (${source}): $${strike.toFixed(2)} | BTC actual (Binance−base): $${adj.toFixed(2)} | diff: ${d >= 0 ? '+' : ''}${d.toFixed(2)}`);
+        }
+        mRecorder.setStrike?.(m.conditionId || m.gammaId, strike, source);
+      }
+    };
+    const attempt = () => {
+      if (!m.strike_pending) return;
+      twapStrike(m);
+      if (m.strike_twap != null) return finish(m.strike_twap, 'chainlink_twap');
+      if (Date.now() - t0 < STRIKE_WAIT_MAX_MS) return void setTimeout(attempt, STRIKE_RETRY_MS);
+      const base = binanceClBasis();
+      if (m.binance_at_open != null && base != null) return finish(m.binance_at_open - base, 'binance_ajustado');
+      // Sin base medida todavía: Binance crudo (los cálculos no le restan la base)
+      finish(m.binance_at_open, m.binance_at_open != null ? 'binance' : null);
+    };
+    // Primer intento después del bloque de apertura (que registra el mercado en el recorder)
+    setImmediate(attempt);
+  }
   // ─────────────────────────────────────────────────────────────────────────
 
   // PHASE 1: Initialize User WebSocket for real-time fill detection
@@ -910,7 +984,7 @@ async function main() {
         saveOpenSnaps(mkt, rtS != null && rtC != null ? (rtC >= rtS ? 'UP' : 'DOWN') : null, rtS, rtC);
         if (rtS != null && rtC != null) parts.push(`RTDS-TWAP60 ${fmtRes(rtS, rtC)}`);
         if (clS != null && clC != null) parts.push(`CL spot ${fmtRes(clS, clC)}`);
-        if (bnS && bnC) parts.push(`BN ${fmtRes(bnS, bnC)} (aprox.)`);
+        if (bnS && bnC) parts.push(`BN−base ${fmtRes(bnS, bnVsStrike(mkt, bnC))} (aprox., strike ${mkt.strike_source || 'n/a'})`);
         const label = mkt.question?.slice(-22) || '';
         if (parts.length) logger.info(`[MARKET-RESULT] ${label} | ${parts.join(' | ')}`);
         // Precio de referencia oficial de Polymarket, cuando ya resolvió
@@ -940,17 +1014,13 @@ async function main() {
           cachedMarket.startTime = marketStart;
           cachedMarket.endTime = new Date(nextMarketCache.endDate).getTime();
           nextMarketCache = null;
-          // Para mercados "Bitcoin Up or Down" sin strike explícito:
-          // Polymarket fija el precio inicial en 0.50 (50% YES / 50% NO)
-          // pero necesitamos capturar el precio de BTC en Binance AL MOMENTO DE APERTURA
-          // como baseline de referencia para analizar si subió/bajó en esos 5 minutos
+          // Strike = TWAP 60 s de Chainlink en la apertura (captureOpenStrike). Binance en la
+          // apertura queda como referencia y como respaldo ajustado por la base.
           const btcPriceNow = btcPriceHistory.length > 0
             ? btcPriceHistory[btcPriceHistory.length - 1].price
             : (signal.getStats()?.lastPrice || null);
-          if (btcPriceNow && !cachedMarket.strikePrice) {
-            cachedMarket.market_strike_price_captured_at_open = btcPriceNow;
-            logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
-          }
+          if (btcPriceNow) logger.info(`[POLY] 📍 Binance @apertura: $${btcPriceNow.toLocaleString()} (strike: TWAP Chainlink, pendiente)`);
+          captureOpenStrike(cachedMarket, btcPriceNow);
           logger.info(`[POLY] ✅ Mercado pre-cacheado activado: ${cachedMarket.question}`);
           logger.info(`[POLY] yesToken: ${cachedMarket.yesTokenId}`);
           logger.info(`[POLY] noToken: ${cachedMarket.noTokenId}`);
@@ -961,7 +1031,7 @@ async function main() {
             marketId: cachedMarket.conditionId, gammaId: cachedMarket.gammaId, question: cachedMarket.question,
             endTs: new Date(cachedMarket.endDate).getTime(),
             yesTokenId: cachedMarket.yesTokenId, noTokenId: cachedMarket.noTokenId,
-            botStrike: cachedMarket.market_strike_price_captured_at_open || null,
+            botStrike: cachedMarket.binance_at_open || null, // respaldo del shadow: compara contra Binance
           });
           // Mercado nuevo: descartar precio WS del mercado anterior
           lastWsPriceAt = 0; livePolyYes = null; livePolyNo = null;
@@ -978,15 +1048,8 @@ async function main() {
               priceAtOpen: signal.getStats()?.lastPrice || 0,
             });
           }
-          // Mostrar strike price si disponible
+          // El strike (y su log "[POLY] Strike BTC") se completa en captureOpenStrike
           const effectiveStrike = cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open;
-          if (effectiveStrike) {
-            const btcNow = signal.getStats()?.lastPrice || 0;
-            const diff = btcNow - effectiveStrike;
-            const pct = btcNow > 0 ? ((diff / effectiveStrike) * 100).toFixed(3) : '?';
-            const sourceLabel = cachedMarket.strikePrice ? 'desc' : 'captured@open';
-            logger.info(`[POLY] Strike BTC ($${sourceLabel}): $${effectiveStrike.toLocaleString()} | BTC actual: $${btcNow.toLocaleString()} | diff: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} (${pct}%)`);
-          }
           // ── MarketRecorder: inicio del mercado ─────────────────────────
           mRecorder.startMarket({
             market_id:     cachedMarket.conditionId || cachedMarket.gammaId,
@@ -994,7 +1057,7 @@ async function main() {
             start_ts:      Date.now(),
             end_ts:        cachedMarket.endDate ? new Date(cachedMarket.endDate).getTime() : null,
             strike_price:  effectiveStrike || null,
-            strike_source: cachedMarket.strikePrice ? 'polymarket_description' : 'binance_at_open',
+            strike_source: cachedMarket.strikePrice ? 'polymarket_description' : 'pendiente',  // se completa con STRIKE_SET
           });
           // ────────────────────────────────────────────────────────────────
         }
@@ -1003,21 +1066,18 @@ async function main() {
       if (!cachedMarket?.gammaId) {
         const m = await poly.findBTCMarket();
         if (m) {
-          // Para mercados "Bitcoin Up or Down" sin strike explícito:
-          // Capturar el precio de BTC en Binance AL MOMENTO EN QUE COMIENZA EL MERCADO
-          // Este es el baseline para analizar si subió/bajó durante esos 5 minutos
-          const btcPriceNow = btcPriceHistory.length > 0
-            ? btcPriceHistory[btcPriceHistory.length - 1].price
-            : (signal.getStats()?.lastPrice || null);
-          if (btcPriceNow && !m.strikePrice) {
-            m.market_strike_price_captured_at_open = btcPriceNow;
-            logger.info(`[POLY] 📍 Precio de referencia (BTC @apertura): $${btcPriceNow.toLocaleString()}`);
-          }
           const marketEndTime = new Date(m.endDate).getTime();
           const marketStartTime = marketEndTime - 300000; // 5 minutos atrás
           m.startTime = marketStartTime;
           m.endTime = marketEndTime;
           cachedMarket = m;
+          // Strike = TWAP 60 s de Chainlink en la apertura (captureOpenStrike). Al arrancar a
+          // mitad de mercado puede no haber TWAP de la apertura: a los 10 s usa Binance − base.
+          const btcPriceNow = btcPriceHistory.length > 0
+            ? btcPriceHistory[btcPriceHistory.length - 1].price
+            : (signal.getStats()?.lastPrice || null);
+          if (btcPriceNow) logger.info(`[POLY] 📍 Binance ahora: $${btcPriceNow.toLocaleString()} (strike: TWAP Chainlink de la apertura, pendiente)`);
+          captureOpenStrike(m, btcPriceNow);
 
           // PHASE 2: Log MARKET_START
           const bookSnapStart = polyWs.getBookSnapshot();
@@ -1046,7 +1106,7 @@ async function main() {
             marketId: m.conditionId, gammaId: m.gammaId, question: m.question,
             endTs: new Date(m.endDate).getTime(),
             yesTokenId: m.yesTokenId, noTokenId: m.noTokenId,
-            botStrike: m.market_strike_price_captured_at_open || null,
+            botStrike: m.binance_at_open || null, // respaldo del shadow: compara contra Binance
           });
           // Mercado nuevo: descartar precio WS del mercado anterior
           lastWsPriceAt = 0; livePolyYes = null; livePolyNo = null;
@@ -1069,7 +1129,7 @@ async function main() {
             start_ts:      Date.now(),
             end_ts:        m.endDate ? new Date(m.endDate).getTime() : null,
             strike_price:  m.strikePrice || m.market_strike_price_captured_at_open || null,
-            strike_source: m.strikePrice ? 'polymarket_description' : 'binance_at_open',
+            strike_source: m.strikePrice ? 'polymarket_description' : 'pendiente',  // se completa con STRIKE_SET
           });
           // ──────────────────────────────────────────────────────────────────
         } else {
@@ -1265,11 +1325,13 @@ async function main() {
       });
     }
 
-    // Respaldo (sin historial Chainlink suficiente): spot de Binance contra el strike capturado
+    // Respaldo (sin historial Chainlink suficiente): spot de Binance menos la base
+    // Binance−Chainlink, contra el strike (TWAP de Chainlink o Binance ajustado)
     const strike = cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open;
     const tRem = (endMs - nowMs) / 1000;
-    if (!strike || !btcNowBinance || tRem <= 0) return null;
-    const fairUp = normCdf(Math.log(btcNowBinance / strike) / (sigma * Math.sqrt(tRem)));
+    const bnAdj = bnVsStrike(cachedMarket, btcNowBinance);
+    if (!strike || !bnAdj || tRem <= 0) return null;
+    const fairUp = normCdf(Math.log(bnAdj / strike) / (sigma * Math.sqrt(tRem)));
     return out(fairUp, { fair_t_rem_s: Math.round(tRem), fair_strike: strike, fair_src: 'binance' });
   };
 
@@ -1658,7 +1720,7 @@ async function main() {
         {
           official: cachedMarket?.strikePrice || null,
           captured: cachedMarket?.market_strike_price_captured_at_open || null,
-          source: cachedMarket?.strikePrice ? 'polymarket_metadata' : 'bot_captured_at_open',
+          source: cachedMarket?.strikePrice ? 'polymarket_metadata' : (cachedMarket?.strike_source || 'pendiente'),
           timestamp: nowMs,
         }
       );
@@ -1675,6 +1737,14 @@ async function main() {
     sig._signalLatencyMs = signalLatencyMs;
     const MIN_BUFFER = parseInt(process.env.MIN_BUFFER_SIZE || '100');
     if (sig.bufferSize !== undefined && sig.bufferSize < MIN_BUFFER) return; // warmup
+    // Sin strike todavía (esperando el TWAP de Chainlink de la apertura): no hay señales
+    if (cachedMarket?.strike_pending) {
+      if (global._strikePendingLoggedFor !== cachedMarket.gammaId) {
+        global._strikePendingLoggedFor = cachedMarket.gammaId;
+        logger.info(`[SKIP] ⏳ Strike pendiente (esperando TWAP Chainlink de la apertura) — sin señales en este mercado hasta tenerlo`);
+      }
+      return;
+    }
 
     // PHASE 2: Generar signal_id único para esta señal
     const signal_id = randomUUID();
@@ -2491,7 +2561,11 @@ async function main() {
       const changePct = btcPrice1s && btcPriceAtSignal
         ? ((btcPrice1s - btcPriceAtSignal) / btcPriceAtSignal * 100).toFixed(3)
         : '?';
-      logger.info(`[SIGNAL-MONITOR] ${posId} | Strike:$${cachedMarket.strikePrice?.toLocaleString() || '?'} | Entry-BTC:$${btcPriceAtSignal.toLocaleString()} | BTC@1s:$${btcPrice1s?.toLocaleString() || '?'} | Change:${changePct}% | Pred:${sig.direction} | Resolved:?`);
+      // Strike (TWAP Chainlink) contra Binance menos la base, en la misma escala
+      const monStrike = cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open || null;
+      const entryAdj = bnVsStrike(cachedMarket, btcPriceAtSignal);
+      const vsStrike = monStrike && entryAdj ? `${entryAdj - monStrike >= 0 ? '+' : ''}${(entryAdj - monStrike).toFixed(2)}` : '?';
+      logger.info(`[SIGNAL-MONITOR] ${posId} | Strike:$${monStrike?.toFixed(2) || '?'} (${cachedMarket?.strike_source || '?'}) | Entry-BTC:$${btcPriceAtSignal.toLocaleString()} (−base vs strike: ${vsStrike}) | BTC@1s:$${btcPrice1s?.toLocaleString() || '?'} | Change:${changePct}% | Pred:${sig.direction} | Resolved:?`);
     }, 1000);
 
     // ✅ Ejecutar orden real (solo en LIVE)

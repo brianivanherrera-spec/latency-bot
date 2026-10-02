@@ -141,6 +141,10 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     size,
     market:           market?.question?.slice(-30) || '',
     strike_price:     market?.strikePrice || market?.market_strike_price_captured_at_open || null,
+    // chainlink_twap | binance_ajustado | binance. btc_price_* es Binance: para compararlo con
+    // un strike de Chainlink hay que restarle strike_basis (base Binance−Chainlink en la apertura).
+    strike_source:    market?.strike_source ?? null,
+    strike_basis:     market?.strike_basis != null ? parseFloat(market.strike_basis.toFixed(2)) : null,
     // Indicadores de señal
     zscore:           parseFloat(sig?.zScore?.toFixed(3) || 0),
     movePct:          parseFloat(sig?.movePct?.toFixed(4) || 0),

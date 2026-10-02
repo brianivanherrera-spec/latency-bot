@@ -37,6 +37,13 @@ class MarketRecorder {
     this.diag.markets_started++;
     this._append({ type: 'MARKET_START', market_id, question, start_ts, end_ts, strike_price, strike_source, received_ts: Date.now(), timestamp_quality: 'good' });
   }
+  // El strike se fija 1-10 s después de MARKET_START (TWAP de Chainlink de la apertura)
+  setStrike(market_id, strike_price, strike_source) {
+    if (!this._market || this._market.market_id !== market_id) return;
+    this._market.strike_price = strike_price;
+    this._market.strike_source = strike_source;
+    this._append({ type: 'STRIKE_SET', market_id, strike_price, strike_source, received_ts: Date.now() });
+  }
   recordBinance({ price, source_ts, received_ts, bid, ask, is_buyer_maker }) {
     if (!this._market) return;
     if (this._lastBinance !== null && Math.abs(price - this._lastBinance) < BINANCE_MIN_CHANGE) return;
