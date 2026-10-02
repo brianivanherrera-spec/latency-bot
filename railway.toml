@@ -8,3 +8,7 @@ watchPatterns = ["src/**", "scripts/**", "package.json", "package-lock.json", "r
 startCommand = "node src/index-final.js"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
+# /health devuelve 503 si Binance, Chainlink o el libro de Polymarket llevan > 10 s sin datos.
+# Con volumen Railway igual tiene una caída corta en cada deploy (no corre dos a la vez).
+healthcheckPath = "/health"
+healthcheckTimeout = 120

@@ -437,11 +437,18 @@ const httpServer = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   
   if (url.pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    // Antigüedad del último dato de cada feed (ms). 503 si alguno pasa de HEALTH_MAX_AGE_MS
+    // (10 s): el proceso puede estar vivo con un feed muerto.
+    const feeds = healthProbe ? healthProbe() : null;
+    const maxAge = parseInt(process.env.HEALTH_MAX_AGE_MS || '10000');
+    const stale = feeds ? Object.entries(feeds).filter(([, v]) => v == null || v > maxAge).map(([k]) => k) : ['arrancando'];
+    res.writeHead(stale.length ? 503 : 200, { 'Content-Type': 'application/json' });
     const sigStats = (typeof signal !== 'undefined' && signal?.getStats) ? signal.getStats() : {};
     const trackerStats = (typeof tracker !== 'undefined' && tracker?.getStats) ? tracker.getStats() : {};
     res.end(JSON.stringify({
-      status: 'ok',
+      status: stale.length ? 'degraded' : 'ok',
+      stale_feeds: stale,
+      feed_age_ms: feeds,
       mode: process.env.DRY_RUN === 'true' ? 'paper' : 'live',
       orderType: process.env.ORDER_TYPE || 'GTC',
       btcTrendFilter: parseInt(process.env.BTC_TREND_FILTER || '0'),
@@ -640,6 +647,7 @@ httpServer.listen(PORT, () => {
 const tracker = new PnLTracker();
 const activePositions = new Map();
 let shuttingDown = false;       // SIGTERM: no abrir posiciones nuevas
+let healthProbe = null;         // () => { binance, chainlink, polymarket } antigüedad en ms (lo define main)
 const shutdownHooks = [];       // tareas de apagado (cancelar órdenes en real)
 require('./retention').start(); // borra grabaciones/crudos viejos del volumen cada hora
 
@@ -755,6 +763,40 @@ async function main() {
   const polyWs = new PolymarketWS();
   poly.setPolyWs(polyWs);
   polyWs.startImbalanceSampler(); // para registrar el movimiento del book en cada entrada
+
+  healthProbe = () => { try {
+    const now = Date.now();
+    const age = (t) => (t ? now - t : null);
+    const clLast = clSpot.getLast?.();
+    const rtds = clRTDS.diag || {};
+    const clAt = Math.max(clLast?.received || 0, rtds.last_received_60s || 0) || null;
+    return {
+      binance: age(ws.getLastPrice().timestamp),
+      chainlink: age(clAt),
+      polymarket: age(polyWs._lastDataAt || null),
+    };
+  } catch (_) { return null; } }; // null = todavía arrancando
+
+  // Alerta de feed caído: un feed sin datos más de FEED_ALERT_SEC (60 s) avisa por Discord
+  // una vez, y de nuevo cuando se recupera
+  const FEED_ALERT_MS = parseInt(process.env.FEED_ALERT_SEC || '60') * 1000;
+  const feedDown = new Set();
+  setInterval(() => {
+    const f = healthProbe && healthProbe();
+    if (!f) return;
+    for (const [name, ageMs] of Object.entries(f)) {
+      const down = ageMs == null || ageMs > FEED_ALERT_MS;
+      if (down && !feedDown.has(name) && process.uptime() > 120) {
+        feedDown.add(name);
+        logger.error(`[FEED] ${name} sin datos hace ${ageMs == null ? '—' : Math.round(ageMs / 1000) + ' s'}`);
+        alertOperational(`Feed caído: ${name}`, `sin datos hace ${ageMs == null ? 'siempre' : Math.round(ageMs / 1000) + ' s'}`);
+      } else if (!down && feedDown.has(name)) {
+        feedDown.delete(name);
+        logger.info(`[FEED] ${name} recuperado`);
+        alertOperational(`Feed recuperado: ${name}`, '');
+      }
+    }
+  }, 15000).unref();
 
   // ─── Arranque: posiciones restauradas y reconciliación ────────────────────
   // Las posiciones restauradas ocupan su slot hasta el cierre del mercado (antes
@@ -1975,6 +2017,7 @@ async function main() {
         global._lastCircuitBreakTime = now;
         global._cbLossesAtPause = consecLosses;
         logger.warn(`[CIRCUIT BREAKER] ${consecLosses} losses seguidos — pausa de ${CIRCUIT_BREAKER_PAUSE_MS / 60000}min`);
+        alertOperational('Circuit breaker', `${consecLosses} pérdidas seguidas — pausa de ${CIRCUIT_BREAKER_PAUSE_MS / 60000} min`);
       }
       const pauseRemaining = Math.max(0, CIRCUIT_BREAKER_PAUSE_MS - (now - global._lastCircuitBreakTime));
       if (pauseRemaining > 0) {

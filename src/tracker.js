@@ -11,6 +11,7 @@ const GAMMA_API = 'https://gamma-api.polymarket.com';
 const RESOLVE_GRACE_MIN = parseFloat(process.env.RESOLVE_GRACE_MIN || '20');
  
 const fs = require('fs');
+const { safeWriteAtomic } = require('./atomic-write');
 const config = require('./config');
 const POSITIONS_FILE = process.env.POSITIONS_FILE || '/data/positions.json';
 
@@ -135,9 +136,10 @@ class PnLTracker {
         appliedAdjustments: this._appliedAdjustments || [],
         updatedAt: new Date().toISOString(),
       };
-      fs.writeFileSync(POSITIONS_FILE, JSON.stringify(data, null, 2));
+      // Atómico (tmp + fsync + rename); si falla, log + alerta (antes se tragaba el error)
+      safeWriteAtomic(POSITIONS_FILE, JSON.stringify(data, null, 2), 'positions.json');
     } catch (e) {
-      // No crítico — el bot sigue operando
+      logger.error(`[TRACKER] No se pudo serializar el estado: ${e.message}`);
     }
   }
  

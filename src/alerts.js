@@ -51,6 +51,7 @@ async function alertTradeSignal({ direction, price, edge, move, zscore, segsRest
     timestamp: new Date().toISOString(),
   };
 
+  if (!WEBHOOK_URL) return; // sin webhook no se manda nada (antes logueaba "enviada" igual)
   await sendDiscordAlert({ embeds: [embed] });
   logger.info(`🔔 Alerta Discord enviada: ${direction} @ $${price.toFixed(3)}`);
 }

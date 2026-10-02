@@ -184,7 +184,10 @@ module.exports = {
   // LOGGING
   // =============================================
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
-  LOG_FILE: process.env.LOG_FILE || './logs/bot.log',
+  // Copia del log a archivo (duplica stdout, que Railway ya guarda, y no rota).
+  // LOG_FILE=off (o false/none/0) lo desactiva; antes "off" se tomaba como nombre de archivo.
+  LOG_FILE: /^(off|false|none|0|)$/i.test((process.env.LOG_FILE ?? './logs/bot.log').trim())
+    ? null : (process.env.LOG_FILE || './logs/bot.log'),
 };
 // =============================================
 // TAKE PROFIT

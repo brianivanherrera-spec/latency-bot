@@ -889,6 +889,7 @@ class PolymarketClient {
             }
             logger.info(`[LIVE] 🚫 Orden FOK residual ${staleOrderId} cancelada correctamente`);
           } catch (cancelErr) {
+            try { require('./alerts').alertOperational('Cancelación de orden sin confirmar', `FOK residual ${staleOrderId}: ${cancelErr.message}`); } catch (_) {}
             logger.error(`[LIVE] ❌ No se pudo cancelar la orden FOK residual ${staleOrderId}: ${cancelErr.message} — ABORTANDO reintento para no duplicar exposición`);
             rec.status = 'FAILED'; rec.error = 'stale_fok_cancel_failed';
             this._orderHistory.push(rec);
@@ -1332,6 +1333,7 @@ class PolymarketClient {
             logger.info(`[RETRY] 🚫 intento ${attempt} cancelado (sin fill completo en ${ATTEMPT_MS/1000}s)`);
           } else {
             logger.error(`[RETRY] error cancelando intento ${attempt}: ${c.error}`);
+            try { require('./alerts').alertOperational('Cancelación de orden sin confirmar', `orderID ${orderId}: ${c.error}`); } catch (_) {}
             // Si no pudimos confirmar la cancelación, NO reintentar con otra
             // orden — riesgo de doble posición. Cortamos acá, pero si ya
             // sabemos que hay fill parcial confirmado, lo reportamos igual.

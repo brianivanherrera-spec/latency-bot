@@ -2,7 +2,7 @@
   "name": "latency-bot",
   "version": "2.1.0",
   "description": "BTC latency bot v2.0",
-  "main": "src/index.js",
+  "main": "src/index-final.js",
   "scripts": {
     "start": "node src/index-final.js"
   },

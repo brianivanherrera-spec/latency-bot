@@ -4,6 +4,7 @@
  */
 
 const fs = require('fs');
+const { safeWriteAtomic } = require('./atomic-write');
 const path = require('path');
 const loopMonitor = require('./loop-monitor');
 
@@ -72,7 +73,7 @@ const correctionDelta = (() => {
       return JSON.stringify({ ...r, result: c.result, pnl: c.pnl, corrected_from: { result: r.result, pnl: r.pnl } });
     });
     if (d.applied.length) {
-      fs.writeFileSync(SIGNAL_FILE, out.join('\n'));
+      safeWriteAtomic(SIGNAL_FILE, out.join('\n'), 'signals.jsonl');
       updateStats();
     }
   } catch (_) {}
@@ -380,7 +381,7 @@ function updateRecord(posId, fields, calcDuration = false) {
           return JSON.stringify(r);
         } catch { return line; }
       });
-      fs.writeFileSync(SIGNAL_FILE, updated.join('\n') + '\n');
+      safeWriteAtomic(SIGNAL_FILE, updated.join('\n') + '\n', 'signals.jsonl');
     } catch(e) {}
   }));
 }
@@ -404,7 +405,7 @@ function _flushRecordToDisk(posId, record) {
       } catch { return line; }
     });
     if (!found) updated.push(JSON.stringify(record));
-    fs.writeFileSync(SIGNAL_FILE, updated.join('\n') + '\n');
+    safeWriteAtomic(SIGNAL_FILE, updated.join('\n') + '\n', 'signals.jsonl');
     openRecordsCache.delete(posId);
   } catch(e) {}
 }
@@ -510,7 +511,7 @@ function updateStats() {
       byConsecLoss: Object.fromEntries(Object.entries(byConsecLoss).map(([k,d]) => [k, { winRate: (d.wins/d.total*100).toFixed(1)+'%', trades: d.total }])),
     };
 
-    fs.writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2));
+    safeWriteAtomic(STATS_FILE, JSON.stringify(stats, null, 2), 'stats.json');
   } catch(e) {}
 }
 
@@ -604,7 +605,7 @@ function _updateFillTime(posId, fillTimeMs) {
       } catch (parseErr) { }
       return line;
     });
-    fs.writeFileSync(SIGNAL_FILE, updated.join('\n'));
+    safeWriteAtomic(SIGNAL_FILE, updated.join('\n'), 'signals.jsonl');
   } catch (e) {
     // Non-critical — no afecta el trading
   }
@@ -743,7 +744,7 @@ function logMarketTwapFinal(twap30Final, twap60Final) {
         return JSON.stringify(r);
       } catch { return line; }
     });
-    fs.writeFileSync(SIGNAL_FILE, updated.join('\n') + '\n');
+    safeWriteAtomic(SIGNAL_FILE, updated.join('\n') + '\n', 'signals.jsonl');
     // Actualizar cache también
     for (const [posId, record] of openRecordsCache.entries()) {
       if (record.twap_30_final === null) record.twap_30_final = twap30Final ?? null;
