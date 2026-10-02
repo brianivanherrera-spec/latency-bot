@@ -651,6 +651,21 @@ let healthProbe = null;         // () => { binance, chainlink, polymarket } anti
 const shutdownHooks = [];       // tareas de apagado (cancelar órdenes en real)
 require('./retention').start(); // borra grabaciones/crudos viejos del volumen cada hora
 
+// Backtest de reglas de entrada sobre shadow-ticks.jsonl (solo análisis: escribe
+// /data/backtest-report.json y una línea [BACKTEST]). Proceso aparte para no frenar el bot.
+function runBacktest() {
+  const { execFile } = require('child_process');
+  execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'backtest.js')],
+    { timeout: 10 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
+      if (err) logger.warn(`[BACKTEST] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
+      else if (stdout.trim()) logger.info(stdout.trim());
+    });
+}
+if (process.env.BACKTEST_ENABLED !== 'false') {
+  setTimeout(runBacktest, 2 * 60000).unref();
+  setInterval(runBacktest, 12 * 3600000).unref();
+}
+
 let lastTradeTime = 0;
 const COOLDOWN = config.COOLDOWN_SECONDS * 1000; // configurable via Railway
 
