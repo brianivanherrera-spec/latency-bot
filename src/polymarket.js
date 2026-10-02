@@ -16,6 +16,12 @@ const DEPOSIT_WALLET_FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
 const DEPOSIT_WALLET_IMPL    = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
 const CLOB_API_BASE  = 'https://clob.polymarket.com';
 const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
+// Timeouts HTTP: un request colgado dejaba el slot tomado. fetch propios (Gamma, libro,
+// saldo): 3 s. El cliente CLOB usa axios sin timeout: se fija uno global más largo
+// (CLOB_HTTP_TIMEOUT_MS, default 10 s) porque cortar un POST de orden que sí se ejecutó
+// dejaría el estado de la orden desconocido.
+const HTTP_TIMEOUT_MS = parseInt(process.env.HTTP_TIMEOUT_MS || '3000');
+try { require('axios').defaults.timeout = parseInt(process.env.CLOB_HTTP_TIMEOUT_MS || '10000'); } catch (_) {}
 
 let ClobClient, SignatureTypeV2, Chain, Side, OrderType;
 let createWalletClient, http, privateKeyToAccount;
@@ -120,6 +126,7 @@ class PolymarketClient {
       // Intentar via fetch directo si el SDK no tiene el método
       try {
         const res = await fetch(`${CLOB_API_BASE}/balance-allowance/update?asset_type=COLLATERAL&signature_type=3`, {
+          signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
           method: 'GET',
           headers: {
             'POLY_ADDRESS': depositWallet,
@@ -141,7 +148,7 @@ class PolymarketClient {
   async findNextBTCMarket(nextWindowTs) {
     try {
       const slug = `btc-updown-5m-${nextWindowTs}`;
-      const response = await fetch(`${GAMMA_API_BASE}/events?slug=${slug}`);
+      const response = await fetch(`${GAMMA_API_BASE}/events?slug=${slug}`, { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
       if (!response.ok) return null;
       const data = await response.json();
       const events = Array.isArray(data) ? data : (data.events || data.data || []);
@@ -165,7 +172,7 @@ class PolymarketClient {
       const now = Math.floor(Date.now() / 1000);
       const windowTs = now - (now % 300);
       const slug = `btc-updown-5m-${windowTs}`;
-      const response = await fetch(`${GAMMA_API_BASE}/events?slug=${slug}`);
+      const response = await fetch(`${GAMMA_API_BASE}/events?slug=${slug}`, { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
       if (!response.ok) throw new Error(`Gamma API error: ${response.status}`);
       const data = await response.json();
       const events = Array.isArray(data) ? data : (data.events || data.data || []);
@@ -249,8 +256,8 @@ class PolymarketClient {
       const BASE = 'https://clob.polymarket.com';
       const headers = { 'Content-Type': 'application/json' };
       const [yesRes, noRes] = await Promise.all([
-        fetch(`${BASE}/book?token_id=${yesTokenId}`, { headers }).catch(() => null),
-        fetch(`${BASE}/book?token_id=${noTokenId}`,  { headers }).catch(() => null),
+        fetch(`${BASE}/book?token_id=${yesTokenId}`, { headers, signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) }).catch(() => null),
+        fetch(`${BASE}/book?token_id=${noTokenId}`,  { headers, signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) }).catch(() => null),
       ]);
       const yesBook = yesRes?.ok ? await yesRes.json().catch(() => null) : null;
       const noBook  = noRes?.ok  ? await noRes.json().catch(() => null)  : null;
@@ -1242,6 +1249,7 @@ class PolymarketClient {
       try {
         const h = await this._buildAuthHeaders();
         const res = await fetch(`${CLOB_API_BASE}/balance-allowance?asset_type=COLLATERAL`, {
+          signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
           method: 'GET', headers: h,
         });
         const d = await res.json();

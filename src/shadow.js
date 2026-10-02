@@ -269,7 +269,7 @@ class Shadow {
   async _resolve(m, attempt) {
     let winner = null, source = null, prices = null, closed = false;
     try {
-      const res = await fetch(`${GAMMA}/markets/${m.gammaId}`);
+      const res = await fetch(`${GAMMA}/markets/${m.gammaId}`, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         const data = await res.json();
         prices = typeof data.outcomePrices === 'string' ? JSON.parse(data.outcomePrices) : data.outcomePrices;

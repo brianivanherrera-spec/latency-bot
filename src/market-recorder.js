@@ -105,7 +105,19 @@ class MarketRecorder {
       resolution, resolution_price: resolution_price ?? null, resolution_ts,
       twap_30_final: twap_30_final ?? null, twap_60_final: twap_60_final ?? null,
       total_events: this._seq, received_ts: received_ts || Date.now(), timestamp_quality: 'good' });
+    const ref = { file: this._file, market_id: this._market.market_id, seq: this._seq };
     this._market = null; this._file = null;
+    return ref;
+  }
+  // El resultado se conoce ~3 s después del cierre (TWAP de Chainlink): se agrega al
+  // archivo del mercado ya cerrado
+  appendResolution(ref, { resolution, resolution_source }) {
+    if (!ref?.file) return;
+    try {
+      append(ref.file, JSON.stringify({ seq: ++ref.seq, market_id: ref.market_id,
+        type: 'MARKET_RESOLUTION', resolution, resolution_source: resolution_source || null,
+        received_ts: Date.now() }));
+    } catch (e) {}
   }
   getDiag() {
     return { ...this.diag, current_market: this._market?.market_id ?? null, events_in_market: this._seq };

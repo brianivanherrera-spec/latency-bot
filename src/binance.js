@@ -31,6 +31,12 @@ class BinanceWS {
     this._pingInterval = null;
   }
 
+  // El callback es async: un rechazo sin .catch quedaba como unhandledRejection
+  _emitPrice(data) {
+    const fail = err => logger.error(`[PRICE-CB] ${err?.stack || err?.message || err}`);
+    try { Promise.resolve(this.priceCallback(data)).catch(fail); } catch (err) { fail(err); }
+  }
+
   onPrice(cb) { this.priceCallback = cb; }
   onError(cb) { this.errorCallback = cb; }
   onReconnect(cb) { this.reconnectCallback = cb; }
@@ -77,7 +83,7 @@ class BinanceWS {
           this._lastTimestamp = receivedAt;
 
           if (this.priceCallback) {
-            this.priceCallback({
+            this._emitPrice({
               price,
               timestamp: receivedAt,
               latencyMs: receivedAt - exchangeTs,
@@ -148,7 +154,7 @@ class BinanceWS {
           this._lastTimestamp = Date.now();
 
           if (this.priceCallback) {
-            this.priceCallback({
+            this._emitPrice({
               price, timestamp: this._lastTimestamp,
               bestBid, bestAsk,
               bidQty: parseFloat(ticker.best_bid_quantity) || 0,

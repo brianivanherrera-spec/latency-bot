@@ -90,4 +90,30 @@ async function alertBotStart({ dryRun }) {
   });
 }
 
-module.exports = { alertTradeSignal, alertTradeResult, alertBotStart };
+/**
+ * Alerta operativa (caídas, excepciones, pausas). Devuelve la promesa para poder
+ * esperarla antes de salir; no lanza. Sin webhook no hace nada.
+ */
+async function alertOperational(title, detail = '') {
+  if (!WEBHOOK_URL) return false;
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds: [{
+        title: `⚠️ ${String(title).slice(0, 240)}`,
+        description: String(detail).slice(0, 3800),
+        color: 0xe67e22,
+        timestamp: new Date().toISOString(),
+      }] }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) { logger.warn(`Discord webhook error: ${res.status}`); return false; }
+    return true;
+  } catch (e) {
+    logger.warn(`Discord send failed: ${e.message}`);
+    return false;
+  }
+}
+
+module.exports = { alertTradeSignal, alertTradeResult, alertBotStart, alertOperational };

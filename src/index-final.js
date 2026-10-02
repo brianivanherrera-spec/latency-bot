@@ -22,6 +22,7 @@ const { Logger } = require('./logger');
 const loopMonitor = require('./loop-monitor');
 const config = require('./config');
 const { randomUUID } = require('crypto');
+const crypto = require('crypto');
 
 // DYNAMIC_SIZING: escala automática de order size según balance actual.
 // Variable de entorno: DYNAMIC_SIZE_SCALE="30:3,50:5,100:7,200:10,500:20,1000:50"
@@ -53,7 +54,7 @@ function normCdf(x) {
   return x >= 0 ? (1 + erf) / 2 : (1 - erf) / 2;
 }
 
-const { alertTradeSignal, alertBotStart } = require('./alerts');
+const { alertTradeSignal, alertBotStart, alertOperational } = require('./alerts');
 const signalLogger = require('./signal-logger');
 const phase2Logger = require('./phase2-logger');
 
@@ -413,7 +414,27 @@ setInterval(refresh, 30000);
 </html>`;
 }
 
-const httpServer = http.createServer((req, res) => {
+// Comparación en tiempo constante (se comparan los hash para igualar largos)
+const _secretHash = crypto.createHash('sha256').update(SECRET).digest();
+function isAuthorized(req, url) {
+  const auth = req.headers.authorization || '';
+  const given = auth.startsWith('Bearer ') ? auth.slice(7).trim() : url.searchParams.get('key');
+  if (!given) return false;
+  return crypto.timingSafeEqual(crypto.createHash('sha256').update(given).digest(), _secretHash);
+}
+
+// Cuenta líneas leyendo por stream (antes readFileSync de archivos de cientos de MB)
+function countLines(filePath) {
+  return new Promise((resolve, reject) => {
+    let n = 0;
+    fs.createReadStream(filePath)
+      .on('data', (buf) => { for (let i = 0; i < buf.length; i++) if (buf[i] === 10) n++; })
+      .on('end', () => resolve(n))
+      .on('error', reject);
+  });
+}
+
+const httpServer = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   
   if (url.pathname === '/health') {
@@ -436,8 +457,12 @@ const httpServer = http.createServer((req, res) => {
     }));
     return;
   }
-  
-  if (url.pathname === '/open-snaps' && url.searchParams.get('key') === SECRET) {
+
+  // Todo lo que no es /health pide la clave (antes /phase2-status y /phase2-download
+  // respondían sin clave): ?key=<clave> o header "Authorization: Bearer <clave>"
+  if (!isAuthorized(req, url)) { res.writeHead(401); res.end('Unauthorized'); return; }
+
+  if (url.pathname === '/open-snaps') {
     const file = path.join(process.env.DATA_DIR || '/data', 'open-snaps.jsonl');
     if (!fs.existsSync(file)) { res.writeHead(404); res.end('No open-snaps file yet'); return; }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename=open-snaps.jsonl' });
@@ -445,7 +470,7 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/signals' && url.searchParams.get('key') === SECRET) {
+  if (url.pathname === '/signals') {
     const file = path.join(process.env.DATA_DIR || '/data', 'signals.jsonl');
     if (!fs.existsSync(file)) {
       res.writeHead(404); res.end('No signals file yet'); return;
@@ -458,7 +483,7 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/research' && url.searchParams.get('key') === SECRET) {
+  if (url.pathname === '/research') {
     const file = process.env.RESEARCH_FILE || path.join(process.env.DATA_DIR || '/data', 'market-research.jsonl');
     if (!fs.existsSync(file)) {
       res.writeHead(404); res.end('No research file yet — activar RESEARCH_MODE=true'); return;
@@ -472,7 +497,7 @@ const httpServer = http.createServer((req, res) => {
   }
 
   // PHASE 1: Endpoint para descargar fills.jsonl con T3-T7 latency data
-  if (url.pathname === '/fills' && url.searchParams.get('key') === SECRET) {
+  if (url.pathname === '/fills') {
     const file = path.join(process.env.DATA_DIR || '/data', 'fills.jsonl');
     if (!fs.existsSync(file)) {
       res.writeHead(404); res.end('No fills file yet'); return;
@@ -486,14 +511,14 @@ const httpServer = http.createServer((req, res) => {
   }
 
   // ─── Modo sombra: descargas y reporte ───────────────────────────────────
-  if ((url.pathname === '/shadow-markets' || url.pathname === '/shadow-ticks') && url.searchParams.get('key') === SECRET) {
+  if ((url.pathname === '/shadow-markets' || url.pathname === '/shadow-ticks')) {
     const file = url.pathname === '/shadow-markets' ? SHADOW_MARKETS_FILE : SHADOW_TICKS_FILE;
     if (!fs.existsSync(file)) { res.writeHead(404); res.end('Todavía no hay datos del modo sombra'); return; }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename=${path.basename(file)}` });
     fs.createReadStream(file).pipe(res);
     return;
   }
-  if (url.pathname === '/shadow-report' && url.searchParams.get('key') === SECRET) {
+  if (url.pathname === '/shadow-report') {
     // Corre el reporte en un proceso aparte para no frenar el bot
     const { execFile } = require('child_process');
     const script = path.join(__dirname, '..', 'scripts', 'shadow-report.js');
@@ -505,13 +530,13 @@ const httpServer = http.createServer((req, res) => {
     });
     return;
   }
-  if (url.pathname === '/shadow-status' && url.searchParams.get('key') === SECRET) {
+  if (url.pathname === '/shadow-status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(shadowRef ? shadowRef.getStats() : { enabled: false }));
     return;
   }
 
-  if (url.pathname === '/stats' && url.searchParams.get('key') === SECRET) {
+  if (url.pathname === '/stats') {
     // Resumen liviano sin bajar el log completo: /stats?key=X&days=1
     const days = parseInt(url.searchParams.get('days') || '1');
     const summary = signalLogger.getDailySummary(days);
@@ -520,7 +545,7 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === '/' && url.searchParams.get('key') === SECRET) {
+  if (url.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(getDashboardHTML(SECRET));
     return;
@@ -540,7 +565,7 @@ const httpServer = http.createServer((req, res) => {
       for (const [name, filePath] of Object.entries(files)) {
         if (fs.existsSync(filePath)) {
           const stats = fs.statSync(filePath);
-          const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(l => l.trim()).length;
+          const lines = await countLines(filePath);
           status[name] = {
             exists: true,
             size: (stats.size / 1024).toFixed(2) + ' KB',
@@ -956,7 +981,19 @@ async function main() {
     }, delay);
   }
 
+  let _polyUpdateBusy = false;
   async function actualizarPrecioPolymarket() {
+    if (_polyUpdateBusy) return; // la corrida anterior todavía no terminó
+    _polyUpdateBusy = true;
+    try {
+      await _actualizarPrecioPolymarket();
+    } catch (err) {
+      logger.error(`[POLY] actualizarPrecioPolymarket: ${err?.stack || err?.message || err}`);
+    } finally {
+      _polyUpdateBusy = false;
+    }
+  }
+  async function _actualizarPrecioPolymarket() {
     // Cambio de mercado por horario. Antes solo se soltaba el mercado cuando Gamma
     // lo marcaba resuelto o cuando llegaba una señal post-cierre, y el bot seguía
     // en el mercado viejo 1-107s después de la apertura del nuevo.
@@ -968,6 +1005,7 @@ async function main() {
       const fmtRes = (s, c) => `strike=$${s.toFixed(2)} close=$${c.toFixed(2)} (${c - s >= 0 ? '+' : ''}${(c - s).toFixed(2)}) → ${c >= s ? 'UP' : 'DOWN'}`;
       const mkt = cachedMarket;
       const mktEndMs = new Date(mkt.endDate).getTime();
+      const closeCtx = closeMarketAtRotation(mkt);
       const bnS = mkt.strikePrice || mkt.market_strike_price_captured_at_open;
       const bnC = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : signal.getStats()?.lastPrice;
       // El precio de Chainlink del instante de cierre llega ~1.5 s tarde: esperar 3 s para
@@ -982,6 +1020,11 @@ async function main() {
         const parts = [];
         if (twS != null && twC != null) parts.push(`TWAP60 ${fmtRes(twS, twC)}`);
         saveOpenSnaps(mkt, rtS != null && rtC != null ? (rtC >= rtS ? 'UP' : 'DOWN') : null, rtS, rtC);
+        // Resultado para el cierre: TWAP RTDS (fuente de Polymarket) > TWAP propio > spot Chainlink
+        const win = (a, b) => (a != null && b != null) ? (b >= a ? 'UP' : 'DOWN') : null;
+        const winRt = win(rtS, rtC), winTw = win(twS, twC), winCl = win(clS, clC);
+        finishMarketClose(closeCtx, winRt || winTw || winCl,
+          winRt ? 'rtds_twap60' : winTw ? 'twap60_propio' : winCl ? 'chainlink_spot' : null);
         if (rtS != null && rtC != null) parts.push(`RTDS-TWAP60 ${fmtRes(rtS, rtC)}`);
         if (clS != null && clC != null) parts.push(`CL spot ${fmtRes(clS, clC)}`);
         if (bnS && bnC) parts.push(`BN−base ${fmtRes(bnS, bnVsStrike(mkt, bnC))} (aprox., strike ${mkt.strike_source || 'n/a'})`);
@@ -1145,7 +1188,7 @@ async function main() {
 
     if (!cachedMarket?.gammaId) return;
     try {
-      const res = await fetch(`https://gamma-api.polymarket.com/markets/${cachedMarket.gammaId}`);
+      const res = await fetch(`https://gamma-api.polymarket.com/markets/${cachedMarket.gammaId}`, { signal: AbortSignal.timeout(3000) });
       if (!res.ok) {
         logger.warn(`[POLY] Gamma API error: ${res.status}`);
         return;
@@ -1254,10 +1297,6 @@ async function main() {
       lastLoggedPolyYes = yes;
       lastLoggedPolyAt = now;
     }
-  });
-
-  polyWs.onResolved((winner) => {
-    logger.info(`[POLY-WS] Mercado resuelto (${winner}) — esperando transición natural`);
   });
 
   // MARKET RESOLUTION TRACKER — guarda señales del mercado y muestra resolución al cerrar
@@ -1410,82 +1449,90 @@ async function main() {
     });
   };
 
-  // Mostrar resumen al cerrar el mercado
-  const logMarketResolution = (winner) => {
-    if (marketSignalLog.length === 0) return;
-    const upSignals = marketSignalLog.filter(s => s.direction === 'UP').length;
-    const downSignals = marketSignalLog.filter(s => s.direction === 'DOWN').length;
-    const correctSignals = marketSignalLog.filter(s => s.direction === winner).length;
-    const skippedCorrect = marketSignalLog.filter(s => s.direction === winner && s.skipReason).length;
+  // Mostrar resumen al cerrar el mercado (winner = 'UP' | 'DOWN')
+  const logMarketResolution = (winner, signals) => {
+    if (!signals.length) return;
+    const upSignals = signals.filter(s => s.direction === 'UP').length;
+    const downSignals = signals.filter(s => s.direction === 'DOWN').length;
+    const correctSignals = signals.filter(s => s.direction === winner).length;
+    const skippedCorrect = signals.filter(s => s.direction === winner && s.skipReason);
     logger.info(`[MARKET-RESOLUTION] ✅ Mercado cerró: ${winner}`);
-    logger.info(`[MARKET-RESOLUTION] Señales UP: ${upSignals} | DOWN: ${downSignals} | Correctas: ${correctSignals}/${marketSignalLog.length}`);
-    if (skippedCorrect > 0) {
-      logger.warn(`[MARKET-RESOLUTION] ⚠️ ${skippedCorrect} señales correctas bloqueadas:`);
-      marketSignalLog.filter(s => s.direction === winner && s.skipReason).forEach(s => {
+    logger.info(`[MARKET-RESOLUTION] Señales UP: ${upSignals} | DOWN: ${downSignals} | Correctas: ${correctSignals}/${signals.length}`);
+    if (skippedCorrect.length > 0) {
+      logger.warn(`[MARKET-RESOLUTION] ⚠️ ${skippedCorrect.length} señales correctas bloqueadas:`);
+      skippedCorrect.forEach(s => {
         logger.warn(`[MARKET-RESOLUTION]   ${s.direction} Z:${s.zscore} book:${s.bookImb || '-'} → SKIP: ${s.skipReason}`);
       });
     }
-    // Limpiar para el próximo mercado
-    marketSignalLog.length = 0;
+  };
+
+  // Cierre del mercado. Antes corría solo en polyWs.onResolved, que en la práctica no llega
+  // ([MKT] markets=50/0: endMarket nunca corría y marketSignalLog crecía sin vaciarse).
+  // Ahora lo dispara la rotación por horario con el objeto del mercado viejo, en dos pasos:
+  // closeMarketAtRotation (sincrónico, antes de abrir el siguiente) y finishMarketClose
+  // cuando se conoce el resultado (TWAP de Chainlink del cierre, ~3 s después).
+  const closedMarketIds = new Set();
+  const closeMarketAtRotation = (mkt) => {
+    const id = mkt?.conditionId || mkt?.gammaId;
+    if (!id || closedMarketIds.has(id)) return null;
+    closedMarketIds.add(id);
+    if (closedMarketIds.size > 50) closedMarketIds.delete(closedMarketIds.values().next().value);
+    const tw30 = clRTDS.getLatestTWAP(30); const tw60 = clRTDS.getLatestTWAP(60);
+    const recRef = mRecorder.endMarket({ resolution: null, resolution_price: null,
+      resolution_ts: Date.now(), twap_30_final: tw30?.value_num ?? null,
+      twap_60_final: tw60?.value_num ?? null, received_ts: Date.now() });
+    const ctx = {
+      mkt, recRef,
+      signals: marketSignalLog.splice(0), // vacía el log para el mercado nuevo
+      fill: marketFillData,
+      book: polyWs.getBookSnapshot(),
+      yes: livePolyYes, no: livePolyNo,
+      btc: signal.getStats()?.lastPrice || null,
+      ts: Date.now(),
+    };
+    marketFillData = null;
+    return ctx;
+  };
+  const finishMarketClose = (ctx, winner, winnerSource) => {
+    if (!ctx) return;
+    const { mkt } = ctx;
+    if (!winner) {
+      winner = (ctx.yes ?? 0.5) >= 0.5 ? 'UP' : 'DOWN';
+      winnerSource = 'polymarket_precio';
+    }
+    mRecorder.appendResolution(ctx.recRef, { resolution: winner, resolution_source: winnerSource });
+    logMarketResolution(winner, ctx.signals);
+    if (mkt?.gammaId) {
+      let position_result = null;
+      if (ctx.fill) {
+        const filledPrice = ctx.fill.filled_price;
+        const won = ctx.fill.filled_direction === winner;
+        position_result = ((won ? 1 : 0) - filledPrice) / filledPrice * 100;
+      }
+      phase2Logger.logBotEvent('MARKET_END', {
+        market_id: mkt.yesTokenId,
+        market_start_ms: mkt.startTime || null,
+        market_end_ms: mkt.endTime || null,
+        event_timestamp_ms: ctx.ts,
+        market_resolution: winner === 'UP' ? 'YES' : 'NO',
+        resolution_source: winnerSource,
+        yes_price_snapshot: ctx.yes,
+        no_price_snapshot: ctx.no,
+        yes_bid_snapshot: ctx.book?.yes_bid,
+        yes_ask_snapshot: ctx.book?.yes_ask,
+        no_bid_snapshot: ctx.book?.no_bid,
+        no_ask_snapshot: ctx.book?.no_ask,
+        btc_price_snapshot: ctx.btc,
+        position_result,
+      });
+      phase2Logger.updateMarketStats(true, ctx.signals.length > 0);
+    }
   };
 
   polyWs.onResolved((winner) => {
-    logger.info(`[POLY-WS] Mercado resuelto (${winner}) — esperando transición natural`);
-    // ── MarketRecorder: fin del mercado ──────────────────────────────────────
-    { const tw30 = clRTDS.getLatestTWAP(30); const tw60 = clRTDS.getLatestTWAP(60);
-      mRecorder.endMarket({ resolution: winner, resolution_price: null,
-        resolution_ts: Date.now(), twap_30_final: tw30?.value_num ?? null,
-        twap_60_final: tw60?.value_num ?? null, received_ts: Date.now() }); }
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // PHASE 2: Log MARKET_END
-    if (cachedMarket?.gammaId) {
-      const bookSnapEnd = polyWs.getBookSnapshot();
-
-      // Calculate position_result if there was a FILL
-      let position_result = null;
-      if (marketFillData) {
-        const resolutionPrice = winner === 'YES' ? 1.0 : 0.0;
-        const filledPrice = marketFillData.filled_price;
-        const direction = marketFillData.filled_direction;
-
-        if (direction === 'UP') {
-          position_result = ((resolutionPrice - filledPrice) / filledPrice) * 100;
-        } else {
-          const noResolutionPrice = 1.0 - resolutionPrice;
-          const noFilledPrice = 1.0 - filledPrice;
-          position_result = ((noResolutionPrice - noFilledPrice) / noFilledPrice) * 100;
-        }
-      }
-
-      phase2Logger.logBotEvent('MARKET_END', {
-        market_id: cachedMarket?.yesTokenId,
-        market_start_ms: cachedMarket?.startTime || null,
-        market_end_ms: cachedMarket?.endTime || null,
-        event_timestamp_ms: Date.now(),
-        market_resolution: winner,
-        yes_price_snapshot: livePolyYes,
-        no_price_snapshot: livePolyNo,
-        yes_bid_snapshot: bookSnapEnd?.yes_bid,
-        yes_ask_snapshot: bookSnapEnd?.yes_ask,
-        no_bid_snapshot: bookSnapEnd?.no_bid,
-        no_ask_snapshot: bookSnapEnd?.no_ask,
-        btc_price_snapshot: signal.getStats()?.lastPrice || null,
-        position_result: position_result,
-      });
-
-      // Update market stats: this market is ending
-      phase2Logger.updateMarketStats(true, marketSignalLog.length > 0);
-
-      // Reset fill data for next market
-      marketFillData = null;
-    }
-
-    if (polyWs.onResolved2) polyWs.onResolved2(winner);
+    // Solo informativo: el cierre lo hace la rotación por horario (closeMarketAtRotation)
+    logger.info(`[POLY-WS] Mercado resuelto (${winner}) — el cierre lo registra la rotación`);
   });
-
-  // Hook al resolver — mostrar resolución
-  polyWs.onResolved2 = logMarketResolution;
 
 
   // Conectar WS de Polymarket en paralelo
@@ -2196,6 +2243,20 @@ async function main() {
     // del 24/07: entradas duplicadas con 2-54ms de diferencia).
     // El cooldown (lastTradeTime) NO se arranca acá: si la entrada se descarta más
     // abajo (precio, tamaño), antes igual bloqueaba 30s de señales sin haber operado.
+    // Snapshot del mercado de ESTA entrada: con DUAL_FILL_ORDER la orden espera hasta el
+    // cierre y mientras tanto la rotación reasigna cachedMarket al mercado siguiente (o null).
+    // Todo el flujo de entrada (filtros, orden, tracker, telemetría) usa este snapshot.
+    if (!cachedMarket?.endDate || !cachedMarket?.yesTokenId) return;
+    const mkt = {
+      conditionId: cachedMarket.conditionId, gammaId: cachedMarket.gammaId,
+      endDate: cachedMarket.endDate, question: cachedMarket.question,
+      startTime: cachedMarket.startTime, endTime: cachedMarket.endTime,
+      strikePrice: cachedMarket.strikePrice,
+      market_strike_price_captured_at_open: cachedMarket.market_strike_price_captured_at_open,
+      strike_source: cachedMarket.strike_source, strike_basis: cachedMarket.strike_basis,
+      yesTokenId: cachedMarket.yesTokenId, noTokenId: cachedMarket.noTokenId,
+      marketSlug: cachedMarket.marketSlug,
+    };
     const posId = `POS_${Date.now()}`;
     activePositions.set(posId, {
       exposure: 0, openTime: now,
@@ -2292,7 +2353,7 @@ async function main() {
     // Para DOWN: BUY NO tokens   (comprar NO esperando que suba a $1 cuando BTC baja)
     // NUNCA SELL — el bot no tiene tokens previos para vender
     const side = 'BUY';
-    const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
+    const tokenId = sig.direction === 'UP' ? mkt.yesTokenId : mkt.noTokenId;
     const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo; // solo para filtros y logs
 
     // PRECIO DE ORDEN = siempre del book real (bestAsk del WS, 0ms latencia)
@@ -2378,7 +2439,7 @@ async function main() {
       if (!shadow) {
         if (!global._fairGateWarned) { logger.warn('[FAIR-GATE] SHADOW_MODE=false — sin modelo, el filtro no se aplica'); global._fairGateWarned = true; }
       } else {
-        const g = shadow.evaluateEntry({ gammaId: cachedMarket?.gammaId, direction: sig.direction, ask: price ?? bestAskWS ?? priceRaw, mode: fairGate });
+        const g = shadow.evaluateEntry({ gammaId: mkt?.gammaId, direction: sig.direction, ask: price ?? bestAskWS ?? priceRaw, mode: fairGate });
         if (!g.ok) {
           // Máximo un log cada 10s (las señales se repiten cada 500ms)
           if (now - (global._fairGateLogTs || 0) > 10000) {
@@ -2410,7 +2471,7 @@ async function main() {
       move: sig.movePct,
       zscore: sig.zScore,
       segsRestantes,
-      market: cachedMarket,
+      market: mkt,
       size,
       exposure: finalExposure,
     }).catch(e => logger.warn(`Discord alert failed: ${e.message}`));
@@ -2433,10 +2494,10 @@ async function main() {
     });
 
     // Capturar tokenIds AHORA en variables locales inmutables
-    // antes de pasarlos al closure — cachedMarket es una referencia
+    // antes de pasarlos al closure — mkt es una referencia
     // que puede cambiar al siguiente mercado antes de que corran t1/t2/t5
-    const snapshotYesTokenId = cachedMarket?.yesTokenId ?? null;
-    const snapshotNoTokenId  = cachedMarket?.noTokenId  ?? null;
+    const snapshotYesTokenId = mkt?.yesTokenId ?? null;
+    const snapshotNoTokenId  = mkt?.noTokenId  ?? null;
 
     // Registrar señal en volumen persistente
     const utcHour = new Date().getUTCHours();
@@ -2446,13 +2507,13 @@ async function main() {
       direction: sig.direction,
       price,
       size,
-      market: cachedMarket,
+      market: mkt,
       sig,
       utcHour,
       btcPrice: btcPriceAtSignal,
       bookShadow,
       getPolyPrice: (dir) => {
-        // Usar tokenIds capturados al momento de apertura — no cachedMarket
+        // Usar tokenIds capturados al momento de apertura — no mkt
         // que puede ya apuntar al siguiente mercado cuando corran t1/t2/t5
         const tokenId = dir === 'UP' ? snapshotYesTokenId : snapshotNoTokenId;
         if (tokenId) {
@@ -2468,9 +2529,9 @@ async function main() {
       // de la señal — yes_bid_size, yes_ask_size, no_bid_size, no_ask_size,
       // vol_imbalance — para analizar si el order flow confirma la dirección.
       getBookSnapshot: async () => {        let snap = polyWs.getBookSnapshot();
-        if (!snap && cachedMarket?.yesTokenId && cachedMarket?.noTokenId) {
+        if (!snap && mkt?.yesTokenId && mkt?.noTokenId) {
           // WS no tiene el book todavía — pedir via HTTP como fallback
-          const depth = await poly.fetchBookDepth(cachedMarket.yesTokenId, cachedMarket.noTokenId);
+          const depth = await poly.fetchBookDepth(mkt.yesTokenId, mkt.noTokenId);
           if (depth) {
             const totalBid = depth.yesBid + depth.noBid;
             snap = {
@@ -2499,7 +2560,7 @@ async function main() {
         : null,
       // Datos del CLOB al momento de la señal — para análisis posterior
       getClobSnapshot: async () => {
-        const tokenId = sig.direction === 'UP' ? cachedMarket?.yesTokenId : cachedMarket?.noTokenId;
+        const tokenId = sig.direction === 'UP' ? mkt?.yesTokenId : mkt?.noTokenId;
         if (!tokenId || !poly.clobClient) return null;
         try {
           const [spreadRes, tradesRes] = await Promise.allSettled([
@@ -2562,14 +2623,16 @@ async function main() {
         ? ((btcPrice1s - btcPriceAtSignal) / btcPriceAtSignal * 100).toFixed(3)
         : '?';
       // Strike (TWAP Chainlink) contra Binance menos la base, en la misma escala
-      const monStrike = cachedMarket?.strikePrice || cachedMarket?.market_strike_price_captured_at_open || null;
-      const entryAdj = bnVsStrike(cachedMarket, btcPriceAtSignal);
+      const monStrike = mkt?.strikePrice || mkt?.market_strike_price_captured_at_open || null;
+      const entryAdj = bnVsStrike(mkt, btcPriceAtSignal);
       const vsStrike = monStrike && entryAdj ? `${entryAdj - monStrike >= 0 ? '+' : ''}${(entryAdj - monStrike).toFixed(2)}` : '?';
-      logger.info(`[SIGNAL-MONITOR] ${posId} | Strike:$${monStrike?.toFixed(2) || '?'} (${cachedMarket?.strike_source || '?'}) | Entry-BTC:$${btcPriceAtSignal.toLocaleString()} (−base vs strike: ${vsStrike}) | BTC@1s:$${btcPrice1s?.toLocaleString() || '?'} | Change:${changePct}% | Pred:${sig.direction} | Resolved:?`);
+      logger.info(`[SIGNAL-MONITOR] ${posId} | Strike:$${monStrike?.toFixed(2) || '?'} (${mkt?.strike_source || '?'}) | Entry-BTC:$${btcPriceAtSignal.toLocaleString()} (−base vs strike: ${vsStrike}) | BTC@1s:$${btcPrice1s?.toLocaleString() || '?'} | Change:${changePct}% | Pred:${sig.direction} | Resolved:?`);
     }, 1000);
 
     // ✅ Ejecutar orden real (solo en LIVE)
     if (!config.DRY_RUN) {
+      // Fuera del try: el catch lo usa (antes era const dentro del try → ReferenceError)
+      let depthInfo = null;
       try {
         // Determinar tipo de orden según el número de entrada en este mercado
         // Entrada 0 (primera) → FAK (instantáneo)
@@ -2600,18 +2663,18 @@ async function main() {
         // ───────────────────────────────────────────────────────────────────
 
         // PHASE 2: Log ORDER_SENT
-        if (cachedMarket?.gammaId) {
+        if (mkt?.gammaId) {
           const bookSnap = polyWs.getBookSnapshot();
           phase2Logger.logBotEvent('ORDER_SENT', {
             order_id: posId,
             signal_id: sig._signal_id || null,
-            market_id: cachedMarket?.yesTokenId,
-            market_start_ms: cachedMarket?.startTime || null,
-            market_end_ms: cachedMarket?.endTime || null,
+            market_id: mkt?.yesTokenId,
+            market_start_ms: mkt?.startTime || null,
+            market_end_ms: mkt?.endTime || null,
             event_timestamp_ms: t4_order_sent_ms,
             btc_price_snapshot: btcPriceNow,
-            official_strike_price: cachedMarket?.strikePrice || null,
-            bot_captured_strike_price: cachedMarket?.market_strike_price_captured_at_open || null,
+            official_strike_price: mkt?.strikePrice || null,
+            bot_captured_strike_price: mkt?.market_strike_price_captured_at_open || null,
             yes_price_snapshot: livePolyYes,
             no_price_snapshot: livePolyNo,
             yes_bid_snapshot: bookSnap?.yes_bid,
@@ -2630,7 +2693,7 @@ async function main() {
           : null;
 
         // Profundidad real del libro antes de la orden
-        const depthInfo = polyWs.getDepthInfo?.(tokenId, size);
+        depthInfo = polyWs.getDepthInfo?.(tokenId, size) ?? null;
         if (depthInfo) {
           logger.info(`[DEPTH] bestAsk=$${depthInfo.bestAsk?.toFixed(2)} | avail@1tick=${depthInfo.availableAt1Tick} | avail@2ticks=${depthInfo.availableAt2Ticks} | vwap=$${depthInfo.vwap} | slippage=${(depthInfo.expectedSlippage * 100).toFixed(2)}% | fillable=${depthInfo.fillable}`);
         }
@@ -2641,13 +2704,13 @@ async function main() {
 
         // T5: order accepted (when placeLimitOrder returns)
         const orderResult = await poly.placeLimitOrder({
-          marketId: cachedMarket.conditionId,
+          marketId: mkt.conditionId,
           tokenId,
           side: 'BUY',
           price,
           size,
-          marketQuestion: cachedMarket.question,
-          marketEndTs: new Date(cachedMarket.endDate).getTime(),
+          marketQuestion: mkt.question,
+          marketEndTs: new Date(mkt.endDate).getTime(),
           forcedOrderType,
         });
 
@@ -2697,9 +2760,9 @@ async function main() {
             btc_price_entry: btcPriceAtSignal,
             poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
             signal_direction: sig.direction,
-            market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
-            market_start_time: cachedMarket.startTime || null,
-            market_end_time: cachedMarket.endTime || null,
+            market_strike_price: mkt.strikePrice || mkt.market_strike_price_captured_at_open || btcPriceAtSignal,
+            market_start_time: mkt.startTime || null,
+            market_end_time: mkt.endTime || null,
             // PHASE 1: Latency timestamps
             t3_price_decision_ms: t3_ms,
             t4_order_sent_ms,
@@ -2710,18 +2773,18 @@ async function main() {
           });
 
           // PHASE 2: Log NO_FILL
-          if (cachedMarket?.gammaId) {
+          if (mkt?.gammaId) {
             const bookSnap = polyWs.getBookSnapshot();
             phase2Logger.logBotEvent('NO_FILL', {
               order_id: posId,
               signal_id: sig._signal_id || null,
-              market_id: cachedMarket?.yesTokenId,
-              market_start_ms: cachedMarket?.startTime || null,
-              market_end_ms: cachedMarket?.endTime || null,
+              market_id: mkt?.yesTokenId,
+              market_start_ms: mkt?.startTime || null,
+              market_end_ms: mkt?.endTime || null,
               event_timestamp_ms: Date.now(),
               btc_price_snapshot: btcPriceNow,
-              official_strike_price: cachedMarket?.strikePrice || null,
-              bot_captured_strike_price: cachedMarket?.market_strike_price_captured_at_open || null,
+              official_strike_price: mkt?.strikePrice || null,
+              bot_captured_strike_price: mkt?.market_strike_price_captured_at_open || null,
               yes_price_snapshot: livePolyYes,
               no_price_snapshot: livePolyNo,
               yes_bid_snapshot: bookSnap?.yes_bid,
@@ -2790,18 +2853,18 @@ async function main() {
         };
 
         // PHASE 2: Log FILL
-        if (cachedMarket?.gammaId) {
+        if (mkt?.gammaId) {
           const bookSnap = polyWs.getBookSnapshot();
           phase2Logger.logBotEvent('FILL', {
             order_id: posId,
             signal_id: sig._signal_id || null,
-            market_id: cachedMarket?.yesTokenId,
-            market_start_ms: cachedMarket?.startTime || null,
-            market_end_ms: cachedMarket?.endTime || null,
+            market_id: mkt?.yesTokenId,
+            market_start_ms: mkt?.startTime || null,
+            market_end_ms: mkt?.endTime || null,
             event_timestamp_ms: t7_final_ms,
             btc_price_snapshot: btcPriceNow,
-            official_strike_price: cachedMarket?.strikePrice || null,
-            bot_captured_strike_price: cachedMarket?.market_strike_price_captured_at_open || null,
+            official_strike_price: mkt?.strikePrice || null,
+            bot_captured_strike_price: mkt?.market_strike_price_captured_at_open || null,
             yes_price_snapshot: livePolyYes,
             no_price_snapshot: livePolyNo,
             yes_bid_snapshot: bookSnap?.yes_bid,
@@ -2829,9 +2892,9 @@ async function main() {
           btc_price_entry: btcPriceAtSignal,
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
-          market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
-          market_start_time: cachedMarket.startTime || null,
-          market_end_time: cachedMarket.endTime || null,
+          market_strike_price: mkt.strikePrice || mkt.market_strike_price_captured_at_open || btcPriceAtSignal,
+          market_start_time: mkt.startTime || null,
+          market_end_time: mkt.endTime || null,
           // PHASE 1: Latency timestamps
           t3_price_decision_ms: t3_ms,
           t4_order_sent_ms,
@@ -2861,13 +2924,13 @@ async function main() {
 
         // Fix 2: tracker solo se abre DESPUÉS de fill confirmado
         tracker.openPosition({
-          marketId: cachedMarket.conditionId,
-          gammaId: cachedMarket.gammaId,
-          marketQuestion: cachedMarket.question,
+          marketId: mkt.conditionId,
+          gammaId: mkt.gammaId,
+          marketQuestion: mkt.question,
           side,
           price: actualPrice,
           size: actualSize,
-          endDate: cachedMarket.endDate,
+          endDate: mkt.endDate,
           posId,
           tokenId,
           tokenOutcome: sig.direction === 'UP' ? 'YES' : 'NO',
@@ -2882,7 +2945,7 @@ async function main() {
 
         // Liberar el slot al cierre del mercado: la posición ya no puede cambiar de
         // resultado, y esperar la resolución de Gamma bloqueaba la apertura del siguiente.
-        const msToMarketEnd = new Date(cachedMarket.endDate).getTime() - Date.now();
+        const msToMarketEnd = new Date(mkt.endDate).getTime() - Date.now();
         setTimeout(() => activePositions.delete(posId), Math.max(0, msToMarketEnd));
         // Fallback de seguridad por si endDate fuera inválido
         setTimeout(() => activePositions.delete(posId), 10 * 60 * 1000);
@@ -2907,9 +2970,9 @@ async function main() {
           btc_price_entry: btcPriceAtSignal,
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
-          market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
-          market_start_time: cachedMarket.startTime || null,
-          market_end_time: cachedMarket.endTime || null,
+          market_strike_price: mkt.strikePrice || mkt.market_strike_price_captured_at_open || btcPriceAtSignal,
+          market_start_time: mkt.startTime || null,
+          market_end_time: mkt.endTime || null,
           // PHASE 1: Latency tracking (may be partial)
           t3_price_decision_ms: t3_err_ms,
           t4_order_sent_ms: latencyDataErr?.t4_order_sent_ms || null,
@@ -2967,9 +3030,9 @@ async function main() {
           btc_price_entry: btcPriceAtSignal,
           poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
           signal_direction: sig.direction,
-          market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
-          market_start_time: cachedMarket.startTime || null,
-          market_end_time: cachedMarket.endTime || null,
+          market_strike_price: mkt.strikePrice || mkt.market_strike_price_captured_at_open || btcPriceAtSignal,
+          market_start_time: mkt.startTime || null,
+          market_end_time: mkt.endTime || null,
           // PHASE 1: Simulated latency timestamps
           t3_price_decision_ms: t3_paper_ms,
           t4_order_sent_ms: t4_paper_ms,
@@ -3006,9 +3069,9 @@ async function main() {
         btc_price_entry: btcPriceAtSignal,
         poly_price_entry: sig.getPolyPrice?.() || sig._initialPolyPrice,
         signal_direction: sig.direction,
-        market_strike_price: cachedMarket.strikePrice || cachedMarket.market_strike_price_captured_at_open || btcPriceAtSignal,
-        market_start_time: cachedMarket.startTime || null,
-        market_end_time: cachedMarket.endTime || null,
+        market_strike_price: mkt.strikePrice || mkt.market_strike_price_captured_at_open || btcPriceAtSignal,
+        market_start_time: mkt.startTime || null,
+        market_end_time: mkt.endTime || null,
         // PHASE 1: Simulated latency timestamps
         t3_price_decision_ms: t3_paper_ms,
         t4_order_sent_ms: t4_paper_ms,
@@ -3020,13 +3083,13 @@ async function main() {
       signalLogger.clearLatencyTracking(posId);
 
       tracker.openPosition({
-        marketId: cachedMarket.conditionId,
-        gammaId: cachedMarket.gammaId,
-        marketQuestion: cachedMarket.question,
+        marketId: mkt.conditionId,
+        gammaId: mkt.gammaId,
+        marketQuestion: mkt.question,
         side,
         price,
         size,
-        endDate: cachedMarket.endDate,
+        endDate: mkt.endDate,
         posId,
         tokenOutcome: sig.direction === 'UP' ? 'YES' : 'NO',
         direction: sig.direction,
@@ -3037,7 +3100,7 @@ async function main() {
 
       // Antes el slot se liberaba a los 8 min fijos: con MAX_ACTIVE_POSITIONS=1
       // bloqueaba el mercado siguiente entero. Ahora se libera al cierre del mercado.
-      const msToMarketEnd = new Date(cachedMarket.endDate).getTime() - Date.now();
+      const msToMarketEnd = new Date(mkt.endDate).getTime() - Date.now();
       setTimeout(() => activePositions.delete(posId), Math.max(0, msToMarketEnd));
       setTimeout(() => activePositions.delete(posId), 10 * 60 * 1000);
     }
@@ -3133,8 +3196,28 @@ async function main() {
 }
 
 main().catch(err => {
-  logger.error(`Fatal: ${err.message}`);
-  process.exit(1);
+  logger.error(`Fatal: ${err?.stack || err?.message || err}`);
+  alertOperational('Bot detenido (error fatal)', err?.stack || err?.message || String(err))
+    .finally(() => process.exit(1));
+});
+
+// Errores no atrapados: antes no había handler. Una promesa rechazada se loguea y avisa
+// (sin cortar el bot); una excepción sincrónica deja el proceso en estado dudoso → salir
+// y que Railway lo reinicie.
+let _lastRejectionAlert = 0;
+process.on('unhandledRejection', (reason) => {
+  const txt = reason?.stack || reason?.message || String(reason);
+  logger.error(`[UNHANDLED-REJECTION] ${txt}`);
+  if (Date.now() - _lastRejectionAlert > 10 * 60 * 1000) { // máx. una alerta cada 10 min
+    _lastRejectionAlert = Date.now();
+    alertOperational('Promesa rechazada sin manejar', txt).catch(() => {});
+  }
+});
+process.on('uncaughtException', (err) => {
+  logger.error(`[UNCAUGHT-EXCEPTION] ${err?.stack || err}`);
+  alertOperational('Bot detenido (excepción no atrapada)', err?.stack || String(err))
+    .finally(() => process.exit(1));
+  setTimeout(() => process.exit(1), 4000).unref();
 });
 
 // PHASE 1: Cleanup on exit

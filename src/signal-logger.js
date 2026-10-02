@@ -291,9 +291,11 @@ function logSignalClose(posId, result, pnl, btcPriceNow) {
   ensureDir();
 
   // Actualizar consecutive losses
+  // Solo WIN/LOSS mueven la racha: un NO_FILL no es una pérdida (antes sumaba y
+  // disparaba pausas falsas del circuit breaker)
   if (result === 'WIN') {
     consecutiveLosses = 0;
-  } else {
+  } else if (result === 'LOSS') {
     consecutiveLosses++;
   }
 
@@ -394,7 +396,9 @@ function updateStats() {
     if (!fs.existsSync(SIGNAL_FILE)) return;
     const lines = fs.readFileSync(SIGNAL_FILE, 'utf8').trim().split('\n').filter(Boolean);
     const records = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
-    const closed = records.filter(r => r.result !== null);
+    // Solo trades resueltos: NO_FILL (y registros sin resultado) no son ganadas ni perdidas
+    const closed = records.filter(r => r.result === 'WIN' || r.result === 'LOSS');
+    const noFills = records.filter(r => r.result === 'NO_FILL').length;
     if (!closed.length) return;
 
     const wins = closed.filter(r => r.result === 'WIN');
@@ -455,7 +459,8 @@ function updateStats() {
       totalSignals: records.length,
       closedTrades: closed.length,
       wins:         wins.length,
-      losses:       closed.length - wins.length,
+      losses:       closed.filter(r => r.result === 'LOSS').length,
+      noFills,
       winRate:      (wins.length / closed.length * 100).toFixed(1) + '%',
       totalPnL:     totalPnL.toFixed(2),
       edgeDecay: withDecay.length >= 5 ? {
@@ -491,9 +496,9 @@ function getStats() {
 // daysBack: cuántos días hacia atrás incluir (default 1 = últimas 24hs)
 function getDailySummary(daysBack = 1) {
   try {
-    if (!fs.existsSync(SIGNALS_FILE)) return { error: 'no signals file' };
+    if (!fs.existsSync(SIGNAL_FILE)) return { error: 'no signals file' };
     const cutoff = new Date(Date.now() - daysBack * 24 * 3600 * 1000).toISOString();
-    const lines = fs.readFileSync(SIGNALS_FILE, 'utf8').split('\n').filter(Boolean);
+    const lines = fs.readFileSync(SIGNAL_FILE, 'utf8').split('\n').filter(Boolean);
 
     const trades = [];
     for (const line of lines) {
@@ -556,7 +561,7 @@ function updateFillTime(posId, fillTimeMs) {
 
 function _updateFillTime(posId, fillTimeMs) {
   try {
-    const raw = fs.readFileSync(SIGNALS_FILE, 'utf8');
+    const raw = fs.readFileSync(SIGNAL_FILE, 'utf8');
     const lines = raw.split('\n');
     const updated = lines.map(line => {
       if (!line.trim()) return line;
@@ -569,7 +574,7 @@ function _updateFillTime(posId, fillTimeMs) {
       } catch (parseErr) { }
       return line;
     });
-    fs.writeFileSync(SIGNALS_FILE, updated.join('\n'));
+    fs.writeFileSync(SIGNAL_FILE, updated.join('\n'));
   } catch (e) {
     // Non-critical — no afecta el trading
   }
@@ -832,5 +837,5 @@ module.exports = {
   getConsecutiveLosses, updateFillTime, startTickRecorder, stopTickRecorder,
   logFillTelemetry, getT3Timestamp, recordOrderSent, recordOrderAccepted,
   recordOrderResting, recordOrderFilled, getLatencyTracking, clearLatencyTracking,
-  logMarketTwapFinal, analyzeNoFillReason, correctionDelta, closedPosIds
+  logMarketTwapFinal, analyzeNoFillReason, correctionDelta, closedPosIds, updateStats
 };

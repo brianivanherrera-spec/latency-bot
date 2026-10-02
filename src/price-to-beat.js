@@ -30,7 +30,7 @@ function scan(obj, path = '', out = {}, depth = 0) {
 }
 
 async function getJson(url) {
-  const res = await fetch(url, { headers: { accept: 'application/json' } });
+  const res = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }

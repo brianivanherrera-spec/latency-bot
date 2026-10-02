@@ -96,15 +96,20 @@ class PnLTracker {
     }
     // signals.jsonl (en el volumen) tiene todos los trades cerrados: si registra más que
     // positions.json (sobrescrito por un proceso que arrancó de cero), manda ese
+    // Antes contaba NO_FILL como pérdida (losses = cerrados − ganados) y lo copiaba acá;
+    // ahora stats cuenta solo WIN/LOSS, así que si difiere se reconstruye desde ahí.
     try {
+      signalLogger.updateStats(); // stats.json puede venir del criterio viejo
       const st = signalLogger.getStats();
-      if (st && st.closedTrades > this.wins + this.losses) {
+      if (st && st.closedTrades > 0 && (st.wins !== this.wins || st.losses !== this.losses)) {
+        logger.warn(`[TRACKER] W/L reconstruido desde signals.jsonl (solo WIN/LOSS): antes W:${this.wins} L:${this.losses} P&L ${this.totalPnL.toFixed(2)} → W:${st.wins} L:${st.losses} P&L ${st.totalPnL} | NO_FILL: ${st.noFills ?? 'n/a'}`);
         this.wins = st.wins || 0;
         this.losses = st.losses || 0;
         this.totalPnL = parseFloat(st.totalPnL) || 0;
+        this._wlRebuilt = true;
       }
     } catch (_) {}
-    if (cd && cd.applied.length) this._saveToDisk();
+    if ((cd && cd.applied.length) || this._wlRebuilt) this._saveToDisk();
     if (this.wins + this.losses > 0) {
       logger.info(`✅ Historial restaurado: W:${this.wins} L:${this.losses} | P&L ${this.totalPnL >= 0 ? '+' : ''}$${this.totalPnL.toFixed(2)}`);
     }
@@ -183,7 +188,7 @@ class PnLTracker {
   async _getMarketResult(marketId, gammaId, endDate) {
     try {
       const id = gammaId || marketId;
-      const res = await fetch(`${GAMMA_API}/markets/${id}`);
+      const res = await fetch(`${GAMMA_API}/markets/${id}`, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) {
         logger.warn(`Gamma market fetch failed: ${res.status} for ${id}`);
         return null;
