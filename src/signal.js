@@ -35,10 +35,13 @@ class SignalEngine {
     this.tickFrequency = []; // timestamps para calcular frecuencia
   }
 
-  updatePolyPrice(yesPrice, noPrice) {
+  // source 'gamma': outcomePrices llega con minutos de atraso, así que actualiza el
+  // precio pero no renueva polyUpdatedAt (si no, POLY_PRICE_STALE nunca salta)
+  updatePolyPrice(yesPrice, noPrice, source = 'ws') {
     this.polyYesPrice = yesPrice;
     this.polyNoPrice = noPrice;
-    this.polyUpdatedAt = Date.now();
+    this.polyPriceSource = source;
+    if (source !== 'gamma') this.polyUpdatedAt = Date.now();
   }
 
   process({ price, timestamp, isBuyerMaker, bidQty = 0, askQty = 0, spread = 0 }) {

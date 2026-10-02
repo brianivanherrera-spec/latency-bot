@@ -25,6 +25,13 @@ const ADJUSTMENTS = [
 const RESTORE_MAX_AGE_MIN = parseInt(process.env.RESTORE_MAX_AGE_MIN || '120');
 const PAPER_FEE = config.DRY_RUN ? (parseFloat(process.env.PAPER_FEE_PCT || '0') || 0) / 100 : 0;
 const fee = (notional) => parseFloat((notional * PAPER_FEE).toFixed(4));
+// Comisión taker de Polymarket en mercados cripto: 0.07·p·(1−p) USDC por acción, se paga
+// al comprar. Se aplica al P&L de paper (PAPER_TAKER_FEE=false la apaga); en real ya la
+// cobra el exchange.
+const TAKER_FEE_RATE = parseFloat(process.env.TAKER_FEE_RATE || '0.07');
+const PAPER_TAKER_FEE = config.DRY_RUN && process.env.PAPER_TAKER_FEE !== 'false';
+const takerFee = (p, shares) => PAPER_TAKER_FEE
+  ? parseFloat((TAKER_FEE_RATE * p * (1 - p) * shares).toFixed(4)) : 0;
 
 class PnLTracker {
   constructor() {
@@ -263,7 +270,7 @@ class PnLTracker {
     const won = pos.tokenOutcome === winner;
  
     // Comisión de entrada (paper); cobrar al resolver no paga comisión
-    const entryFee = fee(pos.entryPrice * pos.size);
+    const entryFee = parseFloat((fee(pos.entryPrice * pos.size) + takerFee(pos.entryPrice, pos.size)).toFixed(4));
     let pnl;
     if (won) {
       pnl = parseFloat(((1 - pos.entryPrice) * pos.size - entryFee).toFixed(2));
@@ -285,14 +292,14 @@ class PnLTracker {
  
     const emoji = won ? 'WIN' : 'LOSS';
     logger.info(`[${emoji}] Posicion cerrada: ${pos.id}`);
-    logger.info(`   Resultado: ${winner} | PnL: ${pnl > 0 ? '+' : ''}$${pnl}`);
+    logger.info(`   Resultado: ${winner} | PnL: ${pnl > 0 ? '+' : ''}$${pnl} | comisión $${entryFee.toFixed(4)}`);
     // Log claro para análisis: qué predijo el bot vs cómo resolvió el mercado
     logger.info(`[SIGNAL-RESOLUTION] ${pos.id} | Predicted:${pos.direction || '?'} | Resolved:${winner} | Match:${(pos.direction === 'UP' && winner === 'YES') || (pos.direction === 'DOWN' && winner === 'NO') ? 'YES' : 'NO'}`);
     logger.info(`   P&L Total acumulado: ${this.totalPnL > 0 ? '+' : ''}$${this.totalPnL.toFixed(2)} | W:${this.wins} L:${this.losses}`);
     // Registrar resultado en signal logger
     // Intentar con pos.id y pos.posId (ambos formatos usados)
     const signalId = pos.posId || pos.id;
-    signalLogger.logSignalClose(signalId, won ? 'WIN' : 'LOSS', pnl);
+    signalLogger.logSignalClose(signalId, won ? 'WIN' : 'LOSS', pnl, undefined, { fee_usdc: entryFee });
     if (typeof pos._onClose === 'function') pos._onClose();
     this._saveToDisk();
   }
@@ -307,7 +314,11 @@ class PnLTracker {
   forceClosePosition(posId, pnl, reason, exitNotional = 0) {
     const pos = this.positions.find(p => p.id === posId);
     if (!pos) return;
-    if (PAPER_FEE) pnl = parseFloat((pnl - fee(pos.entryPrice * pos.size) - fee(exitNotional)).toFixed(2));
+    // Venta anticipada: taker al entrar y al salir (precio de salida = exitNotional / size)
+    const exitPx = pos.size ? exitNotional / pos.size : 0;
+    const feeUsdc = parseFloat((fee(pos.entryPrice * pos.size) + fee(exitNotional)
+      + takerFee(pos.entryPrice, pos.size) + (exitNotional ? takerFee(exitPx, pos.size) : 0)).toFixed(4));
+    if (feeUsdc) pnl = parseFloat((pnl - feeUsdc).toFixed(2));
     pos.status = 'CLOSED';
     pos.pnl = pnl;
     pos.closedAt = new Date();
@@ -322,7 +333,7 @@ class PnLTracker {
     logger.info(`   Razón: ${reason} | PnL: ${pnl >= 0 ? '+' : ''}$${pnl}`);
     logger.info(`   P&L Total acumulado: ${this.totalPnL > 0 ? '+' : ''}$${this.totalPnL.toFixed(2)} | W:${this.wins} L:${this.losses}`);
     const signalId = pos.posId || pos.id;
-    signalLogger.logSignalClose(signalId, pnl >= 0 ? 'WIN' : 'LOSS', pnl);
+    signalLogger.logSignalClose(signalId, pnl >= 0 ? 'WIN' : 'LOSS', pnl, undefined, { fee_usdc: feeUsdc });
     if (typeof pos._onClose === 'function') pos._onClose();
     this._saveToDisk();
   }

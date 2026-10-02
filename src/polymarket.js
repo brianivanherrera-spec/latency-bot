@@ -386,7 +386,7 @@ class PolymarketClient {
             const ask = await this._getBestAsk(tokenId);
             if (ask == null) return price;
             const MAX_PRICE_LIMIT_F = parseFloat(process.env.MAX_PRICE_LIMIT || '0.97');
-            const MAX_GTC_ENTRY_ASK_F = parseFloat(process.env.MAX_GTC_ENTRY_ASK || '0.85');
+            const MAX_GTC_ENTRY_ASK_F = config.MAX_GTC_ENTRY_ASK;
             if (ask > MAX_GTC_ENTRY_ASK_F) {
               logger.warn(`[LIVE] ❌ ${forcedOrderType}: bestAsk=$${ask.toFixed(2)} > MAX_GTC_ENTRY_ASK=$${MAX_GTC_ENTRY_ASK_F} — NO_FILL`);
               return null;
@@ -450,7 +450,7 @@ class PolymarketClient {
         // Objetivo: maximizar ganancia real — solo entrar cuando el token cuesta ≤ MAX_GTC_ENTRY_ASK
         // Con $3 de inversión y token a $0.60 → ganancia $0.40 × 5 tokens = $2
         // Con $3 de inversión y token a $0.55 → ganancia $0.45 × 5 tokens = $2.25 ✅
-        const MAX_FAK_PRICE = parseFloat(process.env.MAX_GTC_ENTRY_ASK || '0.85');
+        const MAX_FAK_PRICE = config.MAX_GTC_ENTRY_ASK;
         const FAK_RETRY_MS = parseInt(process.env.FAK_RETRY_MS || '1500');
         const FAK_MAX_ATTEMPTS = parseInt(process.env.FAK_MAX_ATTEMPTS || '10');
 
@@ -1055,7 +1055,7 @@ class PolymarketClient {
         // arrancaría tan caro que la ganancia sería mínima y el riesgo alto.
         // Por ejemplo: bestAsk=$0.97 → ganancia máxima=$0.03/token vs riesgo=$0.97/token
         // Default: 0.85 — si el ask ya está en $0.85+ no vale la pena entrar por GTC
-        const MAX_GTC_ENTRY_ASK = parseFloat(process.env.MAX_GTC_ENTRY_ASK || '0.85');
+        const MAX_GTC_ENTRY_ASK = config.MAX_GTC_ENTRY_ASK;
         if (bestAsk > MAX_GTC_ENTRY_ASK) {
           logger.warn(`[RETRY] ❌ bestAsk=$${bestAsk.toFixed(2)} > MAX_GTC_ENTRY_ASK=$${MAX_GTC_ENTRY_ASK} — ratio riesgo/recompensa malo, cancelando GTC retry → NO_FILL`);
           return { success: false, error: 'ask_too_high', bestAsk, noFill: true };

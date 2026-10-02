@@ -31,6 +31,10 @@ const DECISION_EDGE = parseFloat(process.env.SHADOW_EDGE || '0.05');  // umbral 
 // 8 pts: en 29/09 (180 mercados, ~6.300 señales) mejoró a 5 pts en los tres tramos del día;
 // el modelo sobreestima ~5-10 pts su probabilidad, con 5 pts la ventaja era casi toda ruido.
 const GATE_EDGE = parseFloat(process.env.FAIR_GATE_EDGE || '0.08');
+// FAIR_GATE_FEE=true descuenta la comisión taker (0.07·p·(1−p) por acción) de la ventaja.
+// Default false = como antes.
+const GATE_FEE = process.env.FAIR_GATE_FEE === 'true';
+const GATE_FEE_RATE = parseFloat(process.env.TAKER_FEE_RATE || '0.07');
 const MIN_SECS = parseInt(process.env.SHADOW_MIN_SECS || '10');       // no contar oportunidades con <10s
 // Con P(UP) ≈ 0.50 el modelo no sabe nada (spot ≈ strike al abrir) y la "ventaja" es solo la
 // inclinación del mercado, que resultó informada: en 200 mercados esas entradas acertaron 19%.
@@ -43,7 +47,7 @@ const WINDOW_FROM = parseInt(process.env.SHADOW_WINDOW_FROM || '60');
 const WINDOW_TO = parseInt(process.env.SHADOW_WINDOW_TO || '120');
 const WINDOW_EDGE = parseFloat(process.env.SHADOW_WINDOW_EDGE || '0.05');
 // src: 1 = FAIR del bot con TWAP de Chainlink (cómo resuelve Polymarket), 0 = respaldo con spot de Binance
-const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src'];
+const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src', 'sigma_short_e6', 'sigma_long_e6'];
 
 const rnd = (v, d) => (v == null || !Number.isFinite(v)) ? null : Math.round(v * 10 ** d) / 10 ** d;
 const pnl = (win, price) => win == null || price == null ? null : rnd(win ? 1 - price : -price, 4);
@@ -86,7 +90,7 @@ class Shadow {
       rtdsAtStart: this.rtds?.getLatestTWAP?.(30)?.value_num ?? null,
       rows: [], first: {}, firstConf: {}, firstAgree: {}, firstWindow: null, maxEdge: { UP: null, DOWN: null }, path: {},
       signals: { UP: 0, DOWN: 0 }, firstSignal: { UP: null, DOWN: null }, trades: [],
-      sigmaSum: 0, sigmaN: 0, closed: false, srcCount: [0, 0],
+      sigmaSum: 0, sigmaN: 0, sigmaShortSum: 0, sigmaShortN: 0, sigmaLongSum: 0, sigmaLongN: 0, closed: false, srcCount: [0, 0],
     };
   }
 
@@ -135,8 +139,9 @@ class Shadow {
     // la probabilidad sale sesgada, así que el filtro no deja entrar.
     if (F.src !== 1 && process.env.FAIR_GATE_ALLOW_BINANCE !== 'true') return { ok: false, reason: 'modelo sin Chainlink (usando Binance)' };
     const pSide = direction === 'UP' ? p : 1 - p;
-    const edge = pSide - ask;
-    const txt = `P=${(pSide * 100).toFixed(1)}% ventaja=${(edge * 100).toFixed(1)} pts`;
+    const feeAdj = GATE_FEE ? GATE_FEE_RATE * ask * (1 - ask) : 0;
+    const edge = pSide - ask - feeAdj;
+    const txt = `P=${(pSide * 100).toFixed(1)}% ventaja=${(edge * 100).toFixed(1)} pts${GATE_FEE ? ` (neta de comisión ${(feeAdj * 100).toFixed(1)})` : ''}`;
     if (edge < GATE_EDGE) return { ok: false, p: pSide, edge, reason: `${txt} < ${(GATE_EDGE * 100).toFixed(0)} pts` };
     if (mode === 'agree' && ask < 0.5) return { ok: false, p: pSide, edge, reason: `${txt} pero precio $${ask.toFixed(3)} < 0.50 (lado que el mercado no favorece)` };
     return { ok: true, p: pSide, edge, reason: txt };
@@ -170,7 +175,7 @@ class Shadow {
         const r = this.fairFn(m.gammaId, now);
         if (r && r.p != null && Number.isFinite(r.p)) {
           if (r.src === 'chainlink_twap' && r.strike) { m.strike = r.strike; m.strikeSource = 'chainlink_twap_60s'; }
-          return { p: r.p, sigma: r.sigma ?? null, src: r.src === 'chainlink_twap' ? 1 : 0 };
+          return { p: r.p, sigma: r.sigma ?? null, sigmaShort: r.sigmaShort ?? null, sigmaLong: r.sigmaLong ?? null, src: r.src === 'chainlink_twap' ? 1 : 0 };
         }
       } catch (e) { this.stats.errors++; }
     }
@@ -179,7 +184,7 @@ class Shadow {
     if (!K || !fresh) return null;
     const sigma = this.fv.sigma(now);
     const p = probUp(this.fv.lastPrice, K, (m.endTs - now) / 1000, sigma);
-    return p == null ? null : { p, sigma, src: 0 };
+    return p == null ? null : { p, sigma, sigmaShort: null, sigmaLong: sigma, src: 0 };
   }
 
   _pNow(m, now) { return this._fair(m, now)?.p ?? null; }
@@ -208,7 +213,10 @@ class Shadow {
     const imb = same ? (this.poly.getDepthImbalance?.()?.imb ?? null) : null;
 
     const t = Math.round((now - m.startTs) / 1000);
-    m.rows.push([t, rnd(T, 1), rnd(S, 2), rnd(p, 4), yesBid, yesAsk, noBid, noAsk, rnd(sigma == null ? null : sigma * 1e6, 3), imb, F ? F.src : null]);
+    m.rows.push([t, rnd(T, 1), rnd(S, 2), rnd(p, 4), yesBid, yesAsk, noBid, noAsk, rnd(sigma == null ? null : sigma * 1e6, 3), imb, F ? F.src : null,
+      rnd(F?.sigmaShort == null ? null : F.sigmaShort * 1e6, 3), rnd(F?.sigmaLong == null ? null : F.sigmaLong * 1e6, 3)]);
+    if (F?.sigmaShort) { m.sigmaShortSum += F.sigmaShort; m.sigmaShortN++; }
+    if (F?.sigmaLong) { m.sigmaLongSum += F.sigmaLong; m.sigmaLongN++; }
     if (F) m.srcCount[F.src]++;
     if (sigma) { m.sigmaSum += sigma; m.sigmaN++; }
 
@@ -313,6 +321,9 @@ class Shadow {
       btc_close: m.btcClose, btc_winner: m.btcWinner,
       winner, winner_source: source,
       sigma_avg_e6: m.sigmaN ? rnd(m.sigmaSum / m.sigmaN * 1e6, 3) : null,
+      sigma_short_avg_e6: m.sigmaShortN ? rnd(m.sigmaShortSum / m.sigmaShortN * 1e6, 3) : null,
+      sigma_long_avg_e6: m.sigmaLongN ? rnd(m.sigmaLongSum / m.sigmaLongN * 1e6, 3) : null,
+      sigma_mode: process.env.FAIR_SIGMA_MODE || 'short',
       samples: m.rows.length,
       model_src: { chainlink_twap: m.srcCount[1], binance: m.srcCount[0] },
       path: Object.keys(m.path).map(Number).sort((a, b) => a - b).map(k => m.path[k]),

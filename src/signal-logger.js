@@ -287,7 +287,7 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
 }
 
 // ─── Cerrar trade ─────────────────────────────────────────────────────────────
-function logSignalClose(posId, result, pnl, btcPriceNow) {
+function logSignalClose(posId, result, pnl, btcPriceNow, extra = {}) {
   ensureDir();
 
   // Actualizar consecutive losses
@@ -304,6 +304,7 @@ function logSignalClose(posId, result, pnl, btcPriceNow) {
 
   // Actualizar registro con resultado y duración
   updateRecord(posId, {
+    ...extra,
     result,
     pnl,
     close_timestamp: Date.now(),

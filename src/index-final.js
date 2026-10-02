@@ -643,7 +643,7 @@ const activePositions = new Map();
 require('./retention').start(); // borra grabaciones/crudos viejos del volumen cada hora
 
 let lastTradeTime = 0;
-const COOLDOWN = parseInt(process.env.COOLDOWN_SECONDS || '180') * 1000; // configurable via Railway
+const COOLDOWN = config.COOLDOWN_SECONDS * 1000; // configurable via Railway
 let userWs = null; // PHASE 1: Will be initialized in main()
 
 async function main() {
@@ -1206,7 +1206,7 @@ async function main() {
           // POLY_PRICE_STALE (3s) nunca saltaba y señales/filtros usaban precios viejos.
           // Ahora Gamma solo alimenta la señal si el WS no mandó nada en 5s.
           const wsFresh = lastWsPriceAt && (Date.now() - lastWsPriceAt) < 5000;
-          if (!wsFresh) signal.updatePolyPrice(yes, no);
+          if (!wsFresh) signal.updatePolyPrice(yes, no, 'gamma');
           const tag = `YES=${yes.toFixed(3)} NO=${no.toFixed(3)}`;
           if (tag !== lastPolyPrice) {
             logger.info(`[POLY] ${tag}`);
@@ -1309,11 +1309,27 @@ async function main() {
   // P(UP) = Φ( ln(BTC/strike) / (σ·√T) ), σ = volatilidad realizada por √s,
   // T = segundos restantes. fair_edge = prob. justa del lado de la señal − ask real.
   const FAIR_VOL_MULT = parseFloat(process.env.FAIR_VOL_MULT || '1.4');
+  // FAIR_SIGMA_MODE: 'short' (default, como antes) = σ de ~60 s de retornos de 0.5 s;
+  // 'blend' = sqrt(0.25·σcorta² + 0.75·σlarga²) con σlarga = FairValue.sigma() (15 min,
+  // retornos de 5 s) y piso FAIR_SIGMA_FLOOR sobre la σ cruda. Con mercado quieto la σ corta
+  // da ~15e-6 y FAIR salta a 0.98/0.09 al abrir. Las dos σ se registran siempre.
+  const FAIR_SIGMA_MODE = (process.env.FAIR_SIGMA_MODE || 'short').toLowerCase();
+  const FAIR_SIGMA_FLOOR = parseFloat(process.env.FAIR_SIGMA_FLOOR || '3e-5');
+  const fairSigmas = (nowMs) => {
+    const sS = signal.realizedVolPerSec() || null;
+    const sL = fairValue.sigma(nowMs) || null;
+    let raw = sS;
+    if (FAIR_SIGMA_MODE === 'blend') {
+      const b = sS && sL ? Math.sqrt(0.25 * sS * sS + 0.75 * sL * sL) : (sL || sS);
+      raw = b ? Math.max(b, FAIR_SIGMA_FLOOR) : null;
+    }
+    return { raw, sS, sL };
+  };
   const computeFair = (sig, btcNowBinance, nowMs) => {
     const endMs = cachedMarket?.endDate ? new Date(cachedMarket.endDate).getTime() : null;
     // σ de retornos log por √s, inflada por FAIR_VOL_MULT: con σ realizada sola FAIR salía
     // sobreconfiado (calibración contra 207 aperturas: escala óptima 0.71 → σ × 1.4).
-    const rawSigma = signal.realizedVolPerSec();
+    const { raw: rawSigma, sS, sL } = fairSigmas(nowMs || Date.now());
     if (!endMs || !rawSigma) return null;
     const sigma = rawSigma * FAIR_VOL_MULT;
     const tokenId = sig.direction === 'UP' ? cachedMarket.yesTokenId : cachedMarket.noTokenId;
@@ -1327,6 +1343,9 @@ async function main() {
         fair_ask: ask,
         fair_edge: ask != null ? r3(fairSide - ask) : null,
         fair_sigma_ps: parseFloat(sigma.toExponential(3)),
+        fair_sigma_short: sS != null ? parseFloat(sS.toExponential(3)) : null,
+        fair_sigma_long: sL != null ? parseFloat(sL.toExponential(3)) : null,
+        fair_sigma_mode: FAIR_SIGMA_MODE,
         ...extra,
       };
     };
@@ -1342,7 +1361,9 @@ async function main() {
     const P = chainlinkNowcast();
     if (K != null && last && P != null) {
       const W = TWAP_WINDOW_MS / 1000;
-      const T = Math.max(0, (endMs - last.ts) / 1000);
+      // T = tiempo hasta el cierre desde el instante que representa P (ahora − lag de
+      // Chainlink). Antes endMs − last.ts: el último dato de Chainlink puede tener segundos.
+      const T = Math.max(0, (endMs - Date.now() - lagEstimateMs) / 1000);
       if (T <= 0) return null;
       const sp = sigma * P;
       let mean, sd;
@@ -1380,7 +1401,8 @@ async function main() {
     if (!cachedMarket || cachedMarket.gammaId !== gammaId) return null;
     const bn = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null;
     const f = computeFair({ direction: 'UP' }, bn, nowMs);
-    return f ? { p: f.fair_up, strike: f.fair_strike, src: f.fair_src, sigma: f.fair_sigma_ps } : null;
+    return f ? { p: f.fair_up, strike: f.fair_strike, src: f.fair_src, sigma: f.fair_sigma_ps,
+      sigmaShort: f.fair_sigma_short, sigmaLong: f.fair_sigma_long } : null;
   });
 
   // ─── OPEN-SNAP (sombra): ¿el mercado abre mal valuado? ─────────────────────
@@ -2060,7 +2082,7 @@ async function main() {
 
     if (!bookEntryOverride) {
       if (!sig.edge || sig.edge.reason !== 'EDGE_FOUND') return;
-      const maxEdgePct = parseFloat(process.env.MAX_EDGE_PCT || '15');
+      const maxEdgePct = config.MAX_REALISTIC_EDGE;
       if (sig.edge.edgePct < config.MIN_EDGE_PCT || sig.edge.edgePct > maxEdgePct) return;
     }
 
@@ -2147,7 +2169,7 @@ async function main() {
     // maxExposure: usar MAX_TOTAL_EXPOSURE_USDC como tope absoluto
     // No limitar por finalExposure × maxSlots porque bloquea silenciosamente
     // cuando el size dinámico es pequeño (ej: $3 × 3 = $9 bloquea la 3ra entrada)
-    const maxExposure = parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '100');
+    const maxExposure = config.MAX_TOTAL_EXPOSURE_USDC;
     if (totalExposure + finalExposure > maxExposure) {
       logger.warn(`[SKIP] 💰 Exposición total $${(totalExposure + finalExposure).toFixed(2)} supera máximo $${maxExposure} — esperando que cierren posiciones`);
       return;
@@ -2357,7 +2379,7 @@ async function main() {
     const priceRaw = sig.direction === 'UP' ? sig.edge.polyYes : sig.edge.polyNo; // solo para filtros y logs
 
     // PRECIO DE ORDEN = siempre del book real (bestAsk del WS, 0ms latencia)
-    const MAX_ORDER_PRICE = parseFloat(process.env.MAX_GTC_ENTRY_ASK || process.env.MAX_ENTRY_PRICE || '0.85');
+    const MAX_ORDER_PRICE = config.MAX_GTC_ENTRY_ASK;
     const tick = 0.005;  // Reducido de 0.01 → 0.005 para reducir slippage
     const round2 = v => parseFloat((Math.round(v * 100) / 100).toFixed(2));
 
@@ -2373,9 +2395,12 @@ async function main() {
       const msgExtra = bootstrapYaIntentado
         ? '(después de bootstrap fallido)'
         : '(primer intento — re-bootstrap lanzado)';
-      logger.warn(`[PRICE] ⚠️ bestAsk null ${msgExtra} — usando priceRaw+tolerance como fallback`);
-      // Fallback: usar priceRaw + tolerance en vez de SKIP
-      // Antes del commit 812cf8f así funcionaba y el bot entraba
+      // Antes armaba la orden a priceRaw + 0.02 (priceRaw puede venir de Gamma, con
+      // minutos de atraso) sin chequear MAX_ORDER_PRICE. Sin ask del WS de los últimos 3 s
+      // no se entra.
+      logger.warn(`[SKIP] 🚫 Sin ask del WS (null o > 3 s) ${msgExtra} — no se entra`);
+      activePositions.delete(posId);
+      return;
     }
 
     // Precio final: bestAsk del WS si disponible, sino priceRaw + tolerance
@@ -2409,7 +2434,7 @@ async function main() {
     // MAX_ENTRY_PRICE — se compara contra el mayor entre priceRaw y el bestAsk real.
     // Solo con priceRaw, un precio de señal viejo (fallback Gamma ~$0.50) dejaba
     // pasar compras a $0.97 con el ask real en $0.99-$1.00.
-    const maxEntryPrice = parseFloat(process.env.MAX_ENTRY_PRICE || '0.97');
+    const maxEntryPrice = config.MAX_ENTRY_PRICE;
     const entryPriceCheck = Math.max(priceRaw ?? 0, bestAskWS ?? 0);
     if (maxEntryPrice < 0.97 && entryPriceCheck > maxEntryPrice) {
       logger.warn(`[SKIP] 🚫 MAX_ENTRY_PRICE: precio $${entryPriceCheck.toFixed(2)} (raw $${priceRaw?.toFixed(2)} ask ${bestAskWS != null ? '$' + bestAskWS.toFixed(2) : 'n/a'}) > máximo $${maxEntryPrice} — señal vieja`);
@@ -2421,7 +2446,7 @@ async function main() {
     // En 137 mercados con ganador oficial (25-28/09), la primera señal con ask < $0.35
     // acertó 1 de 10 (y 1 de 25 contando los inferidos); en el paper, 3 de 4 trades a
     // $0.23-0.30 perdieron. Se compara contra el ask real (priceRaw puede ser viejo).
-    const minEntryPrice = parseFloat(process.env.MIN_ENTRY_PRICE || '0.35');
+    const minEntryPrice = config.MIN_ENTRY_PRICE;
     const entryPriceMin = bestAskWS ?? priceRaw;
     if (entryPriceMin != null && entryPriceMin < minEntryPrice) {
       logger.warn(`[SKIP] 🚫 MIN_ENTRY_PRICE: ${bestAskWS != null ? 'ask' : 'precio raw'} $${entryPriceMin.toFixed(2)} < mínimo $${minEntryPrice} — lado barato (contra el mercado)`);
@@ -2998,19 +3023,33 @@ async function main() {
       const paperFillRate = config.PAPER_FILL_RATE;
       // Una orden límite de compra no llena si el ask real está por encima del precio
       // (pasaba con el tope 0.97: se "llenaba" a $0.97 con el ask en $0.99-$1.00).
-      const askAbovePrice = bestAskWS != null && bestAskWS > price;
+      // PAPER_FILL_DELAY_MS (default 0 = como antes): Polymarket retiene cada orden taker
+      // en cripto ~150 ms antes de casarla y los makers pueden retirar el precio. Con N > 0
+      // se espera N ms y recién ahí se mira el mejor ask y su tamaño en el WS.
+      const paperDelayMs = Math.max(0, parseInt(process.env.PAPER_FILL_DELAY_MS || '0') || 0);
+      let fillAsk = bestAskWS;
+      let askSize = polyWs.getBestAskSize?.(tokenId) ?? null;
+      if (paperDelayMs > 0) {
+        await new Promise(r => setTimeout(r, paperDelayMs));
+        fillAsk = polyWs.getBestAskForToken?.(tokenId) ?? null;
+        askSize = polyWs.getBestAskSize?.(tokenId) ?? null;
+      }
+      // Con demora y sin ask fresco no se puede confirmar el fill: sin fill
+      const askAbovePrice = fillAsk != null ? fillAsk > price : paperDelayMs > 0;
       // Liquidez: en real solo se compra lo publicado en el libro. Se exige que el mejor
       // ask tenga al menos el tamaño de la orden (conservador: no cuenta el nivel siguiente,
       // que la orden a ask + tick también podría tomar). Sin dato de tamaño no se bloquea.
       // PAPER_REQUIRE_DEPTH=false vuelve al fill sin mirar el tamaño.
-      const askSize = polyWs.getBestAskSize?.(tokenId) ?? null;
       const thinBook = process.env.PAPER_REQUIRE_DEPTH !== 'false' && askSize != null && askSize < size;
       const filled = !askAbovePrice && !thinBook && Math.random() < paperFillRate;
-      logger.info(`[PAPER-LIQ] mejor ask $${bestAskWS?.toFixed(2) ?? 'n/a'} con ${askSize ?? 'n/a'} tokens | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
+      if (paperDelayMs > 0) {
+        logger.info(`[PAPER-DELAY] ask decisión=$${bestAskWS?.toFixed(2) ?? 'n/a'} → ask a +${paperDelayMs}ms=$${fillAsk?.toFixed(2) ?? 'n/a'} (${askSize ?? 'n/a'} tokens) | orden ${size} a $${price} | ${filled ? 'lleno' : 'no'}`);
+      }
+      logger.info(`[PAPER-LIQ] mejor ask $${fillAsk?.toFixed(2) ?? 'n/a'} con ${askSize ?? 'n/a'} tokens | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
 
       if (!filled) {
         logger.warn(askAbovePrice
-          ? `[PAPER] ⚠️ Sin fill: ask $${bestAskWS.toFixed(2)} > precio de orden $${price}`
+          ? `[PAPER] ⚠️ Sin fill: ask ${fillAsk != null ? '$' + fillAsk.toFixed(2) : 'sin dato'} > precio de orden $${price}`
           : thinBook
             ? `[PAPER] ⚠️ Sin fill: el mejor ask tiene ${askSize} tokens y la orden pide ${size}`
             : `[PAPER] ⚠️ Simulando GTC sin fill (fill rate ${(paperFillRate*100).toFixed(0)}%)`);

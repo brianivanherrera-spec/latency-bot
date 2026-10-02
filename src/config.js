@@ -61,12 +61,24 @@ module.exports = {
 
   // Límites de posiciones y capital
   MAX_POSITIONS: parseInt(process.env.MAX_POSITIONS || '10'),
-  MAX_TOTAL_EXPOSURE_USDC: parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '30'),
+  // Default 100 = el que usaba index-final.js (el de acá, 30, no se leía en ningún lado)
+  MAX_TOTAL_EXPOSURE_USDC: parseFloat(process.env.MAX_TOTAL_EXPOSURE_USDC || '100'),
   MAX_POSITION_SIZE_USDC: parseFloat(process.env.MAX_POSITION_SIZE_USDC || '12'),
   STOP_LOSS_PERCENT: parseFloat(process.env.STOP_LOSS_PERCENT || '10'),
 
-  // Cooldown entre órdenes - OPTIMIZADO: 30s vs 360s para máxima operación
-  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '30'),
+  // Cooldown entre órdenes. Default 180 = el que usaba index-final.js (el 30 de acá no se
+  // leía); en producción COOLDOWN_SECONDS está definido en Railway.
+  COOLDOWN_SECONDS: parseInt(process.env.COOLDOWN_SECONDS || '180'),
+
+  // Precios de entrada (antes cada archivo tenía su default):
+  //  - MAX_GTC_ENTRY_ASK: tope del precio de la orden (ask + tick). Si no está, cae a
+  //    MAX_ENTRY_PRICE y después a 0.85, como hacía index-final.js. Como el precio de la
+  //    orden es ask + 0.005 redondeado a centavo, con tope 0.80 el ask máximo real es 0.79.
+  //  - MAX_ENTRY_PRICE: tope sobre max(precio de la señal, ask); default 0.97 (sin efecto).
+  //  - MIN_ENTRY_PRICE: mínimo sobre el ask crudo (sin tick).
+  MAX_GTC_ENTRY_ASK: parseFloat(process.env.MAX_GTC_ENTRY_ASK || process.env.MAX_ENTRY_PRICE || '0.85'),
+  MAX_ENTRY_PRICE: parseFloat(process.env.MAX_ENTRY_PRICE || '0.97'),
+  MIN_ENTRY_PRICE: parseFloat(process.env.MIN_ENTRY_PRICE || '0.35'),
 
   // =============================================
   // LATENCIA Y FRESHNESS DE DATOS
@@ -81,8 +93,9 @@ module.exports = {
   // Edge mínimo para operar (%)
   MIN_EDGE_PCT: parseFloat(process.env.MIN_EDGE_PCT || '0.8'),
 
-  // Edge máximo realista — mayor indica precio stale
-  MAX_REALISTIC_EDGE: parseFloat(process.env.MAX_REALISTIC_EDGE || '15'),
+  // Edge máximo realista — mayor indica precio stale. El filtro lee MAX_EDGE_PCT; si no
+  // está definido usa MAX_REALISTIC_EDGE (antes se leía y no se usaba). Default 15 en los dos.
+  MAX_REALISTIC_EDGE: parseFloat(process.env.MAX_EDGE_PCT || process.env.MAX_REALISTIC_EDGE || '15'),
 
   // =============================================
   // FILTROS DE HORARIO
