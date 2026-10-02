@@ -22,6 +22,13 @@ const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
 // dejaría el estado de la orden desconocido.
 const HTTP_TIMEOUT_MS = parseInt(process.env.HTTP_TIMEOUT_MS || '3000');
 try { require('axios').defaults.timeout = parseInt(process.env.CLOB_HTTP_TIMEOUT_MS || '10000'); } catch (_) {}
+// tickSize/negRisk de los mercados BTC Up/Down 5m. Pasarlos siempre evita que el cliente los
+// consulte por red antes de cada orden. (El tipo de orden va como 3er argumento de
+// createAndPost*: dentro del objeto la librería lo ignora y la orden sale GTC.)
+const ORDER_OPTS = { tickSize: process.env.TICK_SIZE || '0.01', negRisk: process.env.NEG_RISK === 'true' };
+// Estados finales de una orden (live/delayed todavía pueden llenar)
+const FINAL_STATUSES = new Set(['matched', 'canceled', 'cancelled', 'unmatched', 'expired']);
+const r2 = (v) => parseFloat((Math.round(v * 100) / 100).toFixed(2));
 
 let ClobClient, SignatureTypeV2, Chain, Side, OrderType;
 let createWalletClient, http, privateKeyToAccount;
@@ -49,6 +56,67 @@ class PolymarketClient {
     this._orderHistory = [];
     this._depositWalletAddress = null;
     this._polyWs = null; // referencia al WS para obtener bestAsk en tiempo real
+    // Acciones propias por token (suma de fills de esta sesión + posiciones restauradas):
+    // sirve para saber cuánto de un saldo de token viene de la orden en curso
+    this._heldShares = new Map();
+  }
+
+  // Registrar acciones ya en poder (posiciones restauradas al arrancar)
+  noteHeldShares(tokenId, shares) {
+    if (!tokenId || !(shares > 0)) return;
+    this._heldShares.set(tokenId, (this._heldShares.get(tokenId) || 0) + shares);
+  }
+
+  // getOrder sin lanzar: null si falló (la librería devuelve { error } en vez de lanzar)
+  async _getOrderSafe(orderId) {
+    try {
+      const o = await this.clobClient.getOrder(orderId);
+      return (!o || o.error) ? null : o;
+    } catch (_) { return null; }
+  }
+
+  // Sigue una orden hasta un estado final o el timeout. matched = último size_matched
+  // conocido (una consulta fallida no lo vuelve a 0).
+  async _waitOrderFinal(orderId, timeoutMs, pollMs = 300) {
+    const until = Date.now() + timeoutMs;
+    let status = null, matched = 0;
+    while (true) {
+      const o = await this._getOrderSafe(orderId);
+      if (o) {
+        status = String(o.status || '').toLowerCase();
+        const m = parseFloat(o.size_matched || 0);
+        if (m > matched) matched = m;
+        if (FINAL_STATUSES.has(status)) return { final: true, status, matched, order: o };
+      }
+      if (Date.now() >= until) return { final: false, status, matched };
+      await new Promise(r => setTimeout(r, pollMs));
+    }
+  }
+
+  // Cancelación verificada. cancelOrder no lanza: devuelve { error } o
+  // { canceled: [ids], not_canceled: { id: motivo } }. Solo es OK si no hay error y el id
+  // está en canceled, o si la orden ya estaba en un estado final (matched/canceled).
+  async _cancelChecked(orderId) {
+    let res;
+    try { res = await this.clobClient.cancelOrder({ orderID: orderId }); }
+    catch (e) { res = { error: e.message }; }
+    const canceled = Array.isArray(res?.canceled) ? res.canceled : [];
+    if (!res?.error && canceled.includes(orderId)) return { ok: true, res };
+    const fin = await this._getOrderSafe(orderId);
+    const st = String(fin?.status || '').toLowerCase();
+    if (fin && FINAL_STATUSES.has(st)) return { ok: true, res, finalStatus: st, matched: parseFloat(fin.size_matched || 0) || 0 };
+    const why = res?.error ? JSON.stringify(res.error).slice(0, 120) : (res?.not_canceled?.[orderId] || 'orderID ausente en canceled');
+    return { ok: false, res, error: why };
+  }
+
+  // Saldo del token (acciones) de la deposit wallet; null si no se pudo leer
+  async _tokenBalance(tokenId) {
+    try {
+      await this.clobClient.updateBalanceAllowance({ asset_type: 'CONDITIONAL', token_id: tokenId }).catch(() => null);
+      const r = await this.clobClient.getBalanceAllowance({ asset_type: 'CONDITIONAL', token_id: tokenId });
+      if (!r || r.error || r.balance === undefined) return null;
+      return parseFloat(r.balance) / 1e6;
+    } catch (_) { return null; }
   }
 
   // Conectar el WS para obtener bestAsk sin REST call (~0ms latencia)
@@ -68,6 +136,7 @@ class PolymarketClient {
           this.clobClient = new ClobClient({
             host:  CLOB_API_BASE,
             chain: Chain?.POLYGON ?? 137,
+            useServerTime: false,
           });
           logger.info('[DRY_RUN] CLOB client de solo lectura inicializado');
         } catch (e) {
@@ -102,7 +171,7 @@ class PolymarketClient {
       creds = { key: config.POLY_API_KEY, secret: config.POLY_API_SECRET, passphrase: config.POLY_PASSPHRASE };
       logger.info(`Creds config: ${creds.key.slice(0,8)}...`);
     } else {
-      const tempClient = new ClobClient({ host: CLOB_API_BASE, chain: Chain?.POLYGON ?? 137, signer: walletClient });
+      const tempClient = new ClobClient({ host: CLOB_API_BASE, chain: Chain?.POLYGON ?? 137, signer: walletClient, useServerTime: false });
       creds = await tempClient.createOrDeriveApiKey();
       logger.info(`Creds derivadas: ${creds.key.slice(0,8)}...`);
     }
@@ -115,12 +184,14 @@ class PolymarketClient {
       creds,
       signatureType: SignatureTypeV2.POLY_1271,
       funderAddress: depositWallet,
+      // Con true, cada orden/consulta hacía antes un GET /time extra
+      useServerTime: false,
     });
 
     // Paso 4: Actualizar balance cache (CRÍTICO — docs oficiales)
     try {
       logger.info('Actualizando balance cache para deposit wallet...');
-      await this.clobClient.updateBalanceAllowance({ assetType: 'COLLATERAL', signatureType: 3 });
+      await this.clobClient.updateBalanceAllowance({ asset_type: 'COLLATERAL' });
       logger.info('✓ Balance cache actualizado');
     } catch (e) {
       // Intentar via fetch directo si el SDK no tiene el método
@@ -310,11 +381,40 @@ class PolymarketClient {
     return null;
   }
 
-  async placeLimitOrder({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs, forcedOrderType }) {
+  // Envoltorio: todo resultado con acciones llenadas trae sizeFilled, fillPrice (promedio
+  // ponderado) y usdcSpent. Si algo lanza o falla después de un fill, se devuelve el fill
+  // (antes se perdía y la posición no se registraba).
+  async placeLimitOrder(args) {
+    const ctx = { filledShares: 0, filledUsdc: 0 };
+    let res;
+    try { res = await this._placeLimitOrderInner(args, ctx); }
+    catch (e) { res = { success: false, error: e.message }; }
+    res = res || { success: false, error: 'sin respuesta' };
+    if (res.dryRun) return res;
+    if (!(res.sizeFilled > 0) && ctx.filledShares > 0) {
+      logger.warn(`[LIVE] ⚠️ El flujo terminó con "${res.error || res.status}" pero ya había ${ctx.filledShares} acciones llenadas — se registran`);
+      res = { ...res, success: true, partial: true, status: 'matched',
+        sizeFilled: ctx.filledShares, usdcSpent: r2(ctx.filledUsdc) };
+    }
+    const st = String(res.status || '').toLowerCase();
+    if (res.success && st === 'matched' && !(res.sizeFilled > 0)) res.sizeFilled = args.size;
+    if (res.sizeFilled > 0) {
+      res.success = true;
+      if (!(res.fillPrice > 0 && res.fillPrice < 1)) {
+        res.fillPrice = res.usdcSpent > 0 ? parseFloat((res.usdcSpent / res.sizeFilled).toFixed(4)) : args.price;
+      }
+      if (!(res.usdcSpent > 0)) res.usdcSpent = r2(res.fillPrice * res.sizeFilled);
+      if (args.side === 'BUY') this.noteHeldShares(args.tokenId, res.sizeFilled);
+    }
+    return res;
+  }
+
+  async _placeLimitOrderInner({ marketId, tokenId, side, price, size, marketQuestion, marketEndTs, forcedOrderType }, ctx = { filledShares: 0, filledUsdc: 0 }) {
 
     const usdcValue = parseFloat((Math.round(price * size * 100) / 100).toFixed(2));
     const rec = { timestamp: new Date().toISOString(), marketId, marketQuestion,
       tokenId, side, price, size, usdcValue, status: 'PENDING' };
+    Object.defineProperty(rec, 'ctx', { value: ctx, enumerable: false }); // para los retry-loops
 
     // Helper para parsear fill de BUY correctamente
     // En CLOB BUY: makingAmount = USDC gastado, takingAmount = shares recibidas
@@ -410,19 +510,21 @@ class PolymarketClient {
             try {
               const gtdOrder = await this.clobClient.createAndPostOrder(
                 { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                  price: worstPriceForced, size, orderType: OrderType.GTD, expiration: gtdExpiry },
-                { tickSize: '0.01', negRisk: false }
-              );
+                  price: worstPriceForced, size, expiration: gtdExpiry },
+                ORDER_OPTS, OrderType.GTD);
               const gtdStatus = (String(gtdOrder?.status || '')).toLowerCase();
               const gtdFilled = gtdStatus === 'matched';
               logger.info(`[LIVE] GTD response: status=${gtdStatus} filled=${gtdFilled}`);
+              if (gtdOrder?.error && !gtdOrder?.orderID) return { success: false, error: String(gtdOrder.errorMsg || gtdOrder.error) };
               if (gtdFilled) {
-                const taking = parseFloat(gtdOrder?.takingAmount || 0);
-                const making = parseFloat(gtdOrder?.makingAmount || 0);
-                const fillPrice = taking > 0 && making > 0 ? parseFloat((taking/making).toFixed(4)) : worstPriceForced;
-                return { success: true, fillPrice, sizeFilled: making > 0 ? Math.round(making) : size, status: 'matched' };
+                // BUY: makingAmount = USDC, takingAmount = acciones (antes invertido)
+                const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(gtdOrder, worstPriceForced, size);
+                return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
               }
-              return { success: true, status: 'live', orderID: gtdOrder?.orderID, noFill: false };
+              // Queda en el libro: el polling de abajo la sigue hasta el cierre
+              result = { success: true, status: gtdStatus || 'live', orderID: gtdOrder?.orderID,
+                _restingGtd: true, _restDeadlineMs: marketEndTs || null, _restSize: size,
+                _restPrice: worstPriceForced, _preFilledShares: 0, _preFilledUsdc: 0 };
             } catch (gtdErr) {
               logger.warn(`[LIVE] GTD error: ${gtdErr.message}`);
               return { success: false, error: gtdErr.message };
@@ -430,6 +532,8 @@ class PolymarketClient {
           }
         }
 
+        // La GTD forzada que quedó en el libro va directo al seguimiento de abajo
+        if (!result) {
         // PRECIO REAL: usar bestAsk directamente (no priceRaw + tolerance fijo)
         // bestAsk + 1 tick = cruzar el spread real garantizado
         const MAX_PRICE_LIMIT = parseFloat(process.env.MAX_PRICE_LIMIT || '0.85');
@@ -456,34 +560,44 @@ class PolymarketClient {
         const FAK_MAX_ATTEMPTS = parseInt(process.env.FAK_MAX_ATTEMPTS || '10');
 
         if (!process.env.DUAL_FILL_ORDER || process.env.DUAL_FILL_ORDER !== 'true') {
-          // Camino FAK agresivo con reintentos
+          // Camino FAK agresivo con reintentos. Un fill parcial se acumula y el siguiente
+          // intento pide solo el remanente (antes se ignoraba y se volvía a pedir el total).
           let fakPrice = worstPrice;
-          let fakFilled = false;
-          let fakResult = null;
+          let accShares = 0, accUsdc = 0;
+          const done = () => ({ success: true, status: 'matched', partial: accShares < size - 0.01,
+            fillPrice: parseFloat((accUsdc / accShares).toFixed(4)), sizeFilled: accShares, usdcSpent: r2(accUsdc) });
 
           for (let fakAttempt = 1; fakAttempt <= FAK_MAX_ATTEMPTS; fakAttempt++) {
+            const remaining = parseFloat((size - accShares).toFixed(4));
+            if (accShares > 0 && remaining < 5) return done(); // remanente bajo el mínimo de 5
             if (fakPrice > MAX_FAK_PRICE) {
-              logger.warn(`[LIVE] ❌ FAK precio $${fakPrice.toFixed(2)} > MAX_GTC_ENTRY_ASK=$${MAX_FAK_PRICE} — ganancia insuficiente → NO_FILL`);
-              return { success: false, error: 'ask_too_high', noFill: true };
+              logger.warn(`[LIVE] ❌ FAK precio $${fakPrice.toFixed(2)} > MAX_GTC_ENTRY_ASK=$${MAX_FAK_PRICE} — ganancia insuficiente → ${accShares > 0 ? 'fill parcial' : 'NO_FILL'}`);
+              return accShares > 0 ? done() : { success: false, error: 'ask_too_high', noFill: true };
             }
 
-            logger.info(`[LIVE] ⚡ FAK intento ${fakAttempt}/${FAK_MAX_ATTEMPTS} @ $${fakPrice.toFixed(2)}`);
+            logger.info(`[LIVE] ⚡ FAK intento ${fakAttempt}/${FAK_MAX_ATTEMPTS} @ $${fakPrice.toFixed(2)} (${remaining} acciones)`);
             try {
-              // Precision fix: ensure exactly 2 decimals for FAK order amount
-              const fakAmount = parseFloat((Math.round(size * fakPrice * 100) / 100).toFixed(2));
-              const fakRes = hasMarketOrderMethod
-                ? await this.clobClient.createAndPostMarketOrder(
-                    { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL,
-                      amount: fakAmount, price: fakPrice, orderType: OrderType.FAK },
-                    { tickSize: '0.01', negRisk: false }, OrderType.FAK, true
-                  )
-                : await this.clobClient.createAndPostOrder({ ...orderParams, price: fakPrice, orderType: OrderType.FAK });
-
+              const fakAmount = r2(remaining * fakPrice); // USDC con 2 decimales
+              const fakRes = await this.clobClient.createAndPostMarketOrder(
+                { tokenID: tokenId, side: side === 'BUY' ? Side.BUY : Side.SELL, amount: fakAmount, price: fakPrice },
+                ORDER_OPTS, OrderType.FAK);
               const fakStatus = (String(fakRes?.status || '')).toLowerCase();
-              if (fakStatus === 'matched') {
-                const { fillPrice, sizeFilled, usdcSpent } = parseBuyFill(fakRes, fakPrice, size);
-                logger.info(`[LIVE] ✅ FAK llenó @ $${fillPrice.toFixed(4)} | ${sizeFilled} shares | USDC: $${usdcSpent.toFixed(2)}`);
-                return { success: true, fillPrice, sizeFilled, usdcSpent, status: 'matched' };
+              let shares = parseFloat(fakRes?.takingAmount || 0), usdc = parseFloat(fakRes?.makingAmount || 0);
+              const fakId = fakRes?.orderID;
+              if (fakId && !FINAL_STATUSES.has(fakStatus) && !(shares > 0)) {
+                // delayed/live: seguirla hasta su estado final antes de mandar otra
+                const fin = await this._waitOrderFinal(fakId, 5000);
+                if (!fin.final) {
+                  logger.warn(`[LIVE] ⚠️ FAK ${fakId} sin estado final en 5 s — no se reintenta para no duplicar`);
+                  return accShares > 0 ? done() : { success: false, error: 'fak_state_unknown', noFill: true, orderId: fakId };
+                }
+                if (fin.matched > 0) { shares = fin.matched; usdc = fin.matched * fakPrice; }
+              }
+              if (shares > 0 && usdc > 0) {
+                accShares += shares; accUsdc += usdc;
+                ctx.filledShares = accShares; ctx.filledUsdc = accUsdc;
+                logger.info(`[LIVE] ✅ FAK llenó ${shares} acciones @ $${(usdc / shares).toFixed(4)} (acumulado ${accShares}/${size})`);
+                if (size - accShares < 5) return done();
               }
 
               // Esperar y refrescar el bestAsk para el siguiente intento
@@ -501,6 +615,7 @@ class PolymarketClient {
             }
           }
 
+          if (accShares > 0) return done();
           logger.warn(`[LIVE] FAK agresivo agotó ${FAK_MAX_ATTEMPTS} intentos → NO_FILL`);
           return { success: false, error: 'fak_exhausted', noFill: true };
         }
@@ -525,17 +640,18 @@ class PolymarketClient {
           const safeSize = Math.floor(parseFloat((size * worstPrice).toFixed(2)) / worstPrice);
           const orderSize = safeSize > 0 ? safeSize : size;
           const sideEnum = side === 'BUY' ? Side.BUY : Side.SELL;
-          const opts = { tickSize: '0.01', negRisk: false };
+          const opts = ORDER_OPTS;
 
-          let fakShares = 0, fakUsdc = 0;
+          // Acciones de este token que ya teníamos antes de esta orden (otras entradas del
+          // mismo mercado): el saldo real menos esto es lo que llenó esta orden
+          const heldBefore = this._heldShares.get(tokenId) || 0;
+          let fakShares = 0, fakUsdc = 0, fakUnresolved = false;
           try {
             logger.info(`[LIVE] 🔀 FAK + GTD de respaldo @ $${worstPrice} (${orderSize} tokens)`);
-            const fakAmount = parseFloat((Math.round(orderSize * worstPrice * 100) / 100).toFixed(2));
-            const fakRes = hasMarketOrderMethod
-              ? await this.clobClient.createAndPostMarketOrder(
-                  { tokenID: tokenId, side: sideEnum, amount: fakAmount, price: worstPrice, orderType: OrderType.FAK },
-                  opts, OrderType.FAK)
-              : await this.clobClient.createAndPostOrder({ tokenID: tokenId, side: sideEnum, price: worstPrice, size: orderSize, orderType: OrderType.FAK });
+            const fakAmount = r2(orderSize * worstPrice);
+            const fakRes = await this.clobClient.createAndPostMarketOrder(
+              { tokenID: tokenId, side: sideEnum, amount: fakAmount, price: worstPrice },
+              opts, OrderType.FAK);
             logger.info(`[LIVE] FAK response: ${JSON.stringify(fakRes)}`);
             const fakErr = String(fakRes?.error || fakRes?.errorMsg || '').toLowerCase();
             if (fakErr.includes('trading is disabled')) {
@@ -545,18 +661,50 @@ class PolymarketClient {
             const usdc = parseFloat(fakRes?.makingAmount || 0);
             const shares = parseFloat(fakRes?.takingAmount || 0);
             if (shares > 0 && usdc > 0) { fakShares = shares; fakUsdc = usdc; }
+            const fakStatus = String(fakRes?.status || '').toLowerCase();
+            const fakId = fakRes?.orderID;
+            if (fakId && !FINAL_STATUSES.has(fakStatus)) {
+              // delayed (retención de ~150 ms de Polymarket) / live: antes quedaba fakShares = 0
+              // y se mandaba una GTD por el total → doble exposición posible
+              logger.info(`[LIVE] ⏳ FAK status="${fakStatus}" — esperando estado final (${fakId})`);
+              const fin = await this._waitOrderFinal(fakId, 5000);
+              if (fin.final) {
+                if (fin.matched > fakShares) { fakShares = fin.matched; fakUsdc = fin.matched * worstPrice; }
+              } else fakUnresolved = true;
+            }
           } catch (fakErr) {
             logger.warn(`[LIVE] FAK error: ${fakErr.message}`);
+            fakUnresolved = true; // pudo haber llenado
+          }
+          ctx.filledShares = fakShares; ctx.filledUsdc = fakUsdc;
+
+          // Saldo real del token antes de la GTD: pedir solo lo que falta
+          const bal = await this._tokenBalance(tokenId);
+          if (bal != null) {
+            const viaBal = Math.max(0, parseFloat((bal - heldBefore).toFixed(4)));
+            if (viaBal > fakShares + 0.01) {
+              logger.warn(`[LIVE] 🔎 Saldo del token muestra ${viaBal} acciones de esta orden (FAK informó ${fakShares}) — se usa el saldo`);
+              fakUsdc += (viaBal - fakShares) * worstPrice;
+              fakShares = viaBal;
+              ctx.filledShares = fakShares; ctx.filledUsdc = fakUsdc;
+            }
+            fakUnresolved = false;
+          }
+          const fakFillPrice = fakShares > 0 ? parseFloat((fakUsdc / fakShares).toFixed(4)) : worstPrice;
+          const fakOnly = () => ({ success: true, status: 'matched', fillPrice: fakFillPrice, sizeFilled: fakShares,
+            usdcSpent: r2(fakUsdc), partial: fakShares < orderSize - 0.01, requestedSize: orderSize });
+          if (fakUnresolved) {
+            logger.warn(`[LIVE] ⚠️ Estado de la FAK desconocido y sin saldo del token — no se manda la GTD (evita doble exposición)`);
+            return fakShares > 0 ? fakOnly() : { success: false, error: 'fak_state_unknown', noFill: true };
           }
 
           const remaining = Math.floor(orderSize - fakShares);
-          const fakFillPrice = fakShares > 0 ? parseFloat((fakUsdc / fakShares).toFixed(4)) : worstPrice;
           if (fakShares > 0 && remaining < 5) {
             // Llenó todo, o lo que falta está por debajo del mínimo de Polymarket (5 tokens)
             logger.info(`[LIVE] ✅ FAK llenó ${fakShares} tokens @ $${fakFillPrice}${remaining > 0 ? ` (remanente ${remaining} < 5, se acepta parcial)` : ''}`);
-            return { success: true, status: 'matched', fillPrice: fakFillPrice, sizeFilled: fakShares,
-              usdcSpent: fakUsdc, partial: remaining > 0, requestedSize: orderSize };
+            return fakOnly();
           }
+          if (remaining < 5) return { success: false, error: 'size_below_min', noFill: true };
 
           try {
             const gtdRes = await this.clobClient.createAndPostOrder(
@@ -565,7 +713,7 @@ class PolymarketClient {
             logger.info(`[LIVE] GTD response: ${JSON.stringify(gtdRes)}`);
             const gtdId = gtdRes?.orderID || gtdRes?.orderId;
             const gtdStatus = String(gtdRes?.status || '').toLowerCase();
-            if (gtdRes?.success !== false && gtdId) {
+            if (gtdRes?.success !== false && !gtdRes?.error && gtdId) {
               logger.info(`[LIVE] 📋 GTD ${remaining} tokens @ $${worstPrice} en el libro hasta el cierre (status=${gtdStatus})${fakShares > 0 ? ` | FAK ya llenó ${fakShares}` : ''}`);
               result = {
                 success: true, status: gtdStatus || 'live', orderID: gtdId,
@@ -577,18 +725,16 @@ class PolymarketClient {
                 _preFilledUsdc: fakUsdc,
               };
             } else {
-              logger.warn(`[LIVE] GTD rechazada: ${gtdRes?.errorMsg || gtdRes?.error || 'sin orderID'}`);
+              logger.warn(`[LIVE] GTD rechazada: ${gtdRes?.errorMsg || JSON.stringify(gtdRes?.error || '') || 'sin orderID'}`);
             }
           } catch (gtdErr) {
             logger.warn(`[LIVE] GTD error: ${gtdErr.message}`);
           }
 
-          if (!result && fakShares > 0) {
-            // La GTD no quedó en el libro: devolver lo que llenó la FAK, sin abrir otra orden
-            return { success: true, status: 'matched', fillPrice: fakFillPrice, sizeFilled: fakShares,
-              usdcSpent: fakUsdc, partial: true, requestedSize: orderSize };
+          if (!result) {
+            // Desde DUAL nunca se cae al loop FOK ni a MARKET_RETRY (abrían órdenes extra)
+            return fakShares > 0 ? fakOnly() : { success: false, error: 'dual_no_fill', noFill: true };
           }
-          // Sin nada llenado ni GTD en el libro: sigue el camino FAK/FOK normal de abajo
         }
         // Camino normal FAK/FOK si no hay DUAL o falló
         if (!result) {
@@ -612,14 +758,13 @@ class PolymarketClient {
                 side: side === 'BUY' ? Side.BUY : Side.SELL,
                 amount: marketAmt,
                 price: orderParams.price,
-                orderType: firstOrderType,
               },
-              { tickSize: '0.01', negRisk: false },
+              ORDER_OPTS,
               firstOrderType
             );
           } else {
             // Fallback al método anterior si la versión del cliente no tiene createAndPostMarketOrder
-            result = await this.clobClient.createAndPostOrder({ ...orderParams, orderType: firstOrderType });
+            result = await this.clobClient.createAndPostOrder({ ...orderParams }, ORDER_OPTS, firstOrderType);
           }
           logger.info(`[LIVE] response (${orderLabel} intento ${attempt}): ${JSON.stringify(result)}`);
 
@@ -634,7 +779,7 @@ class PolymarketClient {
           if (errMsgFak.toLowerCase().includes('not enough balance') || errMsgFak.toLowerCase().includes('allowance')) {
             logger.warn(`[LIVE] ⚡ Balance insuficiente detectado — refrescando allowance...`);
             try {
-              await this.clobClient.updateBalanceAllowance({ assetType: 'COLLATERAL', signatureType: 3 });
+              await this.clobClient.updateBalanceAllowance({ asset_type: 'COLLATERAL' });
               logger.info(`[LIVE] ✅ Allowance actualizado`);
             } catch (e) { logger.warn(`[LIVE] Error actualizando allowance: ${e.message}`); }
           }
@@ -654,7 +799,7 @@ class PolymarketClient {
             await new Promise(r => setTimeout(r, 450));
             if (delayedOrderId) {
               try {
-                const recheck = await this.clobClient.getOrder(delayedOrderId).catch(() => null);
+                const recheck = await this._getOrderSafe(delayedOrderId);
                 const recheckStatus = (String(recheck?.status || '')).toLowerCase();
                 if (recheckStatus === 'matched') {
                   logger.info(`[LIVE] ✅ ${orderLabel} llenó durante el taker delay (450ms) — usando ese fill`);
@@ -701,11 +846,11 @@ class PolymarketClient {
           result._preFilledFromFak = preFilledFromFak;
         }
         } // end if (!result) — cierre del camino FAK normal
+        } // end if (!result) — GTD forzada
       } else {
         // GTC — orden límite con tolerancia de precio
-        orderParams.orderType = OrderType.GTC;
         orderParams.price = price;
-        result = await this.clobClient.createAndPostOrder(orderParams);
+        result = await this.clobClient.createAndPostOrder(orderParams, ORDER_OPTS, OrderType.GTC);
         logger.info(`[LIVE] response: ${JSON.stringify(result)}`);
       }
 
@@ -726,9 +871,11 @@ class PolymarketClient {
         if (staleOrderId && staleStatus !== 'matched' && staleStatus !== 'cancelled' && staleStatus !== 'canceled') {
           logger.warn(`[LIVE] ⚠️ FOK quedó con estado "${staleStatus}" (no killed) — cancelando orden ${staleOrderId} antes de reintentar`);
           try {
-            await this.clobClient.cancelOrder({ orderID: staleOrderId });
+            // cancelOrder no lanza: devuelve { error }. Sin confirmación → abortar
+            const c = await this._cancelChecked(staleOrderId);
+            if (!c.ok) throw new Error(c.error);
             // Verificar que no se haya llenado (total o parcial) en el instante entre el check y el cancel
-            const check = await this.clobClient.getOrder(staleOrderId).catch(() => null);
+            const check = await this._getOrderSafe(staleOrderId);
             if ((String(check?.status || '')).toLowerCase() === 'matched') {
               logger.info(`[LIVE] ✅ La orden FOK "muerta" en realidad ya había llenado — usando ese fill, no se abre una segunda`);
               const fillTimeMs = Date.now() - (rec._placedAt || Date.now());
@@ -782,8 +929,8 @@ class PolymarketClient {
           return retryResult;
         }
         logger.warn(`[LIVE] 🔁 FOK sin liquidez tras varios intentos — reintentando como GTC (timeout corto)`);
-        const retryParams = { ...orderParams, orderType: OrderType.GTC };
-        result = await this.clobClient.createAndPostOrder(retryParams);
+        const retryParams = { ...orderParams };
+        result = await this.clobClient.createAndPostOrder(retryParams, ORDER_OPTS, OrderType.GTC);
         logger.info(`[LIVE] response (retry GTC): ${JSON.stringify(result)}`);
       }
 
@@ -807,11 +954,19 @@ class PolymarketClient {
       if (orderStatus === 'matched') {
         const fillTimeMs = Date.now() - orderPlacedAt;
         logger.info(`[LIVE] ⚡ Fill instantáneo: ${fillTimeMs}ms`);
-        return { success: true, orderId, status: 'matched', fillTimeMs };
+        if (result?._restingGtd) {
+          const sh = result._restSize, us = (result._preFilledUsdc || 0) + sh * result._restPrice;
+          const tot = (result._preFilledShares || 0) + sh;
+          return { success: true, orderId, status: 'matched', fillTimeMs, sizeFilled: tot,
+            usdcSpent: r2(us), fillPrice: parseFloat((us / tot).toFixed(4)) };
+        }
+        return { success: true, orderId, status: 'matched', fillTimeMs,
+          ...parseBuyFill(result, orderParams.price ?? price, orderParams.size ?? size) };
       }
 
-      // Orden en el book ('live') → polling hasta fill o timeout
-      if (orderStatus === 'live') {
+      // Orden en el book ('live', o 'delayed' por la retención de Polymarket) → polling
+      // hasta fill o timeout. Antes 'delayed' salía como "sin fill" y la orden quedaba viva.
+      if (orderStatus === 'live' || orderStatus === 'delayed' || result?._restingGtd) {
         // GTD de respaldo (DUAL_FILL_ORDER): se sigue hasta el cierre del mercado, no 60 s
         const resting = !!result?._restingGtd;
         const preShares = resting ? (result._preFilledShares || 0) : 0;
@@ -833,10 +988,13 @@ class PolymarketClient {
         while (Date.now() < deadline) {
           await new Promise(r => setTimeout(r, Math.min(POLL_INTERVAL_MS, Math.max(0, deadline - Date.now()))));
           try {
-            const orderData = await this.clobClient.getOrder(orderId);
+            const orderData = await this._getOrderSafe(orderId);
+            if (!orderData) { logger.warn(`[LIVE] Poll: getOrder falló — se mantiene filled=${lastMatched}`); continue; }
             const rawStatus = orderData?.status || orderStatus;
             orderStatus = String(rawStatus).toLowerCase(); // normalizar a minúsculas
-            lastMatched = parseFloat(orderData?.size_matched || orderData?.sizeFilled || 0) || 0;
+            // Una consulta fallida antes devolvía {error} y ponía lastMatched en 0
+            lastMatched = Math.max(lastMatched, parseFloat(orderData?.size_matched || 0) || 0);
+            if (resting) { ctx.filledShares = preShares + lastMatched; ctx.filledUsdc = preUsdc + lastMatched * restPrice; }
             logger.info(`[LIVE] 🔄 Poll: status=${rawStatus} filled=${lastMatched}/${resting ? result._restSize : size}`);
 
             if (orderStatus === 'matched') {
@@ -848,7 +1006,7 @@ class PolymarketClient {
               }
               return { success: true, orderId, status: 'matched', fillTimeMs };
             }
-            if (orderStatus === 'cancelled' || orderStatus === 'canceled' || orderStatus === 'expired') {
+            if (FINAL_STATUSES.has(orderStatus)) {
               logger.warn(`[LIVE] ⚠️ Orden ${orderStatus} durante poll (llenado ${lastMatched})`);
               break;
             }
@@ -858,19 +1016,17 @@ class PolymarketClient {
         }
 
         // Cierre o timeout: cancelar lo que quede y contar lo que haya llenado (total o parcial)
-        if (orderStatus !== 'cancelled' && orderStatus !== 'canceled' && orderStatus !== 'expired') {
+        if (!FINAL_STATUSES.has(orderStatus)) {
           logger.warn(`[LIVE] ⏱️ ${resting ? 'Cierre del mercado' : `Timeout GTC (${GTC_TIMEOUT_MS/1000}s)`} — cancelando orden ${orderId}`);
-          try {
-            await this.clobClient.cancelOrder({ orderID: orderId });
-            logger.info(`[LIVE] 🚫 Orden cancelada`);
-          } catch (cancelErr) {
-            logger.error(`[LIVE] Error cancelando orden ${orderId}: ${cancelErr.message}`);
+          const c = await this._cancelChecked(orderId);
+          if (c.ok) logger.info(`[LIVE] 🚫 Orden cancelada${c.finalStatus ? ` (ya estaba ${c.finalStatus})` : ''}`);
+          else {
+            logger.error(`[LIVE] ❌ No se pudo confirmar la cancelación de ${orderId}: ${c.error} — puede seguir viva en el libro`);
+            try { require('./alerts').alertOperational?.('Cancelación de orden sin confirmar', `orderID ${orderId}: ${c.error}`); } catch (_) {}
           }
         }
-        try {
-          const finalData = await this.clobClient.getOrder(orderId);
-          lastMatched = parseFloat(finalData?.size_matched || finalData?.sizeFilled || 0) || lastMatched;
-        } catch (_) {}
+        const finalData = await this._getOrderSafe(orderId);
+        if (finalData) lastMatched = Math.max(lastMatched, parseFloat(finalData.size_matched || 0) || 0);
 
         const fill = withPreFill(lastMatched);
         if (fill.sizeFilled > 0) {
@@ -933,25 +1089,28 @@ class PolymarketClient {
       const exitPrice = require('./book-utils').bestOfBook(book).bestBid || 0; // max(bids)
       if (!exitPrice) return { success: false, error: 'sin liquidez para salir' };
 
-      logger.info(`[POSITION-MONITOR] 🚪 Cerrando ${posId} — ${exitSide} ${size}t @ $${exitPrice.toFixed(3)}`);
-      const orderParams = {
-        tokenID: tokenId,
-        size,
-        side: exitSide === 'BUY' ? Side.BUY : Side.SELL,
-        // FAK (Fill And Kill) en vez de FOK: llena lo que haya en el book
-        // y cancela el resto. Con FOK si no hay tamaño exacto la orden muere
-        // y la posición queda abierta hasta resolución — peor que un cierre parcial.
-        orderType: OrderType.FAK,
-        price: exitPrice,
-      };
-      const result = await this.clobClient.createAndPostOrder(orderParams);
-      const ok = result?.success && (String(result?.status || '')).toLowerCase() === 'matched';
+      // Vender floor(saldo real del token): Math.round del tamaño registrado podía pedir más
+      // acciones de las que hay y la orden se rechazaba
+      const bal = await this._tokenBalance(tokenId);
+      const shares = Math.floor(bal != null ? Math.min(size, bal) : size);
+      if (!(shares > 0)) return { success: false, error: `sin acciones para vender (saldo ${bal})` };
+      logger.info(`[POSITION-MONITOR] 🚪 Cerrando ${posId} — ${exitSide} ${shares}t @ $${exitPrice.toFixed(3)} (saldo ${bal ?? 'n/a'})`);
+      // FAK (llena lo que haya y cancela el resto) como 3er argumento: dentro del objeto la
+      // librería lo ignoraba y la venta salía GTC (quedaba en el libro). SELL: amount = acciones.
+      const result = await this.clobClient.createAndPostMarketOrder(
+        { tokenID: tokenId, side: Side.SELL, amount: shares, price: exitPrice },
+        ORDER_OPTS, OrderType.FAK);
+      // SELL: makingAmount = acciones entregadas, takingAmount = USDC recibido
+      const soldShares = parseFloat(result?.makingAmount || 0) || 0;
+      const usdcIn = parseFloat(result?.takingAmount || 0) || 0;
+      const ok = !result?.error && result?.success !== false && soldShares > 0;
+      const avg = ok && usdcIn > 0 ? parseFloat((usdcIn / soldShares).toFixed(4)) : exitPrice;
       if (ok) {
-        logger.info(`[POSITION-MONITOR] ✅ Posición ${posId} cerrada @ $${exitPrice.toFixed(3)}`);
+        logger.info(`[POSITION-MONITOR] ✅ Posición ${posId}: vendidas ${soldShares}/${shares} @ $${avg.toFixed(3)}`);
       } else {
-        logger.warn(`[POSITION-MONITOR] ⚠️ No se pudo cerrar ${posId}: ${result?.errorMsg || 'sin fill'}`);
+        logger.warn(`[POSITION-MONITOR] ⚠️ No se pudo cerrar ${posId}: ${result?.errorMsg || JSON.stringify(result?.error || '') || 'sin fill'}`);
       }
-      return { success: ok, price: exitPrice, result };
+      return { success: ok, price: avg, soldShares, partial: ok && soldShares < shares, result };
     } catch (e) {
       logger.error(`[POSITION-MONITOR] Error cerrando ${posId}: ${e.message}`);
       return { success: false, error: e.message };
@@ -1088,21 +1247,20 @@ class PolymarketClient {
         const orderParams = {
           tokenID: tokenId, size: remainingSize,
           side: isBuy ? Side.BUY : Side.SELL,
-          orderType: OrderType.GTC,
           price: currentPrice,
         };
 
         let result;
         try {
-          result = await this.clobClient.createAndPostOrder(orderParams);
+          result = await this.clobClient.createAndPostOrder(orderParams, ORDER_OPTS, OrderType.GTC);
         } catch (e) {
           logger.warn(`[RETRY] error al postear intento ${attempt}: ${e.message}`);
           await new Promise(r => setTimeout(r, 1500));
           continue;
         }
 
-        if (!result?.success) {
-          const errMsg = result?.errorMsg || result?.error || '';
+        if (!result?.success || result?.error) {
+          const errMsg = String(result?.errorMsg || result?.error || '');
           logger.warn(`[RETRY] intento ${attempt} rechazado: ${errMsg || 'sin detalle'}`);
 
           // Si Polymarket está en mantenimiento → NO_FILL inmediato, no reintentar
@@ -1114,7 +1272,7 @@ class PolymarketClient {
           if (errMsg.toLowerCase().includes('not enough balance') || errMsg.toLowerCase().includes('allowance')) {
             logger.warn(`[RETRY] ⚡ Detectado error de allowance — refrescando balance cache...`);
             try {
-              await this.clobClient.updateBalanceAllowance({ assetType: 'COLLATERAL', signatureType: 3 });
+              await this.clobClient.updateBalanceAllowance({ asset_type: 'COLLATERAL' });
               logger.info(`[RETRY] ✅ Balance allowance actualizado — reintentando`);
             } catch (updateErr) {
               logger.warn(`[RETRY] Error al actualizar allowance: ${updateErr.message}`);
@@ -1142,9 +1300,11 @@ class PolymarketClient {
         while (Date.now() < attemptDeadline) {
           await new Promise(r => setTimeout(r, POLL_MS));
           try {
-            const orderData = await this.clobClient.getOrder(orderId);
+            const orderData = await this._getOrderSafe(orderId);
+            if (!orderData) continue; // consulta fallida: no se pisa lo ya llenado
             orderStatus = (String(orderData?.status || orderStatus)).toLowerCase();
-            thisOrderFilled = parseFloat(orderData?.size_matched || orderData?.sizeFilled || 0) || 0;
+            thisOrderFilled = Math.max(thisOrderFilled, parseFloat(orderData?.size_matched || 0) || 0);
+            if (rec.ctx) { rec.ctx.filledShares = filledSoFar + thisOrderFilled; rec.ctx.filledUsdc = (filledSoFar + thisOrderFilled) * currentPrice; }
             if (thisOrderFilled > 0 && thisOrderFilled < remainingSize) {
               logger.info(`[RETRY] 🔶 Fill parcial detectado: ${thisOrderFilled}/${remainingSize} en esta orden — se sigue esperando el resto`);
             }
@@ -1157,7 +1317,7 @@ class PolymarketClient {
               logger.info(`[RETRY] ✅ Fill en intento ${attempt} @ $${currentPrice.toFixed(3)} — ${filledSoFar}/${size} (${fillTimeMs}ms total)`);
               return { success: true, orderId, status: 'matched', fillTimeMs, attempts: attempt, fillPrice: currentPrice, sizeFilled: filledSoFar };
             }
-            if (orderStatus === 'cancelled' || orderStatus === 'canceled') break;
+            if (FINAL_STATUSES.has(orderStatus)) break;
           } catch (pollErr) {
             logger.warn(`[RETRY] poll error: ${pollErr.message}`);
           }
@@ -1165,26 +1325,28 @@ class PolymarketClient {
 
         // No llenó del todo en este intento — cancelar el remanente antes de
         // reintentar (crítico: nunca dejar dos órdenes vivas al mismo tiempo)
-        if (orderStatus !== 'matched' && orderStatus !== 'cancelled' && orderStatus !== 'canceled') {
-          try {
-            await this.clobClient.cancelOrder({ orderID: orderId });
+        if (!FINAL_STATUSES.has(orderStatus)) {
+          // cancelOrder no lanza (devuelve { error }): validar la respuesta
+          const c = await this._cancelChecked(orderId);
+          if (c.ok) {
             logger.info(`[RETRY] 🚫 intento ${attempt} cancelado (sin fill completo en ${ATTEMPT_MS/1000}s)`);
-          } catch (cancelErr) {
-            logger.error(`[RETRY] error cancelando intento ${attempt}: ${cancelErr.message}`);
+          } else {
+            logger.error(`[RETRY] error cancelando intento ${attempt}: ${c.error}`);
             // Si no pudimos confirmar la cancelación, NO reintentar con otra
             // orden — riesgo de doble posición. Cortamos acá, pero si ya
             // sabemos que hay fill parcial confirmado, lo reportamos igual.
             rec.status = 'FAILED'; rec.error = 'cancel_failed'; rec.sizeFilled = filledSoFar + thisOrderFilled;
             this._orderHistory.push(rec);
             return { success: filledSoFar + thisOrderFilled > 0, orderId, attempts: attempt,
-              error: 'cancel_failed', sizeFilled: filledSoFar + thisOrderFilled, partial: true };
+              error: 'cancel_failed', sizeFilled: filledSoFar + thisOrderFilled, partial: true,
+              fillPrice: currentPrice };
           }
           // Verificación post-cancel: si justo llenó (total o parcial) entre
           // el poll y el cancel, leer el estado final antes de seguir.
           try {
-            const finalCheck = await this.clobClient.getOrder(orderId);
+            const finalCheck = await this._getOrderSafe(orderId);
             const finalStatus = (String(finalCheck?.status || '')).toLowerCase();
-            const finalFilled = parseFloat(finalCheck?.size_matched || finalCheck?.sizeFilled || 0) || 0;
+            const finalFilled = Math.max(thisOrderFilled, parseFloat(finalCheck?.size_matched || 0) || 0);
             if (finalStatus === 'matched') {
               filledSoFar += remainingSize;
               const fillTimeMs = Date.now() - startedAt;
@@ -1221,7 +1383,7 @@ class PolymarketClient {
         logger.warn(`[RETRY] ⏱️ Presupuesto agotado tras ${attempt} intento(s) — fill PARCIAL: ${filledSoFar}/${size} tokens`);
         rec.status = 'PARTIAL'; rec.fillAttempts = attempt; rec.sizeFilled = filledSoFar;
         this._orderHistory.push(rec);
-        return { success: true, partial: true, sizeFilled: filledSoFar, requestedSize: size, attempts: attempt };
+        return { success: true, partial: true, sizeFilled: filledSoFar, requestedSize: size, attempts: attempt, fillPrice: currentPrice };
       }
       logger.warn(`[RETRY] ⏱️ Presupuesto agotado tras ${attempt} intento(s) — NO_FILL definitivo`);
       rec.status = 'REJECTED'; rec.error = 'retry_budget_exhausted'; rec.fillAttempts = attempt;
@@ -1243,39 +1405,35 @@ class PolymarketClient {
       const result = await this.clobClient.getBalanceAllowance({
         asset_type: 'COLLATERAL',
       });
+      if (result?.error) throw new Error(JSON.stringify(result.error).slice(0, 120));
       // El CLOB devuelve el balance en unidades USDC (6 decimales)
       const raw = result?.balance ?? result?.allowance ?? result?.data?.balance;
       if (raw === undefined) return null;
       return parseFloat((parseFloat(raw) / 1e6).toFixed(2));
     } catch (e) {
-      // Fallback: consultar via fetch directo
-      try {
-        const h = await this._buildAuthHeaders();
-        const res = await fetch(`${CLOB_API_BASE}/balance-allowance?asset_type=COLLATERAL`, {
-          signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-          method: 'GET', headers: h,
-        });
-        const d = await res.json();
-        const raw = d?.balance ?? d?.data?.balance;
-        if (raw === undefined) return null;
-        return parseFloat((parseFloat(raw) / 1e6).toFixed(2));
-      } catch (e2) {
-        return null;
-      }
+      // (Se eliminó el respaldo por fetch directo: mandaba el secret de la API en texto
+      // plano en un header en vez de la firma HMAC)
+      logger.warn(`[BALANCE] getBalanceAllowance falló: ${e.message}`);
+      return null;
     }
   }
 
-  // Headers L2 autenticados para llamadas directas
-  async _buildAuthHeaders() {
-    if (!this.clobClient?.creds) return {};
-    const ts = Math.floor(Date.now() / 1000);
-    return {
-      'POLY_ADDRESS':    this._depositWalletAddress,
-      'POLY-API-KEY':    this.clobClient.creds.key,
-      'POLY-SECRET':     this.clobClient.creds.secret,
-      'POLY-PASSPHRASE': this.clobClient.creds.passphrase,
-      'POLY-TIMESTAMP':  String(ts),
-    };
+  // Cancela todas las órdenes abiertas de la cuenta (arranque y apagado en real)
+  async cancelAllOrders() {
+    if (config.DRY_RUN) return { ok: true, dryRun: true };
+    try {
+      await this._init();
+      const res = await this.clobClient.cancelAll();
+      if (res?.error) return { ok: false, error: JSON.stringify(res.error).slice(0, 150) };
+      return { ok: true, canceled: Array.isArray(res?.canceled) ? res.canceled.length : 0 };
+    } catch (e) { return { ok: false, error: e.message }; }
+  }
+
+  // Saldo de un token (acciones) — para reconciliar posiciones restauradas
+  async getTokenBalance(tokenId) {
+    if (config.DRY_RUN) return null;
+    try { await this._init(); } catch (_) { return null; }
+    return this._tokenBalance(tokenId);
   }
 }
 

@@ -12,7 +12,6 @@ const { PriceToBeat } = require('./price-to-beat');
 const { FairValue } = require('./fair-value');
 const { Shadow, MARKETS_FILE: SHADOW_MARKETS_FILE, TICKS_FILE: SHADOW_TICKS_FILE } = require('./shadow');
 const { MarketRecorder } = require('./market-recorder');
-const UserWebSocket = require('./polymarket-user-ws');
 const marketResearch = require('./market-research');
 const RESEARCH_MODE = process.env.RESEARCH_MODE === 'true';
 const { SignalEngine } = require('./signal');
@@ -640,11 +639,12 @@ httpServer.listen(PORT, () => {
 
 const tracker = new PnLTracker();
 const activePositions = new Map();
+let shuttingDown = false;       // SIGTERM: no abrir posiciones nuevas
+const shutdownHooks = [];       // tareas de apagado (cancelar órdenes en real)
 require('./retention').start(); // borra grabaciones/crudos viejos del volumen cada hora
 
 let lastTradeTime = 0;
 const COOLDOWN = config.COOLDOWN_SECONDS * 1000; // configurable via Railway
-let userWs = null; // PHASE 1: Will be initialized in main()
 
 async function main() {
   logger.info('═'.repeat(70));
@@ -755,6 +755,47 @@ async function main() {
   const polyWs = new PolymarketWS();
   poly.setPolyWs(polyWs);
   polyWs.startImbalanceSampler(); // para registrar el movimiento del book en cada entrada
+
+  // ─── Arranque: posiciones restauradas y reconciliación ────────────────────
+  // Las posiciones restauradas ocupan su slot hasta el cierre del mercado (antes
+  // activePositions arrancaba vacío y se podía volver a entrar en el mismo mercado) y
+  // cuentan como acciones ya en poder para el cálculo de fills por saldo.
+  for (const p of tracker.getOpenPositions()) {
+    const id = p.posId || p.id;
+    const endMs = new Date(p.endDate).getTime();
+    if (endMs > Date.now()) {
+      activePositions.set(id, { exposure: p.usdcIn || p.entryPrice * p.size,
+        openTime: new Date(p.openedAt).getTime() || Date.now(),
+        marketId: p.marketId || p.gammaId, entryType: p.entryType || 'early' });
+      setTimeout(() => activePositions.delete(id), endMs - Date.now());
+    }
+    poly.noteHeldShares(p.tokenId, p.size);
+  }
+  if (activePositions.size) logger.info(`[ARRANQUE] ${activePositions.size} posición(es) restaurada(s) ocupan slot hasta el cierre de su mercado`);
+  if (!config.DRY_RUN) {
+    // Órdenes que quedaron vivas de la corrida anterior (p. ej. una GTD de respaldo): cancelar
+    const c = await poly.cancelAllOrders();
+    if (c.ok) logger.info(`[ARRANQUE] cancelAll: ${c.canceled ?? 0} orden(es) abierta(s) cancelada(s)`);
+    else { logger.error(`[ARRANQUE] cancelAll falló: ${c.error}`); alertOperational('cancelAll al arrancar falló', c.error); }
+    // Reconciliar posiciones restauradas contra el saldo real del token
+    for (const p of tracker.getOpenPositions()) {
+      if (!p.tokenId) continue;
+      const bal = await poly.getTokenBalance(p.tokenId);
+      if (bal == null) { logger.warn(`[RECONCILIAR] ${p.id}: no se pudo leer el saldo del token`); continue; }
+      if (bal + 0.01 < p.size) {
+        const msg = `${p.id}: el tracker tiene ${p.size} acciones y la wallet ${bal}`;
+        logger.warn(`[RECONCILIAR] ⚠️ ${msg}${new Date(p.endDate).getTime() > Date.now() ? ' — se ajusta al saldo' : ' (mercado cerrado: pudo haberse cobrado)'}`);
+        if (new Date(p.endDate).getTime() > Date.now() && bal > 0) p.size = parseFloat(bal.toFixed(4));
+        alertOperational('Posición no coincide con la wallet', msg);
+      } else logger.info(`[RECONCILIAR] ${p.id}: ${p.size} acciones OK (saldo ${bal})`);
+    }
+  }
+  // Apagado ordenado: en real, cancelar las órdenes abiertas
+  shutdownHooks.push(async () => {
+    if (config.DRY_RUN) return;
+    const c = await poly.cancelAllOrders();
+    logger.warn(`[SHUTDOWN] cancelAll: ${c.ok ? `${c.canceled ?? 0} cancelada(s)` : `falló (${c.error})`}`);
+  });
 
   // ─── Instrumentación observacional (NO afecta trading) ────────────────────
   const clRTDS    = new ChainlinkRTDS();   // TWAP 30s + 60s de Chainlink
@@ -933,22 +974,8 @@ async function main() {
   }
   // ─────────────────────────────────────────────────────────────────────────
 
-  // PHASE 1: Initialize User WebSocket for real-time fill detection
-  if (!config.DRY_RUN) {
-    // Auth header for User WS (derived from CLOB credentials)
-    const authHeader = process.env.USER_WS_AUTH || config.POLY_API_KEY;
-    if (authHeader) {
-      userWs = new UserWebSocket(authHeader);
-      // Wire up fill detection callback
-      userWs.onFill((fillInfo) => {
-        logger.info(`[PHASE1-FILL-WS] Detected fill: ${fillInfo.orderId}`);
-        // Mark in signal-logger that this fill was detected via User WS
-        // We'll use this flag when logging telemetry
-        if (!global.ws_detected_fills) global.ws_detected_fills = {};
-        global.ws_detected_fills[fillInfo.orderId] = fillInfo;
-      });
-    }
-  }
+  // (User WebSocket eliminado: autenticaba con un header y esperaba {type,data}, que no es
+  // el protocolo de Polymarket — nunca detectó un fill. Los fills se confirman por getOrder.)
 
   let cachedMarket = null;
   let nextMarketCache = null;   // FIX A: mercado pre-fetcheado
@@ -1561,9 +1588,6 @@ async function main() {
   polyWs.connect().catch(err => logger.warn(`Polymarket WS no disponible: ${err.message} — usando HTTP polling`));
 
   // PHASE 1: Connect User WebSocket for fill detection
-  if (userWs) {
-    userWs.connect().catch(err => logger.warn(`User WS no disponible: ${err.message} — fills detected via polling`));
-  }
 
   // PHASE 2: Run diagnostics at startup
   if (process.env.ENABLE_PHASE2_DIAGNOSTICS !== 'false') {
@@ -1677,7 +1701,9 @@ async function main() {
             });
             if (exitResult.success) {
               const exitPrice = exitResult.price;
-              const pnl = parseFloat(((exitPrice - pos.entryPrice) * pos.size).toFixed(2));
+              const sold = exitResult.soldShares > 0 ? exitResult.soldShares : pos.size;
+              if (exitResult.partial) logger.warn(`[POSITION-MONITOR] 🔶 Venta parcial de ${pos.id}: ${sold}/${pos.size} — el resto queda en la wallet hasta la resolución`);
+              const pnl = parseFloat(((exitPrice - pos.entryPrice) * sold).toFixed(2));
               tracker.forceClosePosition(pos.id, pnl, reason);
               closingPositions.delete(pos.id);
             } else {
@@ -1964,6 +1990,7 @@ async function main() {
     // TRADING_PAUSED=true: no abre posiciones nuevas (las abiertas se resuelven igual).
     // MAX_DAILY_LOSS_USDC: con el P&L cerrado del día UTC ≤ −límite, no entra hasta las
     // 00:00 UTC. Sin estas variables no cambia nada.
+    if (shuttingDown) return; // apagado en curso
     if (process.env.TRADING_PAUSED === 'true') {
       if (!global._pausedLogged) {
         global._pausedLogged = true;
@@ -1973,12 +2000,21 @@ async function main() {
     }
     const maxDailyLoss = parseFloat(process.env.MAX_DAILY_LOSS_USDC || '0');
     if (maxDailyLoss > 0) {
+      // Peor caso del día: P&L cerrado (ya neto de comisiones) − lo comprometido en
+      // posiciones abiertas sin resolver − su comisión taker. Antes solo el P&L cerrado,
+      // así que varias posiciones abiertas podían pasar el límite antes de resolverse.
       const dailyPnL = tracker.getDailyPnL();
-      if (dailyPnL <= -maxDailyLoss) {
+      const open = tracker.getOpenPositions();
+      const committed = open.reduce((t, p) => t + (p.usdcIn || p.entryPrice * p.size), 0);
+      const openFees = open.reduce((t, p) => t + 0.07 * p.entryPrice * (1 - p.entryPrice) * p.size, 0);
+      const worstCase = dailyPnL - committed - openFees;
+      if (worstCase <= -maxDailyLoss) {
         const day = new Date().toISOString().slice(0, 10);
         if (global._dailyLossLoggedFor !== day) {
           global._dailyLossLoggedFor = day;
-          logger.warn(`[LÍMITE DIARIO] P&L del día $${dailyPnL.toFixed(2)} ≤ −$${maxDailyLoss} — sin entradas hasta las 00:00 UTC`);
+          const msg = `P&L del día $${dailyPnL.toFixed(2)} − abierto $${committed.toFixed(2)} − comisiones $${openFees.toFixed(2)} = $${worstCase.toFixed(2)} ≤ −$${maxDailyLoss}`;
+          logger.warn(`[LÍMITE DIARIO] ${msg} — sin entradas nuevas`);
+          alertOperational('Límite de pérdida diaria alcanzado', msg);
         }
         return;
       }
@@ -2671,6 +2707,7 @@ async function main() {
     if (!config.DRY_RUN) {
       // Fuera del try: el catch lo usa (antes era const dentro del try → ReferenceError)
       let depthInfo = null;
+      let liveFill = null, liveOpened = false; // fill confirmado / posición ya registrada
       try {
         // Determinar tipo de orden según el número de entrada en este mercado
         // Entrada 0 (primera) → FAK (instantáneo)
@@ -2765,10 +2802,10 @@ async function main() {
         // T7 = order filled (either immediately or after time_to_fill_ms)
         const t6_order_resting_ms = orderStatus === 'live' ? t5_order_accepted_ms : null;
         const t7_order_filled_ms = orderStatus === 'matched' ? t5_order_accepted_ms : null;
-        // Exigir status=matched O sizeFilled verificable — fillPrice solo no alcanza
-        const reallyFilled = orderResult.success &&
-          (orderStatus === 'matched' ||
-           (orderResult.sizeFilled > 0 && orderResult.fillPrice > 0 && orderResult.fillPrice < 1));
+        // Llenó si hay acciones llenadas (total o parcial). placeLimitOrder garantiza que todo
+        // resultado con sizeFilled trae fillPrice promedio ponderado. Antes se exigía
+        // status=matched o fillPrice, y los parciales sin fillPrice salían como NO_FILL.
+        const reallyFilled = orderResult.success && orderResult.sizeFilled > 0;
         
         if (!orderResult.success || !reallyFilled) {
           const reason = orderResult.error === 'gtc_timeout'
@@ -2848,7 +2885,8 @@ async function main() {
 
         const fillMs = orderResult.fillTimeMs || null;
         // FIX: sizeFilled = shares recibidas (takingAmount en BUY), no USDC
-        const actualSize  = orderResult.sizeFilled > 0 ? Math.round(orderResult.sizeFilled) : size;
+        // Sin redondear: Math.round podía registrar más acciones de las compradas
+        const actualSize  = parseFloat(orderResult.sizeFilled.toFixed(4));
         const actualPrice = (orderResult.fillPrice > 0 && orderResult.fillPrice < 1) ? orderResult.fillPrice : price;
         const actualUsdc  = orderResult.usdcSpent  > 0 ? orderResult.usdcSpent : actualPrice * actualSize;
         if (actualPrice !== price) {
@@ -2858,6 +2896,9 @@ async function main() {
           logger.warn(`[LIVE] 🔶 Fill PARCIAL: ${actualSize}/${size} shares`);
         }
         logger.info(`[LIVE] ✅ Orden llenada: ${actualSize} shares @ $${actualPrice.toFixed(4)} | USDC: $${actualUsdc.toFixed(2)} | fill_time: ${fillMs ? fillMs+'ms' : 'instantáneo'}`);
+
+        // Datos para registrar la posición aunque algo de la telemetría de abajo lance
+        liveFill = { price: actualPrice, size: actualSize };
 
         // ── MarketRecorder: FILL ─────────────────────────────────────────────
         mRecorder.recordFill({ signal_id: sig._signal_id, order_id: posId,
@@ -2961,6 +3002,7 @@ async function main() {
         );
 
         // Fix 2: tracker solo se abre DESPUÉS de fill confirmado
+        liveOpened = true;
         tracker.openPosition({
           marketId: mkt.conditionId,
           gammaId: mkt.gammaId,
@@ -2989,7 +3031,28 @@ async function main() {
         setTimeout(() => activePositions.delete(posId), 10 * 60 * 1000);
 
       } catch (err) {
-        logger.error(`[LIVE] ❌ Error: ${err.message}`);
+        logger.error(`[LIVE] ❌ Error: ${err?.stack || err.message}`);
+
+        // Excepción DESPUÉS de un fill: la posición existe en la wallet, registrarla igual
+        if (liveFill && !liveOpened) {
+          logger.warn(`[LIVE] ⚠️ Excepción después del fill — se registra la posición igual (${liveFill.size} @ $${liveFill.price})`);
+          try {
+            tracker.openPosition({
+              marketId: mkt.conditionId, gammaId: mkt.gammaId, marketQuestion: mkt.question,
+              side, price: liveFill.price, size: liveFill.size, endDate: mkt.endDate, posId, tokenId,
+              tokenOutcome: sig.direction === 'UP' ? 'YES' : 'NO', direction: sig.direction,
+              mode: 'live', entryType,
+              onClose: () => { activePositions.delete(posId); signalLogger.stopTickRecorder(posId); },
+            });
+            const msLeft = new Date(mkt.endDate).getTime() - Date.now();
+            setTimeout(() => activePositions.delete(posId), Math.max(0, msLeft));
+          } catch (e2) {
+            logger.error(`[LIVE] ❌ No se pudo registrar la posición llenada ${posId}: ${e2.message}`);
+            alertOperational('Posición llenada sin registrar', `${posId} ${liveFill.size} @ $${liveFill.price}: ${e2.message}`);
+          }
+          return;
+        }
+        if (liveOpened) return; // la posición ya quedó registrada; el error fue después
 
         // PHASE 0: Log error as NO_FILL
         // PHASE 1: Include latency tracking (may be partial if error occurred mid-flow)
@@ -3276,13 +3339,23 @@ process.on('uncaughtException', (err) => {
   setTimeout(() => process.exit(1), 4000).unref();
 });
 
-// PHASE 1: Cleanup on exit
-process.on('SIGTERM', () => {
-  if (userWs) userWs.close();
+// Apagado ordenado (redeploy de Railway = SIGTERM): no abrir posiciones nuevas, cancelar
+// órdenes abiertas (real), guardar el tracker, vaciar los buffers de archivos, cerrar el
+// server HTTP y salir. Antes salía en el acto y podía cortar una escritura a medias.
+async function gracefulShutdown(sig) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.warn(`[SHUTDOWN] ${sig} — sin entradas nuevas, cerrando ordenado`);
+  setTimeout(() => process.exit(0), parseInt(process.env.SHUTDOWN_TIMEOUT_MS || '8000')).unref();
+  for (const h of shutdownHooks) {
+    try { await h(); } catch (e) { logger.warn(`[SHUTDOWN] ${e.message}`); }
+  }
+  try { tracker._saveToDisk(); } catch (e) { logger.warn(`[SHUTDOWN] tracker: ${e.message}`); }
+  try { require('./async-append').flushSync(); } catch (_) {}
+  await new Promise(r => { try { httpServer.close(() => r()); } catch (_) { r(); } setTimeout(r, 1500).unref(); });
+  logger.info('[SHUTDOWN] listo');
   process.exit(0);
-});
-process.on('SIGINT', () => {
-  if (userWs) userWs.close();
-  process.exit(0);
-});
+}
+process.on('SIGTERM', () => { gracefulShutdown('SIGTERM'); });
+process.on('SIGINT', () => { gracefulShutdown('SIGINT'); });
 // build trigger 1788958727

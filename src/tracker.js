@@ -192,6 +192,23 @@ class PnLTracker {
     }
   }
  
+  // Ganador según el CLOB: GET /markets/{conditionId} → tokens[{ outcome, winner }].
+  // tokens[0] es Up/Yes (= yesTokenId del bot). null si todavía no hay ganador.
+  async _clobWinner(conditionId) {
+    try {
+      const res = await fetch(`https://clob.polymarket.com/markets/${conditionId}`, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return null;
+      const m = await res.json();
+      const toks = Array.isArray(m?.tokens) ? m.tokens : [];
+      const idx = toks.findIndex(t => t?.winner === true);
+      if (idx < 0) return null;
+      const o = String(toks[idx].outcome || '').toLowerCase();
+      if (o === 'yes' || o === 'up') return 'YES';
+      if (o === 'no' || o === 'down') return 'NO';
+      return idx === 0 ? 'YES' : 'NO';
+    } catch (_) { return null; }
+  }
+
   async _getMarketResult(marketId, gammaId, endDate) {
     try {
       const id = gammaId || marketId;
@@ -220,11 +237,16 @@ class PnLTracker {
         if (pYes >= 0.99) return 'YES';
         if (pNo >= 0.99) return 'NO';
       } else {
-        // Sin cierre oficial pasados RESOLVE_GRACE_MIN: mejor dato disponible, avisado
+        // Sin cierre en Gamma pasados RESOLVE_GRACE_MIN: el CLOB marca el token ganador
+        // (tokens[].winner). Antes se resolvía con precios ≥ 0.95 del mercado abierto, que
+        // no son el resultado. Si el CLOB tampoco lo tiene, se sigue esperando.
         const lateMin = endDate ? (Date.now() - new Date(endDate).getTime()) / 60000 : 0;
-        if (lateMin > RESOLVE_GRACE_MIN && (pYes >= 0.95 || pNo >= 0.95)) {
-          logger.warn(`Mercado ${id} sin cerrar a ${lateMin.toFixed(0)} min del fin — resuelvo con precios (${prices[0]}/${prices[1]})`);
-          return pYes >= 0.95 ? 'YES' : 'NO';
+        if (lateMin > RESOLVE_GRACE_MIN && marketId) {
+          const w = await this._clobWinner(marketId);
+          if (w) {
+            logger.warn(`Mercado ${id} sin cerrar en Gamma a ${lateMin.toFixed(0)} min del fin — ganador según el CLOB: ${w}`);
+            return w;
+          }
         }
         return null;
       }
