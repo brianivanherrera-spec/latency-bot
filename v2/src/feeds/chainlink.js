@@ -15,7 +15,7 @@ class ChainlinkSeries {
 
   start() {
     this.client = new WsClient({
-      url: this.cfg.RTDS_WS, name: this.name, log: this.log, pingText: 'PING', pingMs: 5000,
+      url: this.cfg.RTDS_WS, name: this.name, log: this.log, pingText: 'PING', pingMs: 5000, dataTimeoutMs: 10000,
       onOpen: (c) => {
         c.send({ action: 'subscribe', subscriptions: [{ topic: this.topic, type: '*', filters: '{"symbol":"btc/usd"}' }] });
         this.log.info(`✅ ${this.name} suscripto (${this.topic})`);

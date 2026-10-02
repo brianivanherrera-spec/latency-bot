@@ -57,9 +57,11 @@ class Strategy {
           sh += l.size; limit = l.price;
           if (sh >= held) break;
         }
-        if (sh > 0) {
+        // Polymarket no acepta órdenes de menos de 5 acciones (mk.minShares)
+        const sellSh = Math.min(sh, held);
+        if (sellSh >= (mk.minShares || this.cfg.MIN_ORDER_SHARES_DEFAULT)) {
           this.busy.add(mk.gammaId);
-          this.executor.sell(mk, side, Math.min(sh, held), limit, {
+          this.executor.sell(mk, side, sellSh, limit, {
             q: round(q, 4), secsLeft: Math.round(secsLeft), reason: 'mercado_paga_de_mas',
             onResult: () => this.busy.delete(mk.gammaId),
           });

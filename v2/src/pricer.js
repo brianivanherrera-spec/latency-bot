@@ -22,6 +22,8 @@ class Pricer {
     Object.assign(this, { cfg, btc, clSpot, clTwap });
     this.basis = null; this.basisN = 0;
     clSpot.onPoint = (pt) => this._updateBasis(pt);
+    // Binance (USDT) ↔ Coinbase (USD): la base es otra; se recalibra desde cero
+    btc.onSourceChange = () => { this.basis = null; this.basisN = 0; };
   }
 
   _updateBasis(pt) {
@@ -64,7 +66,9 @@ class Pricer {
     const cfg = this.cfg, W = cfg.TWAP_WINDOW_S, end = mk.endMs / 1000;
     const sigmaAbs = this.btc.sigma(now) * cfg.VOL_MULT * this.btc.last.price;   // USD por √s
     const X0 = this.btc.last.price + this.basis;
-    const s0 = (now + cfg.CL_LAG_MS) / 1000;
+    // X0 proyecta el Chainlink del instante del último tick de BTC + lag (antes usaba now:
+    // con un tick de hace 1-2 s la proyección quedaba corrida)
+    const s0 = (this.btc.last.ts + cfg.CL_LAG_MS) / 1000;
     const cl = this.clSpot.last(), tCL = cl.ts / 1000;
 
     // Media del TWAP de cierre, segundo a segundo

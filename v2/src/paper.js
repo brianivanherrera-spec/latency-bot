@@ -51,7 +51,11 @@ class PaperExecutor {
       const held = this.ledger.positions[mk.gammaId]?.[side]?.shares || 0;
       const fills = PaperExecutor.walk(mk.book.levels(side, 'bids'), Math.min(shares, held), limit, false);
       const got = fills.reduce((s, f) => s + f.shares, 0);
-      if (got < 1e-9) { meta.onResult?.(null); return; }
+      const minSh = mk.minShares || this.cfg.MIN_ORDER_SHARES_DEFAULT;
+      if (got < minSh - 1e-9) { // menos del mínimo de Polymarket: en real la orden se rechaza
+        if (got > 1e-9) this.log.info(`[NO-FILL] SELL ${side} ${mk.label}: ${got.toFixed(2)} acciones < mínimo ${minSh}`);
+        meta.onResult?.(null); return;
+      }
       let proceeds = 0, fee = 0;
       for (const f of fills) { mk.book.consume(side, 'bids', f.price, f.shares); proceeds += f.price * f.shares; fee += takerFee(f.price, mk.feeRate) * f.shares; }
       const fill = { shares: round(got, 4), avgPrice: round(proceeds / got, 4), proceeds: round(proceeds, 4), fee: round(fee, 4), limit };

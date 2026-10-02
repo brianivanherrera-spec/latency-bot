@@ -15,12 +15,12 @@ class BtcFeed {
 
   start() {
     this._bn = new WsClient({
-      url: this.cfg.BINANCE_WS, name: 'Binance', log: this.log,
+      url: this.cfg.BINANCE_WS, name: 'Binance', log: this.log, dataTimeoutMs: 5000,
       onOpen: () => this.log.info('✅ Binance aggTrade conectado'),
       onMessage: (raw) => {
         const m = JSON.parse(raw);
         const p = parseFloat(m.p);
-        if (p > 0) { this.source = 'binance'; this.onTick(p, Date.now()); }
+        if (p > 0) { this._setSource('binance'); this.onTick(p, Date.now()); }
       },
     }).start();
     // Respaldo: si Binance no manda nada en 10 s, prender Coinbase
@@ -29,7 +29,7 @@ class BtcFeed {
       if (stale && !this._cb) {
         this.log.warn('Binance sin datos 10 s → usando Coinbase de respaldo');
         this._cb = new WsClient({
-          url: this.cfg.COINBASE_WS, name: 'Coinbase', log: this.log,
+          url: this.cfg.COINBASE_WS, name: 'Coinbase', log: this.log, dataTimeoutMs: 30000,
           onOpen: (c) => c.send({ type: 'subscribe', product_ids: ['BTC-USD'], channel: 'ticker' }),
           onMessage: (raw) => {
             const m = JSON.parse(raw);
@@ -37,7 +37,7 @@ class BtcFeed {
             const t = m.events?.[0]?.tickers?.[0];
             const p = parseFloat(t?.price);
             // Solo si Binance sigue callado (evita mezclar USDT y USD)
-            if (p > 0 && (!this._bnAlive())) { this.source = 'coinbase'; this.onTick(p, Date.now()); }
+            if (p > 0 && (!this._bnAlive())) { this._setSource('coinbase'); this.onTick(p, Date.now()); }
           },
         }).start();
       } else if (!stale && this._cb && this.source === 'binance') {
@@ -45,6 +45,16 @@ class BtcFeed {
       }
     }, 5000);
     return this;
+  }
+
+  // Cambio de fuente (USDT ↔ USD, ~$17 de diferencia): avisar para que el pricer resetee
+  // la base Chainlink − BTC en vez de mezclar las dos
+  _setSource(src) {
+    if (src === this.source) return;
+    const prev = this.source;
+    this.source = src;
+    this.log.warn(`Fuente de BTC: ${prev} → ${src} (se recalibra la base)`);
+    try { this.onSourceChange?.(src, prev); } catch (_) {}
   }
 
   _bnAlive() { return this._bn?.connected && Date.now() - this._bn.lastMsgAt < 5000; }

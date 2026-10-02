@@ -17,7 +17,7 @@ const { report } = require('./report');
 
 const log = make('MAIN');
 const fetchJson = async (url) => {
-  const r = await fetch(url, { headers: { accept: 'application/json' } });
+  const r = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(cfg.FETCH_TIMEOUT_MS) });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 };
@@ -48,7 +48,7 @@ function main() {
   for (const [gammaId, p] of Object.entries(app.ledger.positions)) {
     const mk = { gammaId, label: p.label, startMs: p.startMs, endMs: p.startMs + cfg.WINDOW_MS };
     log.info(`Posición pendiente de ${p.label}: se resuelve al volver Gamma`);
-    app.resolver.onClose(mk);
+    app.resolver.onClose(mk); // si el scheduler cierra el mismo mercado después, onClose lo ignora
   }
 
   setInterval(() => {

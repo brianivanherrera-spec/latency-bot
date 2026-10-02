@@ -4,7 +4,8 @@ const os = require('os'), fs = require('fs'), path = require('path');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'v2t-'));
 process.env.DATA_DIR = dir;
 const base = require('../src/config');
-const cfg = { ...base, DATA_DIR: dir, SIM_LATENCY_MS: 0, EDGE_MIN: 0.03, KELLY_FRACTION: 0.25, MAX_STAKE_USD: 10, PAPER_BANKROLL: 100 };
+// STALE_BOOK_MS alto: el test evalúa con relojes simulados (now + 10 s) sobre un libro actualizado en tiempo real
+const cfg = { ...base, DATA_DIR: dir, STALE_BOOK_MS: 60000, SIM_LATENCY_MS: 0, EDGE_MIN: 0.03, KELLY_FRACTION: 0.25, MAX_STAKE_USD: 10, PAPER_BANKROLL: 100 };
 const quiet = { info() {}, warn() {}, debug() {}, error() {} };
 const { MarketBook } = require('../src/feeds/book');
 const { PaperExecutor } = require('../src/paper');
@@ -34,8 +35,18 @@ const fills = PaperExecutor.walk(book.levels('UP', 'asks'), 30, 0.60, true);
 assert.ok(fills.length === 2 && fills[0].price === 0.59 && fills[1].shares === 15, 'walk: 15 @0.59 + 15 @0.60, se frena en el límite');
 book.consume('UP', 'asks', 0.59, 15);
 assert.eq(book.best('UP').ask, 0.60, 'liquidez tomada en paper no se reusa');
+// G4: un snapshot/delta con el mismo tamaño NO libera lo tomado (antes sí, y el paper
+// volvía a comprar la misma liquidez); se libera si el tamaño baja o pasa CONSUMED_TTL_MS
 book.handle({ event_type: 'price_change', price_changes: [{ asset_id: 'U', price: '0.59', size: '15', side: 'SELL' }] });
-assert.eq(book.best('UP').ask, 0.59, 'si el nivel cambia en el WS, vuelve a estar disponible');
+assert.eq(book.best('UP').ask, 0.60, 'mismo tamaño en el WS: lo tomado sigue descontado');
+book.handle({ event_type: 'book', asset_id: 'U', bids: [{ price: '0.55', size: '100' }, { price: '0.56', size: '50' }], asks: [{ price: '0.59', size: '15' }, { price: '0.60', size: '20' }, { price: '0.62', size: '100' }] });
+assert.eq(book.best('UP').ask, 0.60, 'snapshot nuevo con el mismo tamaño: sigue descontado');
+book.handle({ event_type: 'price_change', price_changes: [{ asset_id: 'U', price: '0.59', size: '0', side: 'SELL' }] });
+book.handle({ event_type: 'price_change', price_changes: [{ asset_id: 'U', price: '0.59', size: '15', side: 'SELL' }] });
+assert.eq(book.best('UP').ask, 0.59, 'el nivel bajó (alguien lo tomó) y volvió: disponible de nuevo');
+book.consume('UP', 'asks', 0.59, 15);
+const ck = book.consumed.get('UP|asks|0.5900'); ck.at -= (cfg.CONSUMED_TTL_MS + 1);
+assert.eq(book.best('UP').ask, 0.59, `pasados ${cfg.CONSUMED_TTL_MS} ms lo tomado deja de descontarse`);
 
 // ── Estrategia: entra solo con ventaja después de comisión ─────────────────
 const ledger = new Ledger({ cfg, log: quiet });

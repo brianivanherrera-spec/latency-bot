@@ -27,7 +27,8 @@ module.exports = {
   // Datos frescos (si no, no opera)
   STALE_BINANCE_MS: num('V2_STALE_BINANCE_MS', 2000),
   STALE_CHAINLINK_MS: num('V2_STALE_CHAINLINK_MS', 6000),
-  STALE_BOOK_MS: num('V2_STALE_BOOK_MS', 30000),        // sin ningún mensaje del libro en 30 s → no confiar
+  STALE_BOOK_MS: num('V2_STALE_BOOK_MS', 5000),         // sin ningún mensaje del libro en 5 s → no confiar
+  CONSUMED_TTL_MS: num('V2_CONSUMED_TTL_MS', 10000),    // paper: liquidez tomada se descuenta hasta 10 s
 
   // Decisión
   EDGE_MIN: num('V2_EDGE_MIN', 0.03),                   // ventaja mínima POR ACCIÓN, ya descontada la comisión
@@ -57,10 +58,12 @@ module.exports = {
   // Resolución
   RESOLVE_POLL_MS: num('V2_RESOLVE_POLL_MS', 15000),
   RESOLVE_TIMEOUT_MS: num('V2_RESOLVE_TIMEOUT_MS', 15 * 60000),
+  RESOLVE_MAX_POLL_MS: num('V2_RESOLVE_MAX_POLL_MS', 10 * 60000), // backoff máximo tras el timeout
 
   // Endpoints
   GAMMA: process.env.V2_GAMMA || 'https://gamma-api.polymarket.com',
   POLY_WS: process.env.V2_POLY_WS || 'wss://ws-subscriptions-clob.polymarket.com/ws/market',
+  FETCH_TIMEOUT_MS: num('V2_FETCH_TIMEOUT_MS', 5000),
   RTDS_WS: process.env.V2_RTDS_WS || 'wss://ws-live-data.polymarket.com',
   BINANCE_WS: process.env.BINANCE_WS_URL || 'wss://stream.binance.com:9443/ws/btcusdt@aggTrade',
   COINBASE_WS: process.env.V2_COINBASE_WS || 'wss://advanced-trade-ws.coinbase.com',

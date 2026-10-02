@@ -15,13 +15,19 @@ class MarketBook {
     this.tick = market.tickSize || 0.01;
     this.lastUpdate = 0;
     this.resolvedHint = null;   // winner según market_resolved, si llega
-    this.consumed = new Map();  // paper: liquidez que ya "tomamos" → key side|book|price → shares
+    // paper: liquidez que ya "tomamos" → key side|book|price → { shares, at, levelSize }.
+    // Se mantiene hasta que el tamaño observado del nivel baje (alguien la tomó, en real
+    // nosotros) o pasen CONSUMED_TTL_MS. Antes cada snapshot/delta la borraba y el paper
+    // volvía a comprar la misma liquidez.
+    this.consumed = new Map();
   }
 
   start() {
     this.client = new WsClient({
       url: this.cfg.POLY_WS, name: `Book ${this.market.label}`, log: this.log, pingText: 'PING', pingMs: 10000,
-      onOpen: (c) => c.send({ assets_ids: [this.market.upToken, this.market.downToken], type: 'market', custom_feature_enabled: true }),
+      dataTimeoutMs: 5000,
+      // Reconexión: el libro viejo no vale hasta el próximo snapshot (G5)
+      onOpen: (c) => { this.books.UP.snap = false; this.books.DOWN.snap = false; c.send({ assets_ids: [this.market.upToken, this.market.downToken], type: 'market', custom_feature_enabled: true }); },
       onMessage: (raw) => {
         if (raw[0] !== '{' && raw[0] !== '[') return; // p. ej. "INVALID OPERATION"
         const parsed = JSON.parse(raw);
@@ -67,14 +73,18 @@ class MarketBook {
     if (!(px > 0 && px < 1) || !Number.isFinite(sz)) return;
     const key = px.toFixed(4);
     if (sz <= 0) this.books[side][bookSide].delete(key); else this.books[side][bookSide].set(key, sz);
-    this.consumed.delete(`${side}|${bookSide}|${key}`); // el nivel cambió: lo que "tomamos" en paper ya no aplica
+    const ck = `${side}|${bookSide}|${key}`, c = this.consumed.get(ck);
+    if (c && (sz <= 0 || sz < c.levelSize - 1e-9)) this.consumed.delete(ck); // el nivel bajó: ya se descontó solo
   }
 
   // Niveles ordenados (asks ascendente, bids descendente), descontando lo que el paper ya tomó
   levels(side, bookSide) {
     const arr = [];
+    const now = Date.now(), ttl = this.cfg.CONSUMED_TTL_MS ?? 10000;
     for (const [k, sz] of this.books[side][bookSide]) {
-      const left = sz - (this.consumed.get(`${side}|${bookSide}|${k}`) || 0);
+      const ck = `${side}|${bookSide}|${k}`, c = this.consumed.get(ck);
+      if (c && now - c.at > ttl) this.consumed.delete(ck);
+      const left = sz - (c && now - c.at <= ttl ? c.shares : 0);
       if (left > 1e-9) arr.push({ price: parseFloat(k), size: left });
     }
     return arr.sort((a, b) => bookSide === 'asks' ? a.price - b.price : b.price - a.price);
@@ -86,8 +96,10 @@ class MarketBook {
   }
 
   consume(side, bookSide, price, shares) {
-    const key = `${side}|${bookSide}|${price.toFixed(4)}`;
-    this.consumed.set(key, (this.consumed.get(key) || 0) + shares);
+    const k = price.toFixed(4), key = `${side}|${bookSide}|${k}`;
+    const prev = this.consumed.get(key);
+    const levelSize = this.books[side][bookSide].get(k) ?? 0;
+    this.consumed.set(key, { shares: (prev?.shares || 0) + shares, at: Date.now(), levelSize: prev ? prev.levelSize : levelSize });
   }
 
   healthy(now = Date.now()) {

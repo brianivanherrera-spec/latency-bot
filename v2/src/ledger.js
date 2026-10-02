@@ -19,18 +19,36 @@ class Ledger {
     this._load();
   }
 
+  // Sin archivo = primer arranque. Archivo ilegible = NO es primer arranque: antes el catch
+  // lo trataba igual y reseteaba la banca a $100 sin aviso. Ahora se guarda una copia
+  // .corrupt, se loguea y se aborta para revisarlo a mano.
   _load() {
-    try {
-      const s = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
-      Object.assign(this, { cash: s.cash, positions: s.positions || {}, day: s.day || this.day, totals: s.totals || this.totals });
-      this.log.info(`Estado recuperado: banca $${this.cash.toFixed(2)}, ${Object.keys(this.positions).length} posiciones abiertas`);
-    } catch (_) { /* primer arranque */ }
+    let raw;
+    try { raw = fs.readFileSync(this.stateFile, 'utf8'); }
+    catch (e) {
+      if (e.code === 'ENOENT') return; // primer arranque
+      throw e;
+    }
+    let s;
+    try { s = JSON.parse(raw); if (!s || typeof s.cash !== 'number') throw new Error('sin campo cash'); }
+    catch (e) {
+      const bad = `${this.stateFile}.corrupt-${Date.now()}`;
+      try { fs.copyFileSync(this.stateFile, bad); } catch (_) {}
+      this.log.error(`Estado corrupto en ${this.stateFile} (${e.message}) — copia en ${bad}. Se aborta para no resetear la banca.`);
+      throw new Error(`estado corrupto: ${e.message}`);
+    }
+    Object.assign(this, { cash: s.cash, positions: s.positions || {}, day: s.day || this.day, totals: s.totals || this.totals });
+    this.log.info(`Estado recuperado: banca $${this.cash.toFixed(2)}, ${Object.keys(this.positions).length} posiciones abiertas`);
   }
 
+  // Sincrónico (writeFileSync + renameSync): dos save() asíncronos en vuelo escribían el
+  // mismo .tmp a la vez y podían dejar el archivo corrupto
   save() {
     const tmp = this.stateFile + '.tmp';
-    fs.promises.writeFile(tmp, JSON.stringify({ cash: this.cash, positions: this.positions, day: this.day, totals: this.totals }))
-      .then(() => fs.promises.rename(tmp, this.stateFile)).catch(e => this.log.warn(`save: ${e.message}`));
+    try {
+      fs.writeFileSync(tmp, JSON.stringify({ cash: this.cash, positions: this.positions, day: this.day, totals: this.totals }));
+      fs.renameSync(tmp, this.stateFile);
+    } catch (e) { this.log.error(`save: ${e.message}`); }
   }
 
   append(file, obj) { fs.promises.appendFile(file, JSON.stringify(obj) + '\n').catch(e => this.log.warn(`append: ${e.message}`)); }
@@ -72,6 +90,8 @@ class Ledger {
     const basis = (s.cost + s.fees) * frac;
     const pnl = fill.proceeds - fill.fee - basis;
     s.cost *= (1 - frac); s.fees *= (1 - frac); s.shares -= fill.shares;
+    // Polvo de redondeo (p. ej. 1e-12 acciones) contaba como posición y bloqueaba entradas
+    if (s.shares < 1e-6) { s.shares = 0; s.cost = 0; s.fees = 0; }
     this.cash += fill.proceeds - fill.fee;
     p.realized += pnl; p.sells++;
     this._rollDay(); this.day.pnl += pnl;

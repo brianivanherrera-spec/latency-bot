@@ -3,11 +3,15 @@
 const WebSocket = require('ws');
 
 class WsClient {
-  constructor({ url, name, log, onOpen, onMessage, pingText = null, pingMs = 10000, maxDelay = 30000 }) {
-    Object.assign(this, { url, name, log, onOpen, onMessage, pingText, pingMs, maxDelay });
+  // dataTimeoutMs: sin datos (sin contar PONG) en ese tiempo con el socket abierto →
+  // terminate() y reconexión. Antes no se detectaba un socket mudo y el PONG renovaba lastMsgAt.
+  constructor({ url, name, log, onOpen, onMessage, pingText = null, pingMs = 10000, maxDelay = 30000, dataTimeoutMs = 0 }) {
+    Object.assign(this, { url, name, log, onOpen, onMessage, pingText, pingMs, maxDelay, dataTimeoutMs });
     this.ws = null;
     this.connected = false;
     this.lastMsgAt = 0;
+    this.lastDataAt = 0;
+    this._watch = null;
     this._delay = 1000;
     this._stopped = false;
     this._ping = null;
@@ -20,6 +24,7 @@ class WsClient {
     this._stopped = true;
     clearTimeout(this._timer);
     clearInterval(this._ping);
+    clearInterval(this._watch);
     if (this.ws) { try { this.ws.removeAllListeners(); this.ws.terminate(); } catch (_) {} }
     this.ws = null;
     this.connected = false;
@@ -38,7 +43,21 @@ class WsClient {
       this.connected = true;
       this._delay = 1000;
       this.lastMsgAt = Date.now();
+      this.lastDataAt = Date.now();
       try { this.onOpen?.(this); } catch (e) { this.log.warn(`${this.name} onOpen: ${e.message}`); }
+      if (this.dataTimeoutMs > 0) {
+        clearInterval(this._watch);
+        this._watch = setInterval(() => {
+          if (this.ws !== ws || !this.connected) return;
+          const idle = Date.now() - this.lastDataAt;
+          if (idle > this.dataTimeoutMs) {
+            this.log.warn(`${this.name}: sin datos hace ${idle} ms — reconectando`);
+            this.lastDataAt = Date.now();
+            try { ws.terminate(); } catch (_) {}
+          }
+        }, 1000);
+        this._watch.unref?.();
+      }
       if (this.pingText) {
         clearInterval(this._ping);
         this._ping = setInterval(() => this.send(this.pingText), this.pingMs);
@@ -48,12 +67,14 @@ class WsClient {
       this.lastMsgAt = Date.now();
       const raw = data.toString();
       if (raw === 'PONG' || raw === 'pong' || raw === '') return;
+      this.lastDataAt = Date.now(); // el PONG no cuenta como dato
       try { this.onMessage?.(raw); } catch (e) { this.log.debug(`${this.name} msg: ${e.message}`); }
     });
     ws.on('error', (e) => this.log.warn(`${this.name} error: ${e.message}`));
     ws.on('close', (code) => {
       this.connected = false;
       clearInterval(this._ping);
+      clearInterval(this._watch);
       if (!this._stopped) { this.log.warn(`${this.name} desconectado (${code})`); this._retry(); }
     });
   }
