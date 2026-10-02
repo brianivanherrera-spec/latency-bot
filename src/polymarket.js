@@ -1420,6 +1420,31 @@ class PolymarketClient {
     }
   }
 
+  // Credenciales CLOB para PolyBolt (CHAINLINK_SOURCE=polybolt|both): POLYBOLT_API_* o
+  // POLY_API_*; si no hay, deriveApiKey con POLY_PRIVATE_KEY (solo deriva la existente,
+  // nunca crea una clave nueva). null si no se puede.
+  async getApiCreds() {
+    const e = process.env;
+    if (e.POLYBOLT_API_KEY && e.POLYBOLT_API_SECRET && e.POLYBOLT_API_PASSPHRASE) {
+      return { key: e.POLYBOLT_API_KEY, secret: e.POLYBOLT_API_SECRET, passphrase: e.POLYBOLT_API_PASSPHRASE };
+    }
+    if (config.POLY_API_KEY && config.POLY_API_SECRET && config.POLY_PASSPHRASE) {
+      return { key: config.POLY_API_KEY, secret: config.POLY_API_SECRET, passphrase: config.POLY_PASSPHRASE };
+    }
+    if (this.clobClient?.creds?.key) return this.clobClient.creds;
+    if (!config.POLY_PRIVATE_KEY || !HAS_CLOB_V2) return null;
+    try {
+      const pk = config.POLY_PRIVATE_KEY.startsWith('0x') ? config.POLY_PRIVATE_KEY : `0x${config.POLY_PRIVATE_KEY}`;
+      const walletClient = createWalletClient({ account: privateKeyToAccount(pk), transport: http('https://polygon-rpc.com') });
+      const tmp = new ClobClient({ host: CLOB_API_BASE, chain: Chain?.POLYGON ?? 137, signer: walletClient, useServerTime: false });
+      const c = await tmp.deriveApiKey();
+      return c?.key ? c : null;
+    } catch (err) {
+      logger.warn(`[POLYBOLT] deriveApiKey falló: ${err.message}`);
+      return null;
+    }
+  }
+
   // Cancela todas las órdenes abiertas de la cuenta (arranque y apagado en real)
   async cancelAllOrders() {
     if (config.DRY_RUN) return { ok: true, dryRun: true };

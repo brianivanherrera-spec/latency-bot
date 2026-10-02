@@ -847,10 +847,51 @@ async function main() {
   if (shadow) { shadowRef = shadow; shadow.start(); }
   const mRecorder = new MarketRecorder();  // timeline completo por mercado
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
-  clRTDS.connect();
   // Precio spot Chainlink BTC/USD — la fuente con la que resuelve Polymarket
   const clSpot = new ChainlinkSpot();
-  clSpot.connect();
+
+  // ─── Fuente de Chainlink: CHAINLINK_SOURCE = rtds (default) | polybolt | both ──────
+  // RTDS (ws-live-data) quedó como legado el 15/09/2026; el reemplazo es PolyBolt
+  // (ws-live-v2, pide credenciales CLOB). rtds: como siempre. both: RTDS sigue siendo la
+  // fuente y PolyBolt corre al lado solo para comparar ([POLYBOLT-CMP] y PolyBolt en
+  // [PTB-CHECK]). polybolt: PolyBolt alimenta clSpot/clRTDS (sin TWAP de 30 s).
+  const CHAINLINK_SOURCE = (process.env.CHAINLINK_SOURCE || 'rtds').toLowerCase();
+  let polybolt = null;
+  if (CHAINLINK_SOURCE === 'polybolt' || CHAINLINK_SOURCE === 'both') {
+    const { PolyBoltClient } = require('./chainlink-polybolt');
+    polybolt = new PolyBoltClient({ getCreds: () => poly.getApiCreds() });
+    if (CHAINLINK_SOURCE === 'polybolt') {
+      // Mismo formato que RTDS para que el resto del bot no cambie
+      polybolt.onSpot(pt => clSpot._handle({ topic: 'crypto_prices_chainlink',
+        payload: { symbol: 'btc/usd', timestamp: pt.ts, value: pt.value } }));
+      polybolt.onTwap(pt => clRTDS._handle({ topic: 'crypto_prices_twap_sixty',
+        payload: { symbol: 'btc/usd', timestamp: pt.ts, value: pt.value, full_accuracy_value: String(pt.value) } }, pt.received));
+    }
+    polybolt.connect();
+    logger.info(`[CHAINLINK] Fuente: ${CHAINLINK_SOURCE}${CHAINLINK_SOURCE === 'both' ? ' (RTDS manda, PolyBolt solo compara)' : ' (PolyBolt alimenta spot y TWAP 60 s; sin TWAP 30 s)'}`);
+  }
+  if (CHAINLINK_SOURCE !== 'polybolt') { clRTDS.connect(); clSpot.connect(); }
+
+  // Modo both: diferencia por segundo entre RTDS y PolyBolt (spot y TWAP 60 s), resumen
+  // cada minuto con detalle de los segundos que difieren más de $0.01
+  if (CHAINLINK_SOURCE === 'both') {
+    setInterval(() => {
+      const now = Date.now(), from = now - 65000, to = now - 5000;
+      const cmp = (pbHist, rtHist) => {
+        const rt = new Map(rtHist.filter(x => x.ts > from && x.ts <= to).map(x => [x.ts, x.value]));
+        const pb = pbHist.filter(x => x.ts > from && x.ts <= to);
+        let n = 0, sumAbs = 0, maxAbs = 0, onlyPb = 0; const big = [];
+        for (const x of pb) {
+          if (!rt.has(x.ts)) { onlyPb++; continue; }
+          const d = x.value - rt.get(x.ts); n++; sumAbs += Math.abs(d); maxAbs = Math.max(maxAbs, Math.abs(d));
+          if (Math.abs(d) > 0.01 && big.length < 5) big.push(`${new Date(x.ts).toISOString().slice(11, 19)} Δ${d >= 0 ? '+' : ''}${d.toFixed(2)}`);
+          rt.delete(x.ts);
+        }
+        return `n=${n} Δmedia=$${n ? (sumAbs / n).toFixed(3) : 'n/a'} Δmáx=$${maxAbs.toFixed(2)} solo PolyBolt=${onlyPb} solo RTDS=${rt.size}${big.length ? ` | ${big.join(', ')}` : ''}`;
+      };
+      logger.info(`[POLYBOLT-CMP] spot: ${cmp(polybolt.hist.spot, clSpot._history)} || TWAP60: ${cmp(polybolt.hist.twap, clRTDS._hist[60])} | PolyBolt ${polybolt.diag.authed ? 'autenticado' : `sin auth (${polybolt.diag.last_error || '—'})`}`);
+    }, 60000).unref();
+  }
   const priceToBeat = new PriceToBeat();
   // Diagnóstico al arrancar: ¿Polymarket resuelve contra openPrice (Chainlink) o contra priceToBeat?
   const ptbBackfillHours = parseFloat(process.env.PTB_BACKFILL_HOURS || '24');
@@ -1101,7 +1142,9 @@ async function main() {
         if (parts.length) logger.info(`[MARKET-RESULT] ${label} | ${parts.join(' | ')}`);
         // Precio de referencia oficial de Polymarket, cuando ya resolvió
         setTimeout(() => {
-          priceToBeat.report(label, mkt.startTime, { strike: clS, close: clC, twapStrike: twS, twapClose: twC, rtdsStrike: rtS, rtdsClose: rtC })
+          priceToBeat.report(label, mkt.startTime, { strike: clS, close: clC, twapStrike: twS, twapClose: twC, rtdsStrike: rtS, rtdsClose: rtC,
+            pbStrike: polybolt ? polybolt.valueAt('twap', mkt.startTime) : undefined,
+            pbClose: polybolt ? polybolt.valueAt('twap', mktEndMs) : undefined })
             .catch(e => logger.warn(`[PTB] error: ${e.message}`));
         }, 90000);
       }, 3000);
