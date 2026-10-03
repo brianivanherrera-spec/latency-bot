@@ -44,6 +44,21 @@ class ChainlinkRTDS {
     }
     return null;
   }
+  // TWAP en tsMs interpolado entre el último punto anterior y el primero posterior, cuando
+  // el feed tuvo un hueco justo en tsMs (desconexión, "Gap 8000ms"). El TWAP de 60 s es un
+  // promedio móvil y cambia poco en unos segundos: con los dos puntos a <= maxSideMs el
+  // error es de centavos. null si falta alguno de los dos lados.
+  getTwapInterp(w, tsMs, maxSideMs = 12000) {
+    const h = this._hist[w] || [];
+    let a = null, b = null;
+    for (const p of h) {
+      if (p.ts <= tsMs) a = p;
+      else { b = p; break; }
+    }
+    if (!a || !b || tsMs - a.ts > maxSideMs || b.ts - tsMs > maxSideMs) return null;
+    if (a.ts === tsMs) return a.value;
+    return a.value + (b.value - a.value) * (tsMs - a.ts) / (b.ts - a.ts);
+  }
   // true si ya llegó un TWAP con timestamp de fuente >= tsMs: recién ahí el valor de
   // getTwapAt(w, tsMs) es el del segundo exacto y no el del segundo anterior.
   hasTwapAfter(w, tsMs) {

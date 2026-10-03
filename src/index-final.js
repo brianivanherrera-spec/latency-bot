@@ -941,6 +941,12 @@ async function main() {
     if (rt != null && clRTDS.hasTwapAfter(60, market.startTime)) {
       market.strike_twap = rt; market.strike_twap_origin = 'rtds'; return rt;
     }
+    // Hueco del feed justo en la apertura (03/10: 3 de ~60 aperturas caían a Binance por
+    // gaps de 7-8 s): interpolar entre el punto anterior y el posterior.
+    if (rt == null && process.env.STRIKE_TWAP_INTERP !== 'false') {
+      const ip = clRTDS.getTwapInterp?.(60, market.startTime);
+      if (ip != null) { market.strike_twap = ip; market.strike_twap_origin = 'rtds_interp'; return ip; }
+    }
     // Promedio propio del spot de Chainlink: solo si el RTDS no está publicando.
     const tw = clSpot.getTwap(market.startTime, TWAP_WINDOW_MS);
     const rtdsAlive = Date.now() - (clRTDS.getLatestTWAP(60)?.received_ts ?? 0) < 10000;
