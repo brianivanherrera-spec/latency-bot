@@ -1069,9 +1069,24 @@ async function main() {
       if (m.strike_twap != null) return finish(m.strike_twap, 'chainlink_twap');
       if (Date.now() - t0 < STRIKE_WAIT_MAX_MS) return void setTimeout(attempt, STRIKE_RETRY_MS);
       const base = binanceClBasis();
-      if (m.binance_at_open != null && base != null) return finish(m.binance_at_open - base, 'binance_ajustado');
+      if (m.binance_at_open != null && base != null) finish(m.binance_at_open - base, 'binance_ajustado');
       // Sin base medida todavía: Binance crudo (los cálculos no le restan la base)
-      finish(m.binance_at_open, m.binance_at_open != null ? 'binance' : null);
+      else finish(m.binance_at_open, m.binance_at_open != null ? 'binance' : null);
+      if (process.env.STRIKE_LATE_UPGRADE !== 'false') setTimeout(upgrade, STRIKE_RETRY_MS * 2);
+    };
+    // El TWAP suele aparecer unos segundos después del fallback (04/10 10:35: gap de 18 s
+    // del RTDS, binance_ajustado erró $22.77 y el TWAP llegó a +20 s con Δ $0.36). Si llega
+    // dentro de STRIKE_UPGRADE_MAX_MS se reemplaza el strike; con MAX_ENTRY 240 s todavía no
+    // se pudo haber entrado.
+    const upgradeMaxMs = Number(process.env.STRIKE_UPGRADE_MAX_MS) || 60000;
+    const upgrade = () => {
+      if (m.strike_source === 'chainlink_twap') return;
+      twapStrike(m);
+      if (m.strike_twap != null) {
+        logger.warn(`[STRIKE] Mejora tardía: ${m.strike_source || 'n/a'} $${m.market_strike_price_captured_at_open?.toFixed(2) ?? 'n/a'} → TWAP Chainlink`);
+        return finish(m.strike_twap, 'chainlink_twap');
+      }
+      if (Date.now() - t0 < upgradeMaxMs) setTimeout(upgrade, STRIKE_RETRY_MS * 2);
     };
     // Primer intento después del bloque de apertura (que registra el mercado en el recorder)
     setImmediate(attempt);
