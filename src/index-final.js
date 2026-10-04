@@ -930,6 +930,17 @@ async function main() {
   // Strike TWAP = promedio de Chainlink en el minuto previo a la apertura (se fija cuando llegó
   // el punto de la apertura).
   const TWAP_WINDOW_MS = 60000;
+  // TWAP 60 s publicado por Chainlink (RTDS) en la apertura: exacto, o interpolado si el feed
+  // tuvo un hueco justo ahí (03/10: 3 de ~60 aperturas caían a Binance por gaps de 7-8 s).
+  const rtdsStrike = (market) => {
+    const rt = clRTDS.getTwapAt(60, market.startTime, 1000);
+    if (rt != null && clRTDS.hasTwapAfter(60, market.startTime)) return { value: rt, origin: 'rtds' };
+    if (rt == null && process.env.STRIKE_TWAP_INTERP !== 'false') {
+      const ip = clRTDS.getTwapInterp?.(60, market.startTime);
+      if (ip != null) return { value: ip, origin: 'rtds_interp' };
+    }
+    return null;
+  };
   const twapStrike = (market) => {
     if (!market?.startTime) return null;
     if (market.strike_twap != null) return market.strike_twap;
@@ -937,16 +948,9 @@ async function main() {
     // en el instante de apertura (Δ $0.00). Usarlo cuando está; si no, el promedio propio.
     // Se fija solo cuando llegó el punto del segundo exacto de la apertura (~1-2 s tarde);
     // antes devuelve el último valor como provisorio.
+    const r = rtdsStrike(market);
+    if (r) { market.strike_twap = r.value; market.strike_twap_origin = r.origin; return r.value; }
     const rt = clRTDS.getTwapAt(60, market.startTime, 1000);
-    if (rt != null && clRTDS.hasTwapAfter(60, market.startTime)) {
-      market.strike_twap = rt; market.strike_twap_origin = 'rtds'; return rt;
-    }
-    // Hueco del feed justo en la apertura (03/10: 3 de ~60 aperturas caían a Binance por
-    // gaps de 7-8 s): interpolar entre el punto anterior y el posterior.
-    if (rt == null && process.env.STRIKE_TWAP_INTERP !== 'false') {
-      const ip = clRTDS.getTwapInterp?.(60, market.startTime);
-      if (ip != null) { market.strike_twap = ip; market.strike_twap_origin = 'rtds_interp'; return ip; }
-    }
     // Promedio propio del spot de Chainlink: solo si el RTDS no está publicando.
     const tw = clSpot.getTwap(market.startTime, TWAP_WINDOW_MS);
     const rtdsAlive = Date.now() - (clRTDS.getLatestTWAP(60)?.received_ts ?? 0) < 10000;
@@ -1066,7 +1070,11 @@ async function main() {
     const attempt = () => {
       if (!m.strike_pending) return;
       twapStrike(m);
-      if (m.strike_twap != null) return finish(m.strike_twap, 'chainlink_twap');
+      if (m.strike_twap != null) {
+        finish(m.strike_twap, 'chainlink_twap');
+        if (m.strike_twap_origin === 'promedio_spot' && process.env.STRIKE_LATE_UPGRADE !== 'false') setTimeout(upgrade, STRIKE_RETRY_MS * 2);
+        return;
+      }
       if (Date.now() - t0 < STRIKE_WAIT_MAX_MS) return void setTimeout(attempt, STRIKE_RETRY_MS);
       const base = binanceClBasis();
       if (m.binance_at_open != null && base != null) finish(m.binance_at_open - base, 'binance_ajustado');
@@ -1079,12 +1087,25 @@ async function main() {
     // dentro de STRIKE_UPGRADE_MAX_MS se reemplaza el strike; con MAX_ENTRY 240 s todavía no
     // se pudo haber entrado.
     const upgradeMaxMs = Number(process.env.STRIKE_UPGRADE_MAX_MS) || 60000;
+    // También el promedio propio (promedio_spot, sin RTDS en la apertura) se reemplaza por el
+    // valor publicado si este llega: 04/10 21:55 el promedio erró $3.92 contra priceToBeat.
     const upgrade = () => {
-      if (m.strike_source === 'chainlink_twap') return;
-      twapStrike(m);
-      if (m.strike_twap != null) {
-        logger.warn(`[STRIKE] Mejora tardía: ${m.strike_source || 'n/a'} $${m.market_strike_price_captured_at_open?.toFixed(2) ?? 'n/a'} → TWAP Chainlink`);
-        return finish(m.strike_twap, 'chainlink_twap');
+      const prev = `${m.strike_source || 'n/a'}${m.strike_twap_origin === 'promedio_spot' ? ' (promedio_spot)' : ''} $${m.market_strike_price_captured_at_open?.toFixed(2) ?? 'n/a'}`;
+      if (m.strike_source === 'chainlink_twap') {
+        if (m.strike_twap_origin !== 'promedio_spot') return;
+        const r = rtdsStrike(m);
+        if (r) {
+          m.strike_twap = r.value; m.strike_twap_origin = r.origin;
+          logger.warn(`[STRIKE] Mejora tardía: ${prev} → TWAP Chainlink (${r.origin})`);
+          return finish(r.value, 'chainlink_twap');
+        }
+      } else {
+        twapStrike(m);
+        if (m.strike_twap != null) {
+          logger.warn(`[STRIKE] Mejora tardía: ${prev} → TWAP Chainlink (${m.strike_twap_origin})`);
+          finish(m.strike_twap, 'chainlink_twap');
+          if (m.strike_twap_origin !== 'promedio_spot') return;
+        }
       }
       if (Date.now() - t0 < upgradeMaxMs) setTimeout(upgrade, STRIKE_RETRY_MS * 2);
     };
