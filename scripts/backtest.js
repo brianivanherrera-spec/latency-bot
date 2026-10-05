@@ -13,6 +13,8 @@
  *
  * Familias extra (cada una con su propia selección en train y prueba en test):
  *   - momentum: el BTC de Binance se movió ≥ m% en los últimos k s → comprar ese lado
+ *   - anclada: precio justo = mid de Polymarket + cuánto se movió el modelo desde que ese mid
+ *     cambió por última vez (el modelo solo aporta el movimiento que Polymarket no reflejó)
  *   - vivo: los intentos de compra reales del bot (columnas sig/pass, desde el 05/10)
  *
  * Validación: los mercados se ordenan por tiempo; las reglas se eligen con el 60% más
@@ -46,6 +48,14 @@ async function load(file) {
       rows.push({ sl, p, yb: r[c.yes_bid], ya: r[c.yes_ask], nb: r[c.no_bid], na: r[c.no_ask], sig: r[c.sigma_e6],
         btc: r[c.btc] ?? null, bsig: c.sig != null ? r[c.sig] : null, pass: c.pass != null ? r[c.pass] : null });
     }
+    // Ancla de cada fila: p del modelo en el segundo en que el mid de YES tomó su valor actual
+    let aMid = null, aP = null;
+    for (const r of rows) {
+      if (!r || r.ya == null || r.yb == null) { aMid = null; continue; }
+      const mid = (r.ya + r.yb) / 2;
+      if (aMid == null || Math.abs(mid - aMid) > 1e-9) { aMid = mid; aP = r.p; }
+      r.pAdj = Math.min(0.999, Math.max(0.001, mid + (r.p - aP)));
+    }
     markets.push({ start: m.start_ts, winner: m.winner, rows, live: c.pass != null });
   }
   return markets.sort((a, b) => a.start - b.start);
@@ -59,6 +69,10 @@ function fires(R, i, side, cfg, ask, bid) {
     if (!j || j.btc == null || r.btc == null) return false;
     const mv = (r.btc / j.btc - 1) * 100;
     return side === 'UP' ? mv >= cfg.m : mv <= -cfg.m;
+  }
+  if (cfg.kind === 'anchored') {
+    const pa = side === 'UP' ? r.pAdj : 1 - r.pAdj;
+    return pa != null && pa - ask - fee(ask) >= cfg.e;
   }
   if (cfg.kind === 'live') return (cfg.field === 'pass' ? r.pass : r.bsig) === (side === 'UP' ? 1 : -1);
   const pm = side === 'UP' ? r.p : 1 - r.p;
@@ -112,6 +126,16 @@ function gridMomentum() {
         for (const hi of [0.70, 0.80, 0.90])
           for (const [tMax, tMin] of [[295, 10], [240, 60], [240, 120], [180, 60], [120, 30]])
             out.push({ kind: 'momentum', k, m, lo, hi, tMax, tMin });
+  return out;
+}
+
+function gridAnchored() {
+  const out = [];
+  for (const e of [0.01, 0.02, 0.03, 0.05, 0.08])
+    for (const lo of [0.30, 0.50, 0.60])
+      for (const hi of [0.70, 0.80, 0.90])
+        for (const [tMax, tMin] of [[295, 10], [240, 60], [240, 120], [180, 60], [120, 30]])
+          out.push({ kind: 'anchored', e, lo, hi, tMax, tMin });
   return out;
 }
 
@@ -211,6 +235,7 @@ function evGrid(markets) {
     calibration: calibration(markets),
     evGrid: { train: evGrid(train), test: evGrid(test) },
     momentum: selectFamily(train, test, markets, gridMomentum()),
+    anchored: selectFamily(train, test, markets, gridAnchored()),
   };
   // Regla real del bot: solo mercados con las columnas nuevas (sin train/test hasta tener volumen)
   const liveMk = markets.filter(m => m.live);
@@ -223,6 +248,7 @@ function evGrid(markets) {
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
   console.log(`[BACKTEST-MOMENTUM] ${fam(report.momentum)}`);
+  console.log(`[BACKTEST-ANCLA] ${fam(report.anchored)}`);
   const lv = report.live;
   console.log(`[BACKTEST-VIVO] ${lv.markets} mercados con señal grabada | intentos del bot: n=${lv.attempts.n} WR=${lv.attempts.wr} EV/acc=${lv.attempts.evPerShare} | primera señal 240-10 s a $0.50-0.85: n=${lv.signals_240.n} EV/acc=${lv.signals_240.evPerShare}`);
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);

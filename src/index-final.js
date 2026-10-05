@@ -2654,7 +2654,14 @@ async function main() {
       if (!shadow) {
         if (!global._fairGateWarned) { logger.warn('[FAIR-GATE] SHADOW_MODE=false — sin modelo, el filtro no se aplica'); global._fairGateWarned = true; }
       } else {
-        const g = shadow.evaluateEntry({ gammaId: mkt?.gammaId, direction: sig.direction, ask: price ?? bestAskWS ?? priceRaw, mode: fairGate });
+        const gateAsk = price ?? bestAskWS ?? priceRaw;
+        const g = shadow.evaluateEntry({ gammaId: mkt?.gammaId, direction: sig.direction, ask: gateAsk, mode: fairGate });
+        // Filtro anclado al mercado en sombra: solo registra qué haría (no cambia la decisión)
+        const ga = shadow.evaluateEntryAnchored({ gammaId: mkt?.gammaId, direction: sig.direction, ask: gateAsk, actualOk: g.ok });
+        if (ga && (ga.ok !== g.ok || g.ok) && now - (global._anchorLogTs || 0) > 10000) {
+          global._anchorLogTs = now;
+          logger.info(`[GATE-SOMBRA] ${sig.direction} @ $${gateAsk?.toFixed(3)} | actual: ${g.ok ? 'entra' : 'no'} | anclado: ${ga.ok ? 'entraría' : 'no'} (P=${(ga.pSide * 100).toFixed(1)}% ventaja ${(ga.edge * 100).toFixed(1)} pts, mid de hace ${ga.staleS.toFixed(1)} s)`);
+        }
         if (!g.ok) {
           // Máximo un log cada 10s (las señales se repiten cada 500ms)
           if (now - (global._fairGateLogTs || 0) > 10000) {

@@ -52,6 +52,11 @@ const WINDOW_EDGE = parseFloat(process.env.SHADOW_WINDOW_EDGE || '0.05');
 // Con eso el backtest evalúa la regla que opera el bot, no solo las reglas del modelo.
 const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src', 'sigma_short_e6', 'sigma_long_e6',
   'z', 'move_pct', 'sig', 'pass'];
+// Filtro FAIR "anclado" (solo sombra, no decide): precio justo = último mid de Polymarket + cuánto
+// se movió el modelo desde que ese mid cambió por última vez. El nivel lo pone el mercado (que
+// predice mejor que el modelo: Brier 0.162 vs 0.184 a 120 s, 528 mercados 03-05/10) y el modelo
+// solo aporta el movimiento de Binance que Polymarket todavía no reflejó.
+const ANCHOR_EDGE = parseFloat(process.env.FAIR_ANCHOR_EDGE || '0.03');
 
 const rnd = (v, d) => (v == null || !Number.isFinite(v)) ? null : Math.round(v * 10 ** d) / 10 ** d;
 const pnl = (win, price) => win == null || price == null ? null : rnd(win ? 1 - price : -price, 4);
@@ -96,7 +101,7 @@ class Shadow {
       rtdsAtStart: this.rtds?.getLatestTWAP?.(30)?.value_num ?? null,
       rows: [], first: {}, firstConf: {}, firstAgree: {}, firstWindow: null, maxEdge: { UP: null, DOWN: null }, path: {},
       signals: { UP: 0, DOWN: 0 }, firstSignal: { UP: null, DOWN: null }, trades: [],
-      secSig: 0, secPass: 0,
+      secSig: 0, secPass: 0, anchor: null, firstAnchored: null, gateCmp: { both: 0, onlyActual: 0, onlyAnchored: 0, neither: 0 },
       sigmaSum: 0, sigmaN: 0, sigmaShortSum: 0, sigmaShortN: 0, sigmaLongSum: 0, sigmaLongN: 0, closed: false, srcCount: [0, 0],
     };
   }
@@ -154,6 +159,31 @@ class Shadow {
     if (edge < GATE_EDGE) return { ok: false, p: pSide, edge, reason: `${txt} < ${(GATE_EDGE * 100).toFixed(0)} pts` };
     if (mode === 'agree' && ask < 0.5) return { ok: false, p: pSide, edge, reason: `${txt} pero precio $${ask.toFixed(3)} < 0.50 (lado que el mercado no favorece)` };
     return { ok: true, p: pSide, edge, reason: txt };
+  }
+
+  // Sombra del filtro anclado al mercado: no bloquea nada. Se llama en el mismo punto que
+  // evaluateEntry con el resultado del filtro actual (actualOk) para comparar los dos.
+  evaluateEntryAnchored({ gammaId, direction, ask, actualOk }) {
+    const m = this.cur;
+    if (!m || m.closed || (gammaId && m.gammaId !== gammaId) || ask == null || !Number.isFinite(ask)) return null;
+    const now = Date.now();
+    const F = this._fair(m, now);
+    const Y = this.poly?._yesTokenId === m.yesTokenId ? this._top(m.yesTokenId, now) : null;
+    if (F?.p == null || F.src !== 1 || Y?.bid == null || Y?.ask == null) return null;
+    const mid = (Y.bid + Y.ask) / 2;
+    // Si el mid cambió desde la última muestra, Polymarket ya está al día: ancla = ahora (Δ = 0)
+    const a = m.anchor && Math.abs(m.anchor.mid - mid) < 1e-9 ? m.anchor : { mid, p: F.p, t: now };
+    const pAdj = Math.min(0.999, Math.max(0.001, mid + (F.p - a.p)));
+    const pSide = direction === 'UP' ? pAdj : 1 - pAdj;
+    const edge = pSide - ask - GATE_FEE_RATE * ask * (1 - ask);
+    const ok = edge >= ANCHOR_EDGE;
+    const key = actualOk ? (ok ? 'both' : 'onlyActual') : (ok ? 'onlyAnchored' : 'neither');
+    m.gateCmp[key]++;
+    if (ok && !m.firstAnchored) {
+      m.firstAnchored = { side: direction, t: Math.round((now - m.startTs) / 1000), secs_left: Math.round((m.endTs - now) / 1000),
+        ask: rnd(ask, 4), p_adj: rnd(pSide, 4), edge: rnd(edge, 4), stale_s: rnd((now - a.t) / 1000, 1), actual_ok: !!actualOk };
+    }
+    return { ok, edge, pSide, staleS: (now - a.t) / 1000 };
   }
 
   getStats() { return { ...this.stats, pending: this.pending.size, current: this.cur?.question || null }; }
@@ -222,6 +252,10 @@ class Shadow {
     const imb = same ? (this.poly.getDepthImbalance?.()?.imb ?? null) : null;
 
     const t = Math.round((now - m.startTs) / 1000);
+    if (yesBid != null && yesAsk != null && p != null && F?.src === 1) {
+      const mid = (yesBid + yesAsk) / 2;
+      if (!m.anchor || Math.abs(m.anchor.mid - mid) >= 1e-9) m.anchor = { mid, p, t: now };
+    }
     let snap = null;
     try { snap = this.signalFn ? this.signalFn() : null; } catch (_) {}
     m.rows.push([t, rnd(T, 1), rnd(S, 2), rnd(p, 4), yesBid, yesAsk, noBid, noAsk, rnd(sigma == null ? null : sigma * 1e6, 3), imb, F ? F.src : null,
@@ -348,6 +382,8 @@ class Shadow {
         first_agree: firsts(m.firstAgree),
         window: m.firstWindow ? (() => { const win = W(m.firstWindow.side); return { ...m.firstWindow, from: WINDOW_FROM, to: WINDOW_TO, min_edge: WINDOW_EDGE, win, pnl_token: pnl(win, m.firstWindow.ask) }; })() : null,
         max_edge_up: m.maxEdge.UP, max_edge_down: m.maxEdge.DOWN,
+        anchored: m.firstAnchored ? (() => { const win = W(m.firstAnchored.side); return { ...m.firstAnchored, min_edge: ANCHOR_EDGE, win, pnl_token: pnl(win, m.firstAnchored.ask) }; })() : null,
+        gate_cmp: m.gateCmp,
       },
       bot: {
         signals: m.signals, first_signal: m.firstSignal,
