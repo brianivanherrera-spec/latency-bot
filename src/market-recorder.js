@@ -11,6 +11,9 @@ const DATA_DIR = process.env.DATA_DIR || '/data';
 const MARKETS_DIR = path.join(DATA_DIR, 'markets');
 const BINANCE_MIN_CHANGE = 0.5;
 const POLY_MIN_CHANGE = 0.002;
+// Apagado por defecto (05/10): duplica los crudos de phase2 (~1/3 de lo que se escribía en el
+// volumen) y nada lo lee. MARKET_RECORDER=true lo vuelve a encender.
+const ENABLED = process.env.MARKET_RECORDER === 'true';
 
 function ensureDirs() {
   try { if (!fs.existsSync(DATA_DIR))    fs.mkdirSync(DATA_DIR,    { recursive: true }); } catch(e) {}
@@ -19,7 +22,7 @@ function ensureDirs() {
 
 class MarketRecorder {
   constructor() {
-    ensureDirs();
+    if (ENABLED) ensureDirs();
     this._market = null; this._file = null; this._seq = 0;
     this._lastBinance = null; this._lastPoly = { yes: null, no: null };
     this.diag = {
@@ -123,10 +126,10 @@ class MarketRecorder {
     return { ...this.diag, current_market: this._market?.market_id ?? null, events_in_market: this._seq };
   }
   _append(data) {
-    if (!this._file) return;
+    if (!ENABLED || !this._file) return;
     try {
       append(this._file, JSON.stringify({ seq: ++this._seq, market_id: this._market?.market_id ?? null, ...data }));
     } catch(e) {}
   }
 }
-module.exports = { MarketRecorder };
+module.exports = { MarketRecorder, ENABLED };

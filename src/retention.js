@@ -25,7 +25,11 @@ const logger = new Logger('RETENTION');
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const MARKETS_DIR = path.join(DATA_DIR, 'markets');
-const RETENTION_DAYS = parseFloat(process.env.RETENTION_DAYS || '3');
+// 3 → 1 día (05/10): los crudos de phase2 no los lee nada hoy; se guardan solo por si se
+// simulan órdenes límite con el libro completo. Con el grabador por mercado apagado
+// (MARKET_RECORDER), las grabaciones viejas de markets/ se borran en la primera pasada.
+const RETENTION_DAYS = parseFloat(process.env.RETENTION_DAYS || '1');
+const RECORDER_ON = process.env.MARKET_RECORDER === 'true';
 const RETENTION_MAX_GB = parseFloat(process.env.RETENTION_MAX_GB || '2.5');
 const DISK_EMERGENCY_PCT = parseFloat(process.env.DISK_EMERGENCY_PCT || '85');
 const RUN_EVERY_MS = 60 * 60 * 1000;
@@ -118,10 +122,10 @@ async function runOnce() {
 
   for (const f of files) {
     if (now - f.mtime < MIN_AGE_MS) break; // ordenados: el resto es más nuevo
-    const tooOld = f.mtime < cutoff;
+    const tooOld = f.mtime < cutoff || (!RECORDER_ON && MARKET_RE.test(path.basename(f.file)));
     const overBudget = candBytes > RETENTION_MAX_GB * GB;
     const emergency = disk && usedBytes / disk.total * 100 > DISK_EMERGENCY_PCT;
-    if (!tooOld && !overBudget && !emergency) break;
+    if (!tooOld && !overBudget && !emergency) continue;
     try {
       await fs.promises.unlink(f.file);
       n++; freed += f.size; candBytes -= f.size;
