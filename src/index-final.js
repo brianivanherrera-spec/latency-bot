@@ -658,7 +658,7 @@ function runBacktest() {
   execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'backtest.js')],
     { timeout: 10 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
       if (err) logger.warn(`[BACKTEST] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
-      else if (stdout.trim()) logger.info(stdout.trim());
+      else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line);
     });
 }
 if (process.env.BACKTEST_ENABLED !== 'false') {
@@ -859,7 +859,7 @@ async function main() {
   // Modo sombra: modelo de valor justo que solo observa y registra (SHADOW_MODE=false lo apaga)
   const fairValue = new FairValue();
   const shadow = process.env.SHADOW_MODE === 'false' ? null : new Shadow({ fairValue, polyWs, rtds: clRTDS });
-  if (shadow) { shadowRef = shadow; shadow.start(); }
+  if (shadow) { shadowRef = shadow; shadow.setSignalFn(() => signal.snapshot()); shadow.start(); }
   const mRecorder = new MarketRecorder();  // timeline completo por mercado
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
   // Precio spot Chainlink BTC/USD — la fuente con la que resuelve Polymarket

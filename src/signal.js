@@ -151,6 +151,19 @@ class SignalEngine {
     return 'FLAT';
   }
 
+  // Estado de la señal ahora (Z y movimiento con las mismas ventanas que _evaluate), sin
+  // umbrales ni efectos. Lo graba el shadow cada segundo para el backtest de la regla real.
+  snapshot() {
+    const n = this.prices.length;
+    if (n < config.MIN_TICKS_REQUIRED) return null;
+    const cur = this.prices[n - 1];
+    const mean = this.prices.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(this.prices.reduce((s, p) => s + (p - mean) ** 2, 0) / n);
+    const shortWindow = Math.min(75, Math.floor(n / 2));
+    const ago = this.prices[n - shortWindow];
+    return { z: sd > 0 ? (cur - mean) / sd : 0, movePct: ago ? ((cur - ago) / ago) * 100 : 0 };
+  }
+
   _evaluate(currentPrice, currentTimestamp) {
     const n = this.prices.length;
 

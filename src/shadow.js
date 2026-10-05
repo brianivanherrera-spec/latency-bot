@@ -47,7 +47,11 @@ const WINDOW_FROM = parseInt(process.env.SHADOW_WINDOW_FROM || '60');
 const WINDOW_TO = parseInt(process.env.SHADOW_WINDOW_TO || '120');
 const WINDOW_EDGE = parseFloat(process.env.SHADOW_WINDOW_EDGE || '0.05');
 // src: 1 = FAIR del bot con TWAP de Chainlink (cómo resuelve Polymarket), 0 = respaldo con spot de Binance
-const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src', 'sigma_short_e6', 'sigma_long_e6'];
+// z / move_pct: estado de la señal de Binance del bot en ese segundo (SignalEngine.snapshot);
+// sig: el bot generó una señal en ese segundo (+1 UP, −1 DOWN, 0 no); pass: intentó comprar ([OPEN]).
+// Con eso el backtest evalúa la regla que opera el bot, no solo las reglas del modelo.
+const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src', 'sigma_short_e6', 'sigma_long_e6',
+  'z', 'move_pct', 'sig', 'pass'];
 
 const rnd = (v, d) => (v == null || !Number.isFinite(v)) ? null : Math.round(v * 10 ** d) / 10 ** d;
 const pnl = (win, price) => win == null || price == null ? null : rnd(win ? 1 - price : -price, 4);
@@ -62,12 +66,14 @@ class Shadow {
     this.pending = new Map();
     this.timer = null;
     this.fairFn = null; // modelo principal inyectado desde index (FAIR con TWAP de Chainlink)
+    this.signalFn = null; // () => { z, movePct } | null (SignalEngine.snapshot)
     this.stats = { markets: 0, written: 0, resolved_gamma: 0, resolved_fallback: 0, errors: 0 };
     try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
   }
 
   // fn(gammaId, nowMs) → { p, strike, src, sigma } | null. Si no hay, se usa el modelo propio (Binance).
   setFairFn(fn) { this.fairFn = typeof fn === 'function' ? fn : null; }
+  setSignalFn(fn) { this.signalFn = typeof fn === 'function' ? fn : null; }
 
   start() {
     if (this.timer) return;
@@ -90,6 +96,7 @@ class Shadow {
       rtdsAtStart: this.rtds?.getLatestTWAP?.(30)?.value_num ?? null,
       rows: [], first: {}, firstConf: {}, firstAgree: {}, firstWindow: null, maxEdge: { UP: null, DOWN: null }, path: {},
       signals: { UP: 0, DOWN: 0 }, firstSignal: { UP: null, DOWN: null }, trades: [],
+      secSig: 0, secPass: 0,
       sigmaSum: 0, sigmaN: 0, sigmaShortSum: 0, sigmaShortN: 0, sigmaLongSum: 0, sigmaLongN: 0, closed: false, srcCount: [0, 0],
     };
   }
@@ -101,6 +108,7 @@ class Shadow {
     const now = Date.now();
     if (now < m.startTs || now > m.endTs) return;
     m.signals[direction]++;
+    m.secSig = direction === 'UP' ? 1 : -1;
     if (!m.firstSignal[direction]) {
       m.firstSignal[direction] = { t: Math.round((now - m.startTs) / 1000), secs_left: Math.round((m.endTs - now) / 1000) };
     }
@@ -111,6 +119,7 @@ class Shadow {
     const m = this.cur;
     if (!m || m.closed) return;
     const now = Date.now();
+    m.secPass = direction === 'UP' ? 1 : -1;
     const p = this._pNow(m, now);
     const pSide = p == null ? null : (direction === 'UP' ? p : 1 - p);
     const edge = pSide == null || price == null ? null : pSide - price;
@@ -213,8 +222,12 @@ class Shadow {
     const imb = same ? (this.poly.getDepthImbalance?.()?.imb ?? null) : null;
 
     const t = Math.round((now - m.startTs) / 1000);
+    let snap = null;
+    try { snap = this.signalFn ? this.signalFn() : null; } catch (_) {}
     m.rows.push([t, rnd(T, 1), rnd(S, 2), rnd(p, 4), yesBid, yesAsk, noBid, noAsk, rnd(sigma == null ? null : sigma * 1e6, 3), imb, F ? F.src : null,
-      rnd(F?.sigmaShort == null ? null : F.sigmaShort * 1e6, 3), rnd(F?.sigmaLong == null ? null : F.sigmaLong * 1e6, 3)]);
+      rnd(F?.sigmaShort == null ? null : F.sigmaShort * 1e6, 3), rnd(F?.sigmaLong == null ? null : F.sigmaLong * 1e6, 3),
+      rnd(snap?.z, 2), rnd(snap?.movePct, 4), m.secSig, m.secPass]);
+    m.secSig = 0; m.secPass = 0;
     if (F?.sigmaShort) { m.sigmaShortSum += F.sigmaShort; m.sigmaShortN++; }
     if (F?.sigmaLong) { m.sigmaLongSum += F.sigmaLong; m.sigmaLongN++; }
     if (F) m.srcCount[F.src]++;
