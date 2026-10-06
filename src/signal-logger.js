@@ -638,6 +638,10 @@ function logFillTelemetry({
   t6_order_resting_ms,   // T6: timestamp when order began resting in book
   t7_order_filled_ms,    // T7: timestamp when order was actually filled
   user_ws_fill_detected, // whether fill was detected via User WebSocket
+  // Ejecución (informe real vs paper): mode, token_id, decision_ask, fill_price, order_ids,
+  // market_start_ms/end_ms, usdc_spent, partial; en real paper_ask_delay/paper_size_delay/
+  // paper_would_fill (lo que habría dicho paper); en paper fill_ask_delay/size_delay.
+  exec,
 }) {
   ensureDir();
   try {
@@ -672,6 +676,7 @@ function logFillTelemetry({
         t3_to_t7_ms: t3_price_decision_ms && t7_order_filled_ms ? t7_order_filled_ms - t3_price_decision_ms : null,
       } : null,
       user_ws_fill_detected: user_ws_fill_detected || false,
+      ...(exec ? { exec } : {}),
     };
 
     // Append as JSONL

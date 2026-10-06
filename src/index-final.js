@@ -2878,11 +2878,23 @@ async function main() {
       logger.info(`[SIGNAL-MONITOR] ${posId} | Strike:$${monStrike?.toFixed(2) || '?'} (${mkt?.strike_source || '?'}) | Entry-BTC:$${btcPriceAtSignal.toLocaleString()} (−base vs strike: ${vsStrike}) | BTC@1s:$${btcPrice1s?.toLocaleString() || '?'} | Change:${changePct}% | Pred:${sig.direction} | Resolved:?`);
     }, 1000);
 
+    // Datos de ejecución para el informe real vs paper (scripts/exec-report.js)
+    const marketEndMs = new Date(mkt.endDate).getTime();
+    const execInfo = (extra = {}) => ({ mode: config.DRY_RUN ? 'paper' : 'live', token_id: tokenId, decision_ask: bestAskWS,
+      market_start_ms: marketEndMs - 300_000, market_end_ms: marketEndMs, ...extra });
+
     // ✅ Ejecutar orden real (solo en LIVE)
     if (!config.DRY_RUN) {
       // Fuera del try: el catch lo usa (antes era const dentro del try → ReferenceError)
       let depthInfo = null;
       let liveFill = null, liveOpened = false; // fill confirmado / posición ya registrada
+      // En real, lo que habría dicho paper: ask y tamaño hasta el límite PAPER_FILL_DELAY_MS después del envío
+      let paperShadowP = null;
+      const paperShadow = async () => {
+        const ps = paperShadowP ? await paperShadowP : null;
+        return ps ? { paper_ask_delay: ps.ask, paper_size_delay: ps.size,
+          paper_would_fill: ps.ask != null && ps.ask <= price && (ps.size == null || ps.size >= size) } : {};
+      };
       try {
         // Determinar tipo de orden según el número de entrada en este mercado
         // Entrada 0 (primera) → FAK (instantáneo)
@@ -2952,6 +2964,11 @@ async function main() {
           logger.info(`[LATENCY] signal→order: ${signalToOrderMs.toFixed(1)}ms | network: ${sig._networkLatencyMs ?? '?'}ms | signal_proc: ${sig._signalLatencyMs?.toFixed(1) ?? '?'}ms`);
         }
 
+        paperShadowP = new Promise(r => setTimeout(() => {
+          try { r({ ask: polyWs.getBestAskForToken?.(tokenId) ?? null, size: polyWs.getAskSizeUpTo?.(tokenId, price) ?? null }); }
+          catch (_) { r(null); }
+        }, Math.max(0, parseInt(process.env.PAPER_FILL_DELAY_MS || '400') || 0)));
+
         // T5: order accepted (when placeLimitOrder returns)
         const orderResult = await poly.placeLimitOrder({
           marketId: mkt.conditionId,
@@ -2999,6 +3016,7 @@ async function main() {
           const latencyData = signalLogger.getLatencyTracking(posId);
           signalLogger.logFillTelemetry({
             posId,
+            exec: { ...execInfo({ order_ids: [orderResult?.orderID, orderResult?.orderId].filter(Boolean) }), ...(await paperShadow()) },
             fill_result: 'NO_FILL',
             order_status: orderStatus,
             order_price: price,
@@ -3135,6 +3153,7 @@ async function main() {
 
         signalLogger.logFillTelemetry({
           posId,
+          exec: { ...execInfo({ fill_price: actualPrice, usdc_spent: actualUsdc, partial: !!orderResult.partial, order_ids: [orderResult?.orderID, orderResult?.orderId].filter(Boolean) }), ...(await paperShadow()) },
           fill_result: 'FILLED',
           order_status: orderStatus,
           order_price: price,
@@ -3235,6 +3254,7 @@ async function main() {
         const latencyDataErr = signalLogger.getLatencyTracking(posId);
         signalLogger.logFillTelemetry({
           posId,
+          exec: { ...execInfo({ error: String(err?.message || err).slice(0, 160) }), ...(await paperShadow()) },
           fill_result: 'NO_FILL',
           order_status: 'error',
           order_price: price,
@@ -3321,6 +3341,7 @@ async function main() {
         // PHASE 1: Include latency tracking (simulated)
         signalLogger.logFillTelemetry({
           posId,
+          exec: execInfo({ fill_ask_delay: fillAsk, size_delay: askSize }),
           fill_result: 'NO_FILL',
           order_status: 'simulated_no_fill',
           order_price: price,
@@ -3360,6 +3381,7 @@ async function main() {
 
       signalLogger.logFillTelemetry({
         posId,
+        exec: execInfo({ fill_price: paidPrice, fill_ask_delay: fillAsk, size_delay: askSize }),
         fill_result: 'FILLED',
         order_status: 'simulated_filled',
         order_price: price,
