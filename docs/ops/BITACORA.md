@@ -104,7 +104,9 @@ riesgo principal.
 - [ ] Registro de ejecución real: llenado, precio obtenido contra precio esperado, y el
       resultado hipotético de cada señal que no se llenó (para comparar paper contra real).
 - [ ] Alertas por Discord: pausas, pérdida diaria, caídas, errores de órdenes.
-- [ ] Geobloqueo: el servidor en europe-west4 (NL) da blocked=true. Confirmar que el país del usuario está
-      permitido y mover el servicio a una región no bloqueada; repetir `[PREFLIGHT]`.
+- [ ] Geobloqueo: el servidor en europe-west4 (NL) da blocked=true y el usuario reside en Argentina (región
+      bloqueada por Polymarket; hoy entra por VPN). Claude no arma operación real que esquive el bloqueo
+      (VPN, proxy o cambio de región con ese fin): los términos lo prohíben y pueden retener los fondos.
+      El bot sigue en paper; real solo desde una jurisdicción permitida o en otra plataforma legal para el usuario.
 - [ ] Verificar saldo, allowance y tamaño mínimo de orden con una orden chica.
 - [ ] Criterios de salida a real acordados con el usuario (capital, pérdida diaria máxima).
