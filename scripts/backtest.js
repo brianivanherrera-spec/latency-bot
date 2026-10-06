@@ -46,7 +46,8 @@ async function load(file) {
       const p = r[c.p_up], sl = r[c.secs_left], src = r[c.src];
       if (p == null || sl == null || src !== 1) { rows.push(null); continue; }
       rows.push({ sl, p, yb: r[c.yes_bid], ya: r[c.yes_ask], nb: r[c.no_bid], na: r[c.no_ask], sig: r[c.sigma_e6],
-        btc: r[c.btc] ?? null, bsig: c.sig != null ? r[c.sig] : null, pass: c.pass != null ? r[c.pass] : null });
+        btc: r[c.btc] ?? null, bsig: c.sig != null ? r[c.sig] : null, pass: c.pass != null ? r[c.pass] : null,
+        z: c.z != null ? r[c.z] : null, mv: c.move_pct != null ? r[c.move_pct] : null });
     }
     // Ancla de cada fila: p del modelo en el segundo en que el mid de YES tomó su valor actual
     let aMid = null, aP = null;
@@ -80,6 +81,15 @@ function fires(R, i, side, cfg, ask, bid) {
     if (r.bsig !== (side === 'UP' ? 1 : -1) || ask < 0.5) return false;
     return (side === 'UP' ? r.p : 1 - r.p) - ask >= cfg.e;
   }
+  // Señal aproximada con el estado de Binance que graba el shadow cada segundo (z y movimiento
+  // de SignalEngine.snapshot) + el mismo filtro FAIR: sirve para ver si umbrales más bajos
+  // dispararían antes y a mejor precio. No reproduce los filtros secundarios de la señal real.
+  if (cfg.kind === 'zgate') {
+    const s = side === 'UP' ? 1 : -1;
+    if (r.z == null || r.mv == null || ask < 0.5) return false;
+    if (r.z * s < cfg.zt || r.mv * s < cfg.mt) return false;
+    return (side === 'UP' ? r.p : 1 - r.p) - ask >= cfg.e;
+  }
   const pm = side === 'UP' ? r.p : 1 - r.p;
   const mid = bid != null ? (bid + ask) / 2 : ask;
   const pa = cfg.lam * pm + (1 - cfg.lam) * mid;
@@ -100,7 +110,7 @@ function entry(mk, cfg) {
       const ask2 = nx ? (side === 'UP' ? nx.ya : nx.na) : null;
       const price = Math.max(ask, ask2 ?? ask);
       if (price > cfg.hi + 0.02 || price >= 0.99) return null; // el precio se escapó
-      return { side, price };
+      return { side, price, i };
     }
   }
   return null;
@@ -263,6 +273,43 @@ function evGrid(markets) {
   report.bySide = {};
   for (const side of ['UP', 'DOWN'])
     report.bySide[side] = { base: evaluate(markets, { ...base240, side }), live: evaluate(liveMk, { ...cur, side }) };
+  // Anticipación: ¿la señal llega tarde? (1) primera señal del bot en la ventana 240-10 s: cuánto
+  // se había movido ya el ask de ese lado en los 10 s previos; (2) cota superior (sabiendo que la
+  // señal va a venir) de entrar k s antes al ask de ese momento; (3) señal aproximada con umbrales
+  // más bajos de z y movimiento, con el mismo filtro FAIR y la misma ventana.
+  const askOf = (r, side) => r ? (side === 'UP' ? r.ya : r.na) : null;
+  const first = { n: 0, ask: 0, ask10: 0, n10: 0, cara: 0, caraAntes: 0 };
+  for (const mk of liveMk) {
+    const R = mk.rows;
+    const i = R.findIndex(r => r && r.bsig && r.sl <= 240 && r.sl >= 10);
+    if (i < 0) continue;
+    const side = R[i].bsig > 0 ? 'UP' : 'DOWN', a = askOf(R[i], side);
+    if (a == null) continue;
+    first.n++; first.ask += a;
+    const a10 = askOf(R[i - 10], side);
+    if (a10 != null) { first.n10++; first.ask10 += a10; }
+    if (a > 0.79) { first.cara++; if (a10 != null && a10 >= 0.59 && a10 <= 0.79) first.caraAntes++; }
+  }
+  const early = {};
+  for (const k of [0, 3, 5, 10]) {
+    let n = 0, w = 0, ps = 0;
+    for (const mk of liveMk) {
+      const e = entry(mk, cur);
+      if (!e) continue;
+      const j = e.i - k;
+      const a = j >= 0 ? askOf(mk.rows[j], e.side) : null;
+      const price = k === 0 ? e.price : a;
+      if (price == null || price >= 0.99) continue;
+      const win = e.side === mk.winner;
+      n++; if (win) w++; ps += (win ? 1 - price : -price) - fee(price);
+    }
+    early[k] = { n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(ps / n).toFixed(4) : null };
+  }
+  const zgrid = [];
+  for (const zt of [0.8, 1.0, 1.2, 1.5])
+    for (const mt of [0.01, 0.02, 0.04])
+      zgrid.push({ zt, mt, ...evaluate(liveMk, { kind: 'zgate', zt, mt, e: 0.08, lo: 0.59, hi: 0.79, tMax: 240, tMin: 10 }) });
+  report.anticipation = { firstSignal: first, earlyOracle: early, zgrid };
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -276,5 +323,11 @@ function evGrid(markets) {
   }
   const sd = (x) => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z}`;
   console.log(`[BACKTEST-LADO] modelo FAIR sin señal (${markets.length} mercados, 240-10 s, $0.59-0.79, e≥8) UP: ${sd(report.bySide.UP.base)} | DOWN: ${sd(report.bySide.DOWN.base)} || regla actual (${liveMk.length} mercados) UP: ${sd(report.bySide.UP.live)} | DOWN: ${sd(report.bySide.DOWN.live)}`);
+  { const f = report.anticipation.firstSignal, o = report.anticipation.earlyOracle;
+    const pct = (a, b) => b ? `${Math.round(a / b * 100)}%` : 'n/a';
+    console.log(`[BACKTEST-ANTICIPO] primera señal del bot (240-10 s) en ${f.n} mercados: ask del lado $${f.n ? (f.ask / f.n).toFixed(3) : 'n/a'} (10 s antes $${f.n10 ? (f.ask10 / f.n10).toFixed(3) : 'n/a'}); llega con ask > 0.79 en ${pct(f.cara, f.n)}, y de esas ${pct(f.caraAntes, f.cara)} estaban en $0.59-0.79 10 s antes || entrar antes sabiendo que viene (regla actual): ${[0, 3, 5, 10].map(k => `${k} s: n=${o[k].n} EV/acc=${o[k].evPerShare}`).join(' | ')}`);
+    const top = [...report.anticipation.zgrid].sort((a, b) => (b.evPerShare ?? -9) * Math.sqrt(b.n) - (a.evPerShare ?? -9) * Math.sqrt(a.n));
+    console.log(`[BACKTEST-ANTICIPO] señal aproximada z/mov + FAIR e≥8 ($0.59-0.79, 240-10 s): ${top.map(g => `z≥${g.zt} mov≥${g.mt}: n=${g.n} WR=${g.wr} EV/acc=${g.evPerShare} z=${g.z}`).join(' | ')}`);
+  }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });
