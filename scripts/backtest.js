@@ -92,7 +92,7 @@ function entry(mk, cfg) {
   for (let i = 0; i < R.length - 1; i++) {
     const r = R[i];
     if (!r || r.sl > cfg.tMax || r.sl < cfg.tMin) continue;
-    for (const side of ['UP', 'DOWN']) {
+    for (const side of cfg.side ? [cfg.side] : ['UP', 'DOWN']) {
       const ask = side === 'UP' ? r.ya : r.na, bid = side === 'UP' ? r.yb : r.nb;
       if (ask == null || ask < cfg.lo || ask > cfg.hi) continue;
       if (!fires(R, i, side, cfg, ask, bid)) continue;
@@ -256,6 +256,13 @@ function evGrid(markets) {
   for (const hi of [0.74, 0.79, 0.84, 0.89])
     for (const e of [0.04, 0.06, 0.08, 0.10])
       report.liveGrid.push({ hi, e, ...evaluate(liveMk, { kind: 'livegate', e, lo: 0.59, hi, tMax: 240, tMin: 10 }) });
+  // Por lado (UP/DOWN): 6 de las primeras 7 pérdidas con la regla de 240 s fueron DOWN. Con cfg.side la regla
+  // solo mira ese lado (puede tomar una entrada más tardía que la primera del mercado).
+  const cur = { kind: 'livegate', e: 0.08, lo: 0.59, hi: 0.79, tMax: 240, tMin: 10 };
+  const base240 = { ...baseline, tMax: 240 };
+  report.bySide = {};
+  for (const side of ['UP', 'DOWN'])
+    report.bySide[side] = { base: evaluate(markets, { ...base240, side }), live: evaluate(liveMk, { ...cur, side }) };
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -267,5 +274,7 @@ function evGrid(markets) {
     const cells = report.liveGrid.filter(g => g.hi === hi).map(g => `e≥${Math.round(g.e * 100)}: n=${g.n} WR=${g.wr} EV/acc=${g.evPerShare} z=${g.z}`);
     console.log(`[BACKTEST-VIVO-GRID] ask ≤ ${hi.toFixed(2)}${hi === 0.79 ? ' (actual)' : ''} | ${cells.join(' | ')}`);
   }
+  const sd = (x) => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z}`;
+  console.log(`[BACKTEST-LADO] modelo FAIR sin señal (${markets.length} mercados, 240-10 s, $0.59-0.79, e≥8) UP: ${sd(report.bySide.UP.base)} | DOWN: ${sd(report.bySide.DOWN.base)} || regla actual (${liveMk.length} mercados) UP: ${sd(report.bySide.UP.live)} | DOWN: ${sd(report.bySide.DOWN.live)}`);
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });
