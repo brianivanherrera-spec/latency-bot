@@ -3295,12 +3295,15 @@ async function main() {
       // Sin dato de tamaño no se bloquea. PAPER_REQUIRE_DEPTH=false no mira el tamaño.
       const thinBook = process.env.PAPER_REQUIRE_DEPTH !== 'false' && askSize != null && askSize < size;
       const filled = !askAbovePrice && !thinBook && Math.random() < paperFillRate;
-      // PAPER_FILL_AT_BOOK=true: se paga el promedio de los asks publicados hasta el límite (como
-      // cruza el CLOB), no el límite. Default: el límite, como antes (pesimista en ~1 tick).
+      // PAPER_FILL_AT_BOOK=true: se paga el promedio de los asks publicados hasta el límite, pero
+      // nunca menos que ask al decidir + tick (lo que cobraba paper antes). En real el fill depende
+      // de quién llega primero a esos asks; paper no gana nada por esperar a que el libro mejore,
+      // solo paga más si el ask subió. Default: el límite.
       let paidPrice = price;
       if (filled && process.env.PAPER_FILL_AT_BOOK === 'true') {
         const v = polyWs.getAskVwapUpTo?.(tokenId, price, size);
-        if (v?.vwap != null && v.filled >= size) paidPrice = Math.min(price, parseFloat(v.vwap.toFixed(4)));
+        if (v?.vwap != null && v.filled >= size)
+          paidPrice = Math.min(price, Math.max(orderPriceFromWS, parseFloat(v.vwap.toFixed(4))));
       }
       if (paperDelayMs > 0) {
         logger.info(`[PAPER-DELAY] ask decisión=$${bestAskWS?.toFixed(2) ?? 'n/a'} → ask a +${paperDelayMs}ms=$${fillAsk?.toFixed(2) ?? 'n/a'} (${askSize ?? 'n/a'} tokens) | orden ${size} a $${price} | ${filled ? `lleno a $${paidPrice}` : 'no'}`);
