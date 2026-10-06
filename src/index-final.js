@@ -64,7 +64,9 @@ const path = require('path');
 
 // ─── Servidor HTTP para descargar signals.jsonl desde el browser ──────────
 const PORT = process.env.PORT || 3000;
-const SECRET = process.env.DOWNLOAD_SECRET || 'latency2026';
+// Sin valor por defecto: si falta DOWNLOAD_SECRET el dashboard y las descargas quedan cerrados
+const SECRET = process.env.DOWNLOAD_SECRET || '';
+if (!SECRET) logger.warn('[HTTP] DOWNLOAD_SECRET no configurado — dashboard y descargas cerrados (solo /health)');
 let shadowRef = null; // modo sombra (se crea en main)
 
 // ─── Dashboard HTML ────────────────────────────────────────────────────────────
@@ -418,7 +420,7 @@ const _secretHash = crypto.createHash('sha256').update(SECRET).digest();
 function isAuthorized(req, url) {
   const auth = req.headers.authorization || '';
   const given = auth.startsWith('Bearer ') ? auth.slice(7).trim() : url.searchParams.get('key');
-  if (!given) return false;
+  if (!SECRET || !given) return false;
   return crypto.timingSafeEqual(crypto.createHash('sha256').update(given).digest(), _secretHash);
 }
 
