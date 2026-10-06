@@ -75,6 +75,11 @@ function fires(R, i, side, cfg, ask, bid) {
     return pa != null && pa - ask - fee(ask) >= cfg.e;
   }
   if (cfg.kind === 'live') return (cfg.field === 'pass' ? r.pass : r.bsig) === (side === 'UP' ? 1 : -1);
+  // Señal real del bot + filtro FAIR como en vivo (ventaja = P_modelo − ask, sin comisión; ask ≥ 0.50)
+  if (cfg.kind === 'livegate') {
+    if (r.bsig !== (side === 'UP' ? 1 : -1) || ask < 0.5) return false;
+    return (side === 'UP' ? r.p : 1 - r.p) - ask >= cfg.e;
+  }
   const pm = side === 'UP' ? r.p : 1 - r.p;
   const mid = bid != null ? (bid + ask) / 2 : ask;
   const pa = cfg.lam * pm + (1 - cfg.lam) * mid;
@@ -244,6 +249,13 @@ function evGrid(markets) {
     attempts: evaluate(liveMk, { kind: 'live', field: 'pass', lo: 0, hi: 1, tMax: 300, tMin: 0 }),
     signals_240: evaluate(liveMk, { kind: 'live', field: 'sig', lo: 0.5, hi: 0.85, tMax: 240, tMin: 10 }),
   };
+  // Sensibilidad de los filtros de la regla real (tope de precio × ventaja mínima del filtro FAIR).
+  // Actual: ask ≤ 0.79 (orden ≤ 0.80) y ventaja ≥ 8 pts. Sin train/test: es una tabla para mirar,
+  // no una selección; con pocos mercados las diferencias chicas son ruido.
+  report.liveGrid = [];
+  for (const hi of [0.74, 0.79, 0.84, 0.89])
+    for (const e of [0.04, 0.06, 0.08, 0.10])
+      report.liveGrid.push({ hi, e, ...evaluate(liveMk, { kind: 'livegate', e, lo: 0.59, hi, tMax: 240, tMin: 10 }) });
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -251,5 +263,9 @@ function evGrid(markets) {
   console.log(`[BACKTEST-ANCLA] ${fam(report.anchored)}`);
   const lv = report.live;
   console.log(`[BACKTEST-VIVO] ${lv.markets} mercados con señal grabada | intentos del bot: n=${lv.attempts.n} WR=${lv.attempts.wr} EV/acc=${lv.attempts.evPerShare} | primera señal 240-10 s a $0.50-0.85: n=${lv.signals_240.n} EV/acc=${lv.signals_240.evPerShare}`);
+  for (const hi of [0.74, 0.79, 0.84, 0.89]) {
+    const cells = report.liveGrid.filter(g => g.hi === hi).map(g => `e≥${Math.round(g.e * 100)}: n=${g.n} WR=${g.wr} EV/acc=${g.evPerShare} z=${g.z}`);
+    console.log(`[BACKTEST-VIVO-GRID] ask ≤ ${hi.toFixed(2)}${hi === 0.79 ? ' (actual)' : ''} | ${cells.join(' | ')}`);
+  }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });
