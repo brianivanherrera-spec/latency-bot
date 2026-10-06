@@ -684,6 +684,35 @@ if (process.env.PREFLIGHT_REAL !== 'false') {
   setInterval(runPreflight, 24 * 3600000).unref();
 }
 
+// Informe de ejecución real vs paper ([EJECUCION], solo lectura de /data): 5 min después de
+// arrancar y cada 6 h. EXEC_REPORT=false lo apaga.
+// Reconciliación con los trades de Polymarket ([RECONCILIA], solo lectura del CLOB): solo en
+// real, cada hora; las diferencias van a Discord. RECONCILE_LIVE=false la apaga.
+function runReportScript(script, tag, onWarn) {
+  const { execFile } = require('child_process');
+  execFile(process.execPath, [path.join(__dirname, '..', 'scripts', script)],
+    { timeout: 3 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
+      const warns = [];
+      for (const line of String(stdout || '').split('\n')) {
+        if (!line.startsWith(tag)) continue;
+        if (line.includes('⚠️')) { logger.warn(line); warns.push(line); } else logger.info(line);
+      }
+      if (warns.length && onWarn) onWarn(warns);
+      if (err) logger.warn(`${tag} falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
+    });
+}
+if (process.env.EXEC_REPORT !== 'false') {
+  const run = () => runReportScript('exec-report.js', '[EJECUCION]');
+  setTimeout(run, 5 * 60000).unref();
+  setInterval(run, 6 * 3600000).unref();
+}
+if (!config.DRY_RUN && process.env.RECONCILE_LIVE !== 'false') {
+  const run = () => runReportScript('reconcile-live.js', '[RECONCILIA]',
+    warns => alertOperational('Reconciliación con Polymarket', warns.slice(0, 5).join('\n')));
+  setTimeout(run, 6 * 60000).unref();
+  setInterval(run, 3600000).unref();
+}
+
 let lastTradeTime = 0;
 const COOLDOWN = config.COOLDOWN_SECONDS * 1000; // configurable via Railway
 
