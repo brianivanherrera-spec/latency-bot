@@ -309,7 +309,14 @@ function evGrid(markets) {
   for (const zt of [0.8, 1.0, 1.2, 1.5])
     for (const mt of [0.01, 0.02, 0.04])
       zgrid.push({ zt, mt, ...evaluate(liveMk, { kind: 'zgate', zt, mt, e: 0.08, lo: 0.59, hi: 0.79, tMax: 240, tMin: 10 }) });
-  report.anticipation = { firstSignal: first, earlyOracle: early, zgrid };
+  // Prueba fuera de muestra de la candidata elegida el 06/10 19:26 con 344 mercados (z ≥ 1.5,
+  // movimiento ≥ 0.02 %): solo mercados posteriores al corte, contra la regla actual en esos mismos.
+  const cutoff = Date.parse(process.env.ANTICIPO_DESDE || '2026-10-06T19:15:00Z');
+  const holdMk = liveMk.filter(m => m.start >= cutoff);
+  const holdout = { from: new Date(cutoff).toISOString(), markets: holdMk.length,
+    candidate: evaluate(holdMk, { kind: 'zgate', zt: 1.5, mt: 0.02, e: 0.08, lo: 0.59, hi: 0.79, tMax: 240, tMin: 10 }),
+    current: evaluate(holdMk, cur) };
+  report.anticipation = { firstSignal: first, earlyOracle: early, zgrid, holdout };
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -327,6 +334,8 @@ function evGrid(markets) {
     const pct = (a, b) => b ? `${Math.round(a / b * 100)}%` : 'n/a';
     console.log(`[BACKTEST-ANTICIPO] primera señal del bot (240-10 s) en ${f.n} mercados: ask del lado $${f.n ? (f.ask / f.n).toFixed(3) : 'n/a'} (10 s antes $${f.n10 ? (f.ask10 / f.n10).toFixed(3) : 'n/a'}); llega con ask > 0.79 en ${pct(f.cara, f.n)}, y de esas ${pct(f.caraAntes, f.cara)} estaban en $0.59-0.79 10 s antes || entrar antes sabiendo que viene (regla actual): ${[0, 3, 5, 10].map(k => `${k} s: n=${o[k].n} EV/acc=${o[k].evPerShare}`).join(' | ')}`);
     const top = [...report.anticipation.zgrid].sort((a, b) => (b.evPerShare ?? -9) * Math.sqrt(b.n) - (a.evPerShare ?? -9) * Math.sqrt(a.n));
+    const h = report.anticipation.holdout, sd2 = (x) => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} P&L=$${x.pnl}`;
+    console.log(`[BACKTEST-ANTICIPO] fuera de muestra desde ${h.from} (${h.markets} mercados): candidata z≥1.5 mov≥0.02 ${sd2(h.candidate)} | regla actual ${sd2(h.current)}`);
     console.log(`[BACKTEST-ANTICIPO] señal aproximada z/mov + FAIR e≥8 ($0.59-0.79, 240-10 s): ${top.map(g => `z≥${g.zt} mov≥${g.mt}: n=${g.n} WR=${g.wr} EV/acc=${g.evPerShare} z=${g.z}`).join(' | ')}`);
   }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
