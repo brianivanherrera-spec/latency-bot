@@ -2617,10 +2617,17 @@ async function main() {
       ? round2(Math.min(0.97, bestAskWS + tick))
       : round2(Math.min(0.97, priceRaw + priceTolerance));
 
-    const orderPrice = orderPriceFromWS;
+    // ORDER_LIMIT_BUFFER: margen del límite sobre el ask (default = tick, como antes). Con más
+    // margen la orden sigue llenando si el ask sube 1-2 centavos mientras viaja; en el CLOB
+    // se paga lo publicado, no el límite. Quién entra no cambia: el tope se mira con ask + tick
+    // y el límite se recorta a MAX_ORDER_PRICE.
+    const limitBuffer = parseFloat(process.env.ORDER_LIMIT_BUFFER || '') || tick;
+    const orderPrice = bestAskWS != null && limitBuffer > tick
+      ? Math.max(orderPriceFromWS, Math.min(MAX_ORDER_PRICE, round2(Math.min(0.97, bestAskWS + limitBuffer))))
+      : orderPriceFromWS;
 
-    if (bestAskWS != null && orderPrice > MAX_ORDER_PRICE) {
-      logger.warn(`[SKIP] 🚫 ask demasiado caro: bestAsk=$${bestAskWS.toFixed(2)} orderPx=$${orderPrice} > MAX=$${MAX_ORDER_PRICE} → NO_FILL conceptual`);
+    if (bestAskWS != null && orderPriceFromWS > MAX_ORDER_PRICE) {
+      logger.warn(`[SKIP] 🚫 ask demasiado caro: bestAsk=$${bestAskWS.toFixed(2)} orderPx=$${orderPriceFromWS} > MAX=$${MAX_ORDER_PRICE} → NO_FILL conceptual`);
       activePositions.delete(posId);
       return;
     }
@@ -2672,7 +2679,7 @@ async function main() {
       if (!shadow) {
         if (!global._fairGateWarned) { logger.warn('[FAIR-GATE] SHADOW_MODE=false — sin modelo, el filtro no se aplica'); global._fairGateWarned = true; }
       } else {
-        const gateAsk = price ?? bestAskWS ?? priceRaw;
+        const gateAsk = orderPriceFromWS ?? bestAskWS ?? priceRaw; // ask + tick, sin el margen de ORDER_LIMIT_BUFFER
         const g = shadow.evaluateEntry({ gammaId: mkt?.gammaId, direction: sig.direction, ask: gateAsk, mode: fairGate });
         // Filtro anclado al mercado en sombra: solo registra qué haría (no cambia la decisión)
         const ga = shadow.evaluateEntryAnchored({ gammaId: mkt?.gammaId, direction: sig.direction, ask: gateAsk, actualOk: g.ok });
@@ -3288,8 +3295,15 @@ async function main() {
       // Sin dato de tamaño no se bloquea. PAPER_REQUIRE_DEPTH=false no mira el tamaño.
       const thinBook = process.env.PAPER_REQUIRE_DEPTH !== 'false' && askSize != null && askSize < size;
       const filled = !askAbovePrice && !thinBook && Math.random() < paperFillRate;
+      // PAPER_FILL_AT_BOOK=true: se paga el promedio de los asks publicados hasta el límite (como
+      // cruza el CLOB), no el límite. Default: el límite, como antes (pesimista en ~1 tick).
+      let paidPrice = price;
+      if (filled && process.env.PAPER_FILL_AT_BOOK === 'true') {
+        const v = polyWs.getAskVwapUpTo?.(tokenId, price, size);
+        if (v?.vwap != null && v.filled >= size) paidPrice = Math.min(price, parseFloat(v.vwap.toFixed(4)));
+      }
       if (paperDelayMs > 0) {
-        logger.info(`[PAPER-DELAY] ask decisión=$${bestAskWS?.toFixed(2) ?? 'n/a'} → ask a +${paperDelayMs}ms=$${fillAsk?.toFixed(2) ?? 'n/a'} (${askSize ?? 'n/a'} tokens) | orden ${size} a $${price} | ${filled ? 'lleno' : 'no'}`);
+        logger.info(`[PAPER-DELAY] ask decisión=$${bestAskWS?.toFixed(2) ?? 'n/a'} → ask a +${paperDelayMs}ms=$${fillAsk?.toFixed(2) ?? 'n/a'} (${askSize ?? 'n/a'} tokens) | orden ${size} a $${price} | ${filled ? `lleno a $${paidPrice}` : 'no'}`);
       }
       logger.info(`[PAPER-LIQ] mejor ask $${fillAsk?.toFixed(2) ?? 'n/a'}, ${askSize ?? 'n/a'} tokens hasta $${price} | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
 
@@ -3372,7 +3386,7 @@ async function main() {
         gammaId: mkt.gammaId,
         marketQuestion: mkt.question,
         side,
-        price,
+        price: paidPrice,
         size,
         endDate: mkt.endDate,
         posId,

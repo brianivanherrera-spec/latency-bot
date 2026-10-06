@@ -327,6 +327,26 @@ class PolymarketWS {
     return total;
   }
 
+  // Precio promedio que pagaría una compra de `size` acciones con límite `limitPx`: en el
+  // CLOB una orden límite cruza contra los asks publicados a su precio, no al límite.
+  // Devuelve { vwap, filled } (filled = acciones que alcanzan hasta el límite) o null sin libro.
+  getAskVwapUpTo(tokenId, limitPx, size, maxAgeMs = 3000) {
+    const row = this._topOfBook.get(tokenId);
+    if (!row || Date.now() - row.updatedAt > maxAgeMs || row.bestAsk == null) return null;
+    if (row.bestAsk > limitPx + 1e-9) return { vwap: null, filled: 0 };
+    const lv = this._levels.get(tokenId);
+    const levels = lv && lv.asks.size
+      ? [...lv.asks].filter(([p]) => p >= row.bestAsk - 1e-9 && p <= limitPx + 1e-9).sort((a, b) => a[0] - b[0])
+      : [[row.bestAsk, row.bestAskSize ?? size]];
+    let filled = 0, cost = 0;
+    for (const [p, z] of levels) {
+      const take = Math.min(z, size - filled);
+      if (take <= 0) break;
+      filled += take; cost += take * p;
+    }
+    return { vwap: filled > 0 ? cost / filled : null, filled };
+  }
+
   // Profundidad real del libro — calcula VWAP y disponibilidad hasta N ticks
   // Usa los primeros 5 niveles del book snapshot para estimar el fill price real
   // Retorna: { bestAsk, availableAt1Tick, availableAt2Ticks, vwap, expectedSlippage }

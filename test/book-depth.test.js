@@ -18,11 +18,19 @@ assert.strictEqual(ws.getAskSizeUpTo(T, 0.61), 9, 'mejor nivel + siguiente');
 assert.strictEqual(ws.getAskSizeUpTo(T, 0.62), 9, 'no hay nivel en 0.62');
 assert.strictEqual(ws.getAskSizeUpTo(T, 0.59), 0, 'límite debajo del mejor ask');
 
+// Precio promedio de una compra con límite (getAskVwapUpTo): cruza los niveles en orden
+const near = (a, b) => Math.abs(a - b) < 1e-9;
+let v = ws.getAskVwapUpTo(T, 0.62, 8);
+assert.ok(v.filled === 8 && near(v.vwap, (5 * 0.60 + 3 * 0.61) / 8), 'vwap 5 a 0.60 + 3 a 0.61');
+v = ws.getAskVwapUpTo(T, 0.60, 8);
+assert.ok(v.filled === 5 && near(v.vwap, 0.60), 'hasta el límite solo hay 5');
+assert.deepStrictEqual(ws.getAskVwapUpTo(T, 0.59, 8), { vwap: null, filled: 0 }, 'límite debajo del mejor ask');
+
 ws._onPriceChange({ price_changes: [{ asset_id: T, price: '0.60', size: '0', side: 'SELL', best_bid: '0.58', best_ask: '0.61' }] });
 assert.strictEqual(ws.getAskSizeUpTo(T, 0.61), 4, 'nivel retirado no cuenta');
 
 ws._topOfBook.get(T).updatedAt -= 10_000;
 assert.strictEqual(ws.getAskSizeUpTo(T, 0.61), null, 'libro viejo = sin dato');
 assert.strictEqual(ws.getAskSizeUpTo('otro', 0.61), null, 'token sin libro = sin dato');
-console.log('book-depth: 8 ok');
+console.log('book-depth: 11 ok');
 process.exit(0);
