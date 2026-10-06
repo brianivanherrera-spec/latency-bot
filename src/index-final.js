@@ -668,6 +668,22 @@ if (process.env.BACKTEST_ENABLED !== 'false') {
   setInterval(runBacktest, 12 * 3600000).unref();
 }
 
+// Chequeo previo a real, SOLO LECTURA (scripts/preflight-real.js): credenciales, saldo,
+// órdenes abiertas, geobloqueo y latencia al CLOB; no envía órdenes ni mueve fondos.
+// Líneas [PREFLIGHT] al arrancar (+3 min) y cada 24 h. PREFLIGHT_REAL=false lo apaga.
+function runPreflight() {
+  const { execFile } = require('child_process');
+  execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'preflight-real.js')],
+    { timeout: 3 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
+      for (const line of String(stdout || '').split('\n')) if (line.startsWith('[PREFLIGHT]')) logger.info(line);
+      if (err) logger.warn(`[PREFLIGHT] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
+    });
+}
+if (process.env.PREFLIGHT_REAL !== 'false') {
+  setTimeout(runPreflight, 3 * 60000).unref();
+  setInterval(runPreflight, 24 * 3600000).unref();
+}
+
 let lastTradeTime = 0;
 const COOLDOWN = config.COOLDOWN_SECONDS * 1000; // configurable via Railway
 
