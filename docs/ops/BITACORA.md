@@ -104,8 +104,11 @@ riesgo principal.
 - [x] **Envío de órdenes reales** (01/10, el usuario prioriza asegurar el fill): `DUAL_FILL_ORDER=true` ya no manda FAK + GTC + GTD juntas. Ahora en secuencia: FAK a ask + 1 centavo; si falta, UNA sola GTD por el remanente al mismo precio que vence al cierre; se sigue cada 2 s hasta el cierre, ahí se cancela y se suma lo llenado (total o parcial). Nunca hay dos órdenes vivas a la vez. Probado con un cliente simulado (lleno total, parcial, sin fill, GTD rechazada). Falta verlo con una orden real.
 - [ ] Cobro automático de posiciones ganadoras (redeem vía `builder-relayer-client`; necesita
       credenciales del relayer) o, mientras tanto, cobro manual diario en Polymarket.
-- [ ] Registro de ejecución real: llenado, precio obtenido contra precio esperado, y el
+- [x] Registro de ejecución real: llenado, precio obtenido contra precio esperado, y el
       resultado hipotético de cada señal que no se llenó (para comparar paper contra real).
+      06/10: fills.jsonl con `exec` (incluye en real lo que habría dicho paper), informe
+      `[EJECUCION]` (scripts/exec-report.js, cada 6 h) y reconciliación `[RECONCILIA]` contra los
+      trades de Polymarket (scripts/reconcile-live.js, cada hora solo en real, avisa por Discord).
 - [ ] Alertas por Discord: pausas, pérdida diaria, caídas, errores de órdenes.
 - [ ] Geobloqueo: el servidor en europe-west4 (NL) da blocked=true y el usuario reside en Argentina (región
       bloqueada por Polymarket; hoy entra por VPN). Claude no arma operación real que esquive el bloqueo
