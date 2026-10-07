@@ -4,7 +4,7 @@
  */
 'use strict';
 const assert = require('assert');
-const { buildReport, lines } = require('../scripts/exec-report');
+const { buildReport, lines, FEE } = require('../scripts/exec-report');
 
 const END = 1_791_300_000_000; // fin de un mercado
 const mk = (endMs, winner) => ({ start_ts: endMs - 300_000, end_ts: endMs, winner });
@@ -47,7 +47,7 @@ assert.deepStrictEqual(L.noFillReasons, [['FAK sin liquidez', 1]]);
 assert.strictEqual(L.slippage.mean, 0.01, 'sobreprecio 1¢ en las dos llenadas');
 assert.strictEqual(L.adverse.filled.wr, 0.5, 'llenadas: 1 de 2');
 assert.strictEqual(L.adverse.notFilled.wr, 1, 'la no llenada habría ganado');
-assert.strictEqual(L.adverse.missedEvPerShare, +((1 - 0.63) - 0.07 * 0.63 * 0.37).toFixed(4));
+assert.strictEqual(L.adverse.missedEvPerShare, +((1 - 0.63) - FEE * 0.63 * 0.37).toFixed(4));
 assert.deepStrictEqual([L.pnl.closed, L.pnl.wins, L.pnl.total], [2, 1, -0.4]);
 assert.strictEqual(L.latencyMs.sendToResponse.p50, 120);
 assert.deepStrictEqual([L.paperVsReal.both, L.paperVsReal.paperOnly, L.paperVsReal.realOnly], [1, 1, 1]);

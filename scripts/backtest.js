@@ -9,7 +9,7 @@
  *   - probabilidad ajustada pa = λ·p_modelo + (1−λ)·mid_mercado  (λ=1: modelo puro)
  *   - ventaja neta pa − precio − comisión(precio) ≥ eMin
  * Fill conservador: max(ask en t, ask en t+1) — un segundo de latencia en contra.
- * Comisión taker 0.07·p·(1−p) por acción. $5 por trade (floor(5/precio) acciones).
+ * Comisión taker TAKER_FEE_RATE (0.072)·p·(1−p) por acción. $5 por trade (floor(5/precio) acciones).
  *
  * Familias extra (cada una con su propia selección en train y prueba en test):
  *   - momentum: el BTC de Binance se movió ≥ m% en los últimos k s → comprar ese lado
@@ -29,7 +29,7 @@ const readline = require('readline');
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const IN = process.argv[2] || path.join(DATA_DIR, 'shadow-ticks.jsonl');
 const OUT = process.argv[3] || path.join(DATA_DIR, 'backtest-report.json');
-const FEE = 0.07;
+const FEE = parseFloat(process.env.TAKER_FEE_RATE || '0.072');
 const fee = p => FEE * p * (1 - p);
 const STAKE = 5;
 

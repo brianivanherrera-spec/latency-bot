@@ -21,7 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const FEE = 0.07;
+const FEE = parseFloat(process.env.TAKER_FEE_RATE || '0.072');
 const fee = p => FEE * p * (1 - p);
 const num = v => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
 const pctl = (arr, q) => {
@@ -143,7 +143,7 @@ function lines(report) {
   return L;
 }
 
-module.exports = { buildReport, lines };
+module.exports = { buildReport, lines, FEE };
 
 if (require.main === module) {
   const dir = process.argv[2] || process.env.DATA_DIR || '/data';
