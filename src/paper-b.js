@@ -19,7 +19,8 @@
  * Estado en DATA_DIR/paper-b.json: sobrevive reinicios (se guarda desde el arranque).
  * En cada mercado sin entrada deja una línea con la mejor ventaja que vio en la ventana (para ver
  * que la cuenta está viva y qué tan cerca quedó). En cada intento pide además el libro por la API
- * REST al decidir y al momento del fill (PAPER_REST_CHECK, solo registro: el fill sigue siendo el del WS).
+ * REST al decidir y al momento del fill (PAPER_REST_CHECK, solo registro: el fill sigue siendo el del WS);
+ * las llenadas que según el REST no llenaban se cuentan aparte en el balance ("con el libro REST").
  */
 'use strict';
 const fs = require('fs');
@@ -174,10 +175,12 @@ class PaperB {
     if (win) S.w++; else S.l++;
     S.pnl = +(S.pnl + pnl).toFixed(4);
     S.fees = +(S.fees + fee).toFixed(4);
+    // Llenadas que según el libro REST a +delay no llenaban: se cuentan aparte (P&L "con el libro REST")
+    if (p.restFill === false) { const r = S.restNo; r.n++; if (win) r.w++; r.pnl = +(r.pnl + pnl).toFixed(4); }
     S.recent.push({ ...p, winner, win, pnl: +pnl.toFixed(4), source, closedAt: Date.now() });
     if (S.recent.length > 50) S.recent.shift();
     this._save();
-    logger.info(`[PAPER-B] ${win ? 'WIN' : 'LOSS'} ${p.side} ${p.market} @ $${p.paid} ×${p.size} → ${usd(pnl)} (comisión $${fee.toFixed(2)}) | P&L B ${usd(S.pnl)} (${S.w}-${S.l})`);
+    logger.info(`[PAPER-B] ${win ? 'WIN' : 'LOSS'} ${p.side} ${p.market} @ $${p.paid} ×${p.size} → ${usd(pnl)} (comisión $${fee.toFixed(2)}) | P&L B ${usd(S.pnl)} (${S.w}-${S.l})${p.restFill === false ? ' | con el libro REST no llenaba: no cuenta en el P&L con REST' : ''}`);
   }
 
   // Posiciones abiertas cuyo mercado cerró hace > 5 min y el shadow no resolvió (p. ej. hubo un
@@ -199,13 +202,24 @@ class PaperB {
   summary() {
     const S = this.state, n = S.w + S.l;
     const o2 = S.only200.filter(x => x.winner), o2w = o2.filter(x => x.winner === x.side).length;
-    return `[PAPER-B] Balance B: ${usd(S.pnl)} | W:${S.w} L:${S.l}${n ? ` (${(S.w / n * 100).toFixed(1)}%)` : ''} | intentos ${S.attempts}, llenadas ${S.filled}, sin fill ${S.noFill}, abiertas ${S.open.length} | a +${this.cfg.checkMs}ms llenaban ${S.fill200} (solo a ${this.cfg.checkMs} ms: ${S.only200.length}${o2.length ? `, ganaban ${o2w}/${o2.length}` : ''}) | desde ${new Date(S.startedAt).toISOString().slice(0, 16)} UTC`;
+    const r = S.restNo;
+    return `[PAPER-B] Balance B: ${usd(S.pnl)} | W:${S.w} L:${S.l}${n ? ` (${(S.w / n * 100).toFixed(1)}%)` : ''} | intentos ${S.attempts}, llenadas ${S.filled}, sin fill ${S.noFill}, abiertas ${S.open.length} | a +${this.cfg.checkMs}ms llenaban ${S.fill200} (solo a ${this.cfg.checkMs} ms: ${S.only200.length}${o2.length ? `, ganaban ${o2w}/${o2.length}` : ''}) | con el libro REST: ${usd(S.pnl - r.pnl)} (${S.w - r.w}-${S.l - (r.n - r.w)}), ${r.n} llenadas que con REST no llenaban | desde ${new Date(S.startedAt).toISOString().slice(0, 16)} UTC`;
   }
 
   _load() {
-    const fresh = { v: 1, startedAt: Date.now(), attempts: 0, filled: 0, noFill: 0, fill200: 0, w: 0, l: 0, pnl: 0, fees: 0, open: [], recent: [], only200: [] };
+    const fresh = { v: 1, startedAt: Date.now(), attempts: 0, filled: 0, noFill: 0, fill200: 0, w: 0, l: 0, pnl: 0, fees: 0, open: [], recent: [], only200: [],
+      restNo: { n: 0, w: 0, pnl: 0 } };
     try {
-      if (fs.existsSync(this.stateFile)) return { ...fresh, ...JSON.parse(fs.readFileSync(this.stateFile, 'utf8')) };
+      if (fs.existsSync(this.stateFile)) {
+        const saved = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
+        const s = { ...fresh, ...saved };
+        // Estado anterior al contador "con el libro REST": se arma con las cerradas guardadas
+        if (!saved.restNo) {
+          const g = (s.recent || []).filter(x => x.restFill === false);
+          s.restNo = { n: g.length, w: g.filter(x => x.win).length, pnl: +g.reduce((a, x) => a + (x.pnl || 0), 0).toFixed(4) };
+        }
+        return s;
+      }
     } catch (e) { logger.warn(`[PAPER-B] estado ilegible (${e.message}) — empieza de cero`); }
     return fresh;
   }

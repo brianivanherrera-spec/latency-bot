@@ -22,11 +22,14 @@ const polyWs = {
   getAskSizeUpTo: (t, lim) => (book[t] != null && book[t] <= lim + 1e-9 ? 100 : 0),
   getAskVwapUpTo: (t, lim, size) => (book[t] != null && book[t] <= lim + 1e-9 ? { vwap: book[t], filled: size } : { vwap: null, filled: 0 }),
 };
-// API falsa: /book devuelve el libro falso (100 acciones en el ask) y /markets/ el resultado de Gamma
+// API falsa: /book devuelve el libro falso (100 acciones en el ask; `rest` lo pisa para simular un WS
+// atrasado) y /markets/ el resultado de Gamma
+const rest = {};
 const fakeFetch = async (url) => {
   const u = new URL(url);
   if (u.pathname === '/book') {
-    const a = book[u.searchParams.get('token_id')];
+    const tok = u.searchParams.get('token_id');
+    const a = rest[tok] ?? book[tok];
     return { ok: true, json: async () => ({ timestamp: String(Date.now() - 20), bids: [], asks: a == null ? [] : [{ price: String(a), size: '100' }] }) };
   }
   return { ok: true, json: async () => ({ closed: true, outcomePrices: '["0", "1"]' }) };
@@ -121,6 +124,30 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pb2.state.w, 2, 'DOWN ganó');
   assert.ok(Math.abs(pb2.state.pnl - (expWin + expDown)) < 1e-3);
   assert.ok(/Balance B: \+\$/.test(pb2.summary()));
+  assert.ok(pb2.summary().includes('con el libro REST: +$8.52 (2-0), 0 llenadas que con REST no llenaban'), pb2.summary());
+
+  // 8) El WS llena pero el libro REST a +400 ms ya no tenía el precio: cuenta aparte en el P&L con REST
+  const m6 = mkt('g6');
+  book.Y = 0.45;
+  pb2.onSample(m6, sample(150, 0.50));
+  pb2.onSample(m6, sample(100, 0.65));
+  setTimeout(() => { rest.Y = 0.60; }, 15); // el REST al decidir todavía en 0.45; al fill, 0.60
+  await pb2.markets.get('g6').done;
+  delete rest.Y;
+  const p6 = pb2.state.open.find(x => x.gammaId === 'g6');
+  assert.strictEqual(p6.paid, 0.46, 'paper con el WS: llenó');
+  assert.deepStrictEqual([p6.restAsk0, p6.restAsk400, p6.restFill], [0.45, 0.60, false]);
+  pb2.onResolved('g6', 'UP', 'gamma');
+  assert.strictEqual(pb2.state.w, 3);
+  assert.deepStrictEqual([pb2.state.restNo.n, pb2.state.restNo.w], [1, 1]);
+  assert.ok(Math.abs(pb2.state.restNo.pnl - expWin) < 1e-3);
+  assert.ok(pb2.summary().includes('con el libro REST: +$8.52 (2-0), 1 llenadas que con REST no llenaban'), pb2.summary());
+  // 9) Estado guardado antes del contador: se arma con las cerradas
+  const old = path.join(dir, 'viejo.json');
+  fs.writeFileSync(old, JSON.stringify({ v: 1, startedAt: Date.now(), w: 1, l: 1, pnl: 1, recent: [{ restFill: false, win: true, pnl: 2 }, { restFill: true, win: false, pnl: -1 }] }));
+  const pb3 = new PaperB({ polyWs, stateFile: old, env, fetchFn: fakeFetch });
+  assert.deepStrictEqual(pb3.state.restNo, { n: 1, w: 1, pnl: 2 });
+  assert.ok(pb3.summary().includes('con el libro REST: −$1.00 (0-1), 1 llenadas'), pb3.summary());
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 38 ok');
+  console.log('paper-b: 47 ok');
 })().catch(e => { console.error(e); process.exit(1); });
