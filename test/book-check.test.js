@@ -5,7 +5,7 @@
 'use strict';
 process.env.LOG_FILE = 'off';
 const assert = require('assert');
-const { BookCheck, fetchRestBook, restSizeUpTo } = require('../src/book-check');
+const { BookCheck, fetchRestBook, restSizeUpTo, restVwapUpTo } = require('../src/book-check');
 
 const top = new Map();
 const setWs = (tok, bid, ask, topTs = null) => top.set(tok, { bestBid: bid, bestAsk: ask, updatedAt: Date.now(), topTs });
@@ -28,6 +28,10 @@ const fetchFn = async (url) => {
   assert.ok(rb.age >= 500 && rb.ts > 1e12, 'hora y edad del snapshot');
   assert.strictEqual(restSizeUpTo(rb, 0.47), 20, 'hasta $0.47: 10 + 10');
   assert.strictEqual(restSizeUpTo(rb, 0.44), 0, 'límite debajo del mejor ask');
+  const vw = restVwapUpTo(rb, 0.47, 15);
+  assert.strictEqual(vw.filled, 15, '15 acciones hasta $0.47');
+  assert.ok(Math.abs(vw.vwap - (10 * rb.asks[0][0] + 5 * rb.asks[1][0]) / 15) < 1e-9, 'promedio de los dos niveles');
+  assert.deepStrictEqual(restVwapUpTo(rb, 0.44, 5), { vwap: null, filled: 0 }, 'nada hasta el límite');
   assert.strictEqual(restSizeUpTo(null, 0.5), null);
 
   const bc = new BookCheck({ polyWs: poly, fetchFn, intervalMs: 0, lagMs: 100 });
@@ -75,5 +79,5 @@ const fetchFn = async (url) => {
   poly._lastLagAt = Date.now() - 10000;
   await bc.checkOnce();
   assert.strictEqual(bc.s.wsLag.length, 8, 'retraso viejo: no cuenta');
-  console.log('book-check: 20 ok');
+  console.log('book-check: 23 ok');
 })().catch(e => { console.error(e); process.exit(1); });

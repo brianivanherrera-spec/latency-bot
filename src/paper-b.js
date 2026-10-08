@@ -20,13 +20,15 @@
  * En cada mercado sin entrada deja una línea con la mejor ventaja que vio en la ventana (para ver
  * que la cuenta está viva y qué tan cerca quedó). En cada intento pide además el libro por la API
  * REST al decidir y al momento del fill (PAPER_REST_CHECK, solo registro: el fill sigue siendo el del WS);
- * las llenadas que según el REST no llenaban se cuentan aparte en el balance ("con el libro REST").
+ * el balance suma la cuenta "con el libro REST": las llenadas al precio del REST, sin las que según el REST
+ * no llenaban y con las que solo llenaba el REST. Límite de la orden: PAPER_B_LIMIT=buffer (ask + buffer)
+ * o fair (hasta donde queda PAPER_B_LIMIT_MARGIN de ventaja contra el precio justo anclado).
  */
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { Logger } = require('./logger');
-const { fetchRestBook, restSizeUpTo } = require('./book-check');
+const { fetchRestBook, restSizeUpTo, restVwapUpTo } = require('./book-check');
 const logger = new Logger('PAPER-B');
 
 const GAMMA = 'https://gamma-api.polymarket.com';
@@ -45,6 +47,9 @@ class PaperB {
       tMax: num(env.PAPER_B_TMAX, 120), tMin: num(env.PAPER_B_TMIN, 30), stake: num(env.PAPER_B_STAKE, 5),
       delayMs: Math.max(0, num(env.PAPER_B_DELAY_MS, 400)), buffer: num(env.ORDER_LIMIT_BUFFER, 0.02),
       feeRate: num(env.TAKER_FEE_RATE, 0.072),
+      // Límite de la orden: 'buffer' = ask + ORDER_LIMIT_BUFFER; 'fair' = paga hasta donde todavía queda
+      // PAPER_B_LIMIT_MARGIN de ventaja contra el precio justo anclado (neta de comisión). Tope en los dos: max + 2¢
+      limitMode: env.PAPER_B_LIMIT === 'fair' ? 'fair' : 'buffer', margin: num(env.PAPER_B_LIMIT_MARGIN, 0.02),
     };
     c.checkMs = Math.min(c.delayMs, Math.max(0, num(env.PAPER_CHECK_MS, 200)));
     c.cap = round2(c.hi + 0.02);
@@ -60,7 +65,8 @@ class PaperB {
 
   describe() {
     const c = this.cfg;
-    return `regla anclada: ventaja ≥ ${Math.round(c.edge * 100)} pts neta de comisión, ask $${c.lo.toFixed(2)}-$${c.hi.toFixed(2)}, ${c.tMax}-${c.tMin} s restantes, $${c.stake} por operación, fill a +${c.delayMs} ms (registro a +${c.checkMs} ms)`;
+    const lim = c.limitMode === 'fair' ? `límite = precio justo − comisión − ${Math.round(c.margin * 100)} pts` : `límite = ask + ${Math.round(c.buffer * 100)}¢`;
+    return `regla anclada: ventaja ≥ ${Math.round(c.edge * 100)} pts neta de comisión, ask $${c.lo.toFixed(2)}-$${c.hi.toFixed(2)}, ${c.tMax}-${c.tMin} s restantes, $${c.stake} por operación (${lim}, tope $${c.cap.toFixed(2)}), fill a +${c.delayMs} ms (registro a +${c.checkMs} ms)`;
   }
 
   // Resolución de respaldo (reinicios, o si el shadow no resolvió) y resumen cada 5 min
@@ -115,7 +121,10 @@ class PaperB {
     const c = this.cfg, tick = 0.01;
     const tokenId = side === 'UP' ? m.yesTokenId : m.noTokenId;
     const minPx = round2(ask + tick);
-    const limit = Math.max(minPx, Math.min(c.cap, round2(ask + c.buffer)));
+    // Límite 'fair': el precio más alto con el que todavía quedan `margin` pts de ventaja contra el precio
+    // justo anclado, neto de comisión (redondeado hacia abajo al centavo)
+    const fairLimit = () => { const l0 = pa - c.margin; return Math.floor((l0 - this.fee(Math.min(0.99, Math.max(0.01, l0)))) * 100 + 1e-9) / 100; };
+    const limit = Math.max(minPx, Math.min(c.cap, c.limitMode === 'fair' ? fairLimit() : round2(ask + c.buffer)));
     const size = Math.floor(c.stake / limit);
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const book = () => ({ ask: this.poly?.getBestAskForToken?.(tokenId) ?? null, size: this.poly?.getAskSizeUpTo?.(tokenId, limit) ?? null });
@@ -151,9 +160,16 @@ class PaperB {
       const [a, b] = await Promise.all([r0, r1]);
       const sz = restSizeUpTo(b, limit);
       pos.restAsk0 = a?.ask ?? null; pos.restAsk400 = b?.ask ?? null;
-      pos.restFill = b ? b.ask != null && b.ask <= limit + 1e-9 && sz >= size : null;
+      pos.restFill = b ? size > 0 && b.ask != null && b.ask <= limit + 1e-9 && sz >= size : null;
+      if (pos.restFill) {
+        // Precio con el libro REST (mismo criterio que el WS: al menos ask al decidir + 1 tick, sin pasar el límite)
+        const v = restVwapUpTo(b, limit, size);
+        pos.restPaid = v.vwap != null ? Math.min(limit, Math.max(minPx, +v.vwap.toFixed(4))) : limit;
+        // El WS no llenó pero el REST sí: la cuenta "con el libro REST" tiene esta posición
+        if (!filled) S.restOpen.push(pos);
+      }
       this._save();
-      logger.info(`[PAPER-B] REST: al decidir ask ${px(pos.restAsk0)} (WS ${px(ask)}) | a +${c.delayMs}ms ${px(pos.restAsk400)} (WS ${px(b400.ask)}), ${sz ?? 'n/a'} acciones hasta $${limit} → con REST ${pos.restFill == null ? 'sin dato' : pos.restFill ? 'llenaba' : 'no llenaba'} (paper: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms`);
+      logger.info(`[PAPER-B] REST: al decidir ask ${px(pos.restAsk0)} (WS ${px(ask)}) | a +${c.delayMs}ms ${px(pos.restAsk400)} (WS ${px(b400.ask)}), ${sz ?? 'n/a'} acciones hasta $${limit} → con REST ${pos.restFill == null ? 'sin dato' : pos.restFill ? `llenaba a $${pos.restPaid}` : 'no llenaba'} (paper: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms`);
     }
     return pos;
   }
@@ -162,7 +178,27 @@ class PaperB {
   onResolved(gammaId, winner, source) {
     if ((winner !== 'UP' && winner !== 'DOWN') || !String(source || '').startsWith('gamma')) return;
     for (const p of this.state.open.filter(x => x.gammaId === gammaId)) this._close(p, winner, source);
+    for (const p of this.state.restOpen.filter(x => x.gammaId === gammaId)) this._closeRestOnly(p, winner);
     for (const p of this.state.only200.filter(x => x.gammaId === gammaId && x.winner == null)) p.winner = winner;
+  }
+
+  // Resultado de una posición al precio del libro REST (cuenta "con el libro REST")
+  _restResult(p, winner, onlyRest) {
+    const R = this.state.rest, rp = p.restPaid ?? p.paid, win = p.side === winner;
+    const pnl = (win ? p.size * (1 - rp) : -p.size * rp) - this.fee(rp) * p.size;
+    R.n++; if (win) R.w++; if (onlyRest) R.only++;
+    R.pnl = +(R.pnl + pnl).toFixed(4);
+    return pnl;
+  }
+
+  // Posición que solo llenaba con el libro REST (el WS no llenó): cuenta solo en el P&L con REST
+  _closeRestOnly(p, winner) {
+    const S = this.state;
+    if (!S.restOpen.some(x => x.id === p.id)) return;
+    S.restOpen = S.restOpen.filter(x => x.id !== p.id);
+    const pnl = this._restResult(p, winner, true);
+    this._save();
+    logger.info(`[PAPER-B] solo con el libro REST: ${p.side === winner ? 'WIN' : 'LOSS'} ${p.side} ${p.market} @ $${p.restPaid} ×${p.size} → ${usd(pnl)} (el WS no llenó) | P&L con REST ${usd(S.rest.pnl)}`);
   }
 
   _close(p, winner, source) {
@@ -175,8 +211,10 @@ class PaperB {
     if (win) S.w++; else S.l++;
     S.pnl = +(S.pnl + pnl).toFixed(4);
     S.fees = +(S.fees + fee).toFixed(4);
-    // Llenadas que según el libro REST a +delay no llenaban: se cuentan aparte (P&L "con el libro REST")
+    // Llenadas que según el libro REST a +delay no llenaban: se cuentan aparte; el resto entra en el P&L
+    // "con el libro REST" al precio del REST (sin dato del REST: al del WS)
     if (p.restFill === false) { const r = S.restNo; r.n++; if (win) r.w++; r.pnl = +(r.pnl + pnl).toFixed(4); }
+    else this._restResult(p, winner, false);
     S.recent.push({ ...p, winner, win, pnl: +pnl.toFixed(4), source, closedAt: Date.now() });
     if (S.recent.length > 50) S.recent.shift();
     this._save();
@@ -186,15 +224,16 @@ class PaperB {
   // Posiciones abiertas cuyo mercado cerró hace > 5 min y el shadow no resolvió (p. ej. hubo un
   // reinicio): se consulta Gamma, como hace el shadow
   async _resolveStale(now = Date.now()) {
-    for (const p of this.state.open.filter(x => now - x.endTs > 5 * 60000)) {
+    const stale = [...this.state.open, ...this.state.restOpen].filter(x => now - x.endTs > 5 * 60000);
+    for (const gammaId of new Set(stale.map(x => x.gammaId))) {
       try {
-        const res = await this.fetch(`${GAMMA}/markets/${p.gammaId}`, { signal: AbortSignal.timeout(5000) });
+        const res = await this.fetch(`${GAMMA}/markets/${gammaId}`, { signal: AbortSignal.timeout(5000) });
         if (!res.ok) continue;
         const d = await res.json();
         const prices = typeof d.outcomePrices === 'string' ? JSON.parse(d.outcomePrices) : d.outcomePrices;
         const up = parseFloat(prices?.[0]), dn = parseFloat(prices?.[1]);
-        if (d.closed === true && up >= 0.99) this._close(p, 'UP', 'gamma');
-        else if (d.closed === true && dn >= 0.99) this._close(p, 'DOWN', 'gamma');
+        if (d.closed === true && up >= 0.99) this.onResolved(gammaId, 'UP', 'gamma');
+        else if (d.closed === true && dn >= 0.99) this.onResolved(gammaId, 'DOWN', 'gamma');
       } catch (_) { /* se reintenta en el próximo minuto */ }
     }
   }
@@ -202,13 +241,13 @@ class PaperB {
   summary() {
     const S = this.state, n = S.w + S.l;
     const o2 = S.only200.filter(x => x.winner), o2w = o2.filter(x => x.winner === x.side).length;
-    const r = S.restNo;
-    return `[PAPER-B] Balance B: ${usd(S.pnl)} | W:${S.w} L:${S.l}${n ? ` (${(S.w / n * 100).toFixed(1)}%)` : ''} | intentos ${S.attempts}, llenadas ${S.filled}, sin fill ${S.noFill}, abiertas ${S.open.length} | a +${this.cfg.checkMs}ms llenaban ${S.fill200} (solo a ${this.cfg.checkMs} ms: ${S.only200.length}${o2.length ? `, ganaban ${o2w}/${o2.length}` : ''}) | con el libro REST: ${usd(S.pnl - r.pnl)} (${S.w - r.w}-${S.l - (r.n - r.w)}), ${r.n} llenadas que con REST no llenaban | desde ${new Date(S.startedAt).toISOString().slice(0, 16)} UTC`;
+    const R = S.rest;
+    return `[PAPER-B] Balance B: ${usd(S.pnl)} | W:${S.w} L:${S.l}${n ? ` (${(S.w / n * 100).toFixed(1)}%)` : ''} | intentos ${S.attempts}, llenadas ${S.filled}, sin fill ${S.noFill}, abiertas ${S.open.length} | a +${this.cfg.checkMs}ms llenaban ${S.fill200} (solo a ${this.cfg.checkMs} ms: ${S.only200.length}${o2.length ? `, ganaban ${o2w}/${o2.length}` : ''}) | con el libro REST: ${usd(R.pnl)} (${R.w}-${R.n - R.w}); ${S.restNo.n} llenadas que con REST no llenaban, ${R.only} que solo llenaba el REST | límite ${this.cfg.limitMode} | desde ${new Date(S.startedAt).toISOString().slice(0, 16)} UTC`;
   }
 
   _load() {
     const fresh = { v: 1, startedAt: Date.now(), attempts: 0, filled: 0, noFill: 0, fill200: 0, w: 0, l: 0, pnl: 0, fees: 0, open: [], recent: [], only200: [],
-      restNo: { n: 0, w: 0, pnl: 0 } };
+      restNo: { n: 0, w: 0, pnl: 0 }, rest: { n: 0, w: 0, pnl: 0, only: 0 }, restOpen: [] };
     try {
       if (fs.existsSync(this.stateFile)) {
         const saved = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));
@@ -217,6 +256,11 @@ class PaperB {
         if (!saved.restNo) {
           const g = (s.recent || []).filter(x => x.restFill === false);
           s.restNo = { n: g.length, w: g.filter(x => x.win).length, pnl: +g.reduce((a, x) => a + (x.pnl || 0), 0).toFixed(4) };
+        }
+        // Estado anterior a la cuenta "con el libro REST" a precio REST: las cerradas que el REST llenaba, a su precio
+        if (!saved.rest) {
+          const g = (s.recent || []).filter(x => x.restFill !== false);
+          s.rest = { n: g.length, w: g.filter(x => x.win).length, pnl: +g.reduce((a, x) => a + (x.pnl || 0), 0).toFixed(4), only: 0 };
         }
         return s;
       }

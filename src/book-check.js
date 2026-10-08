@@ -9,7 +9,7 @@
  * servidor nos manda los datos tarde) y WS al día (ni se movió ni estaba atrasado: diferencia real,
  * a investigar). El retraso es hora local − timestamp del servidor del último mensaje del WS; se
  * muestra también cuánto antes que la foto del REST se fijó el top del WS (topTs, hora del servidor).
- * fetchRestBook/restSizeUpTo los usa también el paper para comparar cada intento con el REST.
+ * fetchRestBook/restSizeUpTo/restVwapUpTo los usa también el paper para comparar cada intento con el REST.
  * Logs: [BOOK-CHECK] con detalle cuando difiere más de 1¢, y un resumen cada BOOK_CHECK_SUMMARY_MIN (15).
  */
 'use strict';
@@ -41,6 +41,18 @@ function restSizeUpTo(book, limit) {
   let n = 0;
   for (const [p, z] of book.asks) { if (p > limit + 1e-9) break; n += z; }
   return n;
+}
+
+// Precio promedio de comprar `size` acciones en el libro REST sin pasar del límite → { vwap, filled }
+function restVwapUpTo(book, limit, size) {
+  if (!book || !(size > 0)) return { vwap: null, filled: 0 };
+  let got = 0, cost = 0;
+  for (const [p, z] of book.asks) {
+    if (p > limit + 1e-9 || got >= size) break;
+    const take = Math.min(z, size - got);
+    got += take; cost += take * p;
+  }
+  return { vwap: got > 0 ? cost / got : null, filled: got };
 }
 
 class BookCheck {
@@ -125,4 +137,4 @@ class BookCheck {
   }
 }
 
-module.exports = { BookCheck, fetchRestBook, restSizeUpTo };
+module.exports = { BookCheck, fetchRestBook, restSizeUpTo, restVwapUpTo };

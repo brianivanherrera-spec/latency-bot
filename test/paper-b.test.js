@@ -124,7 +124,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pb2.state.w, 2, 'DOWN ganó');
   assert.ok(Math.abs(pb2.state.pnl - (expWin + expDown)) < 1e-3);
   assert.ok(/Balance B: \+\$/.test(pb2.summary()));
-  assert.ok(pb2.summary().includes('con el libro REST: +$8.52 (2-0), 0 llenadas que con REST no llenaban'), pb2.summary());
+  assert.ok(pb2.summary().includes('con el libro REST: +$8.52 (2-0); 0 llenadas que con REST no llenaban, 0 que solo llenaba el REST | límite buffer'), pb2.summary());
 
   // 8) El WS llena pero el libro REST a +400 ms ya no tenía el precio: cuenta aparte en el P&L con REST
   const m6 = mkt('g6');
@@ -141,13 +141,48 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pb2.state.w, 3);
   assert.deepStrictEqual([pb2.state.restNo.n, pb2.state.restNo.w], [1, 1]);
   assert.ok(Math.abs(pb2.state.restNo.pnl - expWin) < 1e-3);
-  assert.ok(pb2.summary().includes('con el libro REST: +$8.52 (2-0), 1 llenadas que con REST no llenaban'), pb2.summary());
+  assert.ok(pb2.summary().includes('con el libro REST: +$8.52 (2-0); 1 llenadas que con REST no llenaban'), pb2.summary());
   // 9) Estado guardado antes del contador: se arma con las cerradas
   const old = path.join(dir, 'viejo.json');
   fs.writeFileSync(old, JSON.stringify({ v: 1, startedAt: Date.now(), w: 1, l: 1, pnl: 1, recent: [{ restFill: false, win: true, pnl: 2 }, { restFill: true, win: false, pnl: -1 }] }));
   const pb3 = new PaperB({ polyWs, stateFile: old, env, fetchFn: fakeFetch });
   assert.deepStrictEqual(pb3.state.restNo, { n: 1, w: 1, pnl: 2 });
-  assert.ok(pb3.summary().includes('con el libro REST: −$1.00 (0-1), 1 llenadas'), pb3.summary());
+  assert.deepStrictEqual(pb3.state.rest, { n: 1, w: 0, pnl: -1, only: 0 });
+  assert.ok(pb3.summary().includes('con el libro REST: −$1.00 (0-1); 1 llenadas'), pb3.summary());
+
+  // 10) Límite por precio justo (PAPER_B_LIMIT=fair, margen 2 pts): pAdj 0.595 → límite
+  //     floor((0.575 − comisión(0.575))·100)/100 = 0.55; el ask sube a 0.52 en la demora y llena igual
+  const pf = new PaperB({ polyWs, stateFile: path.join(dir, 'fair.json'), env: { ...env, PAPER_B_LIMIT: 'fair', PAPER_B_LIMIT_MARGIN: '0.02' }, fetchFn: fakeFetch });
+  assert.ok(pf.describe().includes('límite = precio justo − comisión − 2 pts, tope $0.72'), pf.describe());
+  book.Y = 0.45;
+  const m7 = mkt('g7');
+  pf.onSample(m7, sample(150, 0.50));
+  pf.onSample(m7, sample(100, 0.65));
+  setTimeout(() => { book.Y = 0.52; }, 15);
+  await pf.markets.get('g7').done;
+  const p7 = pf.state.open[0];
+  assert.deepStrictEqual([p7.limit, p7.size, p7.paid, p7.restFill, p7.restPaid], [0.55, 9, 0.52, true, 0.52]);
+  pf.onResolved('g7', 'UP', 'gamma');
+  const exp7 = 9 * (1 - 0.52) - FEE * 0.52 * 0.48 * 9;
+  assert.ok(Math.abs(pf.state.pnl - exp7) < 1e-3);
+  assert.ok(Math.abs(pf.state.rest.pnl - exp7) < 1e-3, 'con el REST, al mismo precio');
+  // 11) Solo el REST llenaba: el WS quedó arriba del límite (0.60) y el REST seguía en 0.45
+  book.Y = 0.45;
+  const m8 = mkt('g8');
+  pf.onSample(m8, sample(150, 0.50));
+  pf.onSample(m8, sample(100, 0.65));
+  setTimeout(() => { book.Y = 0.60; rest.Y = 0.45; }, 15);
+  await pf.markets.get('g8').done;
+  delete rest.Y;
+  assert.strictEqual(pf.state.noFill, 1, 'el WS no llenó');
+  assert.strictEqual(pf.state.restOpen.length, 1, 'con el REST sí');
+  assert.strictEqual(pf.state.restOpen[0].restPaid, 0.46, 'al menos ask al decidir + 1 tick');
+  pf.onResolved('g8', 'UP', 'gamma');
+  const exp8 = 9 * (1 - 0.46) - FEE * 0.46 * 0.54 * 9;
+  assert.deepStrictEqual([pf.state.rest.n, pf.state.rest.w, pf.state.rest.only, pf.state.restOpen.length], [2, 2, 1, 0]);
+  assert.ok(Math.abs(pf.state.rest.pnl - (exp7 + exp8)) < 1e-3);
+  assert.ok(Math.abs(pf.state.pnl - exp7) < 1e-3, 'el P&L del paper no cambia');
+  assert.ok(pf.summary().includes('0 llenadas que con REST no llenaban, 1 que solo llenaba el REST | límite fair'), pf.summary());
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 47 ok');
+  console.log('paper-b: 60 ok');
 })().catch(e => { console.error(e); process.exit(1); });
