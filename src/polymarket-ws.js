@@ -177,6 +177,7 @@ class PolymarketWS {
       bestBidSize: sizeFor(bid, bestBidSize, prev.bestBid, prev.bestBidSize, lv?.bids),
       bestAskSize: sizeFor(ask, bestAskSize, prev.bestAsk, prev.bestAskSize, lv?.asks),
       updatedAt: Date.now(),
+      topTs: this._msgTs ?? null, // hora del servidor del mensaje que lo fijó
     });
     if (ask != null) this._bestAskByToken.set(tokenId, ask);
     else this._bestAskByToken.delete(tokenId);
@@ -888,6 +889,7 @@ class PolymarketWS {
       this._lastLagMs = now - ts; this._lastLagAt = now;
       loopMonitor.observeWsLag(now - ts);
     }
+    this._msgTs = ts > 1e12 ? ts : null; // hora del servidor del mensaje en curso (topTs del top que fije)
 
     if (type === 'book') {
       this._onBook(msg);

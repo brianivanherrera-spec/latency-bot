@@ -29,8 +29,15 @@ assert.deepStrictEqual(ws.getAskVwapUpTo(T, 0.59, 8), { vwap: null, filled: 0 },
 ws._onPriceChange({ price_changes: [{ asset_id: T, price: '0.60', size: '0', side: 'SELL', best_bid: '0.58', best_ask: '0.61' }] });
 assert.strictEqual(ws.getAskSizeUpTo(T, 0.61), 4, 'nivel retirado no cuenta');
 
+// Hora del servidor del mensaje que fijó el top (topTs, la usa el chequeo del libro) y retraso
+const ts = Date.now() - 300;
+ws._handleMessage({ event_type: 'price_change', timestamp: String(ts), price_changes: [{ asset_id: T, price: '0.61', size: '0', side: 'SELL', best_bid: '0.58', best_ask: '0.63' }] });
+assert.strictEqual(ws._topOfBook.get(T).topTs, ts, 'topTs = timestamp del mensaje');
+assert.strictEqual(ws._topOfBook.get(T).bestAsk, 0.63);
+assert.ok(ws._lastLagMs >= 300 && ws._lastLagMs < 2000, 'retraso del último mensaje');
+
 ws._topOfBook.get(T).updatedAt -= 10_000;
 assert.strictEqual(ws.getAskSizeUpTo(T, 0.61), null, 'libro viejo = sin dato');
 assert.strictEqual(ws.getAskSizeUpTo('otro', 0.61), null, 'token sin libro = sin dato');
-console.log('book-depth: 11 ok');
+console.log('book-depth: 14 ok');
 process.exit(0);

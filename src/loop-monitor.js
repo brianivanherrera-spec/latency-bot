@@ -31,7 +31,8 @@ hist.enable();
 let sections = new Map(); // tag -> { n, totalMs, maxMs }
 let tpSamples = [];       // latencias del sondeo del threadpool (ms)
 let disk = { n: 0, maxMs: 0 }; // escrituras a disco (async-append y shadow)
-let wsLag = [];           // retraso de entrega de los mensajes del WS de Polymarket (ms)
+let wsLag = [];           // retraso de entrega de los mensajes del WS de Polymarket (ms; últimos 20.000)
+let wsLagMax = null, wsLagN = 0; // máximo y cantidad exactos del intervalo
 let counters = new Map(); // tag -> n
 let blocks = 0;
 let worstBlock = 0;
@@ -87,6 +88,8 @@ function observeWsLag(ms) {
   if (!Number.isFinite(ms)) return;
   wsLag.push(ms);
   if (wsLag.length > 20000) wsLag.shift();
+  wsLagN++;
+  if (wsLagMax == null || ms > wsLagMax) wsLagMax = ms;
 }
 
 const ms = ns => (ns / 1e6).toFixed(0);
@@ -107,13 +110,13 @@ function snapshot() {
   const diskText = disk.n ? ` | disco máx=${disk.maxMs.toFixed(0)}ms (n=${disk.n})` : '';
   const wl = [...wsLag].sort((a, b) => a - b);
   const wlAt = q => wl[Math.min(wl.length - 1, Math.floor(wl.length * q))];
-  const wsLagText = wl.length ? ` | retraso WS p50=${wlAt(0.5).toFixed(0)}ms p99=${wlAt(0.99).toFixed(0)}ms máx=${wl[wl.length - 1].toFixed(0)}ms (n=${wl.length})` : '';
+  const wsLagText = wl.length ? ` | retraso WS p50=${wlAt(0.5).toFixed(0)}ms p99=${wlAt(0.99).toFixed(0)}ms máx=${wsLagMax.toFixed(0)}ms (n=${wsLagN})` : '';
   return {
     text: `lag p50=${ms(hist.percentile(50))}ms p99=${ms(hist.percentile(99))}ms máx=${ms(hist.max)}ms | bloqueos>${BLOCK_MS}ms=${blocks} (peor ${worstBlock}ms) | CPU ${cpuPct.toFixed(0)}% | heap ${(process.memoryUsage().heapUsed / 1048576).toFixed(0)}MB` +
       tpText + diskText + wsLagText +
       (cnt.length ? ` | ${cnt.join(' ')}` : '') + (top.length ? ` | ${top.join(' ')}` : ''),
     blocks, worstBlock, cpuPct, maxLagMs: hist.max / 1e6, tpMaxMs: tpMax, diskMaxMs: disk.n ? disk.maxMs : null,
-    wsLagMaxMs: wl.length ? wl[wl.length - 1] : null,
+    wsLagMaxMs: wsLagMax,
   };
 }
 
@@ -123,7 +126,7 @@ function reset() {
   counters = new Map();
   tpSamples = [];
   disk = { n: 0, maxMs: 0 };
-  wsLag = [];
+  wsLag = []; wsLagMax = null; wsLagN = 0;
   blocks = 0; worstBlock = 0;
   lastCpu = process.cpuUsage(); lastAt = Date.now();
 }
