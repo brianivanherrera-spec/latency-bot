@@ -208,6 +208,31 @@ function limitExec(markets, cfg, buffer) {
     pnl: +pnl.toFixed(2), z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
 }
 
+// Límite por precio justo (B con PAPER_B_LIMIT=fair): el precio más alto con el que todavía quedan `margin`
+// pts de ventaja contra el precio justo anclado del disparo, neto de comisión (al centavo, hacia abajo),
+// entre ask + 1¢ y el tope (máximo del rango + 2¢). Llena si el ask 1 s después sigue ≤ límite y paga
+// max(ask, ask 1 s después); acciones = floor($5 / límite), como en vivo.
+function fairLimitOf(f, mk, cfg, margin) {
+  const r = mk.rows[f.i], pa = f.side === 'UP' ? r.pAdj : 1 - r.pAdj, l0 = pa - margin;
+  const L = Math.floor((l0 - fee(Math.min(0.99, Math.max(0.01, l0)))) * 100 + 1e-9) / 100;
+  return Math.max(+(f.ask + 0.01).toFixed(2), Math.min(+(cfg.hi + 0.02).toFixed(2), L));
+}
+function fairLimitExec(markets, cfg, margin) {
+  let fires = 0, n = 0, w = 0, ps = 0, pnl = 0, exp = 0, varr = 0;
+  for (const mk of markets) {
+    const f = firstFire(mk, cfg);
+    if (!f) continue;
+    fires++;
+    const L = fairLimitOf(f, mk, cfg, margin), a2 = f.ask2 ?? f.ask;
+    if (a2 > L + 1e-9) continue;
+    const price = Math.max(f.ask, a2), win = f.side === mk.winner;
+    const x = (win ? 1 - price : -price) - fee(price);
+    n++; if (win) w++; ps += x; pnl += Math.floor(STAKE / L) * x; exp += price; varr += price * (1 - price);
+  }
+  return { fires, n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(ps / n).toFixed(4) : null,
+    pnl: +pnl.toFixed(2), z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
+}
+
 // Resultado de una regla por día (UTC) de entrada: para ver si la ventaja es pareja o sale de pocos días
 function byDay(markets, cfg) {
   const d = new Map();
@@ -357,7 +382,7 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-module.exports = { load, firstFire, entry, evaluate, limitExec, btcSeries, priceAt, trendSplit, byDay };
+module.exports = { load, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, byDay };
 if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
@@ -459,14 +484,17 @@ if (require.main === module) (async () => {
     hi: envNum('PAPER_B_MAX_ASK', 0.70), tMax: envNum('PAPER_B_TMAX', 120), tMin: envNum('PAPER_B_TMIN', 30) };
   const bFrom = Date.parse(process.env.PAPER_B_DESDE || '2026-10-08T14:49:00Z');
   const bMk = markets.filter(m => m.start >= bFrom);
-  const bBuf = envNum('ORDER_LIMIT_BUFFER', 0.02);
+  const bBuf = envNum('ORDER_LIMIT_BUFFER', 0.02), bMargin = envNum('PAPER_B_LIMIT_MARGIN', 0.02);
   report.paperB = { cfg: bCfg, byDay: byDay(markets, bCfg), from: new Date(bFrom).toISOString(), markets: bMk.length,
     limit: { buffer: bBuf, all: limitExec(markets, bCfg, bBuf), test: limitExec(test, bCfg, bBuf), stdAll: evaluate(markets, bCfg), stdTest: evaluate(test, bCfg) },
+    fair: [0, 0.02, 0.04].map(mg => ({ margin: mg, all: fairLimitExec(markets, bCfg, mg), test: fairLimitExec(test, bCfg, mg) })),
     holdout: evaluate(bMk, bCfg),
     // Disparos (entradas y los que se escaparon en 1 s): cada intento de B en vivo tiene que estar acá
-    entries: bMk.map(mk => ({ mk, f: firstFire(mk, bCfg) })).filter(x => x.f).map(({ mk, f }) => ({
-      start: new Date(mk.start).toISOString(), side: f.side, ask: f.ask, ask2: f.ask2, price: f.price,
-      secsLeft: mk.rows[f.i].sl, escaped: f.escaped, win: f.side === mk.winner })) };
+    entries: bMk.map(mk => ({ mk, f: firstFire(mk, bCfg) })).filter(x => x.f).map(({ mk, f }) => {
+      const L = fairLimitOf(f, mk, bCfg, bMargin);
+      return { start: new Date(mk.start).toISOString(), side: f.side, ask: f.ask, ask2: f.ask2, price: f.price,
+        secsLeft: mk.rows[f.i].sl, escaped: f.escaped, win: f.side === mk.winner, fairLimit: L, fairFill: (f.ask2 ?? f.ask) <= L + 1e-9 };
+    }) };
   // Tendencia de BTC de 2 h (hipótesis del análisis de pérdidas): se confirma solo con z ≥ 2
   const series = btcSeries(markets);
   report.trend2h = {
@@ -502,8 +530,10 @@ if (require.main === module) (async () => {
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B por día (UTC): ${pb.byDay.map(d => `${dd(d.day)} ${d.wins}-${d.n - d.wins} EV/acc=${d.evPerShare}`).join(' | ') || 'sin entradas'}`);
     const L = pb.limit, lx = x => `disparos ${x.fires}, el ask subió más de ${Math.round(L.buffer * 100)}¢ en 1 s en ${x.moved} (${x.fires ? Math.round(x.moved / x.fires * 100) : 0}%) | llenadas n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B con límite ask+${Math.round(L.buffer * 100)}¢ como en vivo (llena si el ask 1 s después sigue ≤ límite): todos ${lx(L.all)} || test ${lx(L.test)} || con el fill normal del backtest (paga el ask 1 s después hasta $${(bCfg.hi + 0.02).toFixed(2)}): todos n=${L.stdAll.n} EV/acc=${L.stdAll.evPerShare} z=${L.stdAll.z} | test n=${L.stdTest.n} EV/acc=${L.stdTest.evPerShare} z=${L.stdTest.z}`);
+    const fx = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
+    console.log(`[BACKTEST-ANCLA] regla de la cuenta B con límite por precio justo (paga hasta donde quedan M pts de ventaja, tope $${(bCfg.hi + 0.02).toFixed(2)}; llena si el ask 1 s después sigue ≤ límite): ${pb.fair.map(f => `margen ${Math.round(f.margin * 100)}: todos ${fx(f.all)} | test ${fx(f.test)}`).join(' || ')}`);
     const h = pb.holdout, hm = t => t.slice(11, 16);
-    const one = x => `${hm(x.start)} UTC ${x.side} ${Math.round(x.secsLeft)} s ask $${x.ask.toFixed(2)}${x.escaped ? ` → $${x.ask2 == null ? 'n/a' : x.ask2.toFixed(2)} 1 s después: se escapó` : ` → paga $${x.price.toFixed(2)} ${x.win ? 'G' : 'P'}`}`;
+    const one = x => `${hm(x.start)} UTC ${x.side} ${Math.round(x.secsLeft)} s ask $${x.ask.toFixed(2)}${x.escaped ? ` → $${x.ask2 == null ? 'n/a' : x.ask2.toFixed(2)} 1 s después: se escapó` : ` → paga $${x.price.toFixed(2)} ${x.win ? 'G' : 'P'}`} (límite justo $${x.fairLimit.toFixed(2)}: ${x.fairFill ? 'llena' : 'no llena'})`;
     const esc = pb.entries.filter(x => x.escaped).length;
     const list = pb.entries.length <= 12 ? pb.entries.map(one).join(', ') : `${pb.entries.length} disparos`;
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | disparos (inicio del mercado; ${esc} con el precio escapado en 1 s, sin entrada): ${list}` : ''}`); }

@@ -7,7 +7,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { load, firstFire, entry, limitExec, btcSeries, priceAt, trendSplit, byDay } = require('../scripts/backtest');
+const { load, firstFire, entry, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, byDay } = require('../scripts/backtest');
 
 const FEE = 0.072, fee = p => FEE * p * (1 - p);
 const S0 = Date.UTC(2026, 9, 8, 10, 0, 0);
@@ -62,6 +62,13 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const lim = limitExec([mEsc, mOk], bCfg, 0.02);
   assert.deepStrictEqual([lim.fires, lim.moved, lim.n, lim.wr], [2, 1, 1, 1]);
   assert.strictEqual(lim.evPerShare, +((1 - 0.50) - fee(0.50)).toFixed(4));
+  // Límite por precio justo: pAdj = 0.495 + 0.15 = 0.645 → margen 2 pts: floor((0.625 − comisión(0.625))·100)/100 = 0.60.
+  // El salto a 0.80 tampoco llena; con margen 0: 0.62
+  assert.strictEqual(fairLimitOf(f, mEsc, bCfg, 0.02), 0.60);
+  assert.strictEqual(fairLimitOf(f, mEsc, bCfg, 0), 0.62);
+  const fl = fairLimitExec([mEsc, mOk], bCfg, 0.02);
+  assert.deepStrictEqual([fl.fires, fl.n, fl.wr], [2, 1, 1]);
+  assert.strictEqual(fl.pnl, +(Math.floor(5 / 0.60) * ((1 - 0.50) - fee(0.50))).toFixed(2), 'acciones = floor($5 / límite)');
   assert.strictEqual(markets[0].btcOpen, 100000);
   assert.strictEqual(markets[4].btcOpen, 100300);
   const series = btcSeries(markets);
@@ -84,5 +91,5 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const d = byDay(markets, cur);
   assert.deepStrictEqual(d.map(x => [x.day, x.n, x.wins]), [['10-08', 5, 3]]);
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-trend: 22 ok');
+  console.log('backtest-trend: 26 ok');
 })().catch(err => { console.error(err); process.exit(1); });
