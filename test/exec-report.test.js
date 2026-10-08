@@ -27,7 +27,8 @@ const fills = [
   // paper: sin fill porque el ask subió
   { posId: 'P1', fill_result: 'NO_FILL', order_price: '0.6200', order_size: 8, size_filled: 0, signal_direction: 'UP',
     rejection_reason: 'Paper mode simulation (fill_rate=100%)', timestamp: END - 50_000,
-    exec: { mode: 'paper', decision_ask: 0.60, fill_ask_delay: 0.65, size_delay: 0, market_end_ms: END } },
+    exec: { mode: 'paper', decision_ask: 0.60, fill_ask_delay: 0.65, size_delay: 0, market_end_ms: END,
+      fill_ask_200: 0.60, size_200: 50, would_fill_200: true } }, // a +200 ms todavía llenaba
   // paper sin exec (registro viejo): el modo sale de signals.jsonl
   { posId: 'P2', fill_result: 'FILLED', order_price: '0.6600', order_size: 7, size_filled: 7, signal_direction: 'UP',
     order_status: 'simulated_filled', timestamp: END - 40_000 },
@@ -55,7 +56,13 @@ assert.strictEqual(L.paperVsReal.paperFillRate, 0.6667);
 assert.strictEqual(P.attempts, 2); assert.strictEqual(P.filled, 1);
 assert.deepStrictEqual(P.noFillReasons, [['ask subió por encima del límite', 1]]);
 assert.strictEqual(P.latencyMs, null);
+// Registro a +200 ms: P1 llenaba a 200 ms pero no a 400, y habría ganado (UP en mercado UP)
+assert.deepStrictEqual([P.at200.n, P.at200.fill200, P.at200.fill400, P.at200.only200], [1, 1, 0, 1]);
+assert.strictEqual(P.at200.only200wr.wr, 1);
+assert.strictEqual(P.at200.only200EvPerShare, +((1 - 0.60) - FEE * 0.60 * 0.40).toFixed(4));
+assert.ok(lines(rep).some(l => l.startsWith('[EJECUCION] PAPER a +200 ms')));
+assert.strictEqual(L.at200, undefined, 'real no tiene registro a 200 ms');
 assert.ok(lines(rep).some(l => l.startsWith('[EJECUCION] REAL vs lo que habría dicho paper')));
 // Corte por fecha
 assert.strictEqual(buildReport({ fills, signals, markets, since: END + 400_000 }).modes.live.attempts, 1);
-console.log('exec-report: 16 ok');
+console.log('exec-report: 21 ok');

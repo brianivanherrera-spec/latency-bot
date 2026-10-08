@@ -3374,11 +3374,22 @@ async function main() {
       const sizeUpTo = () => polyWs.getAskSizeUpTo?.(tokenId, price) ?? polyWs.getBestAskSize?.(tokenId) ?? null;
       let fillAsk = bestAskWS;
       let askSize = sizeUpTo();
+      // PAPER_CHECK_MS (200): además se mira el libro a ese tiempo, solo para registro — lo que
+      // tardaría una orden real (150 ms de demora de Polymarket + ~40 ms de red). No cambia el fill.
+      const checkMs = Math.max(0, parseInt(process.env.PAPER_CHECK_MS || '200') || 0);
+      const doCheck = paperDelayMs > 0 && checkMs > 0 && checkMs < paperDelayMs;
+      let ask200 = null, size200 = null;
       if (paperDelayMs > 0) {
-        await new Promise(r => setTimeout(r, paperDelayMs));
+        if (doCheck) {
+          await new Promise(r => setTimeout(r, checkMs));
+          ask200 = polyWs.getBestAskForToken?.(tokenId) ?? null;
+          size200 = sizeUpTo();
+        }
+        await new Promise(r => setTimeout(r, doCheck ? paperDelayMs - checkMs : paperDelayMs));
         fillAsk = polyWs.getBestAskForToken?.(tokenId) ?? null;
         askSize = sizeUpTo();
       }
+      const fill200 = doCheck ? ask200 != null && ask200 <= price && (size200 == null || size200 >= size) : null;
       // Con demora y sin ask fresco no se puede confirmar el fill: sin fill
       const askAbovePrice = fillAsk != null ? fillAsk > price : paperDelayMs > 0;
       // Liquidez: en real solo se compra lo publicado en el libro. Se exige que lo ofrecido
@@ -3397,7 +3408,7 @@ async function main() {
           paidPrice = Math.min(price, Math.max(orderPriceFromWS, parseFloat(v.vwap.toFixed(4))));
       }
       if (paperDelayMs > 0) {
-        logger.info(`[PAPER-DELAY] ask decisión=$${bestAskWS?.toFixed(2) ?? 'n/a'} → ask a +${paperDelayMs}ms=$${fillAsk?.toFixed(2) ?? 'n/a'} (${askSize ?? 'n/a'} tokens) | orden ${size} a $${price} | ${filled ? `lleno a $${paidPrice}` : 'no'}`);
+        logger.info(`[PAPER-DELAY] ask decisión=$${bestAskWS?.toFixed(2) ?? 'n/a'}${doCheck ? ` → ask a +${checkMs}ms=$${ask200?.toFixed(2) ?? 'n/a'} (${fill200 ? 'llenaba' : 'no llenaba'})` : ''} → ask a +${paperDelayMs}ms=$${fillAsk?.toFixed(2) ?? 'n/a'} (${askSize ?? 'n/a'} tokens) | orden ${size} a $${price} | ${filled ? `lleno a $${paidPrice}` : 'no'}`);
       }
       logger.info(`[PAPER-LIQ] mejor ask $${fillAsk?.toFixed(2) ?? 'n/a'}, ${askSize ?? 'n/a'} tokens hasta $${price} | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
 
@@ -3412,7 +3423,7 @@ async function main() {
         // PHASE 1: Include latency tracking (simulated)
         signalLogger.logFillTelemetry({
           posId,
-          exec: execInfo({ fill_ask_delay: fillAsk, size_delay: askSize }),
+          exec: execInfo({ fill_ask_delay: fillAsk, size_delay: askSize, fill_ask_200: ask200, size_200: size200, would_fill_200: fill200 }),
           fill_result: 'NO_FILL',
           order_status: 'simulated_no_fill',
           order_price: price,
@@ -3452,7 +3463,7 @@ async function main() {
 
       signalLogger.logFillTelemetry({
         posId,
-        exec: execInfo({ fill_price: paidPrice, fill_ask_delay: fillAsk, size_delay: askSize }),
+        exec: execInfo({ fill_price: paidPrice, fill_ask_delay: fillAsk, size_delay: askSize, fill_ask_200: ask200, size_200: size200, would_fill_200: fill200 }),
         fill_result: 'FILLED',
         order_status: 'simulated_filled',
         order_price: price,

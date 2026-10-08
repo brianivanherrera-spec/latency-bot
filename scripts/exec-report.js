@@ -86,6 +86,7 @@ function buildReport({ fills, signals, markets, since = null }) {
       reason: filled ? null : noFillReason(f),
       lat: f.latencies || null,
       paperWouldFill: e.paper_would_fill ?? null,
+      fill200: e.would_fill_200 ?? null, // paper: ¿llenaba mirando el libro a +200 ms (lo que tarda una orden real)?
       result: s?.result ?? null, pnl: num(s?.pnl),
     });
   }
@@ -115,6 +116,16 @@ function buildReport({ fills, signals, markets, since = null }) {
       pnl: { closed: closed.length, wins: closed.filter(r => r.result === 'WIN').length,
         total: r4(closed.reduce((a, r) => a + (r.pnl || 0), 0)) },
     };
+    // Paper con registro a +200 ms: cuántas llenaban a ese tiempo contra +400 ms, y cómo salieron
+    // las que solo llenaban a 200 ms (entrando al ask de la decisión)
+    const k2 = R.filter(r => r.fill200 != null);
+    if (k2.length) {
+      const only = k2.filter(r => r.fill200 && !r.filled);
+      const onlyEv = only.filter(r => r.winner && r.decisionAsk != null && r.decisionAsk < 0.99);
+      out.at200 = { n: k2.length, fill200: k2.filter(r => r.fill200).length, fill400: k2.filter(r => r.filled).length,
+        only200: only.length, only200wr: wr(only),
+        only200EvPerShare: onlyEv.length ? r4(mean(onlyEv.map(r => (r.winner === r.dir ? 1 - r.decisionAsk : -r.decisionAsk) - fee(r.decisionAsk)))) : null };
+    }
     if (mode === 'live') {
       const k = R.filter(r => r.paperWouldFill != null);
       const both = k.filter(r => r.paperWouldFill && r.filled).length, paperOnly = k.filter(r => r.paperWouldFill && !r.filled).length;
@@ -137,6 +148,7 @@ function lines(report) {
     L.push(`[EJECUCION] ${tag}: ${M.attempts} intentos, ${M.filled} llenadas (${pc(M.fillRate)}), ${M.partial} parciales | sin fill: ${M.noFillReasons.map(([r, n]) => `${r} ×${n}`).join(', ') || '—'}`);
     L.push(`[EJECUCION] ${tag}: sobreprecio vs ask al decidir ${c(M.slippage.mean)} prom, ${c(M.slippage.p90)} p90 (n=${M.slippage.n}) | acierto llenadas ${pc(M.adverse.filled.wr)} (n=${M.adverse.filled.n}) vs no llenadas ${pc(M.adverse.notFilled.wr)} (n=${M.adverse.notFilled.n}), EV/acc perdido en no llenadas ${c(M.adverse.missedEvPerShare)} | P&L ${M.pnl.wins}-${M.pnl.closed - M.pnl.wins} $${M.pnl.total}`);
     if (M.latencyMs) L.push(`[EJECUCION] REAL latencia ms (p50/p90): decisión→envío ${M.latencyMs.decisionToSend.p50}/${M.latencyMs.decisionToSend.p90} | envío→CLOB ${M.latencyMs.sendToResponse.p50}/${M.latencyMs.sendToResponse.p90} | decisión→fill ${M.latencyMs.decisionToFill.p50}/${M.latencyMs.decisionToFill.p90}`);
+    if (M.at200) { const a = M.at200; L.push(`[EJECUCION] ${tag} a +200 ms (lo que tarda una orden real; n=${a.n}): llenaban ${a.fill200} vs ${a.fill400} a +400 ms | solo a 200 ms: ${a.only200}, acierto ${pc(a.only200wr.wr)} (n=${a.only200wr.n}), EV/acc ${c(a.only200EvPerShare)}`); }
     if (M.paperVsReal) { const p = M.paperVsReal; L.push(`[EJECUCION] REAL vs lo que habría dicho paper (n=${p.n}): paper llena ${pc(p.paperFillRate)}, real ${pc(p.realFillRate)} | ambos ${p.both}, solo paper ${p.paperOnly}, solo real ${p.realOnly}, ninguno ${p.neither}`); }
   }
   if (!L.length) L.push('[EJECUCION] sin intentos registrados en el período');
