@@ -189,6 +189,25 @@ function trendSplit(population, cfg, series, thr = 0.1, horizonMs = 7200000) {
   return { fav: stat(g.fav), neu: stat(g.neu), against: stat(g.against), noData, diff, zDiff };
 }
 
+// Regla con límite de precio (como B en vivo: límite = ask al decidir + buffer): llena solo si el ask
+// 1 s después sigue ≤ límite (cota pesimista: en vivo se mira el libro a +400 ms) y paga max(ask, ask 1 s después).
+// El backtest normal en cambio paga el ask de 1 s después hasta el tope del rango + 2¢.
+function limitExec(markets, cfg, buffer) {
+  let fires = 0, moved = 0, n = 0, w = 0, ps = 0, pnl = 0, exp = 0, varr = 0;
+  for (const mk of markets) {
+    const f = firstFire(mk, cfg);
+    if (!f) continue;
+    fires++;
+    const a2 = f.ask2 ?? f.ask;
+    if (a2 > f.ask + buffer + 1e-9) { moved++; continue; }
+    const price = Math.max(f.ask, a2), win = f.side === mk.winner;
+    const x = (win ? 1 - price : -price) - fee(price);
+    n++; if (win) w++; ps += x; pnl += Math.floor(STAKE / price) * x; exp += price; varr += price * (1 - price);
+  }
+  return { fires, moved, n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(ps / n).toFixed(4) : null,
+    pnl: +pnl.toFixed(2), z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
+}
+
 // Resultado de una regla por día (UTC) de entrada: para ver si la ventaja es pareja o sale de pocos días
 function byDay(markets, cfg) {
   const d = new Map();
@@ -338,7 +357,7 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-module.exports = { load, firstFire, entry, evaluate, btcSeries, priceAt, trendSplit, byDay };
+module.exports = { load, firstFire, entry, evaluate, limitExec, btcSeries, priceAt, trendSplit, byDay };
 if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
@@ -440,7 +459,9 @@ if (require.main === module) (async () => {
     hi: envNum('PAPER_B_MAX_ASK', 0.70), tMax: envNum('PAPER_B_TMAX', 120), tMin: envNum('PAPER_B_TMIN', 30) };
   const bFrom = Date.parse(process.env.PAPER_B_DESDE || '2026-10-08T14:49:00Z');
   const bMk = markets.filter(m => m.start >= bFrom);
+  const bBuf = envNum('ORDER_LIMIT_BUFFER', 0.02);
   report.paperB = { cfg: bCfg, byDay: byDay(markets, bCfg), from: new Date(bFrom).toISOString(), markets: bMk.length,
+    limit: { buffer: bBuf, all: limitExec(markets, bCfg, bBuf), test: limitExec(test, bCfg, bBuf), stdAll: evaluate(markets, bCfg), stdTest: evaluate(test, bCfg) },
     holdout: evaluate(bMk, bCfg),
     // Disparos (entradas y los que se escaparon en 1 s): cada intento de B en vivo tiene que estar acá
     entries: bMk.map(mk => ({ mk, f: firstFire(mk, bCfg) })).filter(x => x.f).map(({ mk, f }) => ({
@@ -479,6 +500,8 @@ if (require.main === module) (async () => {
     console.log(`[BACKTEST-SINCL] sin Chainlink (TWAP 60 s de Binance) en ${s.n} mercados: resultado igual al oficial ${s.agreePct}% | con movimiento oficial < $10 (${s.near}): ${s.nearAgreePct}% | error del movimiento ${e(s.moveErr)} | strike con base calibrada con priceToBeat atrasado: error ${e(s.strikeErr)} | entradas de la regla actual: ${s.entries}, con resultado distinto ${s.entriesDiff}`); }
   { const pb = report.paperB, dd = d => `${d.slice(3, 5)}/${d.slice(0, 2)}`;
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B por día (UTC): ${pb.byDay.map(d => `${dd(d.day)} ${d.wins}-${d.n - d.wins} EV/acc=${d.evPerShare}`).join(' | ') || 'sin entradas'}`);
+    const L = pb.limit, lx = x => `disparos ${x.fires}, el ask subió más de ${Math.round(L.buffer * 100)}¢ en 1 s en ${x.moved} (${x.fires ? Math.round(x.moved / x.fires * 100) : 0}%) | llenadas n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
+    console.log(`[BACKTEST-ANCLA] regla de la cuenta B con límite ask+${Math.round(L.buffer * 100)}¢ como en vivo (llena si el ask 1 s después sigue ≤ límite): todos ${lx(L.all)} || test ${lx(L.test)} || con el fill normal del backtest (paga el ask 1 s después hasta $${(bCfg.hi + 0.02).toFixed(2)}): todos n=${L.stdAll.n} EV/acc=${L.stdAll.evPerShare} z=${L.stdAll.z} | test n=${L.stdTest.n} EV/acc=${L.stdTest.evPerShare} z=${L.stdTest.z}`);
     const h = pb.holdout, hm = t => t.slice(11, 16);
     const one = x => `${hm(x.start)} UTC ${x.side} ${Math.round(x.secsLeft)} s ask $${x.ask.toFixed(2)}${x.escaped ? ` → $${x.ask2 == null ? 'n/a' : x.ask2.toFixed(2)} 1 s después: se escapó` : ` → paga $${x.price.toFixed(2)} ${x.win ? 'G' : 'P'}`}`;
     const esc = pb.entries.filter(x => x.escaped).length;
