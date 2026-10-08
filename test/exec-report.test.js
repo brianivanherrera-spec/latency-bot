@@ -29,6 +29,11 @@ const fills = [
     rejection_reason: 'Paper mode simulation (fill_rate=100%)', timestamp: END - 50_000,
     exec: { mode: 'paper', decision_ask: 0.60, fill_ask_delay: 0.65, size_delay: 0, market_end_ms: END,
       fill_ask_200: 0.60, size_200: 50, would_fill_200: true } }, // a +200 ms todavía llenaba
+  // paper: llenada con el ask subiendo en la demora (0.60 → 0.61), ganó; y llenada con el ask bajando, perdió
+  { posId: 'P3', fill_result: 'FILLED', order_price: '0.6200', order_size: 8, size_filled: 8, signal_direction: 'UP', timestamp: END - 30_000,
+    exec: { mode: 'paper', decision_ask: 0.60, fill_ask_delay: 0.61, market_end_ms: END } },
+  { posId: 'P4', fill_result: 'FILLED', order_price: '0.7000', order_size: 7, size_filled: 7, signal_direction: 'UP', timestamp: END + 250_000,
+    exec: { mode: 'paper', decision_ask: 0.68, fill_ask_delay: 0.67, market_end_ms: END + 300_000 } },
   // paper sin exec (registro viejo): el modo sale de signals.jsonl
   { posId: 'P2', fill_result: 'FILLED', order_price: '0.6600', order_size: 7, size_filled: 7, signal_direction: 'UP',
     order_status: 'simulated_filled', timestamp: END - 40_000 },
@@ -38,6 +43,8 @@ const signals = [
   { posId: 'B', mode: 'live', direction: 'DOWN', result: 'NO_FILL', pnl: 0 },
   { posId: 'C', mode: 'live', direction: 'DOWN', result: 'LOSS', pnl: -2.3 },
   { posId: 'P2', mode: 'paper', direction: 'UP', result: 'WIN', pnl: 2.2 },
+  { posId: 'P3', mode: 'paper', direction: 'UP', result: 'WIN', pnl: 2.4 },
+  { posId: 'P4', mode: 'paper', direction: 'UP', result: 'LOSS', pnl: -4.9 },
 ];
 
 const rep = buildReport({ fills, signals, markets });
@@ -53,7 +60,7 @@ assert.deepStrictEqual([L.pnl.closed, L.pnl.wins, L.pnl.total], [2, 1, -0.4]);
 assert.strictEqual(L.latencyMs.sendToResponse.p50, 120);
 assert.deepStrictEqual([L.paperVsReal.both, L.paperVsReal.paperOnly, L.paperVsReal.realOnly], [1, 1, 1]);
 assert.strictEqual(L.paperVsReal.paperFillRate, 0.6667);
-assert.strictEqual(P.attempts, 2); assert.strictEqual(P.filled, 1);
+assert.strictEqual(P.attempts, 4); assert.strictEqual(P.filled, 3);
 assert.deepStrictEqual(P.noFillReasons, [['ask subió por encima del límite', 1]]);
 assert.strictEqual(P.latencyMs, null);
 // Registro a +200 ms: P1 llenaba a 200 ms pero no a 400, y habría ganado (UP en mercado UP)
@@ -63,6 +70,13 @@ assert.strictEqual(P.at200.only200EvPerShare, +((1 - 0.60) - FEE * 0.60 * 0.40).
 assert.ok(lines(rep).some(l => l.startsWith('[EJECUCION] PAPER a +200 ms')));
 assert.strictEqual(L.at200, undefined, 'real no tiene registro a 200 ms');
 assert.ok(lines(rep).some(l => l.startsWith('[EJECUCION] REAL vs lo que habría dicho paper')));
+// Con competencia: P3 llenó con el ask subiendo (ganó), P4 con el ask bajando (perdió); P2 no tiene ask a 400 ms
+assert.strictEqual(P.competition.n, 2);
+assert.deepStrictEqual([P.competition.up.n, P.competition.up.wins, P.competition.down.n, P.competition.down.wins, P.competition.same.n], [1, 1, 1, 0, 0]);
+assert.strictEqual(P.competition.up.evPerShare, +((1 - 0.62) - FEE * 0.62 * 0.38).toFixed(4));
+assert.deepStrictEqual([P.competition.pnlPaper, P.competition.pnlWithoutUp], [-2.5, -4.9]);
+assert.ok(lines(rep).some(l => l.startsWith('[EJECUCION] PAPER con competencia (n=2)')), lines(rep).join('\n'));
+assert.strictEqual(L.competition, undefined, 'solo paper');
 // Corte por fecha
 assert.strictEqual(buildReport({ fills, signals, markets, since: END + 400_000 }).modes.live.attempts, 1);
-console.log('exec-report: 21 ok');
+console.log('exec-report: 28 ok');

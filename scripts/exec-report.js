@@ -87,6 +87,7 @@ function buildReport({ fills, signals, markets, since = null }) {
       lat: f.latencies || null,
       paperWouldFill: e.paper_would_fill ?? null,
       fill200: e.would_fill_200 ?? null, // paper: ¿llenaba mirando el libro a +200 ms (lo que tarda una orden real)?
+      ask400: num(e.fill_ask_delay), // paper: ask a +PAPER_FILL_DELAY_MS (400 ms)
       result: s?.result ?? null, pnl: num(s?.pnl),
     });
   }
@@ -126,6 +127,20 @@ function buildReport({ fills, signals, markets, since = null }) {
         only200: only.length, only200wr: wr(only),
         only200EvPerShare: onlyEv.length ? r4(mean(onlyEv.map(r => (r.winner === r.dir ? 1 - r.decisionAsk : -r.decisionAsk) - fee(r.decisionAsk)))) : null };
     }
+    // Paper con competencia: en real otros bots compran los mismos asks y los más rápidos llenan primero.
+    // Se separan las llenadas según cómo se movió el ask en la demora (subió = había compradores
+    // adelante, igual, bajó) y se calcula el P&L contando como sin fill las que llenaron con el ask subiendo
+    const mv = F.filter(r => r.ask400 != null && r.decisionAsk != null && r.winner);
+    if (mode === 'paper' && mv.length) {
+      const evOf = r => { const p = r.fillPrice ?? r.decisionAsk; return (r.winner === r.dir ? 1 - p : -p) - fee(p); };
+      const grp = g => ({ n: g.length, wins: g.filter(r => r.winner === r.dir).length, evPerShare: g.length ? r4(mean(g.map(evOf))) : null });
+      const up = mv.filter(r => r.ask400 > r.decisionAsk + 1e-9);
+      const same = mv.filter(r => Math.abs(r.ask400 - r.decisionAsk) <= 1e-9);
+      const down = mv.filter(r => r.ask400 < r.decisionAsk - 1e-9);
+      const pnlOf = g => r4(g.reduce((a, r) => a + (r.pnl || 0), 0));
+      out.competition = { n: mv.length, up: grp(up), same: grp(same), down: grp(down),
+        pnlPaper: pnlOf(mv), pnlWithoutUp: pnlOf(mv.filter(r => !up.includes(r))) };
+    }
     if (mode === 'live') {
       const k = R.filter(r => r.paperWouldFill != null);
       const both = k.filter(r => r.paperWouldFill && r.filled).length, paperOnly = k.filter(r => r.paperWouldFill && !r.filled).length;
@@ -149,6 +164,10 @@ function lines(report) {
     L.push(`[EJECUCION] ${tag}: sobreprecio vs ask al decidir ${c(M.slippage.mean)} prom, ${c(M.slippage.p90)} p90 (n=${M.slippage.n}) | acierto llenadas ${pc(M.adverse.filled.wr)} (n=${M.adverse.filled.n}) vs no llenadas ${pc(M.adverse.notFilled.wr)} (n=${M.adverse.notFilled.n}), EV/acc perdido en no llenadas ${c(M.adverse.missedEvPerShare)} | P&L ${M.pnl.wins}-${M.pnl.closed - M.pnl.wins} $${M.pnl.total}`);
     if (M.latencyMs) L.push(`[EJECUCION] REAL latencia ms (p50/p90): decisión→envío ${M.latencyMs.decisionToSend.p50}/${M.latencyMs.decisionToSend.p90} | envío→CLOB ${M.latencyMs.sendToResponse.p50}/${M.latencyMs.sendToResponse.p90} | decisión→fill ${M.latencyMs.decisionToFill.p50}/${M.latencyMs.decisionToFill.p90}`);
     if (M.at200) { const a = M.at200; L.push(`[EJECUCION] ${tag} a +200 ms (lo que tarda una orden real; n=${a.n}): llenaban ${a.fill200} vs ${a.fill400} a +400 ms | solo a 200 ms: ${a.only200}, acierto ${pc(a.only200wr.wr)} (n=${a.only200wr.n}), EV/acc ${c(a.only200EvPerShare)}`); }
+    if (M.competition) {
+      const k = M.competition, g = x => `${x.wins}-${x.n - x.wins} EV/acc ${c(x.evPerShare)}`;
+      L.push(`[EJECUCION] ${tag} con competencia (n=${k.n}): llenadas con el ask subiendo en la demora (compradores adelante) ${g(k.up)} | igual ${g(k.same)} | bajando ${g(k.down)} || si no llenaran las del ask subiendo: P&L $${k.pnlWithoutUp} (paper $${k.pnlPaper})`);
+    }
     if (M.paperVsReal) { const p = M.paperVsReal; L.push(`[EJECUCION] REAL vs lo que habría dicho paper (n=${p.n}): paper llena ${pc(p.paperFillRate)}, real ${pc(p.realFillRate)} | ambos ${p.both}, solo paper ${p.paperOnly}, solo real ${p.realOnly}, ninguno ${p.neither}`); }
   }
   if (!L.length) L.push('[EJECUCION] sin intentos registrados en el período');
