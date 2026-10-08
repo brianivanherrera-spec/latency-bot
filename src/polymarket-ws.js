@@ -881,6 +881,13 @@ class PolymarketWS {
     const type = msg.event_type || msg.type || '';
     if (!type || type === 'heartbeat' || type === 'subscribed') return;
     this._msgCount += 1;
+    // Retraso de entrega: hora local − timestamp del servidor (ms), en los eventos que lo traen
+    const ts = Number(msg.timestamp);
+    if (ts > 1e12) {
+      const now = Date.now();
+      this._lastLagMs = now - ts; this._lastLagAt = now;
+      loopMonitor.observeWsLag(now - ts);
+    }
 
     if (type === 'book') {
       this._onBook(msg);

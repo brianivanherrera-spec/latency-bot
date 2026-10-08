@@ -9,7 +9,7 @@ const { BookCheck } = require('../src/book-check');
 
 const top = new Map();
 const setWs = (tok, bid, ask) => top.set(tok, { bestBid: bid, bestAsk: ask, updatedAt: Date.now() });
-const poly = { _connected: true, _yesTokenId: 'Y', _noTokenId: 'N', _topOfBook: top };
+const poly = { _connected: true, _yesTokenId: 'Y', _noTokenId: 'N', _topOfBook: top, _lastLagMs: 120, _lastLagAt: Date.now() };
 let rest = {};
 const fetchFn = async (url) => {
   const tok = new URL(url).searchParams.get('token_id');
@@ -54,5 +54,11 @@ const fetchFn = async (url) => {
   await bc.checkOnce();
   assert.strictEqual(bc.s.wsMissing, 2);
   assert.ok(/n=10 \| iguales 6 \(60.0%\).*libro moviéndose 1, con el libro quieto 2/.test(bc.summary()), bc.summary());
-  console.log('book-check: 11 ok');
+  // Retraso del WS: se toma el del último mensaje si es reciente (< 5 s), si no se ignora
+  assert.strictEqual(bc.s.wsLag.length, 7);
+  assert.ok(/retraso del WS al chequear p50 120 ms, máx 120 ms/.test(bc.summary()), bc.summary());
+  poly._lastLagAt = Date.now() - 10000;
+  await bc.checkOnce();
+  assert.strictEqual(bc.s.wsLag.length, 7, 'retraso viejo: no cuenta');
+  console.log('book-check: 14 ok');
 })().catch(e => { console.error(e); process.exit(1); });

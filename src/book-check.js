@@ -6,6 +6,8 @@
  * a la vez) y cuenta como igual si alguna de las dos lecturas coincide con el REST. Si difiere más
  * de 1¢ se separa en: libro moviéndose (el WS cambió durante la consulta: es el tiempo, no un
  * error) y libro quieto (el WS no cambió y el REST dice otra cosa: diferencia real).
+ * También registra el retraso de entrega del WS en ese momento (hora local − timestamp del servidor
+ * del último mensaje): si el WS llega atrasado, la diferencia es del WS y no del REST.
  * Logs: [BOOK-CHECK] con detalle cuando difiere más de 1¢, y un resumen cada BOOK_CHECK_SUMMARY_MIN (15).
  */
 'use strict';
@@ -26,7 +28,7 @@ class BookCheck {
     this._timers = [];
   }
 
-  _reset() { this.s = { n: 0, same: 0, oneCent: 0, more: 0, moreMoving: 0, moreStill: 0, restErr: 0, wsMissing: 0, restMs: [], restAge: [], since: Date.now() }; }
+  _reset() { this.s = { n: 0, same: 0, oneCent: 0, more: 0, moreMoving: 0, moreStill: 0, restErr: 0, wsMissing: 0, restMs: [], restAge: [], wsLag: [], since: Date.now() }; }
 
   start() {
     if (!(this.intervalMs > 0)) return;
@@ -68,6 +70,9 @@ class BookCheck {
     const P = this.poly;
     if (!P?._connected || !P._yesTokenId || !P._noTokenId) return;
     const toks = [['Sí', P._yesTokenId], ['No', P._noTokenId]];
+    // Retraso del WS: el del último mensaje, si llegó hace menos de 5 s
+    const lag = Number.isFinite(P._lastLagMs) && Date.now() - (P._lastLagAt || 0) < 5000 ? P._lastLagMs : null;
+    if (lag != null) this.s.wsLag.push(lag);
     const before = toks.map(([, t]) => this._ws(t));
     const rest = await Promise.all(toks.map(([, t]) => this._rest(t).catch(() => null)));
     const after = toks.map(([, t]) => this._ws(t));
@@ -86,7 +91,7 @@ class BookCheck {
       this.s.more++;
       const moving = !before[i] || !after[i] || BookCheck.diff(before[i], after[i]) >= 0.0005;
       if (moving) this.s.moreMoving++; else this.s.moreStill++;
-      logger.warn(`[BOOK-CHECK] ⚠️ ${side} ${moving ? '(libro moviéndose)' : '(libro QUIETO)'}: WS antes ${px(before[i]?.bid)}/${px(before[i]?.ask)} después ${px(after[i]?.bid)}/${px(after[i]?.ask)} vs REST ${px(r.bid)}/${px(r.ask)} (respuesta ${r.ms} ms${r.age != null ? `, snapshot de hace ${r.age} ms` : ''})`);
+      logger.warn(`[BOOK-CHECK] ⚠️ ${side} ${moving ? '(libro moviéndose)' : '(libro QUIETO)'}: WS antes ${px(before[i]?.bid)}/${px(before[i]?.ask)} después ${px(after[i]?.bid)}/${px(after[i]?.ask)} vs REST ${px(r.bid)}/${px(r.ask)} (respuesta ${r.ms} ms${r.age != null ? `, snapshot de hace ${r.age} ms` : ''}${lag != null ? `, retraso del WS ${lag} ms` : ''})`);
     });
   }
 
@@ -95,7 +100,8 @@ class BookCheck {
     const pct = v => (s.n ? `${(v / s.n * 100).toFixed(1)}%` : 'n/a');
     const mins = Math.round((Date.now() - s.since) / 60000);
     const ages = [...s.restAge].sort((a, b) => a - b);
-    return `[BOOK-CHECK] últimos ${mins} min, libro del WS vs API REST de Polymarket (Sí y No, cada ${Math.round(this.intervalMs / 1000)} s): n=${s.n} | iguales ${s.same} (${pct(s.same)}) | 1¢ de diferencia ${s.oneCent} (${pct(s.oneCent)}) | más de 1¢ ${s.more} (con el libro moviéndose ${s.moreMoving}, con el libro quieto ${s.moreStill}) | REST sin respuesta ${s.restErr} | WS sin dato ${s.wsMissing} | REST p50 ${ms.length ? ms[Math.floor(ms.length / 2)] : 'n/a'} ms, snapshot REST de hace p50 ${ages.length ? ages[Math.floor(ages.length / 2)] : 'n/a'} ms`;
+    const lags = [...s.wsLag].sort((a, b) => a - b);
+    return `[BOOK-CHECK] últimos ${mins} min, libro del WS vs API REST de Polymarket (Sí y No, cada ${Math.round(this.intervalMs / 1000)} s): n=${s.n} | iguales ${s.same} (${pct(s.same)}) | 1¢ de diferencia ${s.oneCent} (${pct(s.oneCent)}) | más de 1¢ ${s.more} (con el libro moviéndose ${s.moreMoving}, con el libro quieto ${s.moreStill}) | REST sin respuesta ${s.restErr} | WS sin dato ${s.wsMissing} | REST p50 ${ms.length ? ms[Math.floor(ms.length / 2)] : 'n/a'} ms, snapshot REST de hace p50 ${ages.length ? ages[Math.floor(ages.length / 2)] : 'n/a'} ms | retraso del WS al chequear p50 ${lags.length ? lags[Math.floor(lags.length / 2)] : 'n/a'} ms, máx ${lags.length ? lags[lags.length - 1] : 'n/a'} ms`;
   }
 }
 
