@@ -18,12 +18,14 @@
  * Comisión taker TAKER_FEE_RATE·p·(1−p) por acción. Se resuelve con el ganador oficial (Gamma).
  * Estado en DATA_DIR/paper-b.json: sobrevive reinicios (se guarda desde el arranque).
  * En cada mercado sin entrada deja una línea con la mejor ventaja que vio en la ventana (para ver
- * que la cuenta está viva y qué tan cerca quedó).
+ * que la cuenta está viva y qué tan cerca quedó). En cada intento pide además el libro por la API
+ * REST al decidir y al momento del fill (PAPER_REST_CHECK, solo registro: el fill sigue siendo el del WS).
  */
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { Logger } = require('./logger');
+const { fetchRestBook, restSizeUpTo } = require('./book-check');
 const logger = new Logger('PAPER-B');
 
 const GAMMA = 'https://gamma-api.polymarket.com';
@@ -45,6 +47,7 @@ class PaperB {
     };
     c.checkMs = Math.min(c.delayMs, Math.max(0, num(env.PAPER_CHECK_MS, 200)));
     c.cap = round2(c.hi + 0.02);
+    this.restCheck = env.PAPER_REST_CHECK !== 'false';
     this.state = this._load();
     if (!fs.existsSync(this.stateFile)) this._save(); // que "desde" no se reinicie con cada arranque
     this.markets = new Map(); // gammaId → { anchor, tried, inWin, withData, best }
@@ -116,10 +119,15 @@ class PaperB {
     const wait = ms => new Promise(r => setTimeout(r, ms));
     const book = () => ({ ask: this.poly?.getBestAskForToken?.(tokenId) ?? null, size: this.poly?.getAskSizeUpTo?.(tokenId, limit) ?? null });
     const fills = b => b.ask != null && b.ask <= limit + 1e-9 && (b.size == null || b.size >= size);
+    const restOn = this.restCheck && typeof this.fetch === 'function';
+    const restBook = () => fetchRestBook(this.fetch, tokenId).catch(() => null);
+    const r0 = restOn ? restBook() : null;
+    const lag0 = this.poly?._lastLagMs ?? null;
     await wait(c.checkMs);
     const b200 = book();
     await wait(c.delayMs - c.checkMs);
     const b400 = book();
+    const r1 = restOn ? restBook() : null;
     const filled = size > 0 && fills(b400);
     let paid = null;
     if (filled) {
@@ -138,6 +146,14 @@ class PaperB {
     if (S.only200.length > 200) S.only200.shift();
     this._save();
     logger.info(`[PAPER-B] ${side} ${pos.market} | ${pos.secsLeft} s restantes | ask ${px(ask)} vs precio justo anclado ${(pa * 100).toFixed(1)}% (ventaja ${(edge * 100).toFixed(1)} pts) | ask a +${c.checkMs}ms ${px(b200.ask)} → +${c.delayMs}ms ${px(b400.ask)} | orden ${size} a $${limit} | ${filled ? `lleno a $${paid}` : 'no'}`);
+    if (restOn) {
+      const [a, b] = await Promise.all([r0, r1]);
+      const sz = restSizeUpTo(b, limit);
+      pos.restAsk0 = a?.ask ?? null; pos.restAsk400 = b?.ask ?? null;
+      pos.restFill = b ? b.ask != null && b.ask <= limit + 1e-9 && sz >= size : null;
+      this._save();
+      logger.info(`[PAPER-B] REST: al decidir ask ${px(pos.restAsk0)} (WS ${px(ask)}) | a +${c.delayMs}ms ${px(pos.restAsk400)} (WS ${px(b400.ask)}), ${sz ?? 'n/a'} acciones hasta $${limit} → con REST ${pos.restFill == null ? 'sin dato' : pos.restFill ? 'llenaba' : 'no llenaba'} (paper: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms`);
+    }
     return pos;
   }
 

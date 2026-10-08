@@ -19,6 +19,7 @@ const { PolymarketClient } = require('./polymarket');
 const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const loopMonitor = require('./loop-monitor');
+const { fetchRestBook, restSizeUpTo } = require('./book-check');
 const config = require('./config');
 const { randomUUID } = require('crypto');
 const crypto = require('crypto');
@@ -3376,6 +3377,13 @@ async function main() {
       // en cripto ~150 ms antes de casarla y los makers pueden retirar el precio. Con N > 0
       // se espera N ms y recién ahí se mira el mejor ask y su tamaño en el WS.
       const paperDelayMs = Math.max(0, parseInt(process.env.PAPER_FILL_DELAY_MS || '0') || 0);
+      // PAPER_REST_CHECK (default on con demora): además del WS se pide el libro por la API REST al
+      // decidir y al momento del fill, y queda [PAPER-REST] con la comparación (solo registro: el fill
+      // sigue siendo el del WS). Dice si en ese intento el WS llegaba atrasado.
+      const restCheck = paperDelayMs > 0 && process.env.PAPER_REST_CHECK !== 'false';
+      const restBook = () => fetchRestBook(globalThis.fetch, tokenId).catch(() => null);
+      const rest0 = restCheck ? restBook() : null;
+      const lag0 = polyWs._lastLagMs ?? null;
       // Tamaño disponible: todo lo ofrecido hasta el precio límite de la orden (antes solo
       // el mejor nivel, y 5 acciones a $0.60 con más a $0.61 daban "sin fill" a una orden de 8 a $0.61)
       const sizeUpTo = () => polyWs.getAskSizeUpTo?.(tokenId, price) ?? polyWs.getBestAskSize?.(tokenId) ?? null;
@@ -3396,6 +3404,7 @@ async function main() {
         fillAsk = polyWs.getBestAskForToken?.(tokenId) ?? null;
         askSize = sizeUpTo();
       }
+      const restFill = restCheck ? restBook() : null;
       const fill200 = doCheck ? ask200 != null && ask200 <= price && (size200 == null || size200 >= size) : null;
       // Con demora y sin ask fresco no se puede confirmar el fill: sin fill
       const askAbovePrice = fillAsk != null ? fillAsk > price : paperDelayMs > 0;
@@ -3418,6 +3427,15 @@ async function main() {
         logger.info(`[PAPER-DELAY] ask decisión=$${bestAskWS?.toFixed(2) ?? 'n/a'}${doCheck ? ` → ask a +${checkMs}ms=$${ask200?.toFixed(2) ?? 'n/a'} (${fill200 ? 'llenaba' : 'no llenaba'})` : ''} → ask a +${paperDelayMs}ms=$${fillAsk?.toFixed(2) ?? 'n/a'} (${askSize ?? 'n/a'} tokens) | orden ${size} a $${price} | ${filled ? `lleno a $${paidPrice}` : 'no'}`);
       }
       logger.info(`[PAPER-LIQ] mejor ask $${fillAsk?.toFixed(2) ?? 'n/a'}, ${askSize ?? 'n/a'} tokens hasta $${price} | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
+      if (restCheck) {
+        Promise.all([rest0, restFill]).then(([r0, r1]) => {
+          const sz = restSizeUpTo(r1, price);
+          const restFills = r1 ? r1.ask != null && r1.ask <= price + 1e-9 && (sz == null || sz >= size) : null;
+          const pxs = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
+          const age = r => (r?.age != null ? ` (foto de hace ${r.age} ms)` : '');
+          logger.info(`[PAPER-REST] ${sig.direction} | al decidir: WS ${pxs(bestAskWS)} vs REST ${pxs(r0?.ask)}${age(r0)} | a +${paperDelayMs}ms: WS ${pxs(fillAsk)} vs REST ${pxs(r1?.ask)}${age(r1)}, ${sz ?? 'n/a'} tokens hasta $${price} → con REST ${restFills == null ? 'sin dato' : restFills ? 'llenaba' : 'no llenaba'} (paper con WS: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms`);
+        }).catch(() => {});
+      }
 
       if (!filled) {
         logger.warn(askAbovePrice

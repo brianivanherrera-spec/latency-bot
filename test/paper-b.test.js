@@ -22,11 +22,20 @@ const polyWs = {
   getAskSizeUpTo: (t, lim) => (book[t] != null && book[t] <= lim + 1e-9 ? 100 : 0),
   getAskVwapUpTo: (t, lim, size) => (book[t] != null && book[t] <= lim + 1e-9 ? { vwap: book[t], filled: size } : { vwap: null, filled: 0 }),
 };
+// API falsa: /book devuelve el libro falso (100 acciones en el ask) y /markets/ el resultado de Gamma
+const fakeFetch = async (url) => {
+  const u = new URL(url);
+  if (u.pathname === '/book') {
+    const a = book[u.searchParams.get('token_id')];
+    return { ok: true, json: async () => ({ timestamp: String(Date.now() - 20), bids: [], asks: a == null ? [] : [{ price: String(a), size: '100' }] }) };
+  }
+  return { ok: true, json: async () => ({ closed: true, outcomePrices: '["0", "1"]' }) };
+};
 const mkt = (id, endTs = Date.now() + 100_000) => ({ gammaId: id, yesTokenId: 'Y', noTokenId: 'N', endTs, question: `mercado ${id}` });
 const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBid, yesAsk, noAsk, p, src: 1 });
 
 (async () => {
-  const pb = new PaperB({ polyWs, stateFile, env });
+  const pb = new PaperB({ polyWs, stateFile, env, fetchFn: fakeFetch });
   assert.ok(fs.existsSync(stateFile), 'estado guardado desde el arranque ("desde" no se reinicia)');
   // 1) Fuera de ventana (150 s): fija el ancla (mid 0.445, p 0.50) y no entra
   const m1 = mkt('g1');
@@ -43,6 +52,8 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pos.size, 10, 'floor(5 / 0.47)');
   assert.strictEqual(pos.paid, 0.46, 'paga ask al decidir + tick (el libro está a 0.45)');
   assert.strictEqual(pos.fill200, true);
+  assert.strictEqual(pos.restAsk0, 0.45, 'libro REST al decidir');
+  assert.strictEqual(pos.restFill, true, 'con el REST también llenaba');
   // 3) Un solo intento por mercado
   pb.onSample(m1, sample(90, 0.70));
   assert.strictEqual(pb.state.attempts, 1, 'no reintenta en el mismo mercado');
@@ -65,6 +76,8 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pb.state.noFill, 1);
   assert.strictEqual(pb.state.fill200, 2, 'las dos llenaban a +200 ms');
   assert.strictEqual(pb.state.only200.length, 1, 'una llenaba solo a +200 ms');
+  assert.strictEqual(pb.state.only200[0].restAsk400, 0.60, 'libro REST al momento del fill');
+  assert.strictEqual(pb.state.only200[0].restFill, false, 'con el REST tampoco llenaba');
   pb.onResolved('g2', 'UP', 'gamma');
   assert.strictEqual(pb.state.only200[0].winner, 'UP', 'se guarda cómo salió la que solo llenaba a 200 ms');
 
@@ -100,8 +113,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pb.state.attempts, 3);
 
   // 7) Estado persistente: una instancia nueva lo recupera, y resuelve por Gamma lo que quedó abierto
-  const fetchFn = async () => ({ ok: true, json: async () => ({ closed: true, outcomePrices: '["0", "1"]' }) });
-  const pb2 = new PaperB({ polyWs, stateFile, env, fetchFn });
+  const pb2 = new PaperB({ polyWs, stateFile, env, fetchFn: fakeFetch });
   assert.strictEqual(pb2.state.w, 1);
   assert.strictEqual(pb2.state.open.length, 1);
   await pb2._resolveStale(pb2.state.open[0].endTs + 6 * 60000);
@@ -110,5 +122,5 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.ok(Math.abs(pb2.state.pnl - (expWin + expDown)) < 1e-3);
   assert.ok(/Balance B: \+\$/.test(pb2.summary()));
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 34 ok');
+  console.log('paper-b: 38 ok');
 })().catch(e => { console.error(e); process.exit(1); });
