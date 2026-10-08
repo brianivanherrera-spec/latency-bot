@@ -17,6 +17,9 @@ const STALE_MS = 10000;
 const STALE_RECONNECT_MS = parseInt(process.env.CHAINLINK_STALE_MS || '30000');
 const RTDS_LATENCY_WARN_MS = parseInt(process.env.RTDS_LATENCY_WARN_MS || '3000');
 
+// Timestamps de fuente en ms (RTDS y PolyBolt mandan ms; por las dudas, segundos → ms)
+const toMs = t => { const n = Number(t); return n > 1e12 ? n : n * 1000; };
+
 class ChainlinkRTDS {
   constructor() {
     this.ws = null;
@@ -27,6 +30,9 @@ class ChainlinkRTDS {
     this._last = { 30: null, 60: null };
     this._hist = { 30: [], 60: [] }; // [{ ts (fuente, ms), value }] últimos 15 min
     this._onUpdate = null;
+    // Por fuente del TWAP 60 s (modo dual: RTDS y PolyBolt alimentan este mismo historial):
+    // puntos que entraron primero desde cada una, repetidos y cuándo llegó el último
+    this.bySrc = {};
     this.diag = {
       connected_30s: false, connected_60s: false,
       events_30s: 0, events_60s: 0,
@@ -35,6 +41,11 @@ class ChainlinkRTDS {
     };
   }
   onUpdate(cb) { this._onUpdate = cb; }
+  _srcStat(src, accepted, received_ts) {
+    const s = this.bySrc[src] || (this.bySrc[src] = { first: 0, dup: 0, last: 0 });
+    if (accepted) s.first++; else s.dup++;
+    s.last = received_ts;
+  }
   getLatestTWAP(w) { return this._last[w] || null; }
   // TWAP publicado por Chainlink con timestamp de fuente <= tsMs (máx. maxGapMs antes)
   getTwapAt(w, tsMs, maxGapMs = 5000) {
@@ -140,6 +151,8 @@ class ChainlinkRTDS {
     const topic = msg.topic || '';
     const payload = msg.payload;
     if (!payload) return;
+    const src = msg.src || 'rtds';
+    if (received_ts == null) received_ts = Date.now();
 
     // Formato real del RTDS: llegan 2 mensajes por segundo (30s y 60s)
     // sin campo topic en los updates — se identifica por alternancia
@@ -183,6 +196,9 @@ class ChainlinkRTDS {
           outer_ts: msg.timestamp || null, type: 'snapshot',
           timestamp_quality: 'good',
         };
+        // En modo dual la otra fuente pudo haber traído puntos más nuevos: no retroceder
+        const prevSnap = this._last[window_s];
+        if (prevSnap?.source_ts && last.timestamp && toMs(last.timestamp) < toMs(prevSnap.source_ts)) return;
         this._last[window_s] = event;
         if (window_s === 30) { this.diag.events_30s++; this.diag.connected_30s = true; this.diag.last_received_30s = received_ts; }
         else                 { this.diag.events_60s++; this.diag.connected_60s = true; this.diag.last_received_60s = received_ts; }
@@ -218,8 +234,13 @@ class ChainlinkRTDS {
     if (source_ts && (received_ts - source_ts) > 10000) this.diag.stale++;
 
     const prev = this._last[window_s];
-    if (prev && source_ts && prev.source_ts === source_ts && prev.value_num === value_num) {
-      this.diag.duplicates++; return;
+    // Repetido (mismo segundo y valor: en modo dual la otra fuente ya lo trajo) o más viejo
+    // que el último (fuera de orden): no entra
+    if (prev && source_ts && prev.source_ts && (toMs(source_ts) < toMs(prev.source_ts) ||
+        (toMs(source_ts) === toMs(prev.source_ts) && Math.abs(prev.value_num - value_num) < 0.005))) {
+      this.diag.duplicates++;
+      if (window_s === 60) this._srcStat(src, false, received_ts);
+      return;
     }
     if (prev?.source_ts && source_ts && (source_ts - prev.source_ts) > 5000) {
       this.diag.gaps++;
@@ -235,6 +256,7 @@ class ChainlinkRTDS {
 
     this._last[window_s] = event;
     this._record(window_s, Number(source_ts), value_num);
+    if (window_s === 60) this._srcStat(src, true, received_ts);
     if (window_s === 30) { this.diag.events_30s++; this.diag.connected_30s = true; this.diag.last_received_30s = received_ts; }
     else                 { this.diag.events_60s++; this.diag.connected_60s = true; this.diag.last_received_60s = received_ts; }
     if (this._onUpdate) this._onUpdate(event);

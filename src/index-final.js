@@ -912,27 +912,59 @@ async function main() {
   // Precio spot Chainlink BTC/USD — la fuente con la que resuelve Polymarket
   const clSpot = new ChainlinkSpot();
 
-  // ─── Fuente de Chainlink: CHAINLINK_SOURCE = rtds (default) | polybolt | both ──────
-  // RTDS (ws-live-data) quedó como legado el 15/09/2026; el reemplazo es PolyBolt
-  // (ws-live-v2, pide credenciales CLOB). rtds: como siempre. both: RTDS sigue siendo la
-  // fuente y PolyBolt corre al lado solo para comparar ([POLYBOLT-CMP] y PolyBolt en
-  // [PTB-CHECK]). polybolt: PolyBolt alimenta clSpot/clRTDS (sin TWAP de 30 s).
+  // ─── Fuente de Chainlink: CHAINLINK_SOURCE = rtds (default) | polybolt | both | dual ──
+  // RTDS (ws-live-data) quedó como legado el 15/09/2026 y Polymarket retira sus temas de
+  // precio ~23/10; el reemplazo es PolyBolt (ws-live-v2, pide credenciales CLOB). rtds: como
+  // siempre. both: RTDS sigue siendo la fuente y PolyBolt corre al lado solo para comparar
+  // ([POLYBOLT-CMP] y PolyBolt en [PTB-CHECK]). polybolt: PolyBolt alimenta clSpot/clRTDS
+  // (sin TWAP de 30 s). dual: las dos alimentan los mismos historiales (spot y TWAP 60 s);
+  // entra el primero que llega y el repetido se descarta, así que si una se apaga el bot
+  // sigue con la otra sin reiniciar ([CHAINLINK-DUAL] cada minuto).
   const CHAINLINK_SOURCE = (process.env.CHAINLINK_SOURCE || 'rtds').toLowerCase();
   let polybolt = null;
-  if (CHAINLINK_SOURCE === 'polybolt' || CHAINLINK_SOURCE === 'both') {
+  if (['polybolt', 'both', 'dual'].includes(CHAINLINK_SOURCE)) {
     const { PolyBoltClient } = require('./chainlink-polybolt');
     polybolt = new PolyBoltClient({ getCreds: () => poly.getApiCreds() });
-    if (CHAINLINK_SOURCE === 'polybolt') {
+    if (CHAINLINK_SOURCE === 'polybolt' || CHAINLINK_SOURCE === 'dual') {
       // Mismo formato que RTDS para que el resto del bot no cambie
-      polybolt.onSpot(pt => clSpot._handle({ topic: 'crypto_prices_chainlink',
+      polybolt.onSpot(pt => clSpot._handle({ src: 'polybolt', topic: 'crypto_prices_chainlink',
         payload: { symbol: 'btc/usd', timestamp: pt.ts, value: pt.value } }));
-      polybolt.onTwap(pt => clRTDS._handle({ topic: 'crypto_prices_twap_sixty',
+      polybolt.onTwap(pt => clRTDS._handle({ src: 'polybolt', topic: 'crypto_prices_twap_sixty',
         payload: { symbol: 'btc/usd', timestamp: pt.ts, value: pt.value, full_accuracy_value: String(pt.value) } }, pt.received));
     }
     polybolt.connect();
-    logger.info(`[CHAINLINK] Fuente: ${CHAINLINK_SOURCE}${CHAINLINK_SOURCE === 'both' ? ' (RTDS manda, PolyBolt solo compara)' : ' (PolyBolt alimenta spot y TWAP 60 s; sin TWAP 30 s)'}`);
+    const desc = {
+      both: ' (RTDS manda, PolyBolt solo compara)',
+      polybolt: ' (PolyBolt alimenta spot y TWAP 60 s; sin TWAP 30 s)',
+      dual: ' (RTDS y PolyBolt alimentan spot y TWAP 60 s; entra el primero que llega; si una se apaga sigue la otra)',
+    };
+    logger.info(`[CHAINLINK] Fuente: ${CHAINLINK_SOURCE}${desc[CHAINLINK_SOURCE]}`);
   }
   if (CHAINLINK_SOURCE !== 'polybolt') { clRTDS.connect(); clSpot.connect(); }
+
+  // Modo dual: cada minuto, de qué fuente entró cada punto y cuándo llegó el último de cada
+  // una; aviso (una vez) cuando una deja de traer TWAP > 2 min y cuando vuelve
+  if (CHAINLINK_SOURCE === 'dual') {
+    const t0 = Date.now(), down = {};
+    const NAME = { rtds: 'RTDS', polybolt: 'PolyBolt' };
+    setInterval(() => {
+      const now = Date.now();
+      const fmt = (st) => ['rtds', 'polybolt'].map(k => {
+        const x = st[k];
+        return x ? `${NAME[k]} primero ${x.first}, repetidos ${x.dup}, último hace ${Math.round((now - x.last) / 1000)}s` : `${NAME[k]} sin datos`;
+      }).join(' | ');
+      logger.info(`[CHAINLINK-DUAL] TWAP60: ${fmt(clRTDS.bySrc)} || spot: ${fmt(clSpot.bySrc)} | PolyBolt ${polybolt.diag.authed ? 'autenticado' : `sin auth (${polybolt.diag.last_error || '—'})`}`);
+      if (now - t0 > 120000) {
+        for (const k of ['rtds', 'polybolt']) {
+          const x = clRTDS.bySrc[k];
+          const silent = !x || now - x.last > 120000;
+          if (silent && !down[k]) { down[k] = true; logger.warn(`[CHAINLINK-DUAL] ⚠️ ${NAME[k]} sin TWAP hace más de 2 min — el bot sigue con la otra fuente`); }
+          else if (!silent && down[k]) { down[k] = false; logger.info(`[CHAINLINK-DUAL] ${NAME[k]} volvió a traer TWAP`); }
+        }
+      }
+      for (const st of [clRTDS.bySrc, clSpot.bySrc]) for (const x of Object.values(st)) { x.first = 0; x.dup = 0; }
+    }, 60000).unref();
+  }
 
   // Modo both: diferencia por segundo entre RTDS y PolyBolt (spot y TWAP 60 s), resumen
   // cada minuto con detalle de los segundos que difieren más de $0.01

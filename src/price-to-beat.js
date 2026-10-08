@@ -101,7 +101,7 @@ class PriceToBeat {
     if (ptb != null) {
       const d = v => (v == null ? 'n/a' : (v - ptb >= 0 ? '+' : '') + (v - ptb).toFixed(2));
       const res = (k, c) => (k == null || c == null ? 'n/a' : c >= k ? 'UP' : 'DOWN');
-      // PolyBolt (solo con CHAINLINK_SOURCE=both|polybolt): TWAP 60 s de la apertura vs priceToBeat
+      // PolyBolt (solo con CHAINLINK_SOURCE=both|polybolt|dual): TWAP 60 s de la apertura vs priceToBeat
       const pb = ours.pbStrike !== undefined ? ` | PolyBolt=${d(ours.pbStrike)} (pred. ${res(ours.pbStrike, ours.pbClose)})` : '';
       logger.info(`[PTB-CHECK] ${label} | real=${real} | priceToBeat=${ptb.toFixed(2)} | Δ vs spot=${d(ours.strike)} TWAP60=${d(ours.twapStrike)} RTDS=${d(ours.rtdsStrike)} | predice: spot=${res(ours.strike, ours.close)} TWAP60=${res(ours.twapStrike, ours.twapClose)} RTDS=${res(ours.rtdsStrike, ours.rtdsClose)} ptb+TWAP=${res(ptb, ours.twapClose)} ptb+RTDS=${res(ptb, ours.rtdsClose)}${pb}`);
     }

@@ -23,9 +23,15 @@ class ChainlinkSpot {
     this._history = []; // [{ ts (ms, fuente), value, received }] ordenado por ts
     this._firstLogged = false;
     this._onUpdate = null;
+    this.bySrc = {}; // modo dual: puntos que entraron primero por fuente, repetidos y el último
   }
 
   onUpdate(cb) { this._onUpdate = cb; }
+  _srcStat(src, accepted, received) {
+    const s = this.bySrc[src] || (this.bySrc[src] = { first: 0, dup: 0, last: 0 });
+    if (accepted) s.first++; else s.dup++;
+    s.last = received;
+  }
 
   connect() {
     try { this.ws = new WebSocket(RTDS_URL); } catch (e) {
@@ -71,12 +77,14 @@ class ChainlinkSpot {
     if (!p) return;
     // Snapshot inicial: payload.data = [{ timestamp, value }, ...]
     const points = Array.isArray(p.data) ? p.data : [p];
+    const src = msg.src || 'rtds';
     for (const pt of points) {
       const value = parseFloat(pt.value);
       const ts = Number(pt.timestamp);
       if (!(value > 1000 && value < 10_000_000) || !Number.isFinite(ts)) continue;
-      this._push(ts > 1e12 ? ts : ts * 1000, value);
+      const added = this._push(ts > 1e12 ? ts : ts * 1000, value);
       this._lastDataTs = Date.now();
+      this._srcStat(src, added, this._lastDataTs);
     }
     if (!this._firstLogged && this._history.length) {
       this._firstLogged = true;
@@ -85,12 +93,14 @@ class ChainlinkSpot {
     }
   }
 
+  // true si el punto entró; false si ya estaba (en modo dual lo trajo la otra fuente)
   _push(ts, value) {
     const h = this._history;
     if (h.length && ts <= h[h.length - 1].ts) {
-      if (ts === h[h.length - 1].ts) return;
-      // Fuera de orden (snapshot): insertar ordenado
-      const i = h.findIndex(x => x.ts > ts);
+      if (ts === h[h.length - 1].ts) return false;
+      // Fuera de orden (snapshot o la otra fuente): insertar ordenado, sin repetir el segundo
+      const i = h.findIndex(x => x.ts >= ts);
+      if (i !== -1 && h[i].ts === ts) return false;
       h.splice(i === -1 ? h.length : i, 0, { ts, value, received: Date.now() });
     } else {
       h.push({ ts, value, received: Date.now() });
@@ -98,6 +108,7 @@ class ChainlinkSpot {
     }
     const cutoff = Date.now() - HISTORY_MS;
     while (h.length && h[0].ts < cutoff) h.shift();
+    return true;
   }
 
   // Último punto publicado { ts, value, received } o null

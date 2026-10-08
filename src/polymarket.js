@@ -1420,7 +1420,7 @@ class PolymarketClient {
     }
   }
 
-  // Credenciales CLOB para PolyBolt (CHAINLINK_SOURCE=polybolt|both): POLYBOLT_API_* o
+  // Credenciales CLOB para PolyBolt (CHAINLINK_SOURCE=polybolt|both|dual): POLYBOLT_API_* o
   // POLY_API_*; si no hay, deriveApiKey con POLY_PRIVATE_KEY (solo deriva la existente,
   // nunca crea una clave nueva). null si no se puede.
   async getApiCreds() {

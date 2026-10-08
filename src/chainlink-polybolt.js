@@ -17,7 +17,7 @@
  *   - entre frames de control, al menos 110 ms; cierre 4003 → esperar hasta 10 s
  * Símbolos en minúscula terminados en usd: "btcusd". No hay TWAP de 30 s.
  *
- * Solo se usa con CHAINLINK_SOURCE=polybolt|both (default rtds: este archivo no corre).
+ * Solo se usa con CHAINLINK_SOURCE=polybolt|both|dual (default rtds: este archivo no corre).
  */
 'use strict';
 const WebSocket = require('ws');
