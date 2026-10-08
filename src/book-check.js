@@ -2,8 +2,10 @@
  * Chequeo del libro: cada BOOK_CHECK_MS (30 s) compara el mejor bid/ask que el bot tiene por el
  * WebSocket de Polymarket con el libro que devuelve en ese momento la API REST del CLOB, para los
  * dos tokens (Sí/No) del mercado en curso. Solo registro: no cambia ninguna decisión.
- * El libro cambia en milisegundos: se lee el WS antes y después de la consulta REST y cuenta como
- * igual si alguna de las dos lecturas coincide con el REST.
+ * El libro cambia en milisegundos: se lee el WS antes y después de la consulta REST (los dos tokens
+ * a la vez) y cuenta como igual si alguna de las dos lecturas coincide con el REST. Si difiere más
+ * de 1¢ se separa en: libro moviéndose (el WS cambió durante la consulta: es el tiempo, no un
+ * error) y libro quieto (el WS no cambió y el REST dice otra cosa: diferencia real).
  * Logs: [BOOK-CHECK] con detalle cuando difiere más de 1¢, y un resumen cada BOOK_CHECK_SUMMARY_MIN (15).
  */
 'use strict';
@@ -24,7 +26,7 @@ class BookCheck {
     this._timers = [];
   }
 
-  _reset() { this.s = { n: 0, same: 0, oneCent: 0, more: 0, restErr: 0, wsMissing: 0, restMs: [], since: Date.now() }; }
+  _reset() { this.s = { n: 0, same: 0, oneCent: 0, more: 0, moreMoving: 0, moreStill: 0, restErr: 0, wsMissing: 0, restMs: [], restAge: [], since: Date.now() }; }
 
   start() {
     if (!(this.intervalMs > 0)) return;
@@ -48,7 +50,9 @@ class BookCheck {
     const b = await res.json();
     const nums = arr => (arr || []).map(x => parseFloat(x.price)).filter(Number.isFinite);
     const bids = nums(b.bids), asks = nums(b.asks);
-    return { bid: bids.length ? Math.max(...bids) : null, ask: asks.length ? Math.min(...asks) : null, ms: Date.now() - t0 };
+    const ts = Number(b.timestamp); // hora del snapshot según Polymarket (ms)
+    return { bid: bids.length ? Math.max(...bids) : null, ask: asks.length ? Math.min(...asks) : null, ms: Date.now() - t0,
+      age: Number.isFinite(ts) && ts > 1e12 ? Date.now() - ts : null };
   }
 
   // Mayor diferencia entre bid y ask; un lado vacío en uno y con precio en el otro cuenta como 1.
@@ -63,31 +67,35 @@ class BookCheck {
   async checkOnce() {
     const P = this.poly;
     if (!P?._connected || !P._yesTokenId || !P._noTokenId) return;
-    for (const [side, tok] of [['Sí', P._yesTokenId], ['No', P._noTokenId]]) {
-      const before = this._ws(tok);
-      let rest;
-      try { rest = await this._rest(tok); } catch (_) { this.s.restErr++; continue; }
-      const after = this._ws(tok);
-      this.s.restMs.push(rest.ms);
-      const ws = [before, after].filter(Boolean);
-      if (!ws.length) { this.s.wsMissing++; continue; }
-      const best = ws.reduce((a, w) => (BookCheck.diff(w, rest) < BookCheck.diff(a, rest) ? w : a));
-      const d = BookCheck.diff(best, rest);
+    const toks = [['Sí', P._yesTokenId], ['No', P._noTokenId]];
+    const before = toks.map(([, t]) => this._ws(t));
+    const rest = await Promise.all(toks.map(([, t]) => this._rest(t).catch(() => null)));
+    const after = toks.map(([, t]) => this._ws(t));
+    toks.forEach(([side], i) => {
+      const r = rest[i];
+      if (!r) { this.s.restErr++; return; }
+      this.s.restMs.push(r.ms);
+      if (r.age != null) this.s.restAge.push(r.age);
+      const ws = [before[i], after[i]].filter(Boolean);
+      if (!ws.length) { this.s.wsMissing++; return; }
+      const best = ws.reduce((a, w) => (BookCheck.diff(w, r) < BookCheck.diff(a, r) ? w : a));
+      const d = BookCheck.diff(best, r);
       this.s.n++;
-      if (d < 0.0005) this.s.same++;
-      else if (d <= 0.0105) this.s.oneCent++;
-      else {
-        this.s.more++;
-        logger.warn(`[BOOK-CHECK] ⚠️ ${side}: WS ${px(best.bid)}/${px(best.ask)} (último update hace ${best.age} ms) vs REST ${px(rest.bid)}/${px(rest.ask)} (${rest.ms} ms)`);
-      }
-    }
+      if (d < 0.0005) { this.s.same++; return; }
+      if (d <= 0.0105) { this.s.oneCent++; return; }
+      this.s.more++;
+      const moving = !before[i] || !after[i] || BookCheck.diff(before[i], after[i]) >= 0.0005;
+      if (moving) this.s.moreMoving++; else this.s.moreStill++;
+      logger.warn(`[BOOK-CHECK] ⚠️ ${side} ${moving ? '(libro moviéndose)' : '(libro QUIETO)'}: WS antes ${px(before[i]?.bid)}/${px(before[i]?.ask)} después ${px(after[i]?.bid)}/${px(after[i]?.ask)} vs REST ${px(r.bid)}/${px(r.ask)} (respuesta ${r.ms} ms${r.age != null ? `, snapshot de hace ${r.age} ms` : ''})`);
+    });
   }
 
   summary() {
     const s = this.s, ms = [...s.restMs].sort((a, b) => a - b);
     const pct = v => (s.n ? `${(v / s.n * 100).toFixed(1)}%` : 'n/a');
     const mins = Math.round((Date.now() - s.since) / 60000);
-    return `[BOOK-CHECK] últimos ${mins} min, libro del WS vs API REST de Polymarket (Sí y No, cada ${Math.round(this.intervalMs / 1000)} s): n=${s.n} | iguales ${s.same} (${pct(s.same)}) | 1¢ de diferencia ${s.oneCent} (${pct(s.oneCent)}) | más de 1¢ ${s.more} | REST sin respuesta ${s.restErr} | WS sin dato ${s.wsMissing} | REST p50 ${ms.length ? ms[Math.floor(ms.length / 2)] : 'n/a'} ms`;
+    const ages = [...s.restAge].sort((a, b) => a - b);
+    return `[BOOK-CHECK] últimos ${mins} min, libro del WS vs API REST de Polymarket (Sí y No, cada ${Math.round(this.intervalMs / 1000)} s): n=${s.n} | iguales ${s.same} (${pct(s.same)}) | 1¢ de diferencia ${s.oneCent} (${pct(s.oneCent)}) | más de 1¢ ${s.more} (con el libro moviéndose ${s.moreMoving}, con el libro quieto ${s.moreStill}) | REST sin respuesta ${s.restErr} | WS sin dato ${s.wsMissing} | REST p50 ${ms.length ? ms[Math.floor(ms.length / 2)] : 'n/a'} ms, snapshot REST de hace p50 ${ages.length ? ages[Math.floor(ages.length / 2)] : 'n/a'} ms`;
   }
 }
 
