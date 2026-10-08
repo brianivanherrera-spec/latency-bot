@@ -625,6 +625,12 @@ class PolymarketWS {
       this._reconnectDelay = RECONNECT_MIN;
       this._lastPongAt = Date.now();
       logger.info('✅ Polymarket WS conectado');
+      // Una vez por proceso: si el servidor aceptó permessage-deflate, la descompresión corre
+      // en el threadpool de libuv (hipótesis de los cortes 1013, ver bitácora 08/10)
+      if (!this._extLogged) {
+        this._extLogged = true;
+        logger.info(`[POLY-WS] extensiones del socket: ${ws.extensions || 'ninguna'}`);
+      }
 
       if (this._yesTokenId && this._noTokenId) {
         this._sendSubscribe([this._yesTokenId, this._noTokenId]);

@@ -13,6 +13,7 @@
 
 const WebSocket = require('ws');
 const { Logger } = require('./logger');
+const loopMonitor = require('./loop-monitor');
 
 const logger = new Logger('BINANCE-WS');
 
@@ -103,6 +104,10 @@ class BinanceWS {
           logger.info(`✅ Conectado a Coinbase ticker (BTC-USD) — solo referencia, no entra a la señal`);
         } else {
           logger.info(`✅ Conectado a Binance aggTrade (BTC/USDT)`);
+          if (!this._extLogged) {
+            this._extLogged = true;
+            logger.info(`[BINANCE-WS] extensiones del socket: ${sock.extensions || 'ninguna'}`);
+          }
         }
         this._startPing();
         const wasReconnect = this._everConnected;
@@ -222,6 +227,8 @@ class BinanceWS {
       const idle = Date.now() - this._lastDataAt;
       if (idle > limit) {
         logger.warn(`[WATCHDOG] ${this._label()} sin datos hace ${idle}ms — reconectando`);
+        // Estado del event loop / threadpool / disco en ese momento, para compararlo con los cortes 1013
+        loopMonitor.log(`watchdog ${this._label()} | ${loopMonitor.snapshot().text}`);
         this._lastDataAt = Date.now();
         try { this.ws.terminate(); } catch (_) {} // dispara 'close' → reconexión
       }

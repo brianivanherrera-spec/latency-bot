@@ -10,6 +10,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { observeDisk } = require('./loop-monitor');
 
 const FLUSH_MS = 500;
 const MAX_LINES = 50000;       // tope por archivo si el disco se atrasa (se descartan las más viejas)
@@ -47,6 +48,7 @@ async function flushOne(file, b) {
   b.writing = true;
   const chunk = b.lines.join('\n') + '\n';
   b.lines = [];
+  const t0 = Date.now();
   try {
     if (b.maxBytes && Date.now() - b.checkedAt > ROTATE_CHECK_MS) {
       b.checkedAt = Date.now();
@@ -57,6 +59,7 @@ async function flushOne(file, b) {
   } catch (_) {
     // disco lleno / volumen caído: se pierde este bloque, el bot sigue
   } finally {
+    observeDisk(Date.now() - t0);
     b.writing = false;
   }
 }

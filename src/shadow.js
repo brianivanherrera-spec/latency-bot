@@ -392,8 +392,11 @@ class Shadow {
     };
     const ticks = { v: 1, market_id: m.marketId, gamma_id: m.gammaId, start_ts: m.startTs, end_ts: m.endTs, strike: m.strike, winner, cols: COLS, rows: m.rows };
 
-    fs.promises.appendFile(MARKETS_FILE, JSON.stringify(summary) + '\n').catch(e => logger.warn(`[SHADOW] write markets: ${e.message}`));
-    fs.promises.appendFile(TICKS_FILE, JSON.stringify(ticks) + '\n').catch(e => logger.warn(`[SHADOW] write ticks: ${e.message}`));
+    const t0 = Date.now();
+    fs.promises.appendFile(MARKETS_FILE, JSON.stringify(summary) + '\n').catch(e => logger.warn(`[SHADOW] write markets: ${e.message}`))
+      .finally(() => loopMonitor.observeDisk(Date.now() - t0));
+    fs.promises.appendFile(TICKS_FILE, JSON.stringify(ticks) + '\n').catch(e => logger.warn(`[SHADOW] write ticks: ${e.message}`))
+      .finally(() => loopMonitor.observeDisk(Date.now() - t0));
     this.stats.written++;
 
     // Línea legible para leer desde los logs de Railway
