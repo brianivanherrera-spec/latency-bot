@@ -51,4 +51,25 @@ s._handle(sp(null, T + 2000, 82052));          // repetido (el último)
 assert.deepStrictEqual(s._history.map(p => p.ts), [T, T + 1000, T + 2000], 'spot sin repetidos');
 assert.strictEqual(s.bySrc.rtds.first, 2); assert.strictEqual(s.bySrc.rtds.dup, 2);
 assert.strictEqual(s.bySrc.polybolt.first, 1); assert.strictEqual(s.bySrc.polybolt.dup, 1);
-console.log('chainlink-dual: 18 ok');
+
+// Watchdog de cada socket del RTDS: solo cuentan sus propios datos (PolyBolt no lo tapa)
+const w = new ChainlinkRTDS();
+w._openedAt = T;
+w._handle(tw('polybolt', T + 9000, 82010), T + 60000);
+assert.strictEqual(w._rtdsSilenceMs(T + 60000), 60000, 'PolyBolt no tapa al RTDS callado');
+w._staleStreak = 3;
+assert.strictEqual(w._staleLimitMs(), 240000, 'el umbral se duplica con cada reconexión seguida');
+w._staleStreak = 9;
+assert.strictEqual(w._staleLimitMs(), 480000, 'tope 16 veces');
+w._handle(tw(null, T + 10000, 82011), T + 61000);
+assert.strictEqual(w._rtdsSilenceMs(T + 61000), 0, 'llegó TWAP del RTDS');
+assert.strictEqual(w._staleStreak, 0, 'y reinicia la racha');
+assert.strictEqual(w._staleLimitMs(), 30000);
+const sw = new ChainlinkSpot();
+sw._openedAt = Date.now();
+sw._handle(sp('polybolt', T + 3000, 82053));
+assert.strictEqual(sw._rtdsSilenceMs(sw._openedAt + 60000), 60000, 'spot: PolyBolt no tapa al RTDS callado');
+sw._staleStreak = 2;
+sw._handle(sp(null, T + 4000, 82054));
+assert.ok(sw._rtdsSilenceMs(sw.bySrc.rtds.last + 5) === 5 && sw._staleStreak === 0, 'spot: llegó del RTDS');
+console.log('chainlink-dual: 26 ok');

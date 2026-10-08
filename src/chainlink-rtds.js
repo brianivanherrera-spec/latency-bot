@@ -45,7 +45,15 @@ class ChainlinkRTDS {
     const s = this.bySrc[src] || (this.bySrc[src] = { first: 0, dup: 0, last: 0 });
     if (accepted) s.first++; else s.dup++;
     s.last = received_ts;
+    if (src === 'rtds') this._staleStreak = 0;
   }
+  // Tiempo sin TWAP propio del socket del RTDS. No cuenta lo que trae PolyBolt en modo dual: antes
+  // PolyBolt mantenía fresco el dato y un socket del RTDS que dejaba de mandar el TWAP con la conexión
+  // abierta no se reconectaba nunca (08/10: 17:50 → 18:32 UTC)
+  _rtdsSilenceMs(now = Date.now()) { return now - Math.max(this._openedAt || 0, this.bySrc.rtds?.last || 0); }
+  // Umbral para reconectar: se duplica con cada reconexión seguida sin datos (si Polymarket apaga el
+  // tema no reconecta cada 30 s para siempre), hasta 16 veces
+  _staleLimitMs() { return STALE_RECONNECT_MS * 2 ** Math.min(this._staleStreak || 0, 4); }
   getLatestTWAP(w) { return this._last[w] || null; }
   // TWAP publicado por Chainlink con timestamp de fuente <= tsMs (máx. maxGapMs antes)
   getTwapAt(w, tsMs, maxGapMs = 5000) {
@@ -116,9 +124,10 @@ class ChainlinkRTDS {
       this._openedAt = Date.now();
       this._pingTimer = setInterval(() => {
         if (this.ws?.readyState !== WebSocket.OPEN) return;
-        const lastData = Math.max(this._openedAt, this.diag.last_received_30s || 0, this.diag.last_received_60s || 0);
-        if (Date.now() - lastData > STALE_RECONNECT_MS) {
-          logger.warn(`[RTDS] ⚠️ Sin datos hace ${((Date.now() - lastData) / 1000).toFixed(0)}s con el socket abierto — reconectando`);
+        const silence = this._rtdsSilenceMs();
+        if (silence > this._staleLimitMs()) {
+          this._staleStreak = (this._staleStreak || 0) + 1;
+          logger.warn(`[RTDS] ⚠️ Sin TWAP del RTDS hace ${(silence / 1000).toFixed(0)}s con el socket abierto — reconectando (${this._staleStreak}ª seguida)`);
           this.diag.stale_reconnects = (this.diag.stale_reconnects || 0) + 1;
           this.ws.terminate(); // dispara 'close' → reconexión
           return;

@@ -31,7 +31,12 @@ class ChainlinkSpot {
     const s = this.bySrc[src] || (this.bySrc[src] = { first: 0, dup: 0, last: 0 });
     if (accepted) s.first++; else s.dup++;
     s.last = received;
+    if (src === 'rtds') this._staleStreak = 0;
   }
+  // Tiempo sin precios propios del socket del RTDS (no cuenta PolyBolt: con su dato fresco el socket
+  // callado del RTDS no se reconectaba; 08/10 18:24 → 18:32 UTC) y umbral con duplicación por racha
+  _rtdsSilenceMs(now = Date.now()) { return now - Math.max(this._openedAt || 0, this.bySrc.rtds?.last || 0); }
+  _staleLimitMs() { return STALE_RECONNECT_MS * 2 ** Math.min(this._staleStreak || 0, 4); }
 
   connect() {
     try { this.ws = new WebSocket(RTDS_URL); } catch (e) {
@@ -47,10 +52,13 @@ class ChainlinkSpot {
       }));
       logger.info('[SPOT] ✅ Conectado — suscripto a crypto_prices_chainlink btc/usd');
       this._lastDataTs = Date.now();
+      this._openedAt = Date.now();
       this._pingTimer = setInterval(() => {
         if (this.ws?.readyState !== WebSocket.OPEN) return;
-        if (Date.now() - this._lastDataTs > STALE_RECONNECT_MS) {
-          logger.warn(`[SPOT] ⚠️ Sin precios hace ${((Date.now() - this._lastDataTs) / 1000).toFixed(0)}s con el socket abierto — reconectando`);
+        const silence = this._rtdsSilenceMs();
+        if (silence > this._staleLimitMs()) {
+          this._staleStreak = (this._staleStreak || 0) + 1;
+          logger.warn(`[SPOT] ⚠️ Sin precios del RTDS hace ${(silence / 1000).toFixed(0)}s con el socket abierto — reconectando (${this._staleStreak}ª seguida)`);
           this.ws.terminate(); // dispara 'close' → reconexión
           return;
         }
