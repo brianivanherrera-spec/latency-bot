@@ -118,7 +118,8 @@ class ChainlinkRTDS {
     this.ws.on('message', (data) => {
       const received_ts = Date.now();
       const raw = data.toString();
-      if (raw === 'PONG') return;
+      // PONG, y el mensaje vacío que llega al reconectar (el servidor corta cada ~2 h con 1001)
+      if (raw === 'PONG' || !raw.trim()) return;
       // NO loguear cada MSG — overhead de I/O causaba 1-2s de latencia
       try { this._handle(JSON.parse(raw), received_ts); } catch(e) {
         logger.warn(`[RTDS] Parse error: ${e.message}`);
