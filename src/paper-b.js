@@ -16,7 +16,9 @@
  * que tardaría una orden real) y a +PAPER_B_DELAY_MS (400): llena si el ask sigue ≤ límite y
  * alcanza el tamaño, y paga max(ask al decidir + tick, promedio del libro hasta el límite).
  * Comisión taker TAKER_FEE_RATE·p·(1−p) por acción. Se resuelve con el ganador oficial (Gamma).
- * Estado en DATA_DIR/paper-b.json: sobrevive reinicios.
+ * Estado en DATA_DIR/paper-b.json: sobrevive reinicios (se guarda desde el arranque).
+ * En cada mercado sin entrada deja una línea con la mejor ventaja que vio en la ventana (para ver
+ * que la cuenta está viva y qué tan cerca quedó).
  */
 'use strict';
 const fs = require('fs');
@@ -44,7 +46,9 @@ class PaperB {
     c.checkMs = Math.min(c.delayMs, Math.max(0, num(env.PAPER_CHECK_MS, 200)));
     c.cap = round2(c.hi + 0.02);
     this.state = this._load();
-    this.markets = new Map(); // gammaId → { anchor, tried }
+    if (!fs.existsSync(this.stateFile)) this._save(); // que "desde" no se reinicie con cada arranque
+    this.markets = new Map(); // gammaId → { anchor, tried, inWin, withData, best }
+    this._last = null;        // mercado en curso (para reportarlo cuando empieza el siguiente)
     this._timers = [];
   }
 
@@ -68,25 +72,39 @@ class PaperB {
   onSample(m, s) {
     let st = this.markets.get(m.gammaId);
     if (!st) {
-      st = { anchor: null, tried: false };
+      this._reportLast();
+      st = { anchor: null, tried: false, market: String(m.question || '').slice(-22), inWin: 0, withData: 0, best: null };
       this.markets.set(m.gammaId, st);
+      this._last = st;
       if (this.markets.size > 20) this.markets.delete(this.markets.keys().next().value);
     }
+    const inWin = s.T <= this.cfg.tMax && s.T >= this.cfg.tMin;
+    if (inWin) st.inWin++;
     if (s.yesBid == null || s.yesAsk == null || s.p == null || s.src !== 1) { st.anchor = null; return; }
     const mid = (s.yesBid + s.yesAsk) / 2;
     if (!st.anchor || Math.abs(mid - st.anchor.mid) > 1e-9) st.anchor = { mid, p: s.p };
-    if (st.tried || s.T > this.cfg.tMax || s.T < this.cfg.tMin) return;
+    if (st.tried || !inWin) return;
+    st.withData++;
     const pAdj = Math.min(0.999, Math.max(0.001, mid + (s.p - st.anchor.p)));
     for (const side of ['UP', 'DOWN']) {
       const ask = side === 'UP' ? s.yesAsk : s.noAsk;
       if (ask == null || ask < this.cfg.lo || ask > this.cfg.hi) continue;
       const pa = side === 'UP' ? pAdj : 1 - pAdj;
       const edge = pa - ask - this.fee(ask);
+      if (!st.best || edge > st.best.edge) st.best = { edge, side, ask, T: Math.round(s.T) };
       if (edge < this.cfg.edge) continue;
       st.tried = true;
       st.done = this._execute(m, side, ask, pa, edge, s.T).catch(e => logger.warn(`[PAPER-B] ejecución: ${e.message}`));
       return;
     }
+  }
+
+  // Línea del mercado anterior si no entró: segundos de la ventana con datos y mejor ventaja vista
+  _reportLast() {
+    const st = this._last;
+    if (!st || st.tried || !st.inWin) return;
+    const b = st.best, c = this.cfg;
+    logger.info(`[PAPER-B] sin entrada en ${st.market} | ${st.withData} de ${st.inWin} s de la ventana con libro y modelo Chainlink | ${b ? `mejor ventaja ${(b.edge * 100).toFixed(1)} pts (${b.side}, ask ${px(b.ask)}, ${b.T} s restantes; pide ${Math.round(c.edge * 100)})` : `ningún ask en $${c.lo.toFixed(2)}-$${c.hi.toFixed(2)}`}`);
   }
 
   async _execute(m, side, ask, pa, edge, T) {

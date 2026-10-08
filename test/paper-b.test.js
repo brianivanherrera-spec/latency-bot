@@ -27,6 +27,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
 
 (async () => {
   const pb = new PaperB({ polyWs, stateFile, env });
+  assert.ok(fs.existsSync(stateFile), 'estado guardado desde el arranque ("desde" no se reinicia)');
   // 1) Fuera de ventana (150 s): fija el ancla (mid 0.445, p 0.50) y no entra
   const m1 = mkt('g1');
   pb.onSample(m1, sample(150, 0.50));
@@ -85,6 +86,18 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   pb.onSample(m4, sample(150, 0.50, 0.75, 0.74, 0.26));
   pb.onSample(m4, sample(100, 0.95, 0.75, 0.74, 0.26));
   assert.strictEqual(pb.state.attempts, 3, 'ask 0.75 fuera del rango');
+  assert.strictEqual(pb.markets.get('g4').best, null, 'sin asks en rango: sin mejor ventaja');
+  // Mercado sin entrada: guarda la mejor ventaja vista en la ventana (para la línea "sin entrada")
+  const m5 = mkt('g5');
+  pb.onSample(m5, sample(150, 0.50));
+  pb.onSample(m5, sample(100, 0.55)); // pAdj 0.495 → UP: 0.495 − 0.45 − comisión ≈ 2.7 pts
+  pb.onSample(m5, sample(20, 0.70));  // 20 s restantes: fuera de la ventana, no cuenta
+  const st5 = pb.markets.get('g5');
+  assert.strictEqual(st5.inWin, 1);
+  assert.strictEqual(st5.withData, 1);
+  assert.strictEqual(st5.best.side, 'UP');
+  assert.ok(Math.abs(st5.best.edge - (0.495 - 0.45 - FEE * 0.45 * 0.55)) < 1e-9);
+  assert.strictEqual(pb.state.attempts, 3);
 
   // 7) Estado persistente: una instancia nueva lo recupera, y resuelve por Gamma lo que quedó abierto
   const fetchFn = async () => ({ ok: true, json: async () => ({ closed: true, outcomePrices: '["0", "1"]' }) });
@@ -97,5 +110,5 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.ok(Math.abs(pb2.state.pnl - (expWin + expDown)) < 1e-3);
   assert.ok(/Balance B: \+\$/.test(pb2.summary()));
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 27 ok');
+  console.log('paper-b: 34 ok');
 })().catch(e => { console.error(e); process.exit(1); });
