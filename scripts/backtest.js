@@ -57,14 +57,16 @@ async function load(file) {
       if (aMid == null || Math.abs(mid - aMid) > 1e-9) { aMid = mid; aP = r.p; }
       r.pAdj = Math.min(0.999, Math.max(0.001, mid + (r.p - aP)));
     }
-    // TWAP 60 s de Binance (USDT) en el cierre: promedio de las filas de los últimos 60 s ([BACKTEST-SINCL])
-    let bs = 0, bn = 0;
+    // TWAP 60 s de Binance (USDT) en el cierre: promedio de las filas de los últimos 60 s ([BACKTEST-SINCL]);
+    // y BTC de Binance en la apertura (primera fila de los primeros 30 s, para [BACKTEST-TEND2H])
+    let bs = 0, bn = 0, btcOpen = null;
     for (const r of m.rows || []) {
       const t = r[c.t], b = r[c.btc];
       if (t != null && t >= 240 && t <= 300 && b != null) { bs += b; bn++; }
+      if (btcOpen == null && t != null && t <= 30 && b != null) btcOpen = b;
     }
     markets.push({ start: m.start_ts, winner: m.winner, rows, live: c.pass != null,
-      strike: Number.isFinite(m.strike) ? m.strike : null, bnClose60: bn >= 45 ? bs / bn : null });
+      strike: Number.isFinite(m.strike) ? m.strike : null, bnClose60: bn >= 45 ? bs / bn : null, btcOpen });
   }
   return markets.sort((a, b) => a.start - b.start);
 }
@@ -138,6 +140,62 @@ function evaluate(markets, cfg) {
   return { n, wr: n ? +(w / n).toFixed(3) : null, avgPrice: n ? +(exp / n).toFixed(3) : null,
     evPerShare: n ? +(perShare / n).toFixed(4) : null, pnl: +pnl.toFixed(2),
     z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
+}
+
+// Tendencia de BTC de las 2 h previas, orientada al lado comprado (+ = a favor). Hipótesis del
+// análisis de pérdidas del 08/10 (128 operaciones de la cuenta A): contra la tendencia (< −0.1 %)
+// 24-11 −5.4¢/acc, a favor (> +0.1 %) 27-7 +7.0¢/acc, z ≈ 1.2. Se mide con el BTC de Binance en la
+// apertura de cada mercado: cambio % entre la apertura del mercado y la de 2 h antes (hueco ≤ 10 min).
+function btcSeries(markets) {
+  return markets.filter(m => m.btcOpen != null).map(m => [m.start, m.btcOpen]);
+}
+function priceAt(series, t, maxGapMs = 600000) {
+  let lo = 0, hi = series.length - 1, k = -1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (series[mid][0] <= t) { k = mid; lo = mid + 1; } else hi = mid - 1; }
+  return k >= 0 && t - series[k][0] <= maxGapMs ? series[k][1] : null;
+}
+function trendSplit(population, cfg, series, thr = 0.1, horizonMs = 7200000) {
+  const g = { fav: [], neu: [], against: [] };
+  let noData = 0;
+  for (const mk of population) {
+    const e = entry(mk, cfg);
+    if (!e) continue;
+    const now = priceAt(series, mk.start), then = priceAt(series, mk.start - horizonMs);
+    if (now == null || then == null) { noData++; continue; }
+    const tr = (now / then - 1) * 100 * (e.side === 'UP' ? 1 : -1);
+    const win = e.side === mk.winner;
+    const ps = (win ? 1 - e.price : -e.price) - fee(e.price);
+    (tr > thr ? g.fav : tr < -thr ? g.against : g.neu).push({ win, price: e.price, ps });
+  }
+  const stat = a => {
+    const n = a.length, w = a.filter(x => x.win).length, exp = a.reduce((s, x) => s + x.price, 0);
+    const varr = a.reduce((s, x) => s + x.price * (1 - x.price), 0);
+    return { n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(a.reduce((s, x) => s + x.ps, 0) / n).toFixed(4) : null,
+      z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
+  };
+  const mv = a => { const n = a.length, m = a.reduce((s, x) => s + x.ps, 0) / n;
+    return { n, m, v: n > 1 ? a.reduce((s, x) => s + (x.ps - m) ** 2, 0) / (n - 1) : 0 }; };
+  let diff = null, zDiff = null;
+  if (g.fav.length >= 2 && g.against.length >= 2) {
+    const f = mv(g.fav), a = mv(g.against), se = Math.sqrt(f.v / f.n + a.v / a.n);
+    diff = +(f.m - a.m).toFixed(4); zDiff = se ? +((f.m - a.m) / se).toFixed(2) : null;
+  }
+  return { fav: stat(g.fav), neu: stat(g.neu), against: stat(g.against), noData, diff, zDiff };
+}
+
+// Resultado de una regla por día (UTC) de entrada: para ver si la ventaja es pareja o sale de pocos días
+function byDay(markets, cfg) {
+  const d = new Map();
+  for (const mk of markets) {
+    const e = entry(mk, cfg);
+    if (!e) continue;
+    const k = new Date(mk.start).toISOString().slice(5, 10);
+    const win = e.side === mk.winner, ps = (win ? 1 - e.price : -e.price) - fee(e.price);
+    const c = d.get(k) || { n: 0, w: 0, ps: 0, pnl: 0 };
+    c.n++; if (win) c.w++; c.ps += ps; c.pnl += Math.floor(STAKE / e.price) * ps;
+    d.set(k, c);
+  }
+  return [...d.entries()].map(([day, c]) => ({ day, n: c.n, wins: c.w, evPerShare: +(c.ps / c.n).toFixed(4), pnl: +c.pnl.toFixed(2) }));
 }
 
 function gridMomentum() {
@@ -274,7 +332,8 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-(async () => {
+module.exports = { load, entry, evaluate, btcSeries, priceAt, trendSplit, byDay };
+if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
   const cut = Math.floor(markets.length * 0.6);
@@ -368,6 +427,25 @@ function evGrid(markets) {
     current: evaluate(holdMk, cur) };
   report.anticipation = { firstSignal: first, earlyOracle: early, zgrid, holdout };
   report.sinChainlink = sinChainlink(markets, liveMk, cur);
+  // Regla de la cuenta B (src/paper-b.js, mismas variables): por día, y fuera de muestra desde que se
+  // fijó (08/10 14:49 UTC). En esos mercados las entradas tienen que coincidir con las [PAPER-B] en vivo.
+  const envNum = (k, d) => { const v = parseFloat(process.env[k]); return Number.isFinite(v) ? v : d; };
+  const bCfg = { kind: 'anchored', e: envNum('PAPER_B_EDGE', 0.08), lo: envNum('PAPER_B_MIN_ASK', 0.30),
+    hi: envNum('PAPER_B_MAX_ASK', 0.70), tMax: envNum('PAPER_B_TMAX', 120), tMin: envNum('PAPER_B_TMIN', 30) };
+  const bFrom = Date.parse(process.env.PAPER_B_DESDE || '2026-10-08T14:49:00Z');
+  const bMk = markets.filter(m => m.start >= bFrom);
+  report.paperB = { cfg: bCfg, byDay: byDay(markets, bCfg), from: new Date(bFrom).toISOString(), markets: bMk.length,
+    holdout: evaluate(bMk, bCfg),
+    entries: bMk.map(mk => ({ mk, e: entry(mk, bCfg) })).filter(x => x.e).map(({ mk, e }) => ({
+      start: new Date(mk.start).toISOString(), side: e.side, price: e.price, secsLeft: mk.rows[e.i].sl, win: e.side === mk.winner })) };
+  // Tendencia de BTC de 2 h (hipótesis del análisis de pérdidas): se confirma solo con z ≥ 2
+  const series = btcSeries(markets);
+  report.trend2h = {
+    current: trendSplit(liveMk, cur, series),
+    firstSignal: trendSplit(liveMk, { kind: 'live', field: 'sig', lo: 0.5, hi: 0.85, tMax: 240, tMin: 10 }, series),
+    anchoredB: trendSplit(markets, bCfg, series),
+    fairBase: trendSplit(markets, base240, series),
+  };
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -391,5 +469,16 @@ function evGrid(markets) {
   }
   { const s = report.sinChainlink, e = (x) => `p50 $${x.p50} p90 $${x.p90} máx $${x.max} (n=${x.n})`;
     console.log(`[BACKTEST-SINCL] sin Chainlink (TWAP 60 s de Binance) en ${s.n} mercados: resultado igual al oficial ${s.agreePct}% | con movimiento oficial < $10 (${s.near}): ${s.nearAgreePct}% | error del movimiento ${e(s.moveErr)} | strike con base calibrada con priceToBeat atrasado: error ${e(s.strikeErr)} | entradas de la regla actual: ${s.entries}, con resultado distinto ${s.entriesDiff}`); }
+  { const pb = report.paperB, dd = d => `${d.slice(3, 5)}/${d.slice(0, 2)}`;
+    console.log(`[BACKTEST-ANCLA] regla de la cuenta B por día (UTC): ${pb.byDay.map(d => `${dd(d.day)} ${d.wins}-${d.n - d.wins} EV/acc=${d.evPerShare}`).join(' | ') || 'sin entradas'}`);
+    const h = pb.holdout, hm = t => t.slice(11, 16);
+    const list = pb.entries.length <= 12 ? pb.entries.map(x => `${hm(x.start)} UTC ${x.side} $${x.price.toFixed(2)} ${x.secsLeft} s ${x.win ? 'G' : 'P'}`).join(', ') : `${pb.entries.length} entradas`;
+    console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | entradas (inicio del mercado): ${list}` : ''}`); }
+  { const t = report.trend2h, sd3 = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare}`;
+    const ln = (lab, x) => `[BACKTEST-TEND2H] ${lab}: a favor ${sd3(x.fav)} | neutra ${sd3(x.neu)} | en contra ${sd3(x.against)} | a favor − en contra ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}${x.noData ? ` | sin dato de 2 h: ${x.noData}` : ''}`;
+    console.log(ln(`regla actual (${liveMk.length} mercados; tendencia de BTC de 2 h a favor > +0.1 %, en contra < −0.1 % del lado comprado)`, t.current));
+    console.log(ln('primera señal 240-10 s $0.50-0.85', t.firstSignal));
+    console.log(ln(`anclada de la cuenta B (${markets.length} mercados)`, t.anchoredB));
+    console.log(ln(`modelo FAIR sin señal (${markets.length} mercados, 240-10 s, $0.59-0.79, e≥8)`, t.fairBase)); }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });
