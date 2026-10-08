@@ -57,7 +57,14 @@ async function load(file) {
       if (aMid == null || Math.abs(mid - aMid) > 1e-9) { aMid = mid; aP = r.p; }
       r.pAdj = Math.min(0.999, Math.max(0.001, mid + (r.p - aP)));
     }
-    markets.push({ start: m.start_ts, winner: m.winner, rows, live: c.pass != null });
+    // TWAP 60 s de Binance (USDT) en el cierre: promedio de las filas de los últimos 60 s ([BACKTEST-SINCL])
+    let bs = 0, bn = 0;
+    for (const r of m.rows || []) {
+      const t = r[c.t], b = r[c.btc];
+      if (t != null && t >= 240 && t <= 300 && b != null) { bs += b; bn++; }
+    }
+    markets.push({ start: m.start_ts, winner: m.winner, rows, live: c.pass != null,
+      strike: Number.isFinite(m.strike) ? m.strike : null, bnClose60: bn >= 45 ? bs / bn : null });
   }
   return markets.sort((a, b) => a.start - b.start);
 }
@@ -174,6 +181,49 @@ function grid() {
           for (const [tMax, tMin] of [[295, 10], [270, 30], [240, 60], [240, 120], [180, 60], [120, 30], [90, 10]])
             if (hi > lo) out.push({ lam, e, lo, hi, tMax, tMin });
   return out;
+}
+
+// Sin Chainlink: Polymarket retira los temas de precio del RTDS (~23/10, fecha no oficial) y el
+// reemplazo (PolyBolt) pide credenciales de una cuenta. Con solo Binance: strike ≈ TWAP 60 s de
+// Binance en la apertura − base y cierre ≈ TWAP 60 s de Binance en el cierre − base, así que el
+// resultado (cierre ≥ strike) no depende de la base. Se compara con el oficial: el strike de cada
+// mercado es el TWAP 60 s de Chainlink (= priceToBeat) y la apertura del siguiente es este cierre.
+// La base para un strike absoluto se calibra con priceToBeat ya publicados (Gamma lo publica al
+// resolver): mercados n−8..n−2.
+function sinChainlink(markets, liveMk, cur) {
+  const byStart = new Map(markets.map(m => [m.start, m]));
+  let n = 0, agree = 0, near = 0, nearAgree = 0, entries = 0, entriesDiff = 0;
+  const moveErr = [], strikeErr = [], dHist = [];
+  for (const m of markets) {
+    const prev = byStart.get(m.start - 300000), next = byStart.get(m.start + 300000);
+    const open = prev?.bnClose60, close = m.bnClose60;
+    if (open == null || m.strike == null) continue;
+    const d = open - m.strike; // base Binance − Chainlink medida TWAP contra TWAP
+    if (dHist.length >= 4) {
+      const ref = dHist.slice(-8, -1).sort((a, b) => a - b);
+      strikeErr.push(d - ref[Math.floor(ref.length / 2)]);
+    }
+    dHist.push(d);
+    if (close == null || next?.strike == null) continue;
+    const bnWinner = close >= open ? 'UP' : 'DOWN';
+    const clMove = next.strike - m.strike;
+    n++; if (bnWinner === m.winner) agree++;
+    if (Math.abs(clMove) < 10) { near++; if (bnWinner === m.winner) nearAgree++; }
+    moveErr.push((close - open) - clMove);
+    m.bnWinner = bnWinner;
+  }
+  for (const mk of liveMk) {
+    const e = entry(mk, cur);
+    if (!e || !mk.bnWinner) continue;
+    entries++; if (mk.bnWinner !== mk.winner) entriesDiff++;
+  }
+  const q = (arr) => {
+    const a = arr.map(Math.abs).sort((x, y) => x - y);
+    const at = p => a.length ? +a[Math.min(a.length - 1, Math.floor(p * a.length))].toFixed(2) : null;
+    return { n: a.length, p50: at(0.5), p90: at(0.9), max: a.length ? +a[a.length - 1].toFixed(2) : null };
+  };
+  const pct = (a, b) => b ? +(a / b * 100).toFixed(1) : null;
+  return { n, agreePct: pct(agree, n), near, nearAgreePct: pct(nearAgree, near), moveErr: q(moveErr), strikeErr: q(strikeErr), entries, entriesDiff };
 }
 
 function calibration(markets) {
@@ -317,6 +367,7 @@ function evGrid(markets) {
     candidate: evaluate(holdMk, { kind: 'zgate', zt: 1.5, mt: 0.02, e: 0.08, lo: 0.59, hi: 0.79, tMax: 240, tMin: 10 }),
     current: evaluate(holdMk, cur) };
   report.anticipation = { firstSignal: first, earlyOracle: early, zgrid, holdout };
+  report.sinChainlink = sinChainlink(markets, liveMk, cur);
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -338,5 +389,7 @@ function evGrid(markets) {
     console.log(`[BACKTEST-ANTICIPO] fuera de muestra desde ${h.from} (${h.markets} mercados): candidata z≥1.5 mov≥0.02 ${sd2(h.candidate)} | regla actual ${sd2(h.current)}`);
     console.log(`[BACKTEST-ANTICIPO] señal aproximada z/mov + FAIR e≥8 ($0.59-0.79, 240-10 s): ${top.map(g => `z≥${g.zt} mov≥${g.mt}: n=${g.n} WR=${g.wr} EV/acc=${g.evPerShare} z=${g.z}`).join(' | ')}`);
   }
+  { const s = report.sinChainlink, e = (x) => `p50 $${x.p50} p90 $${x.p90} máx $${x.max} (n=${x.n})`;
+    console.log(`[BACKTEST-SINCL] sin Chainlink (TWAP 60 s de Binance) en ${s.n} mercados: resultado igual al oficial ${s.agreePct}% | con movimiento oficial < $10 (${s.near}): ${s.nearAgreePct}% | error del movimiento ${e(s.moveErr)} | strike con base calibrada con priceToBeat atrasado: error ${e(s.strikeErr)} | entradas de la regla actual: ${s.entries}, con resultado distinto ${s.entriesDiff}`); }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });
