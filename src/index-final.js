@@ -917,6 +917,13 @@ async function main() {
     logger.info(`[PAPER-B] ✅ Cuenta B activa — ${paperB.describe()}`);
     logger.info(paperB.summary());
   }
+  // Chequeo del libro: el mejor bid/ask del WS contra la API REST de Polymarket cada 30 s (solo
+  // registro). BOOK_CHECK_MS=0 lo apaga.
+  if (process.env.BOOK_CHECK_MS !== '0') {
+    const { BookCheck } = require('./book-check');
+    new BookCheck({ polyWs }).start();
+    logger.info(`[BOOK-CHECK] ✅ Comparando el libro del WS con la API REST de Polymarket cada ${Math.round(parseInt(process.env.BOOK_CHECK_MS || '30000') / 1000)} s`);
+  }
   const mRecorder = new MarketRecorder();  // timeline completo por mercado
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
   // Precio spot Chainlink BTC/USD — la fuente con la que resuelve Polymarket
