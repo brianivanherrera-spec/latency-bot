@@ -51,10 +51,13 @@ class BookCheck {
     return { bid: bids.length ? Math.max(...bids) : null, ask: asks.length ? Math.min(...asks) : null, ms: Date.now() - t0 };
   }
 
-  // Mayor diferencia entre bid y ask; un lado vacío en uno y con precio en el otro cuenta como 1
+  // Mayor diferencia entre bid y ask; un lado vacío en uno y con precio en el otro cuenta como 1.
+  // Un ask a $1.00 o un bid a $0 no son ofertas operables (en mercados decididos el WS puede
+  // mostrar el ask a $1.00 y el REST ninguno): cuentan como lado vacío.
   static diff(w, r) {
+    const ask = v => (v != null && v >= 0.9995 ? null : v), bid = v => (v != null && v <= 0.0005 ? null : v);
     const d = (a, b) => (a == null && b == null ? 0 : a == null || b == null ? 1 : Math.abs(a - b));
-    return Math.max(d(w.bid, r.bid), d(w.ask, r.ask));
+    return Math.max(d(bid(w.bid), bid(r.bid)), d(ask(w.ask), ask(r.ask)));
   }
 
   async checkOnce() {

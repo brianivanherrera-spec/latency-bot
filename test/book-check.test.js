@@ -34,12 +34,17 @@ const fetchFn = async (url) => {
   setWs('N', 0.99, 0.999);
   await bc.checkOnce();
   assert.deepStrictEqual([bc.s.n, bc.s.same, bc.s.more], [6, 3, 2]);
+  // Ask a $1.00 en el WS y sin asks en el REST (mercado decidido): igual
+  setWs('N', 0.99, 1); rest = { Y: { bids: [], asks: [0.01] }, N: { bids: [0.99], asks: [] } };
+  setWs('Y', null, 0.01);
+  await bc.checkOnce();
+  assert.deepStrictEqual([bc.s.n, bc.s.same, bc.s.more], [8, 5, 2], 'ask $1.00 = sin oferta');
   // REST caído y WS sin dato
   rest = {}; await bc.checkOnce();
   assert.strictEqual(bc.s.restErr, 2);
   top.clear(); rest = { Y: { bids: [0.4], asks: [0.41] }, N: { bids: [0.59], asks: [0.6] } };
   await bc.checkOnce();
   assert.strictEqual(bc.s.wsMissing, 2);
-  assert.ok(/n=6 \| iguales 3 \(50.0%\)/.test(bc.summary()), bc.summary());
-  console.log('book-check: 7 ok');
+  assert.ok(/n=8 \| iguales 5 \(62.5%\)/.test(bc.summary()), bc.summary());
+  console.log('book-check: 8 ok');
 })().catch(e => { console.error(e); process.exit(1); });
