@@ -105,8 +105,9 @@ function fires(R, i, side, cfg, ask, bid) {
   return pa - ask - fee(ask) >= cfg.e;
 }
 
-// Primera entrada de una regla en un mercado → { side, price } o null
-function entry(mk, cfg) {
+// Primer disparo de una regla en un mercado → { side, i, ask, ask2 (1 s después), price, escaped } o null.
+// escaped: el precio se escapó en ese segundo (fill conservador por encima del tope): no hay entrada.
+function firstFire(mk, cfg) {
   const R = mk.rows;
   for (let i = 0; i < R.length - 1; i++) {
     const r = R[i];
@@ -118,11 +119,16 @@ function entry(mk, cfg) {
       const nx = R[i + 1];
       const ask2 = nx ? (side === 'UP' ? nx.ya : nx.na) : null;
       const price = Math.max(ask, ask2 ?? ask);
-      if (price > cfg.hi + 0.02 || price >= 0.99) return null; // el precio se escapó
-      return { side, price, i };
+      return { side, i, ask, ask2, price, escaped: price > cfg.hi + 0.02 || price >= 0.99 };
     }
   }
   return null;
+}
+
+// Primera entrada de una regla en un mercado → { side, price, i } o null (sin entrada si el precio se escapó)
+function entry(mk, cfg) {
+  const f = firstFire(mk, cfg);
+  return f && !f.escaped ? { side: f.side, price: f.price, i: f.i } : null;
 }
 
 function evaluate(markets, cfg) {
@@ -332,7 +338,7 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-module.exports = { load, entry, evaluate, btcSeries, priceAt, trendSplit, byDay };
+module.exports = { load, firstFire, entry, evaluate, btcSeries, priceAt, trendSplit, byDay };
 if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
@@ -436,8 +442,10 @@ if (require.main === module) (async () => {
   const bMk = markets.filter(m => m.start >= bFrom);
   report.paperB = { cfg: bCfg, byDay: byDay(markets, bCfg), from: new Date(bFrom).toISOString(), markets: bMk.length,
     holdout: evaluate(bMk, bCfg),
-    entries: bMk.map(mk => ({ mk, e: entry(mk, bCfg) })).filter(x => x.e).map(({ mk, e }) => ({
-      start: new Date(mk.start).toISOString(), side: e.side, price: e.price, secsLeft: mk.rows[e.i].sl, win: e.side === mk.winner })) };
+    // Disparos (entradas y los que se escaparon en 1 s): cada intento de B en vivo tiene que estar acá
+    entries: bMk.map(mk => ({ mk, f: firstFire(mk, bCfg) })).filter(x => x.f).map(({ mk, f }) => ({
+      start: new Date(mk.start).toISOString(), side: f.side, ask: f.ask, ask2: f.ask2, price: f.price,
+      secsLeft: mk.rows[f.i].sl, escaped: f.escaped, win: f.side === mk.winner })) };
   // Tendencia de BTC de 2 h (hipótesis del análisis de pérdidas): se confirma solo con z ≥ 2
   const series = btcSeries(markets);
   report.trend2h = {
@@ -472,8 +480,10 @@ if (require.main === module) (async () => {
   { const pb = report.paperB, dd = d => `${d.slice(3, 5)}/${d.slice(0, 2)}`;
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B por día (UTC): ${pb.byDay.map(d => `${dd(d.day)} ${d.wins}-${d.n - d.wins} EV/acc=${d.evPerShare}`).join(' | ') || 'sin entradas'}`);
     const h = pb.holdout, hm = t => t.slice(11, 16);
-    const list = pb.entries.length <= 12 ? pb.entries.map(x => `${hm(x.start)} UTC ${x.side} $${x.price.toFixed(2)} ${x.secsLeft} s ${x.win ? 'G' : 'P'}`).join(', ') : `${pb.entries.length} entradas`;
-    console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | entradas (inicio del mercado): ${list}` : ''}`); }
+    const one = x => `${hm(x.start)} UTC ${x.side} ${Math.round(x.secsLeft)} s ask $${x.ask.toFixed(2)}${x.escaped ? ` → $${x.ask2 == null ? 'n/a' : x.ask2.toFixed(2)} 1 s después: se escapó` : ` → paga $${x.price.toFixed(2)} ${x.win ? 'G' : 'P'}`}`;
+    const esc = pb.entries.filter(x => x.escaped).length;
+    const list = pb.entries.length <= 12 ? pb.entries.map(one).join(', ') : `${pb.entries.length} disparos`;
+    console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | disparos (inicio del mercado; ${esc} con el precio escapado en 1 s, sin entrada): ${list}` : ''}`); }
   { const t = report.trend2h, sd3 = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare}`;
     const ln = (lab, x) => `[BACKTEST-TEND2H] ${lab}: a favor ${sd3(x.fav)} | neutra ${sd3(x.neu)} | en contra ${sd3(x.against)} | a favor − en contra ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}${x.noData ? ` | sin dato de 2 h: ${x.noData}` : ''}`;
     console.log(ln(`regla actual (${liveMk.length} mercados; tendencia de BTC de 2 h a favor > +0.1 %, en contra < −0.1 % del lado comprado)`, t.current));
