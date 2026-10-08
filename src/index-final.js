@@ -907,6 +907,16 @@ async function main() {
   const fairValue = new FairValue();
   const shadow = process.env.SHADOW_MODE === 'false' ? null : new Shadow({ fairValue, polyWs, rtds: clRTDS });
   if (shadow) { shadowRef = shadow; shadow.setSignalFn(() => signal.snapshot()); shadow.start(); }
+  // Paper B: segunda cuenta de paper con la regla anclada, en paralelo (no toca las decisiones
+  // del bot). PAPER_B_ENABLED=false la apaga. Necesita el shadow (muestras y ganador oficial).
+  if (shadow && process.env.PAPER_B_ENABLED !== 'false') {
+    const { PaperB } = require('./paper-b');
+    const paperB = new PaperB({ polyWs });
+    shadow.setPaperB(paperB);
+    paperB.start();
+    logger.info(`[PAPER-B] ✅ Cuenta B activa — ${paperB.describe()}`);
+    logger.info(paperB.summary());
+  }
   const mRecorder = new MarketRecorder();  // timeline completo por mercado
   clRTDS.onUpdate((event) => mRecorder.recordChainlink(event));
   // Precio spot Chainlink BTC/USD — la fuente con la que resuelve Polymarket
