@@ -3399,12 +3399,14 @@ async function main() {
       // tardaría una orden real (150 ms de demora de Polymarket + ~40 ms de red). No cambia el fill.
       const checkMs = Math.max(0, parseInt(process.env.PAPER_CHECK_MS || '200') || 0);
       const doCheck = paperDelayMs > 0 && checkMs > 0 && checkMs < paperDelayMs;
-      let ask200 = null, size200 = null;
+      let ask200 = null, size200 = null, rest200 = null;
       if (paperDelayMs > 0) {
         if (doCheck) {
           await new Promise(r => setTimeout(r, checkMs));
           ask200 = polyWs.getBestAskForToken?.(tokenId) ?? null;
           size200 = sizeUpTo();
+          // Libro REST a ese tiempo (lo que encontraría una orden que llega en ~200 ms): solo registro
+          if (restCheck) rest200 = restBook();
         }
         await new Promise(r => setTimeout(r, doCheck ? paperDelayMs - checkMs : paperDelayMs));
         fillAsk = polyWs.getBestAskForToken?.(tokenId) ?? null;
@@ -3434,12 +3436,14 @@ async function main() {
       }
       logger.info(`[PAPER-LIQ] mejor ask $${fillAsk?.toFixed(2) ?? 'n/a'}, ${askSize ?? 'n/a'} tokens hasta $${price} | orden ${size} a $${price}${thinBook ? ' → NO alcanza' : ''}`);
       if (restCheck) {
-        Promise.all([rest0, restFill]).then(([r0, r1]) => {
+        Promise.all([rest0, restFill, rest200]).then(([r0, r1, r2]) => {
           const sz = restSizeUpTo(r1, price);
           const restFills = r1 ? r1.ask != null && r1.ask <= price + 1e-9 && (sz == null || sz >= size) : null;
+          const sz2 = restSizeUpTo(r2, price);
+          const restFills2 = r2 ? r2.ask != null && r2.ask <= price + 1e-9 && (sz2 == null || sz2 >= size) : null;
           const pxs = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
           const age = r => (r?.age != null ? ` (foto de hace ${r.age} ms)` : '');
-          logger.info(`[PAPER-REST] ${sig.direction} | al decidir: WS ${pxs(bestAskWS)} vs REST ${pxs(r0?.ask)}${age(r0)} | a +${paperDelayMs}ms: WS ${pxs(fillAsk)} vs REST ${pxs(r1?.ask)}${age(r1)}, ${sz ?? 'n/a'} tokens hasta $${price} → con REST ${restFills == null ? 'sin dato' : restFills ? 'llenaba' : 'no llenaba'} (paper con WS: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms`);
+          logger.info(`[PAPER-REST] ${sig.direction} | al decidir: WS ${pxs(bestAskWS)} vs REST ${pxs(r0?.ask)}${age(r0)} | a +${paperDelayMs}ms: WS ${pxs(fillAsk)} vs REST ${pxs(r1?.ask)}${age(r1)}, ${sz ?? 'n/a'} tokens hasta $${price} → con REST ${restFills == null ? 'sin dato' : restFills ? 'llenaba' : 'no llenaba'} (paper con WS: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms${doCheck ? ` | REST a +${checkMs}ms: ${pxs(r2?.ask)} (WS ${pxs(ask200)})${age(r2)}, ${sz2 ?? 'n/a'} tokens hasta $${price} → ${restFills2 == null ? 'sin dato' : restFills2 ? 'llenaba' : 'no llenaba'}` : ''}`);
         }).catch(() => {});
       }
 

@@ -57,6 +57,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pos.fill200, true);
   assert.strictEqual(pos.restAsk0, 0.45, 'libro REST al decidir');
   assert.strictEqual(pos.restFill, true, 'con el REST también llenaba');
+  assert.deepStrictEqual([pos.restAsk200, pos.restFill200, pos.restPaid200], [0.45, true, 0.46], 'libro REST a +200 ms');
   // 3) Un solo intento por mercado
   pb.onSample(m1, sample(90, 0.70));
   assert.strictEqual(pb.state.attempts, 1, 'no reintenta en el mismo mercado');
@@ -68,6 +69,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pb.state.w, 1);
   assert.ok(Math.abs(pb.state.pnl - expWin) < 1e-3, `P&L ${pb.state.pnl} ≈ ${expWin}`);
   assert.strictEqual(pb.state.open.length, 0);
+  assert.deepStrictEqual([pb.state.rest200.n, pb.state.rest200.w, pb.state.rest200.no], [1, 1, 0], 'cuenta con el REST a +200 ms');
 
   // 5) Sin fill: el ask se escapa antes de los 400 ms (pero a los 200 ms todavía llenaba)
   const m2 = mkt('g2');
@@ -81,8 +83,13 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pb.state.only200.length, 1, 'una llenaba solo a +200 ms');
   assert.strictEqual(pb.state.only200[0].restAsk400, 0.60, 'libro REST al momento del fill');
   assert.strictEqual(pb.state.only200[0].restFill, false, 'con el REST tampoco llenaba');
+  assert.deepStrictEqual([pb.state.only200[0].restAsk200, pb.state.only200[0].restFill200], [0.45, true], 'el REST a +200 ms todavía llenaba');
+  assert.strictEqual(pb.state.rest200Open.length, 1, 'cuenta solo en la del REST a +200 ms');
   pb.onResolved('g2', 'UP', 'gamma');
   assert.strictEqual(pb.state.only200[0].winner, 'UP', 'se guarda cómo salió la que solo llenaba a 200 ms');
+  assert.deepStrictEqual([pb.state.rest200.n, pb.state.rest200.w, pb.state.rest200.only, pb.state.rest200Open.length], [2, 2, 1, 0]);
+  assert.ok(Math.abs(pb.state.rest200.pnl - 2 * expWin) < 1e-3, 'al precio del REST a +200 ms');
+  assert.strictEqual(pb.state.pnl, +expWin.toFixed(4), 'el P&L de B no cambia');
 
   // 6) DOWN: el modelo baja → pAdj baja; el ancla se reinicia si falta el libro
   book.Y = 0.45; book.N = 0.56;
@@ -137,11 +144,13 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   const p6 = pb2.state.open.find(x => x.gammaId === 'g6');
   assert.strictEqual(p6.paid, 0.46, 'paper con el WS: llenó');
   assert.deepStrictEqual([p6.restAsk0, p6.restAsk400, p6.restFill], [0.45, 0.60, false]);
+  assert.deepStrictEqual([p6.restAsk200, p6.restFill200], [0.45, true], 'a +200 ms el REST todavía estaba en 0.45');
   pb2.onResolved('g6', 'UP', 'gamma');
   assert.strictEqual(pb2.state.w, 3);
   assert.deepStrictEqual([pb2.state.restNo.n, pb2.state.restNo.w], [1, 1]);
   assert.ok(Math.abs(pb2.state.restNo.pnl - expWin) < 1e-3);
   assert.ok(pb2.summary().includes('con el libro REST: +$8.52 (2-0); 1 llenadas que con REST no llenaban'), pb2.summary());
+  assert.ok(pb2.summary().includes('con el REST a +10ms: +$18.96 (4-0); 0 llenadas que con el REST a +10ms no llenaban, 1 que solo llenaba ese REST (desde '), pb2.summary());
   // 9) Estado guardado antes del contador: se arma con las cerradas
   const old = path.join(dir, 'viejo.json');
   fs.writeFileSync(old, JSON.stringify({ v: 1, startedAt: Date.now(), w: 1, l: 1, pnl: 1, recent: [{ restFill: false, win: true, pnl: 2 }, { restFill: true, win: false, pnl: -1 }] }));
@@ -149,6 +158,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.deepStrictEqual(pb3.state.restNo, { n: 1, w: 1, pnl: 2 });
   assert.deepStrictEqual(pb3.state.rest, { n: 1, w: 0, pnl: -1, only: 0 });
   assert.ok(pb3.summary().includes('con el libro REST: −$1.00 (0-1); 1 llenadas'), pb3.summary());
+  assert.deepStrictEqual([pb3.state.rest200.n, pb3.state.rest200.no, pb3.state.rest200Open], [0, 0, []], 'la cuenta del REST a +200 ms arranca en cero');
 
   // 10) Límite por precio justo (PAPER_B_LIMIT=fair, margen 2 pts): pAdj 0.595 → límite
   //     floor((0.575 − comisión(0.575))·100)/100 = 0.55; el ask sube a 0.52 en la demora y llena igual
@@ -162,6 +172,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   await pf.markets.get('g7').done;
   const p7 = pf.state.open[0];
   assert.deepStrictEqual([p7.limit, p7.size, p7.paid, p7.restFill, p7.restPaid], [0.55, 9, 0.52, true, 0.52]);
+  assert.deepStrictEqual([p7.restAsk200, p7.restPaid200], [0.45, 0.46], 'a +200 ms el REST estaba más barato');
   pf.onResolved('g7', 'UP', 'gamma');
   const exp7 = 9 * (1 - 0.52) - FEE * 0.52 * 0.48 * 9;
   assert.ok(Math.abs(pf.state.pnl - exp7) < 1e-3);
@@ -183,6 +194,8 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.ok(Math.abs(pf.state.rest.pnl - (exp7 + exp8)) < 1e-3);
   assert.ok(Math.abs(pf.state.pnl - exp7) < 1e-3, 'el P&L del paper no cambia');
   assert.ok(pf.summary().includes('0 llenadas que con REST no llenaban, 1 que solo llenaba el REST | límite fair'), pf.summary());
+  assert.deepStrictEqual([pf.state.rest200.n, pf.state.rest200.w, pf.state.rest200.only, pf.state.rest200Open.length], [2, 2, 1, 0]);
+  assert.ok(Math.abs(pf.state.rest200.pnl - 2 * exp8) < 1e-3, 'las dos a $0.46 con el REST a +200 ms');
 
   // 12) Precio viejo del WS con PAPER_B_REST_GUARD=on: el WS dice 0.45 pero el REST al decidir ya está
   //     en 0.60 → no entra; con el WS habría llenado a 0.46 y se anota aparte cómo habría salido
@@ -205,6 +218,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.deepStrictEqual([pg.state.phantom.w, pg.state.phantom.l, pg.state.phantomOpen.length], [0, 1, 0]);
   assert.ok(Math.abs(pg.state.phantom.pnl - exp9) < 1e-3);
   assert.deepStrictEqual([pg.state.pnl, pg.state.rest.n], [0, 0], 'no toca el P&L del paper ni el del REST');
+  assert.deepStrictEqual([pg.state.rest200.n, pg.state.rest200Open.length], [0, 0], 'ni el del REST a +200 ms');
   assert.ok(pg.summary().includes('precio viejo del WS al decidir (REST > WS + 2¢): 1, llenaban 1 (0-1 −$4.30), sin entrada'), pg.summary());
   // 13) Dentro de la tolerancia (REST 2¢ arriba del WS): entra normal
   book.Y = 0.45; rest.Y = 0.47;
@@ -215,7 +229,9 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   delete rest.Y;
   assert.strictEqual(pg.state.attempts, 1);
   assert.deepStrictEqual([pg.state.open[0].phantom, pg.state.open[0].restAsk0, pg.state.phantom.n], [false, 0.47, 1]);
+  assert.deepStrictEqual([pg.state.open[0].restAsk200, pg.state.open[0].restPaid200], [0.47, 0.47]);
   pg.onResolved('g10', 'UP', 'gamma');
+  assert.ok(Math.abs(pg.state.rest200.pnl - (9 * (1 - 0.47) - FEE * 0.47 * 0.53 * 9)) < 1e-3, 'paga lo que tenía el REST a +200 ms');
   // 14) Por defecto (sin PAPER_B_REST_GUARD) entra igual y se cuenta aparte
   const po = new PaperB({ polyWs, stateFile: path.join(dir, 'off.json'), env: { ...env, PAPER_B_LIMIT: 'fair' }, fetchFn: fakeFetch });
   book.Y = 0.45; rest.Y = 0.60;
@@ -231,8 +247,29 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.deepStrictEqual([po.state.phantom.n, po.state.phantom.filled, po.state.phantom.w], [1, 1, 1]);
   assert.ok(Math.abs(po.state.phantom.pnl - exp11) < 1e-3);
   assert.ok(po.summary().includes('llenaban 1 (1-0 +$4.70), entran igual'), po.summary());
+  assert.deepStrictEqual([po.state.rest200.n, po.state.rest200.no], [0, 1], 'el WS llenó y el REST a +200 ms (0.60) no');
+  assert.ok(po.summary().includes('con el REST a +10ms: +$0.00 (0-0); 1 llenadas que con el REST a +10ms no llenaban, 0 que solo llenaba ese REST'), po.summary());
   // Estado guardado antes del contador de precio viejo: arranca en cero
   assert.deepStrictEqual([pb3.state.phantom, pb3.state.phantomOpen], [{ n: 0, filled: 0, w: 0, l: 0, pnl: 0 }, []]);
+  // 15) Posición abierta de antes de la cuenta del REST a +200 ms: no cuenta en esa cuenta
+  const old2 = path.join(dir, 'viejo2.json');
+  fs.writeFileSync(old2, JSON.stringify({ v: 1, startedAt: Date.now(), open: [{ id: 'PB_viejo', gammaId: 'gv', side: 'UP', size: 10, paid: 0.46, endTs: Date.now(), market: 'viejo', restFill: true, restPaid: 0.46 }] }));
+  const pb4 = new PaperB({ polyWs, stateFile: old2, env, fetchFn: fakeFetch });
+  pb4.onResolved('gv', 'UP', 'gamma');
+  assert.deepStrictEqual([pb4.state.w, pb4.state.rest.n, pb4.state.rest200.n, pb4.state.rest200.no], [1, 1, 0, 0]);
+  // 16) Sin respuesta del REST: las dos cuentas con REST usan el precio del WS
+  const failFetch = async (url) => { if (new URL(url).pathname === '/book') throw new Error('fetch failed'); return fakeFetch(url); };
+  const pn = new PaperB({ polyWs, stateFile: path.join(dir, 'norest.json'), env, fetchFn: failFetch });
+  book.Y = 0.45;
+  const m12 = mkt('g12');
+  pn.onSample(m12, sample(150, 0.50));
+  pn.onSample(m12, sample(100, 0.65));
+  await pn.markets.get('g12').done;
+  const p12 = pn.state.open[0];
+  assert.deepStrictEqual([p12.restAsk0, p12.restFill, p12.restFill200, p12.paid], [null, null, null, 0.46]);
+  pn.onResolved('g12', 'UP', 'gamma');
+  assert.deepStrictEqual([pn.state.rest.n, pn.state.rest200.n, pn.state.rest200.no], [1, 1, 0]);
+  assert.ok(Math.abs(pn.state.rest200.pnl - expWin) < 1e-3, 'al precio del WS');
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 78 ok');
+  console.log('paper-b: 100 ok');
 })().catch(e => { console.error(e); process.exit(1); });

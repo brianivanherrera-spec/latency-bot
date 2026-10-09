@@ -532,11 +532,12 @@ if (require.main === module) (async () => {
       return { start: new Date(mk.start).toISOString(), side: f.side, ask: f.ask, ask2: f.ask2, price: f.price,
         secsLeft: mk.rows[f.i].sl, escaped: f.escaped, win: f.side === mk.winner, fairLimit: L, fairFill: (f.ask2 ?? f.ask) <= L + 1e-9 };
     }) };
-  // Doble filtro (regla actual de A según el gate anclado al entrar): todos, la parte de test (40 % más
-  // nuevo) y fuera de muestra desde que se planteó la hipótesis (DOBLE_DESDE)
-  const cuts = [envNum('FAIR_ANCHOR_EDGE', 0.03), bCfg.e], testFrom = test.length ? test[0].start : Infinity;
+  // Doble filtro (regla actual de A según el gate anclado al entrar): todos, la parte de test (el 40 % más
+  // nuevo de los mercados de la regla actual: todos caen dentro del test general) y fuera de muestra desde
+  // que se planteó la hipótesis (DOBLE_DESDE)
+  const cuts = [envNum('FAIR_ANCHOR_EDGE', 0.03), bCfg.e], liveTest = liveMk.slice(Math.floor(liveMk.length * 0.6));
   const dFrom = Date.parse(process.env.DOBLE_DESDE || '2026-10-09T12:33:00Z');
-  report.doubleGate = { all: anchorSplit(liveMk, cur, cuts), test: anchorSplit(liveMk.filter(m => m.start >= testFrom), cur, cuts),
+  report.doubleGate = { all: anchorSplit(liveMk, cur, cuts), test: anchorSplit(liveTest, cur, cuts), testMarkets: liveTest.length,
     from: new Date(dFrom).toISOString(), holdout: anchorSplit(liveMk.filter(m => m.start >= dFrom), cur, cuts) };
   // Tendencia de BTC de 2 h (hipótesis del análisis de pérdidas): se confirma solo con z ≥ 2
   const series = btcSeries(markets);
@@ -590,7 +591,7 @@ if (require.main === module) (async () => {
   { const d = report.doubleGate, [c0, c1] = d.all.cuts.map(c => Math.round(c * 100)), sd4 = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare}`;
     const ln = (lab, x) => `[BACKTEST-DOBLE] ${lab}: anclado ≥ ${c1} pts ${sd4(x.hi)} | ${c0}-${c1} pts ${sd4(x.mid)} | < ${c0} pts (no entraría) ${sd4(x.lo)}${x.noData ? ` | sin dato ${x.noData}` : ''} || con doble filtro (≥ ${c0}) ${sd4(x.agree)} z=${x.agree.z} P&L=$${x.agree.pnl} | las que saca (< ${c0}) P&L=$${x.disagree.pnl} | diferencia ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}`;
     console.log(ln(`regla actual de A (${liveMk.length} mercados) según la ventaja anclada de la regla de B al entrar`, d.all));
-    console.log(ln('test (40 % más nuevo)', d.test));
+    console.log(ln(`test (40 % más nuevo: ${d.testMarkets} mercados)`, d.test));
     console.log(ln(`fuera de muestra desde ${d.from.slice(0, 16)}`, d.holdout)); }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });
