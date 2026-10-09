@@ -7,7 +7,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { load, firstFire, entry, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, byDay } = require('../scripts/backtest');
+const { load, firstFire, entry, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay } = require('../scripts/backtest');
 
 const FEE = 0.072, fee = p => FEE * p * (1 - p);
 const S0 = Date.UTC(2026, 9, 8, 10, 0, 0);
@@ -41,6 +41,17 @@ function highMarket(start) {
     rows.push([t, 300 - t, up ? 0.77 : 0.5, 1, j ? 0.75 : 0.68, j ? 0.76 : 0.69, j ? 0.24 : 0.31, j ? 0.25 : 0.32, 50, 100000, 0, 0, null, null]);
   }
   return { start_ts: start, winner: 'UP', strike: 100000, cols, rows };
+}
+// Doble filtro: señal de A en UP y desde t=100 el libro queda en YES 0.69/0.70 (el ancla toma el modelo de ese
+// segundo). Sin pLate el modelo ya está en 0.85 al moverse el libro: ventaja anclada −2 pts. Con pLate el modelo
+// sube a pLate en t=150 sin que el libro se mueva: ventaja anclada = 0.695 + (pLate − 0.70) − 0.70 − comisión.
+function gateMarket(start, winner, { pLate = null, noBid = false } = {}) {
+  const rows = [];
+  for (let t = 0; t < 300; t++) {
+    const on = t >= 100, p = !on ? 0.5 : pLate != null ? (t >= 150 ? pLate : 0.70) : 0.85;
+    rows.push([t, 300 - t, p, 1, on ? (noBid ? null : 0.69) : 0.49, on ? 0.70 : 0.50, on ? 0.30 : 0.50, on ? 0.31 : 0.51, 50, 100000, on ? 1 : 0, 0, null, null]);
+  }
+  return { start_ts: start, winner, strike: 100000, cols, rows };
 }
 const mks = [
   anchoredMarket(S0 + 400 * MIN, true), anchoredMarket(S0 + 405 * MIN, false), highMarket(S0 + 410 * MIN),
@@ -117,6 +128,29 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   // Por día: las 5 entradas el mismo día UTC, 2 ganadas
   const d = byDay(markets, cur);
   assert.deepStrictEqual(d.map(x => [x.day, x.n, x.wins]), [['10-08', 5, 3]]);
+  // Doble filtro: dos con el anclado en contra (−2 pts: una gana y otra pierde), una con 7 pts, dos con 23 pts
+  // (gana y pierde) y una sin bid en el libro (sin ancla). Todas pagan $0.70 con 7 acciones.
+  const S1 = Date.UTC(2026, 9, 9, 10, 0, 0);
+  const gfile = path.join(dir, 'gate.jsonl');
+  fs.writeFileSync(gfile, [gateMarket(S1, 'UP'), gateMarket(S1 + 5 * MIN, 'DOWN'), gateMarket(S1 + 10 * MIN, 'UP', { pLate: 0.79 }),
+    gateMarket(S1 + 15 * MIN, 'UP', { pLate: 0.95 }), gateMarket(S1 + 20 * MIN, 'DOWN', { pLate: 0.95 }),
+    gateMarket(S1 + 25 * MIN, 'UP', { noBid: true })].map(m => JSON.stringify(m)).join('\n') + '\n');
+  const gm = await load(gfile);
+  assert.deepStrictEqual(gm.map(m => { const x = entry(m, cur); return x && [x.side, x.price, m.rows[x.i].sl]; }),
+    [['UP', 0.70, 200], ['UP', 0.70, 200], ['UP', 0.70, 150], ['UP', 0.70, 150], ['UP', 0.70, 150], ['UP', 0.70, 200]]);
+  const ds = anchorSplit(gm, cur);
+  assert.deepStrictEqual(ds.cuts, [0.03, 0.08]);
+  assert.deepStrictEqual([ds.lo.n, ds.lo.wr, ds.mid.n, ds.mid.wr, ds.hi.n, ds.hi.wr, ds.noData], [2, 0.5, 1, 1, 2, 0.5, 1]);
+  const win = (1 - 0.70) - fee(0.70), loss = -0.70 - fee(0.70);
+  assert.deepStrictEqual([ds.agree.n, ds.agree.wr, ds.disagree.n], [3, 0.667, 2]);
+  assert.strictEqual(ds.agree.evPerShare, +((2 * win + loss) / 3).toFixed(4));
+  assert.strictEqual(ds.agree.pnl, +(7 * (2 * win + loss)).toFixed(2));
+  assert.strictEqual(ds.disagree.pnl, +(7 * (win + loss)).toFixed(2));
+  assert.strictEqual(ds.diff, +((2 * win + loss) / 3 - (win + loss) / 2).toFixed(4), 'con doble filtro − las que saca');
+  assert.ok(ds.zDiff > 0);
+  // Cortes 8/20 pts: la de 7 pts pasa a "en contra"
+  const d20 = anchorSplit(gm, cur, [0.08, 0.20]);
+  assert.deepStrictEqual([d20.lo.n, d20.mid.n, d20.hi.n, d20.agree.n], [3, 0, 2, 2]);
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-trend: 36 ok');
+  console.log('backtest-trend: 46 ok');
 })().catch(err => { console.error(err); process.exit(1); });

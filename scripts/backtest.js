@@ -173,20 +173,45 @@ function trendSplit(population, cfg, series, thr = 0.1, horizonMs = 7200000) {
     const ps = (win ? 1 - e.price : -e.price) - fee(e.price);
     (tr > thr ? g.fav : tr < -thr ? g.against : g.neu).push({ win, price: e.price, ps });
   }
-  const stat = a => {
-    const n = a.length, w = a.filter(x => x.win).length, exp = a.reduce((s, x) => s + x.price, 0);
-    const varr = a.reduce((s, x) => s + x.price * (1 - x.price), 0);
-    return { n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(a.reduce((s, x) => s + x.ps, 0) / n).toFixed(4) : null,
-      z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
-  };
-  const mv = a => { const n = a.length, m = a.reduce((s, x) => s + x.ps, 0) / n;
-    return { n, m, v: n > 1 ? a.reduce((s, x) => s + (x.ps - m) ** 2, 0) / (n - 1) : 0 }; };
-  let diff = null, zDiff = null;
-  if (g.fav.length >= 2 && g.against.length >= 2) {
-    const f = mv(g.fav), a = mv(g.against), se = Math.sqrt(f.v / f.n + a.v / a.n);
-    diff = +(f.m - a.m).toFixed(4); zDiff = se ? +((f.m - a.m) / se).toFixed(2) : null;
+  return { fav: groupStat(g.fav), neu: groupStat(g.neu), against: groupStat(g.against), noData, ...diffOf(g.fav, g.against) };
+}
+
+// Grupo de entradas ({ win, price, ps }): n, acierto, EV por acción y z del acierto contra el precio pagado
+function groupStat(a) {
+  const n = a.length, w = a.filter(x => x.win).length, exp = a.reduce((s, x) => s + x.price, 0);
+  const varr = a.reduce((s, x) => s + x.price * (1 - x.price), 0);
+  return { n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(a.reduce((s, x) => s + x.ps, 0) / n).toFixed(4) : null,
+    z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
+}
+// Diferencia de EV por acción entre dos grupos y su z (Welch); sin dato con menos de 2 entradas en alguno
+function diffOf(a, b) {
+  if (a.length < 2 || b.length < 2) return { diff: null, zDiff: null };
+  const mv = x => { const n = x.length, m = x.reduce((s, y) => s + y.ps, 0) / n;
+    return { n, m, v: x.reduce((s, y) => s + (y.ps - m) ** 2, 0) / (n - 1) }; };
+  const f = mv(a), g = mv(b), se = Math.sqrt(f.v / f.n + g.v / g.n);
+  return { diff: +(f.m - g.m).toFixed(4), zDiff: se ? +((f.m - g.m) / se).toFixed(2) : null };
+}
+
+// Doble filtro: las entradas de una regla (la actual de A) separadas por la ventaja anclada (la de la
+// regla de B: precio justo anclado − ask − comisión) en el segundo de la entrada. En vivo [GATE-SOMBRA]
+// marca "anclado: no" debajo de FAIR_ANCHOR_EDGE (3 pts) y B entra desde 8 pts. Hipótesis del 09/10: la
+// pérdida de A de las 11:57 UTC entró con el anclado en −2.8 pts; si las de A con el anclado en contra
+// rinden mucho peor, exigir los dos filtros sacaría perdedoras.
+function anchorSplit(population, cfg, cuts = [0.03, 0.08]) {
+  const g = { lo: [], mid: [], hi: [] };
+  let noData = 0;
+  for (const mk of population) {
+    const e = entry(mk, cfg);
+    if (!e) continue;
+    const r = mk.rows[e.i], ask = e.side === 'UP' ? r.ya : r.na;
+    if (r.pAdj == null || ask == null) { noData++; continue; }
+    const edge = (e.side === 'UP' ? r.pAdj : 1 - r.pAdj) - ask - fee(ask);
+    const win = e.side === mk.winner, ps = (win ? 1 - e.price : -e.price) - fee(e.price);
+    (edge >= cuts[1] - 1e-9 ? g.hi : edge >= cuts[0] - 1e-9 ? g.mid : g.lo).push({ win, price: e.price, ps, pnl: Math.floor(STAKE / e.price) * ps });
   }
-  return { fav: stat(g.fav), neu: stat(g.neu), against: stat(g.against), noData, diff, zDiff };
+  const agree = [...g.mid, ...g.hi], pnl = a => +a.reduce((s, x) => s + x.pnl, 0).toFixed(2);
+  return { cuts, lo: groupStat(g.lo), mid: groupStat(g.mid), hi: groupStat(g.hi), noData,
+    agree: { ...groupStat(agree), pnl: pnl(agree) }, disagree: { ...groupStat(g.lo), pnl: pnl(g.lo) }, ...diffOf(agree, g.lo) };
 }
 
 // Regla con límite de precio (como B en vivo: límite = ask al decidir + buffer): llena solo si el ask
@@ -392,7 +417,7 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-module.exports = { load, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, byDay };
+module.exports = { load, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay };
 if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
@@ -507,6 +532,12 @@ if (require.main === module) (async () => {
       return { start: new Date(mk.start).toISOString(), side: f.side, ask: f.ask, ask2: f.ask2, price: f.price,
         secsLeft: mk.rows[f.i].sl, escaped: f.escaped, win: f.side === mk.winner, fairLimit: L, fairFill: (f.ask2 ?? f.ask) <= L + 1e-9 };
     }) };
+  // Doble filtro (regla actual de A según el gate anclado al entrar): todos, la parte de test (40 % más
+  // nuevo) y fuera de muestra desde que se planteó la hipótesis (DOBLE_DESDE)
+  const cuts = [envNum('FAIR_ANCHOR_EDGE', 0.03), bCfg.e], testFrom = test.length ? test[0].start : Infinity;
+  const dFrom = Date.parse(process.env.DOBLE_DESDE || '2026-10-09T12:33:00Z');
+  report.doubleGate = { all: anchorSplit(liveMk, cur, cuts), test: anchorSplit(liveMk.filter(m => m.start >= testFrom), cur, cuts),
+    from: new Date(dFrom).toISOString(), holdout: anchorSplit(liveMk.filter(m => m.start >= dFrom), cur, cuts) };
   // Tendencia de BTC de 2 h (hipótesis del análisis de pérdidas): se confirma solo con z ≥ 2
   const series = btcSeries(markets);
   report.trend2h = {
@@ -556,5 +587,10 @@ if (require.main === module) (async () => {
     console.log(ln('primera señal 240-10 s $0.50-0.85', t.firstSignal));
     console.log(ln(`anclada de la cuenta B (${markets.length} mercados)`, t.anchoredB));
     console.log(ln(`modelo FAIR sin señal (${markets.length} mercados, 240-10 s, $0.59-0.79, e≥8)`, t.fairBase)); }
+  { const d = report.doubleGate, [c0, c1] = d.all.cuts.map(c => Math.round(c * 100)), sd4 = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare}`;
+    const ln = (lab, x) => `[BACKTEST-DOBLE] ${lab}: anclado ≥ ${c1} pts ${sd4(x.hi)} | ${c0}-${c1} pts ${sd4(x.mid)} | < ${c0} pts (no entraría) ${sd4(x.lo)}${x.noData ? ` | sin dato ${x.noData}` : ''} || con doble filtro (≥ ${c0}) ${sd4(x.agree)} z=${x.agree.z} P&L=$${x.agree.pnl} | las que saca (< ${c0}) P&L=$${x.disagree.pnl} | diferencia ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}`;
+    console.log(ln(`regla actual de A (${liveMk.length} mercados) según la ventaja anclada de la regla de B al entrar`, d.all));
+    console.log(ln('test (40 % más nuevo)', d.test));
+    console.log(ln(`fuera de muestra desde ${d.from.slice(0, 16)}`, d.holdout)); }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });
