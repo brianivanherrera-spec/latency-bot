@@ -184,40 +184,40 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.ok(Math.abs(pf.state.pnl - exp7) < 1e-3, 'el P&L del paper no cambia');
   assert.ok(pf.summary().includes('0 llenadas que con REST no llenaban, 1 que solo llenaba el REST | límite fair'), pf.summary());
 
-  // 12) Precio viejo del WS (PAPER_B_REST_GUARD, por defecto on): el WS dice 0.45 pero el REST al decidir
-  //     ya está en 0.60 → no entra; con el WS habría llenado a 0.46 y se anota aparte cómo habría salido
-  assert.ok(pf.describe().includes('no entra si el REST al decidir está más de 2¢ arriba del WS'), pf.describe());
+  // 12) Precio viejo del WS con PAPER_B_REST_GUARD=on: el WS dice 0.45 pero el REST al decidir ya está
+  //     en 0.60 → no entra; con el WS habría llenado a 0.46 y se anota aparte cómo habría salido
+  assert.ok(pf.describe().includes('precio viejo del WS (REST al decidir más de 2¢ arriba): solo se mide'), pf.describe());
+  const pg = new PaperB({ polyWs, stateFile: path.join(dir, 'guard.json'), env: { ...env, PAPER_B_LIMIT: 'fair', PAPER_B_REST_GUARD: 'on' }, fetchFn: fakeFetch });
+  assert.ok(pg.describe().includes('no entra si el REST al decidir está más de 2¢ arriba del WS'), pg.describe());
   book.Y = 0.45; rest.Y = 0.60;
   const m9 = mkt('g9');
-  pf.onSample(m9, sample(150, 0.50));
-  pf.onSample(m9, sample(100, 0.65));
-  await pf.markets.get('g9').done;
+  pg.onSample(m9, sample(150, 0.50));
+  pg.onSample(m9, sample(100, 0.65));
+  await pg.markets.get('g9').done;
   delete rest.Y;
-  assert.strictEqual(pf.state.attempts, 2, 'no cuenta como intento');
-  assert.deepStrictEqual([pf.state.open.length, pf.state.restOpen.length, pf.state.phantomOpen.length], [0, 0, 1]);
-  const p9 = pf.state.phantomOpen[0];
+  assert.strictEqual(pg.state.attempts, 0, 'no cuenta como intento');
+  assert.deepStrictEqual([pg.state.open.length, pg.state.restOpen.length, pg.state.phantomOpen.length], [0, 0, 1]);
+  const p9 = pg.state.phantomOpen[0];
   assert.deepStrictEqual([p9.phantom, p9.restAsk0, p9.paid, p9.size], [true, 0.60, 0.46, 9]);
-  assert.deepStrictEqual(pf.state.phantom, { n: 1, filled: 1, w: 0, l: 0, pnl: 0 });
-  pf.onResolved('g9', 'DOWN', 'gamma');
+  assert.deepStrictEqual(pg.state.phantom, { n: 1, filled: 1, w: 0, l: 0, pnl: 0 });
+  pg.onResolved('g9', 'DOWN', 'gamma');
   const exp9 = -9 * 0.46 - FEE * 0.46 * 0.54 * 9;
-  assert.deepStrictEqual([pf.state.phantom.w, pf.state.phantom.l, pf.state.phantomOpen.length], [0, 1, 0]);
-  assert.ok(Math.abs(pf.state.phantom.pnl - exp9) < 1e-3);
-  assert.ok(Math.abs(pf.state.pnl - exp7) < 1e-3, 'no toca el P&L del paper');
-  assert.ok(Math.abs(pf.state.rest.pnl - (exp7 + exp8)) < 1e-3, 'ni el P&L con REST');
-  assert.ok(pf.summary().includes('precio viejo del WS al decidir (REST > WS + 2¢): 1, llenaban 1 (0-1 −$4.30), sin entrada'), pf.summary());
+  assert.deepStrictEqual([pg.state.phantom.w, pg.state.phantom.l, pg.state.phantomOpen.length], [0, 1, 0]);
+  assert.ok(Math.abs(pg.state.phantom.pnl - exp9) < 1e-3);
+  assert.deepStrictEqual([pg.state.pnl, pg.state.rest.n], [0, 0], 'no toca el P&L del paper ni el del REST');
+  assert.ok(pg.summary().includes('precio viejo del WS al decidir (REST > WS + 2¢): 1, llenaban 1 (0-1 −$4.30), sin entrada'), pg.summary());
   // 13) Dentro de la tolerancia (REST 2¢ arriba del WS): entra normal
   book.Y = 0.45; rest.Y = 0.47;
   const m10 = mkt('g10');
-  pf.onSample(m10, sample(150, 0.50));
-  pf.onSample(m10, sample(100, 0.65));
-  await pf.markets.get('g10').done;
+  pg.onSample(m10, sample(150, 0.50));
+  pg.onSample(m10, sample(100, 0.65));
+  await pg.markets.get('g10').done;
   delete rest.Y;
-  assert.strictEqual(pf.state.attempts, 3);
-  assert.deepStrictEqual([pf.state.open[0].phantom, pf.state.open[0].restAsk0, pf.state.phantom.n], [false, 0.47, 1]);
-  pf.onResolved('g10', 'UP', 'gamma');
-  // 14) Con PAPER_B_REST_GUARD=off entra igual y se cuenta aparte
-  const po = new PaperB({ polyWs, stateFile: path.join(dir, 'off.json'), env: { ...env, PAPER_B_LIMIT: 'fair', PAPER_B_REST_GUARD: 'off' }, fetchFn: fakeFetch });
-  assert.ok(!po.describe().includes('no entra si el REST'), po.describe());
+  assert.strictEqual(pg.state.attempts, 1);
+  assert.deepStrictEqual([pg.state.open[0].phantom, pg.state.open[0].restAsk0, pg.state.phantom.n], [false, 0.47, 1]);
+  pg.onResolved('g10', 'UP', 'gamma');
+  // 14) Por defecto (sin PAPER_B_REST_GUARD) entra igual y se cuenta aparte
+  const po = new PaperB({ polyWs, stateFile: path.join(dir, 'off.json'), env: { ...env, PAPER_B_LIMIT: 'fair' }, fetchFn: fakeFetch });
   book.Y = 0.45; rest.Y = 0.60;
   const m11 = mkt('g11');
   po.onSample(m11, sample(150, 0.50));
@@ -234,5 +234,5 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   // Estado guardado antes del contador de precio viejo: arranca en cero
   assert.deepStrictEqual([pb3.state.phantom, pb3.state.phantomOpen], [{ n: 0, filled: 0, w: 0, l: 0, pnl: 0 }, []]);
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 79 ok');
+  console.log('paper-b: 78 ok');
 })().catch(e => { console.error(e); process.exit(1); });

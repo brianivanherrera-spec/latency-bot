@@ -23,10 +23,10 @@
  * el balance suma la cuenta "con el libro REST": las llenadas al precio del REST, sin las que según el REST
  * no llenaban y con las que solo llenaba el REST. Límite de la orden: PAPER_B_LIMIT=buffer (ask + buffer)
  * o fair (hasta donde queda PAPER_B_LIMIT_MARGIN de ventaja contra el precio justo anclado).
- * Precio viejo del WS (PAPER_B_REST_GUARD, por defecto on): si el libro REST pedido al decidir ya tiene el
- * ask más de PAPER_B_REST_GUARD_TOL (2¢) arriba del WS, el disparo salió de un libro atrasado (con el libro
- * real el ancla se reinicia y no queda ventaja) y no se manda la orden; igual se anota cómo habría salido
- * (en vivo el chequeo suma lo que tarda el REST, ~40 ms). Con off entra igual y solo se cuenta aparte.
+ * Precio viejo del WS: si el libro REST pedido al decidir ya tiene el ask más de PAPER_B_REST_GUARD_TOL (2¢)
+ * arriba del WS, el disparo salió de un libro atrasado. Por defecto solo se mide (entra igual y se cuenta
+ * aparte: el backtest no muestra que esas entradas pierdan); con PAPER_B_REST_GUARD=on no se manda la orden
+ * y se anota cómo habría salido (en vivo el chequeo sumaría lo que tarda el REST, ~40 ms).
  */
 'use strict';
 const fs = require('fs');
@@ -55,8 +55,8 @@ class PaperB {
       // Límite de la orden: 'buffer' = ask + ORDER_LIMIT_BUFFER; 'fair' = paga hasta donde todavía queda
       // PAPER_B_LIMIT_MARGIN de ventaja contra el precio justo anclado (neta de comisión). Tope en los dos: max + 2¢
       limitMode: env.PAPER_B_LIMIT === 'fair' ? 'fair' : 'buffer', margin: num(env.PAPER_B_LIMIT_MARGIN, 0.02),
-      // Precio viejo del WS: no entrar si el REST al decidir tiene el ask más de restGuardTol arriba del WS
-      restGuard: env.PAPER_B_REST_GUARD !== 'off', restGuardTol: num(env.PAPER_B_REST_GUARD_TOL, 0.02),
+      // Precio viejo del WS (REST al decidir con el ask más de restGuardTol arriba del WS): on = no entra; por defecto solo se mide
+      restGuard: env.PAPER_B_REST_GUARD === 'on', restGuardTol: num(env.PAPER_B_REST_GUARD_TOL, 0.02),
     };
     c.checkMs = Math.min(c.delayMs, Math.max(0, num(env.PAPER_CHECK_MS, 200)));
     c.cap = round2(c.hi + 0.02);
@@ -73,7 +73,8 @@ class PaperB {
   describe() {
     const c = this.cfg;
     const lim = c.limitMode === 'fair' ? `límite = precio justo − comisión − ${Math.round(c.margin * 100)} pts` : `límite = ask + ${Math.round(c.buffer * 100)}¢`;
-    const guard = c.restGuard && this.restCheck ? `; no entra si el REST al decidir está más de ${Math.round(c.restGuardTol * 100)}¢ arriba del WS` : '';
+    const tol = Math.round(c.restGuardTol * 100);
+    const guard = !this.restCheck ? '' : c.restGuard ? `; no entra si el REST al decidir está más de ${tol}¢ arriba del WS` : `; precio viejo del WS (REST al decidir más de ${tol}¢ arriba): solo se mide`;
     return `regla anclada: ventaja ≥ ${Math.round(c.edge * 100)} pts neta de comisión, ask $${c.lo.toFixed(2)}-$${c.hi.toFixed(2)}, ${c.tMax}-${c.tMin} s restantes, $${c.stake} por operación (${lim}, tope $${c.cap.toFixed(2)}), fill a +${c.delayMs} ms (registro a +${c.checkMs} ms)${guard}`;
   }
 
@@ -192,7 +193,7 @@ class PaperB {
         if (!filled) S.restOpen.push(pos);
       }
       this._save();
-      logger.info(`[PAPER-B] REST: al decidir ask ${px(pos.restAsk0)} (WS ${px(ask)}${pos.restMs0 != null ? `; respuesta en ${pos.restMs0} ms` : ''}) | a +${c.delayMs}ms ${px(pos.restAsk400)} (WS ${px(b400.ask)}), ${sz ?? 'n/a'} acciones hasta $${limit} → con REST ${pos.restFill == null ? 'sin dato' : pos.restFill ? `llenaba a $${pos.restPaid}` : 'no llenaba'} (paper: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms${phantom ? ' | precio viejo del WS al decidir: entró igual (PAPER_B_REST_GUARD=off)' : ''}`);
+      logger.info(`[PAPER-B] REST: al decidir ask ${px(pos.restAsk0)} (WS ${px(ask)}${pos.restMs0 != null ? `; respuesta en ${pos.restMs0} ms` : ''}) | a +${c.delayMs}ms ${px(pos.restAsk400)} (WS ${px(b400.ask)}), ${sz ?? 'n/a'} acciones hasta $${limit} → con REST ${pos.restFill == null ? 'sin dato' : pos.restFill ? `llenaba a $${pos.restPaid}` : 'no llenaba'} (paper: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms${phantom ? ' | PRECIO VIEJO del WS al decidir: entró igual (se cuenta aparte)' : ''}`);
     }
     return pos;
   }
