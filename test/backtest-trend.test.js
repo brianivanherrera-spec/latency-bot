@@ -93,6 +93,9 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const h80 = fairLimitExec([mHi], bCfg, 0.02, 0.80);
   assert.deepStrictEqual([h80.n, h80.wr, h80.evPerShare, h80.miss.n], [1, 1, evHi, 0]);
   assert.strictEqual(h80.pnl, +(Math.floor(5 / 0.80) * ((1 - 0.76) - fee(0.76))).toFixed(2), 'acciones = floor($5 / tope)');
+  // Llenadas con el ask subiendo ≥ 3¢ en 1 s (el mercado ya se movía al disparar)
+  assert.deepStrictEqual(fl.jump, { n: 0, wr: null, evPerShare: null }, 'la llenada de mOk fue sin salto del ask');
+  assert.deepStrictEqual(h80.jump, { n: 1, wr: 1, evPerShare: evHi }, 'llenó con el ask 7¢ más arriba 1 s después');
   assert.strictEqual(markets[0].btcOpen, 100000);
   assert.strictEqual(markets[4].btcOpen, 100300);
   const series = btcSeries(markets);
@@ -115,5 +118,5 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const d = byDay(markets, cur);
   assert.deepStrictEqual(d.map(x => [x.day, x.n, x.wins]), [['10-08', 5, 3]]);
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-trend: 34 ok');
+  console.log('backtest-trend: 36 ok');
 })().catch(err => { console.error(err); process.exit(1); });
