@@ -28,6 +28,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Logger } = require('./logger');
+const { marketLabel } = require('./market-label');
 const { fetchRestBook, restSizeUpTo, restVwapUpTo } = require('./book-check');
 const logger = new Logger('PAPER-B');
 
@@ -83,7 +84,7 @@ class PaperB {
     let st = this.markets.get(m.gammaId);
     if (!st) {
       this._reportLast();
-      st = { anchor: null, tried: false, market: String(m.question || '').slice(-22), inWin: 0, withData: 0, best: null };
+      st = { anchor: null, tried: false, market: marketLabel(m.question), inWin: 0, withData: 0, best: null };
       this.markets.set(m.gammaId, st);
       this._last = st;
       if (this.markets.size > 20) this.markets.delete(this.markets.keys().next().value);
@@ -146,7 +147,7 @@ class PaperB {
     }
     const S = this.state;
     const pos = {
-      id: `PB_${Date.now()}`, gammaId: m.gammaId, market: String(m.question || '').slice(-22), endTs: m.endTs,
+      id: `PB_${Date.now()}`, gammaId: m.gammaId, market: marketLabel(m.question), endTs: m.endTs,
       side, t: Date.now(), secsLeft: Math.round(T), ask, pa: +pa.toFixed(4), edge: +edge.toFixed(4),
       limit, size, ask200: b200.ask, ask400: b400.ask, fill200: fills(b200), filled, paid,
     };

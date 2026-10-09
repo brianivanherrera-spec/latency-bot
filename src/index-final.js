@@ -20,6 +20,7 @@ const { PnLTracker } = require('./tracker');
 const { Logger } = require('./logger');
 const loopMonitor = require('./loop-monitor');
 const { fetchRestBook, restSizeUpTo } = require('./book-check');
+const { marketLabel } = require('./market-label');
 const config = require('./config');
 const { randomUUID } = require('crypto');
 const crypto = require('crypto');
@@ -1152,7 +1153,7 @@ async function main() {
       const f2 = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
       const diff = strike != null && m.binance_at_open != null ? m.binance_at_open - strike : null;
       const origin = source === 'chainlink_twap' ? ` (${m.strike_twap_origin})` : '';
-      const msg = `[STRIKE] ${m.question?.slice(-22) || ''} | strike_source=${source}${origin} | strike TWAP=${f2(m.strike_twap)} | Binance@apertura=${f2(m.binance_at_open)} | diferencia=${diff == null ? 'n/a' : (diff >= 0 ? '+' : '') + diff.toFixed(2)} | base BN−CL=${f2(m.strike_basis)} | strike=${f2(strike)} | espera=${((Date.now() - t0) / 1000).toFixed(1)}s`;
+      const msg = `[STRIKE] ${marketLabel(m.question)} | strike_source=${source}${origin} | strike TWAP=${f2(m.strike_twap)} | Binance@apertura=${f2(m.binance_at_open)} | diferencia=${diff == null ? 'n/a' : (diff >= 0 ? '+' : '') + diff.toFixed(2)} | base BN−CL=${f2(m.strike_basis)} | strike=${f2(strike)} | espera=${((Date.now() - t0) / 1000).toFixed(1)}s`;
       if (source === 'chainlink_twap') logger.info(msg); else logger.warn(msg);
       if (cachedMarket === m) {
         const btcNow = btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null;
@@ -1292,7 +1293,7 @@ async function main() {
         if (rtS != null && rtC != null) parts.push(`RTDS-TWAP60 ${fmtRes(rtS, rtC)}`);
         if (clS != null && clC != null) parts.push(`CL spot ${fmtRes(clS, clC)}`);
         if (bnS && bnC) parts.push(`BN−base ${fmtRes(bnS, bnVsStrike(mkt, bnC))} (aprox., strike ${mkt.strike_source || 'n/a'})`);
-        const label = mkt.question?.slice(-22) || '';
+        const label = marketLabel(mkt.question);
         if (parts.length) logger.info(`[MARKET-RESULT] ${label} | ${parts.join(' | ')}`);
         // Precio de referencia oficial de Polymarket, cuando ya resolvió
         setTimeout(() => {
@@ -1722,7 +1723,7 @@ async function main() {
     }, null);
     const rec = { market: mkt.question || null, start_ms: mkt.startTime, outcome, strike_twap: twS, close_twap: twC, snaps: mkt._openSnaps };
     try { fs.appendFileSync(OPEN_SNAPS_FILE, JSON.stringify(rec) + '\n'); } catch (e) { logger.warn(`[OPEN-SNAP] no se pudo guardar: ${e.message}`); }
-    logger.info(`[OPEN-RESULT] ${(mkt.question || '').slice(-22)} | resultado=${outcome ?? 'n/a'} | mayor edge en apertura: ${best ? `${best.side} ${best.edge} (+${best.t}s) → ${best.side === outcome ? 'GANA' : 'PIERDE'}` : 'n/a'}`);
+    logger.info(`[OPEN-RESULT] ${marketLabel(mkt.question)} | resultado=${outcome ?? 'n/a'} | mayor edge en apertura: ${best ? `${best.side} ${best.edge} (+${best.t}s) → ${best.side === outcome ? 'GANA' : 'PIERDE'}` : 'n/a'}`);
   };
 
   // Guardar señal en el log del mercado actual
