@@ -32,8 +32,18 @@ function anchoredMarket(start, jump) {
   }
   return { start_ts: start, winner: 'UP', strike: 100000, cols, rows };
 }
+// Ventaja grande con el ask cerca del tope: YES quieto 0.68/0.69 y a 100 s del cierre el modelo sube 27 pts
+// (precio justo anclado 0.955); un segundo después el ask de YES salta a 0.76, arriba del tope de $0.72 de B
+function highMarket(start) {
+  const rows = [];
+  for (let t = 0; t < 300; t++) {
+    const up = t >= 200, j = t >= 201;
+    rows.push([t, 300 - t, up ? 0.77 : 0.5, 1, j ? 0.75 : 0.68, j ? 0.76 : 0.69, j ? 0.24 : 0.31, j ? 0.25 : 0.32, 50, 100000, 0, 0, null, null]);
+  }
+  return { start_ts: start, winner: 'UP', strike: 100000, cols, rows };
+}
 const mks = [
-  anchoredMarket(S0 + 400 * MIN, true), anchoredMarket(S0 + 405 * MIN, false),
+  anchoredMarket(S0 + 400 * MIN, true), anchoredMarket(S0 + 405 * MIN, false), highMarket(S0 + 410 * MIN),
   // referencias 2 h antes (sin señal), BTC 100.000
   ...[0, 1, 2, 3].map(k => market(S0 + k * 5 * MIN, 100000, 'UP', false)),
   // a favor: BTC +0.3 % en 2 h y el bot compra UP → gana
@@ -49,10 +59,10 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
 
 (async () => {
   const markets = await load(file);
-  assert.strictEqual(markets.length, 11);
+  assert.strictEqual(markets.length, 12);
   // Regla anclada (cuenta B): el primer disparo se escapa en 1 s → sin entrada; sin salto, entra a $0.50
   const bCfg = { kind: 'anchored', e: 0.08, lo: 0.30, hi: 0.70, tMax: 120, tMin: 30 };
-  const [mEsc, mOk] = markets.slice(-2);
+  const [mEsc, mOk, mHi] = markets.slice(-3);
   const f = firstFire(mEsc, bCfg);
   assert.deepStrictEqual([f.side, f.ask, f.ask2, f.price, f.escaped, mEsc.rows[f.i].sl], ['UP', 0.50, 0.80, 0.80, true, 100]);
   assert.strictEqual(entry(mEsc, bCfg), null, 'precio escapado: sin entrada');
@@ -69,6 +79,20 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const fl = fairLimitExec([mEsc, mOk], bCfg, 0.02);
   assert.deepStrictEqual([fl.fires, fl.n, fl.wr], [2, 1, 1]);
   assert.strictEqual(fl.pnl, +(Math.floor(5 / 0.60) * ((1 - 0.50) - fee(0.50))).toFixed(2), 'acciones = floor($5 / límite)');
+  // La que no llenó (saltó a 0.80) era ganadora: valuada a $0.80
+  assert.deepStrictEqual(fl.miss, { n: 1, wr: 1, evPerShare: +((1 - 0.80) - fee(0.80)).toFixed(4) });
+  // Tope: con ventaja grande (justo 0.955 → límite 0.93) el tope de $0.72 corta; con tope $0.80/$0.90 llena a $0.76
+  const fh = firstFire(mHi, bCfg);
+  assert.deepStrictEqual([fh.side, fh.ask, fh.ask2, fh.escaped], ['UP', 0.69, 0.76, true]);
+  assert.strictEqual(fairLimitOf(fh, mHi, bCfg, 0.02), 0.72);
+  assert.strictEqual(fairLimitOf(fh, mHi, bCfg, 0.02, 0.80), 0.80);
+  assert.strictEqual(fairLimitOf(fh, mHi, bCfg, 0.02, 0.90), 0.90);
+  const evHi = +((1 - 0.76) - fee(0.76)).toFixed(4);
+  const h72 = fairLimitExec([mHi], bCfg, 0.02);
+  assert.deepStrictEqual([h72.n, h72.miss.n, h72.miss.wr, h72.miss.evPerShare], [0, 1, 1, evHi]);
+  const h80 = fairLimitExec([mHi], bCfg, 0.02, 0.80);
+  assert.deepStrictEqual([h80.n, h80.wr, h80.evPerShare, h80.miss.n], [1, 1, evHi, 0]);
+  assert.strictEqual(h80.pnl, +(Math.floor(5 / 0.80) * ((1 - 0.76) - fee(0.76))).toFixed(2), 'acciones = floor($5 / tope)');
   assert.strictEqual(markets[0].btcOpen, 100000);
   assert.strictEqual(markets[4].btcOpen, 100300);
   const series = btcSeries(markets);
@@ -91,5 +115,5 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const d = byDay(markets, cur);
   assert.deepStrictEqual(d.map(x => [x.day, x.n, x.wins]), [['10-08', 5, 3]]);
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-trend: 26 ok');
+  console.log('backtest-trend: 34 ok');
 })().catch(err => { console.error(err); process.exit(1); });

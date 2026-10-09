@@ -210,27 +210,33 @@ function limitExec(markets, cfg, buffer) {
 
 // Límite por precio justo (B con PAPER_B_LIMIT=fair): el precio más alto con el que todavía quedan `margin`
 // pts de ventaja contra el precio justo anclado del disparo, neto de comisión (al centavo, hacia abajo),
-// entre ask + 1¢ y el tope (máximo del rango + 2¢). Llena si el ask 1 s después sigue ≤ límite y paga
-// max(ask, ask 1 s después); acciones = floor($5 / límite), como en vivo.
-function fairLimitOf(f, mk, cfg, margin) {
+// entre ask + 1¢ y el tope (por defecto, máximo del rango + 2¢, como en vivo). Llena si el ask 1 s después
+// sigue ≤ límite y paga max(ask, ask 1 s después); acciones = floor($5 / límite), como en vivo.
+function fairLimitOf(f, mk, cfg, margin, cap = cfg.hi + 0.02) {
   const r = mk.rows[f.i], pa = f.side === 'UP' ? r.pAdj : 1 - r.pAdj, l0 = pa - margin;
   const L = Math.floor((l0 - fee(Math.min(0.99, Math.max(0.01, l0)))) * 100 + 1e-9) / 100;
-  return Math.max(+(f.ask + 0.01).toFixed(2), Math.min(+(cfg.hi + 0.02).toFixed(2), L));
+  return Math.max(+(f.ask + 0.01).toFixed(2), Math.min(+cap.toFixed(2), L));
 }
-function fairLimitExec(markets, cfg, margin) {
-  let fires = 0, n = 0, w = 0, ps = 0, pnl = 0, exp = 0, varr = 0;
+// miss: los disparos que el límite no llena, valuados al precio de 1 s después (si < $0.99): si salen
+// mucho mejor que los llenados, el límite deja pasar sobre todo ganadoras (selección adversa)
+function fairLimitExec(markets, cfg, margin, cap) {
+  let fires = 0, n = 0, w = 0, ps = 0, pnl = 0, exp = 0, varr = 0, mn = 0, mw = 0, mps = 0;
   for (const mk of markets) {
     const f = firstFire(mk, cfg);
     if (!f) continue;
     fires++;
-    const L = fairLimitOf(f, mk, cfg, margin), a2 = f.ask2 ?? f.ask;
-    if (a2 > L + 1e-9) continue;
+    const L = fairLimitOf(f, mk, cfg, margin, cap), a2 = f.ask2 ?? f.ask;
     const price = Math.max(f.ask, a2), win = f.side === mk.winner;
     const x = (win ? 1 - price : -price) - fee(price);
+    if (a2 > L + 1e-9) {
+      if (price < 0.99) { mn++; if (win) mw++; mps += x; }
+      continue;
+    }
     n++; if (win) w++; ps += x; pnl += Math.floor(STAKE / L) * x; exp += price; varr += price * (1 - price);
   }
   return { fires, n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(ps / n).toFixed(4) : null,
-    pnl: +pnl.toFixed(2), z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
+    pnl: +pnl.toFixed(2), z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null,
+    miss: { n: mn, wr: mn ? +(mw / mn).toFixed(3) : null, evPerShare: mn ? +(mps / mn).toFixed(4) : null } };
 }
 
 // Resultado de una regla por día (UTC) de entrada: para ver si la ventaja es pareja o sale de pocos días
@@ -488,6 +494,8 @@ if (require.main === module) (async () => {
   report.paperB = { cfg: bCfg, byDay: byDay(markets, bCfg), from: new Date(bFrom).toISOString(), markets: bMk.length,
     limit: { buffer: bBuf, all: limitExec(markets, bCfg, bBuf), test: limitExec(test, bCfg, bBuf), stdAll: evaluate(markets, bCfg), stdTest: evaluate(test, bCfg) },
     fair: [0, 0.02, 0.04].map(mg => ({ margin: mg, all: fairLimitExec(markets, bCfg, mg), test: fairLimitExec(test, bCfg, mg) })),
+    // Mismo límite justo con topes más altos: ¿conviene dejar pagar más cuando la ventaja es grande?
+    fairCap: [0.80, 0.90].map(cap => ({ cap, all: fairLimitExec(markets, bCfg, bMargin, cap), test: fairLimitExec(test, bCfg, bMargin, cap) })),
     holdout: evaluate(bMk, bCfg),
     // Disparos (entradas y los que se escaparon en 1 s): cada intento de B en vivo tiene que estar acá
     entries: bMk.map(mk => ({ mk, f: firstFire(mk, bCfg) })).filter(x => x.f).map(({ mk, f }) => {
@@ -530,8 +538,9 @@ if (require.main === module) (async () => {
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B por día (UTC): ${pb.byDay.map(d => `${dd(d.day)} ${d.wins}-${d.n - d.wins} EV/acc=${d.evPerShare}`).join(' | ') || 'sin entradas'}`);
     const L = pb.limit, lx = x => `disparos ${x.fires}, el ask subió más de ${Math.round(L.buffer * 100)}¢ en 1 s en ${x.moved} (${x.fires ? Math.round(x.moved / x.fires * 100) : 0}%) | llenadas n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B con límite ask+${Math.round(L.buffer * 100)}¢ como en vivo (llena si el ask 1 s después sigue ≤ límite): todos ${lx(L.all)} || test ${lx(L.test)} || con el fill normal del backtest (paga el ask 1 s después hasta $${(bCfg.hi + 0.02).toFixed(2)}): todos n=${L.stdAll.n} EV/acc=${L.stdAll.evPerShare} z=${L.stdAll.z} | test n=${L.stdTest.n} EV/acc=${L.stdTest.evPerShare} z=${L.stdTest.z}`);
-    const fx = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
+    const fx = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}; no llena ${x.miss.n} (WR=${x.miss.wr} EV/acc a su precio=${x.miss.evPerShare})`;
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B con límite por precio justo (paga hasta donde quedan M pts de ventaja, tope $${(bCfg.hi + 0.02).toFixed(2)}; llena si el ask 1 s después sigue ≤ límite): ${pb.fair.map(f => `margen ${Math.round(f.margin * 100)}: todos ${fx(f.all)} | test ${fx(f.test)}`).join(' || ')}`);
+    console.log(`[BACKTEST-ANCLA] regla de la cuenta B con límite justo (margen ${Math.round(bMargin * 100)}) y tope más alto: ${pb.fairCap.map(f => `tope $${f.cap.toFixed(2)}: todos ${fx(f.all)} | test ${fx(f.test)}`).join(' || ')}`);
     const h = pb.holdout, hm = t => t.slice(11, 16);
     const one = x => `${hm(x.start)} UTC ${x.side} ${Math.round(x.secsLeft)} s ask $${x.ask.toFixed(2)}${x.escaped ? ` → $${x.ask2 == null ? 'n/a' : x.ask2.toFixed(2)} 1 s después: se escapó` : ` → paga $${x.price.toFixed(2)} ${x.win ? 'G' : 'P'}`} (límite justo $${x.fairLimit.toFixed(2)}: ${x.fairFill ? 'llena' : 'no llena'})`;
     const esc = pb.entries.filter(x => x.escaped).length;
