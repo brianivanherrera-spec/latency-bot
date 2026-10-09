@@ -11,6 +11,8 @@
  *   /data/shadow-markets.jsonl  → un resumen por mercado (ganador, qué hizo el bot, qué habría hecho el modelo)
  *   /data/shadow-ticks.jsonl    → la serie segundo a segundo del mercado (una línea por mercado)
  * y deja en el log una línea [SHADOW] legible + una [SHADOW-JSON] con el resumen completo.
+ * Los mercados cerrados que todavía esperan a Gamma se guardan al apagar (/data/shadow-pending.json)
+ * y se retoman al arrancar: antes cada reinicio perdía el resultado de 1-2 mercados.
  */
 'use strict';
 const fs = require('fs');
@@ -23,6 +25,7 @@ const logger = new Logger('SHADOW');
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const MARKETS_FILE = path.join(DATA_DIR, 'shadow-markets.jsonl');
 const TICKS_FILE = path.join(DATA_DIR, 'shadow-ticks.jsonl');
+const PENDING_FILE = path.join(DATA_DIR, 'shadow-pending.json');
 const GAMMA = 'https://gamma-api.polymarket.com';
 
 const THRESHOLDS = [0.03, 0.05, 0.08, 0.12];                         // ventajas a evaluar (fracción = puntos/100)
@@ -327,6 +330,37 @@ class Shadow {
     setTimeout(() => this._resolve(m, 0), 30000);
   }
 
+  // Apagado (redeploy): guarda los mercados cerrados que esperan el ganador oficial de Gamma
+  savePending(file = PENDING_FILE) {
+    const list = [...this.pending.values()];
+    try {
+      if (!list.length) { if (fs.existsSync(file)) fs.unlinkSync(file); return 0; }
+      fs.writeFileSync(file, JSON.stringify(list));
+      this.handedOff = true; // los resuelve el proceso nuevo: este ya no los escribe (sin duplicados)
+      return list.length;
+    } catch (e) { logger.warn(`[SHADOW] no se pudieron guardar los mercados pendientes: ${e.message}`); return 0; }
+  }
+
+  // Arranque: retoma los mercados que quedaron esperando a Gamma (hasta 2 h de cerrados)
+  restorePending({ file = PENDING_FILE, now = Date.now(), delayMs = 5000 } = {}) {
+    let list;
+    try {
+      if (!fs.existsSync(file)) return 0;
+      list = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch (e) { logger.warn(`[SHADOW] mercados pendientes ilegibles (${e.message}): se descartan`); list = []; }
+    try { fs.unlinkSync(file); } catch (_) {}
+    let n = 0;
+    for (const m of Array.isArray(list) ? list : []) {
+      if (!m || !m.gammaId || !Array.isArray(m.rows) || this.pending.has(m.gammaId) || !(now - m.endTs <= 2 * 3600000)) continue;
+      m.closed = true;
+      this.pending.set(m.gammaId, m);
+      setTimeout(() => this._resolve(m, 0), delayMs);
+      n++;
+    }
+    if (n) logger.info(`[SHADOW] ${n} mercado(s) que cerraron antes del reinicio: se busca su ganador oficial`);
+    return n;
+  }
+
   async _resolve(m, attempt) {
     let winner = null, source = null, prices = null, closed = false;
     try {
@@ -340,6 +374,7 @@ class Shadow {
         else if (closed && dn >= 0.99) { winner = 'DOWN'; source = 'gamma'; }
       }
     } catch (e) { logger.debug(`[SHADOW] gamma error ${m.gammaId}: ${e.message}`); }
+    if (this.handedOff) return;
 
     if (!winner && attempt < 45) {                 // reintentar cada 20s, hasta ~15 min
       setTimeout(() => this._resolve(m, attempt + 1), 20000);
@@ -421,4 +456,4 @@ class Shadow {
   }
 }
 
-module.exports = { Shadow, MARKETS_FILE, TICKS_FILE, COLS, THRESHOLDS };
+module.exports = { Shadow, MARKETS_FILE, TICKS_FILE, PENDING_FILE, COLS, THRESHOLDS };

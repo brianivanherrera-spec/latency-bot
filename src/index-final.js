@@ -908,7 +908,12 @@ async function main() {
   // Modo sombra: modelo de valor justo que solo observa y registra (SHADOW_MODE=false lo apaga)
   const fairValue = new FairValue();
   const shadow = process.env.SHADOW_MODE === 'false' ? null : new Shadow({ fairValue, polyWs, rtds: clRTDS });
-  if (shadow) { shadowRef = shadow; shadow.setSignalFn(() => signal.snapshot()); shadow.start(); }
+  if (shadow) {
+    shadowRef = shadow; shadow.setSignalFn(() => signal.snapshot()); shadow.start();
+    // Mercados cerrados que esperaban a Gamma al reiniciar: se retoman, y se guardan al apagar
+    shadow.restorePending();
+    shutdownHooks.push(async () => { const n = shadow.savePending(); if (n) logger.info(`[SHUTDOWN] shadow: ${n} mercado(s) esperando a Gamma guardados`); });
+  }
   // Paper B: segunda cuenta de paper con la regla anclada, en paralelo (no toca las decisiones
   // del bot). PAPER_B_ENABLED=false la apaga. Necesita el shadow (muestras y ganador oficial).
   if (shadow && process.env.PAPER_B_ENABLED !== 'false') {
