@@ -118,6 +118,12 @@ function fires(R, i, side, cfg, ask, bid) {
   if (cfg.kind === 'anchored') {
     const pj = cfg.blend ? r.pAdjB : r.pAdj;
     if (pj == null) return false;
+    // minTrend: el ask del lado comprado tiene que haber subido al menos eso en los 3 s previos (el mercado ya se
+    // mueve a favor; hipótesis del 12/10, ver [BACKTEST-B-HIPOTESIS])
+    if (cfg.minTrend != null) {
+      const prev = R[i - 3], a3 = prev ? (side === 'UP' ? prev.ya : prev.na) : null;
+      if (a3 == null || ask - a3 < cfg.minTrend - 1e-9) return false;
+    }
     const pa = side === 'UP' ? pj : 1 - pj;
     return pa - ask - fee(ask) >= cfg.e;
   }
@@ -663,7 +669,14 @@ if (require.main === module) (async () => {
         blend: { all: fl(sub(markets), blendCfg), test: fl(sub(test), blendCfg), holdout: fl(sub(bMk), blendCfg) },
         short: { all: fl(sub(markets), bCfg), test: fl(sub(test), bCfg), holdout: fl(sub(bMk), bCfg) },
         cutsBlend: cutStats(fireRecords(sub(markets), blendCfg, bMargin)) },
-      maker: ['near', 'deep'].map(mode => ({ mode, all: makerExec(markets, bCfg, mode), test: makerExec(test, bCfg, mode), holdout: makerExec(bMk, bCfg, mode) })) }; }
+      maker: ['near', 'deep'].map(mode => ({ mode, all: makerExec(markets, bCfg, mode), test: makerExec(test, bCfg, mode), holdout: makerExec(bMk, bCfg, mode) })) };
+    // Hipótesis registradas el 12/10 (bitácora) con lo que mostraron los cortes: se juzgan solo con mercados posteriores
+    // (HIPOTESIS_DESDE); pasan a una cuenta en paper con z ≥ 2 y ≥ 30 llenadas en esos datos nuevos
+    const hFrom = Date.parse(process.env.HIPOTESIS_DESDE || '2026-10-12T12:35:00Z'), hMk = markets.filter(m => m.start >= hFrom);
+    const variants = [['B como está', bCfg], ['(i) modelo en modo blend', blendCfg], ['(ii) ask del lado comprado subiendo ≥ 2¢ en los 3 s previos', { ...bCfg, minTrend: 0.02 }],
+      ['(iii) las dos juntas', { ...blendCfg, minTrend: 0.02 }]];
+    report.paperBHyp = { from: new Date(hFrom).toISOString(), markets: hMk.length,
+      variants: variants.map(([label, cfg]) => ({ label, hold: fl(hMk, cfg), all: fl(markets, cfg) })) }; }
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -707,6 +720,8 @@ if (require.main === module) (async () => {
     const B = P.blend, fb = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl} (disparos ${x.fires})`;
     console.log(`[BACKTEST-B-BLEND] regla de la cuenta B con FAIR_SIGMA_MODE=blend (σ = √(0.25σc² + 0.75σl²), piso ${f6}e-6; recalculada en ${B.markets} mercados con las dos σ grabadas; límite justo margen ${Math.round(bMargin * 100)}): todos ${fb(B.blend.all)} | test ${fb(B.blend.test)} | fuera de muestra desde ${report.paperB.from.slice(0, 10)} ${fb(B.blend.holdout)} || modelo actual en esos mercados: todos ${fb(B.short.all)} | test ${fb(B.short.test)} | fuera de muestra ${fb(B.short.holdout)} || con blend, por ventaja: 8-15 pts ${sd(B.cutsBlend.edge[0])} | 15-25 ${sd(B.cutsBlend.edge[1])} | ≥ 25 ${sd(B.cutsBlend.edge[2])}`);
     const mx = x => `disparos ${x.fires}, llenadas ${x.n} (${x.fires ? Math.round(x.n / x.fires * 100) : 0} %), canceladas ${x.canc}, WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
+    const H = report.paperBHyp, hx = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl} (disparos ${x.fires})`;
+    console.log(`[BACKTEST-B-HIPOTESIS] fuera de muestra desde ${H.from.slice(0, 16).replace('T', ' ')} UTC (${H.markets} mercados; límite justo margen ${Math.round(bMargin * 100)}; se adopta en paper con z ≥ 2 y ≥ 30 llenadas acá): ${H.variants.map(v => `${v.label}: ${hx(v.hold)}`).join(' | ')} || todos los datos (con los que se eligió, solo referencia): ${H.variants.map(v => `${v.label.split(' ')[0]} ${hx(v.all)}`).join(' | ')}`);
     console.log(`[BACKTEST-B-MAKER] regla de la cuenta B como maker (compra límite sin comisión; se cancela si el precio justo anclado baja de la orden; llena si el ask baja hasta la orden antes de los últimos 10 s): ${P.maker.map(m => `${m.mode === 'near' ? '1¢ debajo del ask (o en el bid)' : '3¢ debajo del ask'}: todos ${mx(m.all)} | test ${mx(m.test)} | fuera de muestra ${mx(m.holdout)}`).join(' || ')}`); }
   { const t = report.trend2h, sd3 = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare}`;
     const ln = (lab, x) => `[BACKTEST-TEND2H] ${lab}: a favor ${sd3(x.fav)} | neutra ${sd3(x.neu)} | en contra ${sd3(x.against)} | a favor − en contra ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}${x.noData ? ` | sin dato de 2 h: ${x.noData}` : ''}`;

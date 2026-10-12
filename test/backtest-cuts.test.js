@@ -37,6 +37,12 @@ function trendMarket(start, winner, { dropAt = null, drop2At = null, pFallAt = n
   }
   return { start_ts: start, winner, strike: 100000, cols, rows };
 }
+// El ask de YES sube de 0.45 a 0.50 en t=199 (el mercado ya se mueve a favor) y en t=200 el modelo sube a 0.65
+function riseMarket(start, winner) {
+  const rows = [];
+  for (let t = 0; t < 300; t++) rows.push([t, 300 - t, t >= 200 ? 0.65 : 0.5, 1, ...(t >= 199 ? book(0.49, 0.50) : book(0.44, 0.45)), 70, 50, 50, 100000]);
+  return { start_ts: start, winner, strike: 100000, cols, rows };
+}
 // Formato viejo, sin las columnas de σ corta y larga
 function oldMarket(start) {
   const c = ['t', 'secs_left', 'p_up', 'src', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'btc'];
@@ -65,13 +71,14 @@ function oldMarket(start) {
     trendMarket(S0 + 20 * MIN, 'UP', { pFallAt: 220 }),            // maker: se cancela en t=220
     trendMarket(S0 + 25 * MIN, 'UP', { dropAt: 230, drop2At: 240 }), // maker 3¢ abajo: llena en t=240 y gana
     oldMarket(S0 + 30 * MIN),
+    riseMarket(S0 + 35 * MIN, 'UP'),
   ];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'btc-'));
   const file = path.join(dir, 'shadow-ticks.jsonl');
   fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const M = await load(file);
-  assert.strictEqual(M.length, 7);
-  const [mTrend, mSat, mOff, mFill, mCanc, mDeep, mOld] = M;
+  assert.strictEqual(M.length, 8);
+  const [mTrend, mSat, mOff, mFill, mCanc, mDeep, mOld, mRise] = M;
   assert.strictEqual(mTrend.rows[250].sigS, 50);
   assert.strictEqual(mTrend.rows[250].sigL, 50);
   assert.strictEqual(mOld.rows[250].sigS, null, 'formato viejo: sin σ corta');
@@ -135,6 +142,14 @@ function oldMarket(start) {
   near(dp.pnl, Math.floor(5 / 0.47) * 0.53, 1e-9);
   const dn = makerExec([mDeep], bCfg, 'near');
   assert.deepStrictEqual([dn.n, dn.wr], [1, 1], 'el de 1¢ llena antes, en t=230');
+  // Hipótesis (ii): solo con el ask del lado comprado subiendo ≥ 2¢ en los 3 s previos
+  const upCfg = { ...bCfg, minTrend: 0.02 };
+  assert.strictEqual(firstFire(mTrend, upCfg), null, 'el ask venía bajando 6¢: no entra');
+  assert.strictEqual(firstFire(mSat, upCfg), null, 'el ask estaba quieto: no entra');
+  const fr = firstFire(mRise, upCfg);
+  assert.deepStrictEqual([fr.side, fr.ask, mRise.rows[fr.i].sl], ['UP', 0.50, 100], 'el ask subió 5¢: entra igual que sin filtro');
+  assert.strictEqual(firstFire(mRise, bCfg).i, fr.i);
+  assert.strictEqual(firstFire(mRise, { ...upCfg, blend: true }).i, fr.i, 'σ sobre el piso: con blend también entra');
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-cuts: 47 ok');
+  console.log('backtest-cuts: 53 ok');
 })().catch(err => { console.error(err); process.exit(1); });
