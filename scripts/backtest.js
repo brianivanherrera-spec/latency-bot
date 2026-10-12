@@ -30,8 +30,33 @@ const DATA_DIR = process.env.DATA_DIR || '/data';
 const IN = process.argv[2] || path.join(DATA_DIR, 'shadow-ticks.jsonl');
 const OUT = process.argv[3] || path.join(DATA_DIR, 'backtest-report.json');
 const FEE = parseFloat(process.env.TAKER_FEE_RATE || '0.072');
+const { normCdf } = require('../src/fair-value');
+// Piso de σ del modo blend del modelo FAIR (src/index-final.js), en unidades de las columnas sigma_*_e6
+const SIGMA_FLOOR_E6 = parseFloat(process.env.FAIR_SIGMA_FLOOR || '3e-5') * 1e6;
 const fee = p => FEE * p * (1 - p);
 const STAKE = 5;
+
+// Φ⁻¹(p) — inversa de la normal estándar (Acklam, error relativo < 1.2e-9)
+function normInv(p) {
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const pl = 0.02425;
+  if (p < pl) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p > 1 - pl) { const q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  const q = p - 0.5, r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+// P(UP) del modelo como sería con FAIR_SIGMA_MODE=blend: σ = max(√(0.25·σcorta² + 0.75·σlarga²), piso) en vez de la σ
+// corta (el modo actual, 'short'). El z del modelo escala con 1/σ (el ×1.4 de FAIR_VOL_MULT se cancela), así que
+// p_blend = Φ(Φ⁻¹(p)·σcorta/σblend). Con mercado quieto la σ corta es chica, p se satura en 0.99+ y la ventaja
+// anclada de B sale de 30-56 pts (09-11/10): con el piso esas entradas deberían desaparecer. Sin las dos σ: null.
+function blendP(p, sS, sL, floorE6 = SIGMA_FLOOR_E6) {
+  if (p == null || !(sS > 0) || !(sL > 0)) return null;
+  const sB = Math.max(Math.sqrt(0.25 * sS * sS + 0.75 * sL * sL), floorE6);
+  return normCdf(normInv(Math.min(0.9999, Math.max(0.0001, p))) * sS / sB);
+}
 
 async function load(file) {
   const markets = [];
@@ -46,6 +71,7 @@ async function load(file) {
       const p = r[c.p_up], sl = r[c.secs_left], src = r[c.src];
       if (p == null || sl == null || src !== 1) { rows.push(null); continue; }
       rows.push({ sl, p, yb: r[c.yes_bid], ya: r[c.yes_ask], nb: r[c.no_bid], na: r[c.no_ask], sig: r[c.sigma_e6],
+        sigS: c.sigma_short_e6 != null ? r[c.sigma_short_e6] : null, sigL: c.sigma_long_e6 != null ? r[c.sigma_long_e6] : null,
         btc: r[c.btc] ?? null, bsig: c.sig != null ? r[c.sig] : null, pass: c.pass != null ? r[c.pass] : null,
         z: c.z != null ? r[c.z] : null, mv: c.move_pct != null ? r[c.move_pct] : null });
     }
@@ -56,6 +82,15 @@ async function load(file) {
       const mid = (r.ya + r.yb) / 2;
       if (aMid == null || Math.abs(mid - aMid) > 1e-9) { aMid = mid; aP = r.p; }
       r.pAdj = Math.min(0.999, Math.max(0.001, mid + (r.p - aP)));
+    }
+    // La misma ancla con el modelo como sería con FAIR_SIGMA_MODE=blend (pB, ver blendP)
+    let bMid = null, bP = null;
+    for (const r of rows) {
+      if (r) r.pB = blendP(r.p, r.sigS, r.sigL);
+      if (!r || r.ya == null || r.yb == null || r.pB == null) { bMid = null; continue; }
+      const mid = (r.ya + r.yb) / 2;
+      if (bMid == null || Math.abs(mid - bMid) > 1e-9) { bMid = mid; bP = r.pB; }
+      r.pAdjB = Math.min(0.999, Math.max(0.001, mid + (r.pB - bP)));
     }
     // TWAP 60 s de Binance (USDT) en el cierre: promedio de las filas de los últimos 60 s ([BACKTEST-SINCL]);
     // y BTC de Binance en la apertura (primera fila de los primeros 30 s, para [BACKTEST-TEND2H])
@@ -81,8 +116,10 @@ function fires(R, i, side, cfg, ask, bid) {
     return side === 'UP' ? mv >= cfg.m : mv <= -cfg.m;
   }
   if (cfg.kind === 'anchored') {
-    const pa = side === 'UP' ? r.pAdj : 1 - r.pAdj;
-    return pa != null && pa - ask - fee(ask) >= cfg.e;
+    const pj = cfg.blend ? r.pAdjB : r.pAdj;
+    if (pj == null) return false;
+    const pa = side === 'UP' ? pj : 1 - pj;
+    return pa - ask - fee(ask) >= cfg.e;
   }
   if (cfg.kind === 'live') return (cfg.field === 'pass' ? r.pass : r.bsig) === (side === 'UP' ? 1 : -1);
   // Señal real del bot + filtro FAIR como en vivo (ventaja = P_modelo − ask, sin comisión; ask ≥ 0.50)
@@ -238,7 +275,8 @@ function limitExec(markets, cfg, buffer) {
 // entre ask + 1¢ y el tope (por defecto, máximo del rango + 2¢, como en vivo). Llena si el ask 1 s después
 // sigue ≤ límite y paga max(ask, ask 1 s después); acciones = floor($5 / límite), como en vivo.
 function fairLimitOf(f, mk, cfg, margin, cap = cfg.hi + 0.02) {
-  const r = mk.rows[f.i], pa = f.side === 'UP' ? r.pAdj : 1 - r.pAdj, l0 = pa - margin;
+  const r = mk.rows[f.i], pj = cfg.blend ? r.pAdjB : r.pAdj;
+  const pa = f.side === 'UP' ? pj : 1 - pj, l0 = pa - margin;
   const L = Math.floor((l0 - fee(Math.min(0.99, Math.max(0.01, l0)))) * 100 + 1e-9) / 100;
   return Math.max(+(f.ask + 0.01).toFixed(2), Math.min(+cap.toFixed(2), L));
 }
@@ -266,6 +304,70 @@ function fairLimitExec(markets, cfg, margin, cap) {
     pnl: +pnl.toFixed(2), z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null,
     miss: { n: mn, wr: mn ? +(mw / mn).toFixed(3) : null, evPerShare: mn ? +(mps / mn).toFixed(4) : null },
     jump: { n: jn, wr: jn ? +(jw / jn).toFixed(3) : null, evPerShare: jn ? +(jps / jn).toFixed(4) : null } };
+}
+
+// Disparos de una regla anclada con el fill del límite justo (como B en vivo) y sus rasgos al disparar: ventaja
+// anclada neta de comisión, σ corta del modelo (sin el ×1.4), P del modelo del lado comprado y cuánto se movió el
+// ask de ese lado en los 3 s previos. Sirve para ver de qué disparos sale la ganancia (o la pérdida) de la regla.
+function fireRecords(markets, cfg, margin, cap) {
+  const out = [];
+  for (const mk of markets) {
+    const f = firstFire(mk, cfg);
+    if (!f) continue;
+    const R = mk.rows, r = R[f.i], pj = cfg.blend ? r.pAdjB : r.pAdj;
+    const prev = R[f.i - 3], a3 = prev ? (f.side === 'UP' ? prev.ya : prev.na) : null;
+    const L = fairLimitOf(f, mk, cfg, margin, cap), a2 = f.ask2 ?? f.ask;
+    const price = Math.max(f.ask, a2), win = f.side === mk.winner, ps = (win ? 1 - price : -price) - fee(price);
+    out.push({ filled: a2 <= L + 1e-9, win, price, ps, pnl: Math.floor(STAKE / L) * ps,
+      edge: (f.side === 'UP' ? pj : 1 - pj) - f.ask - fee(f.ask), sigS: r.sigS ?? null,
+      pModel: f.side === 'UP' ? r.p : 1 - r.p, trend: a3 != null ? +(f.ask - a3).toFixed(4) : null });
+  }
+  return out;
+}
+// Las llenadas de fireRecords separadas por ventaja (8-15, 15-25, ≥ 25 pts), σ corta contra el piso del modo blend,
+// modelo saturado (P del lado comprado ≥ 99 %) y movimiento del ask en los 3 s previos (bajó / estable / subió 2¢)
+function cutStats(recs, floorE6 = SIGMA_FLOOR_E6) {
+  const f = recs.filter(x => x.filled);
+  const g = pred => { const a = f.filter(pred); return { ...groupStat(a), pnl: +a.reduce((s, x) => s + x.pnl, 0).toFixed(2) }; };
+  return { fires: recs.length, n: f.length,
+    edge: [g(x => x.edge < 0.15), g(x => x.edge >= 0.15 && x.edge < 0.25), g(x => x.edge >= 0.25)],
+    sigma: [g(x => x.sigS != null && x.sigS < floorE6), g(x => x.sigS != null && x.sigS >= floorE6), g(x => x.sigS == null)],
+    sat: [g(x => x.pModel >= 0.99), g(x => x.pModel < 0.99)],
+    trend: [g(x => x.trend != null && x.trend <= -0.02 + 1e-9), g(x => x.trend != null && Math.abs(x.trend) < 0.02 - 1e-9),
+      g(x => x.trend != null && x.trend >= 0.02 - 1e-9), g(x => x.trend == null)] };
+}
+// Variante maker de una regla anclada: en vez de pagar el ask deja una compra límite y espera. Precio: 'near' = 1¢
+// debajo del ask y como poco el bid (con 1¢ de spread se suma al bid); 'deep' = 3¢ debajo del ask. Llena si en un
+// segundo posterior el ask del lado comprado baja hasta ese precio (si la orden se sumó al bid, tiene que bajar más:
+// la fila de adelante se llena primero) antes de los últimos endSl s, y se cancela si el precio justo anclado cae
+// por debajo del precio de la orden. Sin comisión: los makers no pagan (el rebate de Polymarket no se cuenta).
+// Lo que mide: si las que llenan son las que el mercado tenía en contra (los bots rápidos venden ahí).
+function makerExec(markets, cfg, mode = 'near', endSl = 10) {
+  let fires = 0, n = 0, w = 0, ps = 0, pnl = 0, exp = 0, varr = 0, canc = 0;
+  for (const mk of markets) {
+    const f = firstFire(mk, cfg);
+    if (!f) continue;
+    const R = mk.rows, r0 = R[f.i], bid = f.side === 'UP' ? r0.yb : r0.nb;
+    const X = +(mode === 'deep' ? f.ask - 0.03 : Math.max(f.ask - 0.01, bid ?? 0)).toFixed(2);
+    if (!(X > 0)) continue;
+    fires++;
+    const joined = bid != null && Math.abs(X - bid) < 1e-9;
+    let filled = false;
+    for (let j = f.i + 1; j < R.length; j++) {
+      const r = R[j];
+      if (!r) continue;
+      if (r.sl < endSl) break;
+      const a = f.side === 'UP' ? r.ya : r.na;
+      if (a != null && (joined ? a < X - 1e-9 : a <= X + 1e-9)) { filled = true; break; }
+      const pj = cfg.blend ? r.pAdjB : r.pAdj;
+      if (pj != null && (f.side === 'UP' ? pj : 1 - pj) < X) { canc++; break; }
+    }
+    if (!filled) continue;
+    const win = f.side === mk.winner, x = win ? 1 - X : -X;
+    n++; if (win) w++; ps += x; pnl += Math.floor(STAKE / X) * x; exp += X; varr += X * (1 - X);
+  }
+  return { fires, n, canc, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(ps / n).toFixed(4) : null,
+    pnl: +pnl.toFixed(2), z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
 }
 
 // Resultado de una regla por día (UTC) de entrada: para ver si la ventaja es pareja o sale de pocos días
@@ -417,7 +519,8 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-module.exports = { load, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay };
+module.exports = { load, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
+  normInv, blendP, fireRecords, cutStats, makerExec };
 if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
@@ -547,6 +650,20 @@ if (require.main === module) (async () => {
     anchoredB: trendSplit(markets, bCfg, series),
     fairBase: trendSplit(markets, base240, series),
   };
+  // Regla de B por partes (de qué disparos sale el resultado), con el modelo en modo blend (σ con piso) y como
+  // maker. Lo de blend se recalcula sobre lo grabado: solo los mercados con las dos σ, comparado con el modelo actual
+  // en esos mismos mercados.
+  { const blendCfg = { ...bCfg, blend: true };
+    const sigSet = new Set(markets.filter(m => m.rows.some(r => r && r.pB != null)));
+    const sub = a => a.filter(m => sigSet.has(m));
+    const fl = (mks, cfg) => fairLimitExec(mks, cfg, bMargin);
+    report.paperBParts = { floorE6: SIGMA_FLOOR_E6,
+      cuts: { all: cutStats(fireRecords(markets, bCfg, bMargin)), test: cutStats(fireRecords(test, bCfg, bMargin)) },
+      blend: { markets: sigSet.size,
+        blend: { all: fl(sub(markets), blendCfg), test: fl(sub(test), blendCfg), holdout: fl(sub(bMk), blendCfg) },
+        short: { all: fl(sub(markets), bCfg), test: fl(sub(test), bCfg), holdout: fl(sub(bMk), bCfg) },
+        cutsBlend: cutStats(fireRecords(sub(markets), blendCfg, bMargin)) },
+      maker: ['near', 'deep'].map(mode => ({ mode, all: makerExec(markets, bCfg, mode), test: makerExec(test, bCfg, mode), holdout: makerExec(bMk, bCfg, mode) })) }; }
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -582,6 +699,15 @@ if (require.main === module) (async () => {
     const esc = pb.entries.filter(x => x.escaped).length;
     const list = `${pb.entries.length > 12 ? `últimos 12 de ${pb.entries.length}: ` : ''}${pb.entries.slice(-12).map(one).join(', ')}`;
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | disparos (inicio del mercado; ${esc} con el precio escapado en 1 s, sin entrada): ${list}` : ''}`); }
+  { const P = report.paperBParts, f6 = Math.round(P.floorE6);
+    const sd = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
+    const cut = c => `ventaja 8-15 pts ${sd(c.edge[0])} | 15-25 ${sd(c.edge[1])} | ≥ 25 ${sd(c.edge[2])} || σ corta < piso del modo blend (${f6}e-6) ${sd(c.sigma[0])} | ≥ piso ${sd(c.sigma[1])}${c.sigma[2].n ? ` | sin σ ${c.sigma[2].n}` : ''} || P del modelo ≥ 99 % ${sd(c.sat[0])} | < 99 % ${sd(c.sat[1])} || ask del lado comprado en los 3 s previos: bajó ≥ 2¢ ${sd(c.trend[0])} | estable ${sd(c.trend[1])} | subió ≥ 2¢ ${sd(c.trend[2])}`;
+    console.log(`[BACKTEST-B-CORTES] regla de la cuenta B con límite justo (margen ${Math.round(bMargin * 100)}, como en vivo), llenadas: todos (${P.cuts.all.n} de ${P.cuts.all.fires} disparos): ${cut(P.cuts.all)}`);
+    console.log(`[BACKTEST-B-CORTES] test (${P.cuts.test.n} de ${P.cuts.test.fires} disparos): ${cut(P.cuts.test)}`);
+    const B = P.blend, fb = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl} (disparos ${x.fires})`;
+    console.log(`[BACKTEST-B-BLEND] regla de la cuenta B con FAIR_SIGMA_MODE=blend (σ = √(0.25σc² + 0.75σl²), piso ${f6}e-6; recalculada en ${B.markets} mercados con las dos σ grabadas; límite justo margen ${Math.round(bMargin * 100)}): todos ${fb(B.blend.all)} | test ${fb(B.blend.test)} | fuera de muestra desde ${report.paperB.from.slice(0, 10)} ${fb(B.blend.holdout)} || modelo actual en esos mercados: todos ${fb(B.short.all)} | test ${fb(B.short.test)} | fuera de muestra ${fb(B.short.holdout)} || con blend, por ventaja: 8-15 pts ${sd(B.cutsBlend.edge[0])} | 15-25 ${sd(B.cutsBlend.edge[1])} | ≥ 25 ${sd(B.cutsBlend.edge[2])}`);
+    const mx = x => `disparos ${x.fires}, llenadas ${x.n} (${x.fires ? Math.round(x.n / x.fires * 100) : 0} %), canceladas ${x.canc}, WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
+    console.log(`[BACKTEST-B-MAKER] regla de la cuenta B como maker (compra límite sin comisión; se cancela si el precio justo anclado baja de la orden; llena si el ask baja hasta la orden antes de los últimos 10 s): ${P.maker.map(m => `${m.mode === 'near' ? '1¢ debajo del ask (o en el bid)' : '3¢ debajo del ask'}: todos ${mx(m.all)} | test ${mx(m.test)} | fuera de muestra ${mx(m.holdout)}`).join(' || ')}`); }
   { const t = report.trend2h, sd3 = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare}`;
     const ln = (lab, x) => `[BACKTEST-TEND2H] ${lab}: a favor ${sd3(x.fav)} | neutra ${sd3(x.neu)} | en contra ${sd3(x.against)} | a favor − en contra ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}${x.noData ? ` | sin dato de 2 h: ${x.noData}` : ''}`;
     console.log(ln(`regla actual (${liveMk.length} mercados; tendencia de BTC de 2 h a favor > +0.1 %, en contra < −0.1 % del lado comprado)`, t.current));
