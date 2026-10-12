@@ -8,7 +8,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { PaperB } = require('../src/paper-b');
+const { PaperB, trendTxt } = require('../src/paper-b');
 
 const FEE = 0.072;
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paper-b-'));
@@ -58,6 +58,7 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pos.restAsk0, 0.45, 'libro REST al decidir');
   assert.strictEqual(pos.restFill, true, 'con el REST también llenaba');
   assert.deepStrictEqual([pos.restAsk200, pos.restFill200, pos.restPaid200], [0.45, true, 0.46], 'libro REST a +200 ms');
+  assert.deepStrictEqual([pos.ask3, pos.trend], [null, null], 'sin 3 muestras previas no hay movimiento del ask');
   // 3) Un solo intento por mercado
   pb.onSample(m1, sample(90, 0.70));
   assert.strictEqual(pb.state.attempts, 1, 'no reintenta en el mismo mercado');
@@ -270,6 +271,31 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   pn.onResolved('g12', 'UP', 'gamma');
   assert.deepStrictEqual([pn.state.rest.n, pn.state.rest200.n, pn.state.rest200.no], [1, 1, 0]);
   assert.ok(Math.abs(pn.state.rest200.pnl - expWin) < 1e-3, 'al precio del WS');
+  // 17) Ask del lado comprado 3 muestras antes (como R[i − 3] del backtest; hipótesis (ii) del 12/10, solo registro)
+  const pt = new PaperB({ polyWs, stateFile: path.join(dir, 'trend.json'), env, fetchFn: fakeFetch });
+  book.Y = 0.45; book.N = 0.56;
+  const fire = async (id, first, last = sample(120, 0.65)) => {
+    const m = mkt(id);
+    for (const s of [first, sample(122, 0.50), sample(121, 0.50), last]) pt.onSample(m, s);
+    await pt.markets.get(id).done;
+    return pt.state.open.find(x => x.gammaId === id);
+  };
+  const up = await fire('g13', sample(123, 0.50, 0.42, 0.41));
+  assert.deepStrictEqual([up.side, up.ask, up.ask3, up.trend], ['UP', 0.45, 0.42, 0.03], 'el ask subió 3¢ en los 3 s previos');
+  const dn = await fire('g14', sample(123, 0.50, 0.50, 0.49));
+  assert.deepStrictEqual([dn.ask3, dn.trend], [0.50, -0.05], 'bajó 5¢');
+  const nc = await fire('g15', { ...sample(123, 0.50, 0.42, 0.41), src: 0 });
+  assert.deepStrictEqual([nc.ask3, nc.trend], [null, null], 'sin modelo Chainlink 3 s antes: sin dato');
+  // DOWN: el ask del No (0.54 → 0.56); el modelo baja a 0.35 con el mid quieto
+  const no = await fire('g16', sample(123, 0.50, 0.45, 0.44, 0.54), sample(120, 0.35));
+  assert.deepStrictEqual([no.side, no.ask, no.ask3, no.trend], ['DOWN', 0.56, 0.54, 0.02]);
+  assert.strictEqual(pt.state.attempts, 4);
+  assert.strictEqual(trendTxt(up), '$0.42 (+3¢: subiendo)');
+  assert.strictEqual(trendTxt(dn), '$0.50 (−5¢: bajando)');
+  assert.strictEqual(trendTxt(no), '$0.54 (+2¢: subiendo)', '2¢ ya cuenta como subiendo (minTrend 0.02)');
+  assert.strictEqual(trendTxt({ ask3: 0.45, trend: 0.01 }), '$0.45 (+1¢: estable)');
+  assert.strictEqual(trendTxt({ ask3: 0.45, trend: 0 }), '$0.45 (0¢: estable)');
+  assert.strictEqual(trendTxt(nc), 'sin dato');
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 100 ok');
+  console.log('paper-b: 112 ok');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -29,6 +29,8 @@
  * arriba del WS, el disparo salió de un libro atrasado. Por defecto solo se mide (entra igual y se cuenta
  * aparte: el backtest no muestra que esas entradas pierdan); con PAPER_B_REST_GUARD=on no se manda la orden
  * y se anota cómo habría salido (en vivo el chequeo sumaría lo que tarda el REST, ~40 ms).
+ * Cada intento anota además el ask del lado comprado 3 muestras (3 s) antes, como el backtest con R[i − 3]
+ * (hipótesis (ii) del 12/10: entrar solo con el ask subiendo ≥ 2¢; solo registro).
  */
 'use strict';
 const fs = require('fs');
@@ -43,6 +45,12 @@ const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n :
 const round2 = v => Math.round(v * 100) / 100;
 const usd = v => `${v >= 0 ? '+' : '−'}$${Math.abs(v).toFixed(2)}`;
 const px = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
+// Ask del lado comprado 3 s antes del intento: "$0.42 (+3¢: subiendo)", "(−5¢: bajando)" o "(+1¢: estable)"
+const trendTxt = pos => {
+  if (pos.ask3 == null) return 'sin dato';
+  const c = Math.round(pos.trend * 100);
+  return `${px(pos.ask3)} (${c > 0 ? '+' : c < 0 ? '−' : ''}${Math.abs(c)}¢: ${c >= 2 ? 'subiendo' : c <= -2 ? 'bajando' : 'estable'})`;
+};
 
 class PaperB {
   constructor({ polyWs, stateFile, env = process.env, fetchFn = globalThis.fetch } = {}) {
@@ -94,11 +102,15 @@ class PaperB {
     let st = this.markets.get(m.gammaId);
     if (!st) {
       this._reportLast();
-      st = { anchor: null, tried: false, market: marketLabel(m.question), inWin: 0, withData: 0, best: null };
+      st = { anchor: null, tried: false, market: marketLabel(m.question), inWin: 0, withData: 0, best: null, asks: [] };
       this.markets.set(m.gammaId, st);
       this._last = st;
       if (this.markets.size > 20) this.markets.delete(this.markets.keys().next().value);
     }
+    // Asks de las 3 muestras anteriores (null sin modelo Chainlink, como las filas vacías del backtest)
+    const prev3 = st.asks.length >= 3 ? st.asks[st.asks.length - 3] : null;
+    st.asks.push(s.p != null && s.src === 1 ? { UP: s.yesAsk ?? null, DOWN: s.noAsk ?? null } : null);
+    if (st.asks.length > 3) st.asks.shift();
     const inWin = s.T <= this.cfg.tMax && s.T >= this.cfg.tMin;
     if (inWin) st.inWin++;
     if (s.yesBid == null || s.yesAsk == null || s.p == null || s.src !== 1) { st.anchor = null; return; }
@@ -115,7 +127,7 @@ class PaperB {
       if (!st.best || edge > st.best.edge) st.best = { edge, side, ask, T: Math.round(s.T) };
       if (edge < this.cfg.edge) continue;
       st.tried = true;
-      st.done = this._execute(m, side, ask, pa, edge, s.T).catch(e => logger.warn(`[PAPER-B] ejecución: ${e.message}`));
+      st.done = this._execute(m, side, ask, pa, edge, s.T, prev3 ? prev3[side] : null).catch(e => logger.warn(`[PAPER-B] ejecución: ${e.message}`));
       return;
     }
   }
@@ -128,7 +140,7 @@ class PaperB {
     logger.info(`[PAPER-B] sin entrada en ${st.market} | ${st.withData} de ${st.inWin} s de la ventana con libro y modelo Chainlink | ${b ? `mejor ventaja ${(b.edge * 100).toFixed(1)} pts (${b.side}, ask ${px(b.ask)}, ${b.T} s restantes; pide ${Math.round(c.edge * 100)})` : `ningún ask en $${c.lo.toFixed(2)}-$${c.hi.toFixed(2)}`}`);
   }
 
-  async _execute(m, side, ask, pa, edge, T) {
+  async _execute(m, side, ask, pa, edge, T, ask3 = null) {
     const c = this.cfg, tick = 0.01;
     const tokenId = side === 'UP' ? m.yesTokenId : m.noTokenId;
     const minPx = round2(ask + tick);
@@ -167,7 +179,7 @@ class PaperB {
       id: `PB_${Date.now()}`, gammaId: m.gammaId, market: marketLabel(m.question), endTs: m.endTs,
       side, t: Date.now(), secsLeft: Math.round(T), ask, pa: +pa.toFixed(4), edge: +edge.toFixed(4),
       limit, size, ask200: b200.ask, ask400: b400.ask, fill200: fills(b200), filled, paid,
-      restAsk0, restMs0: d0?.ms ?? null, phantom,
+      restAsk0, restMs0: d0?.ms ?? null, phantom, ask3, trend: ask3 != null ? round2(ask - ask3) : null,
     };
     if (phantom) { S.phantom.n++; if (filled) S.phantom.filled++; }
     if (phantom && c.restGuard) {
@@ -182,7 +194,7 @@ class PaperB {
     if (filled) { S.filled++; S.open.push(pos); } else { S.noFill++; if (pos.fill200) S.only200.push(pos); }
     if (S.only200.length > 200) S.only200.shift();
     this._save();
-    logger.info(`[PAPER-B] ${side} ${pos.market} | ${pos.secsLeft} s restantes | ask ${px(ask)} vs precio justo anclado ${(pa * 100).toFixed(1)}% (ventaja ${(edge * 100).toFixed(1)} pts) | ask a +${c.checkMs}ms ${px(b200.ask)} → +${c.delayMs}ms ${px(b400.ask)} | orden ${size} a $${limit} | ${filled ? `lleno a $${paid}` : 'no'}`);
+    logger.info(`[PAPER-B] ${side} ${pos.market} | ${pos.secsLeft} s restantes | ask ${px(ask)} vs precio justo anclado ${(pa * 100).toFixed(1)}% (ventaja ${(edge * 100).toFixed(1)} pts) | ask hace 3 s ${trendTxt(pos)} | ask a +${c.checkMs}ms ${px(b200.ask)} → +${c.delayMs}ms ${px(b400.ask)} | orden ${size} a $${limit} | ${filled ? `lleno a $${paid}` : 'no'}`);
     if (restOn) {
       const [b, b2] = await Promise.all([r1, r2]);
       const sz = restSizeUpTo(b, limit);
@@ -360,4 +372,4 @@ class PaperB {
   }
 }
 
-module.exports = { PaperB };
+module.exports = { PaperB, trendTxt };
