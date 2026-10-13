@@ -946,9 +946,17 @@ async function main() {
   // sigue con la otra sin reiniciar ([CHAINLINK-DUAL] cada minuto).
   const CHAINLINK_SOURCE = (process.env.CHAINLINK_SOURCE || 'rtds').toLowerCase();
   let polybolt = null;
+  // Chainlink ETH/USD por la misma conexión de PolyBolt, solo para la sombra de ETH 5 min (SERIES_SHADOW_ETH=off la apaga)
+  let ethPrice = null;
   if (['polybolt', 'both', 'dual'].includes(CHAINLINK_SOURCE)) {
     const { PolyBoltClient } = require('./chainlink-polybolt');
-    polybolt = new PolyBoltClient({ getCreds: () => poly.getApiCreds() });
+    const ethShadow = process.env.SERIES_SHADOW_ETH !== 'off';
+    polybolt = new PolyBoltClient({ getCreds: () => poly.getApiCreds(), extraSymbols: ethShadow ? ['ethusd'] : [] });
+    if (ethShadow) {
+      const { AuxPrice } = require('./aux-price');
+      ethPrice = new AuxPrice({ symbol: 'ethusd' });
+      polybolt.onExtra((sym, kind, pt) => { if (sym === 'ethusd') ethPrice.onPoint(kind, pt); });
+    }
     if (CHAINLINK_SOURCE === 'polybolt' || CHAINLINK_SOURCE === 'dual') {
       // Mismo formato que RTDS para que el resto del bot no cambie
       polybolt.onSpot(pt => clSpot._handle({ src: 'polybolt', topic: 'crypto_prices_chainlink',
@@ -1687,6 +1695,13 @@ async function main() {
     const { SeriesShadow } = require('./series-shadow');
     new SeriesShadow({ fairFn: fairAt, strikeFn: ms => rtdsStrike({ startTime: ms })?.value ?? null,
       spotFn: () => (btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null) }).start();
+  }
+  // Sombra de ETH 5 min (plan del 12/10, b; solo registro): mismo módulo, Chainlink ETH/USD por PolyBolt (src/aux-price.js)
+  if (ethPrice) {
+    const { SeriesShadow } = require('./series-shadow');
+    new SeriesShadow({ id: 'eth5m', slugPrefix: 'eth-updown-5m', periodS: 300,
+      fairFn: (K, endMs, nowMs) => ethPrice.fair(K, endMs, nowMs, { volMult: FAIR_VOL_MULT, floor: FAIR_SIGMA_FLOOR }),
+      strikeFn: ms => ethPrice.strike(ms), spotFn: () => ethPrice.last('spot')?.value ?? null }).start();
   }
 
   // ─── OPEN-SNAP (sombra): ¿el mercado abre mal valuado? ─────────────────────
