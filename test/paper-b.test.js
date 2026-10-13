@@ -88,6 +88,10 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pb.state.rest200Open.length, 1, 'cuenta solo en la del REST a +200 ms');
   pb.onResolved('g2', 'UP', 'gamma');
   assert.strictEqual(pb.state.only200[0].winner, 'UP', 'se guarda cómo salió la que solo llenaba a 200 ms');
+  pb.state.only200.push({ gammaId: 'gx', side: 'DOWN', winner: null }); // mercado sin otra posición de B
+  pb.onResolved('gx', 'DOWN', 'gamma');
+  assert.strictEqual(JSON.parse(fs.readFileSync(stateFile, 'utf8')).only200.find(x => x.gammaId === 'gx').winner, 'DOWN', 'el resultado de la que solo llenaba a 200 ms queda en disco (sobrevive al reinicio)');
+  pb.state.only200.pop(); pb._save();
   assert.deepStrictEqual([pb.state.rest200.n, pb.state.rest200.w, pb.state.rest200.only, pb.state.rest200Open.length], [2, 2, 1, 0]);
   assert.ok(Math.abs(pb.state.rest200.pnl - 2 * expWin) < 1e-3, 'al precio del REST a +200 ms');
   assert.strictEqual(pb.state.pnl, +expWin.toFixed(4), 'el P&L de B no cambia');
@@ -297,5 +301,5 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(trendTxt({ ask3: 0.45, trend: 0 }), '$0.45 (0¢: estable)');
   assert.strictEqual(trendTxt(nc), 'sin dato');
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 112 ok');
+  console.log('paper-b: 113 ok');
 })().catch(e => { console.error(e); process.exit(1); });

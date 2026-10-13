@@ -229,7 +229,9 @@ class PaperB {
     for (const p of this.state.restOpen.filter(x => x.gammaId === gammaId)) this._closeRestOnly(p, winner);
     for (const p of this.state.rest200Open.filter(x => x.gammaId === gammaId)) this._closeRest200Only(p, winner);
     for (const p of this.state.phantomOpen.filter(x => x.gammaId === gammaId)) this._closePhantom(p, winner);
-    for (const p of this.state.only200.filter(x => x.gammaId === gammaId && x.winner == null)) p.winner = winner;
+    const o2 = this.state.only200.filter(x => x.gammaId === gammaId && x.winner == null);
+    for (const p of o2) p.winner = winner;
+    if (o2.length) this._save(); // si en ese mercado no había otra posición, nadie más guarda y se perdía al reiniciar
   }
 
   // Resultado de una posición al precio del libro REST (cuenta "con el libro REST")
