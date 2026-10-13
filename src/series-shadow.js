@@ -62,7 +62,7 @@ class SeriesShadow {
       this.stats.markets++;
       this.cur = { startTs, endTs: startTs + this.periodMs, slug: `${this.slugPrefix}-${startTs / 1000}`, partial: now - startTs > 5000,
         tokens: null, upIdx: 0, question: null, discovering: false, lastTry: 0, discoverErr: null, inFlight: false, skipped: 0,
-        strike: null, rows: [], restMs: [], closed: false };
+        strike: null, rows: [], restMs: [], restReq: 0, restFail: 0, restCodes: {}, closed: false };
     }
     const m = this.cur;
     if (!m.tokens) { if (!m.discovering && now - m.lastTry >= 5000) m.done = this._discover(m); return; }
@@ -97,7 +97,16 @@ class SeriesShadow {
     m.inFlight = true;
     try {
       const t0 = this.now();
-      const [Y, N] = await Promise.all([m.tokens.yes, m.tokens.no].map(tok => fetchRestBook(this.fetch, tok).catch(() => null)));
+      // Pedido REST fallido: se cuenta por código (HTTP 429 = demasiados pedidos; el criterio de apagado mira esto)
+      const fail = e => {
+        m.restFail++;
+        const code = /HTTP (\d{3})/.exec(e?.message || '')?.[1] || 'sin respuesta';
+        m.restCodes[code] = (m.restCodes[code] || 0) + 1;
+        if (code === '429' && !m.warned429) { m.warned429 = true; logger.warn(`[SERIE ${this.id}] la API REST respondió 429 (demasiados pedidos) en ${m.slug}`); }
+        return null;
+      };
+      m.restReq += 2;
+      const [Y, N] = await Promise.all([m.tokens.yes, m.tokens.no].map(tok => fetchRestBook(this.fetch, tok).catch(fail)));
       const now = this.now();
       if (m.closed || now > m.endTs) return;
       if (!Y && !N) this.stats.restErrors++;
@@ -189,7 +198,8 @@ class SeriesShadow {
       ? `regla de B: ${b.side} a $${b.ask.toFixed(2)} con ${(b.edge * 100).toFixed(1)} pts a ${Math.round(b.sl)} s → ${b.win == null ? 'sin ganador' : b.win ? 'gana' : 'pierde'}`
       : `regla de B: no entra${b.best ? ` (mejor ${(b.best.edge * 100).toFixed(1)} pts, ${b.best.side} a $${b.best.ask.toFixed(2)})` : ''}`;
     return `[SERIE ${this.id}] ${marketLabel(m.question)} | ganó ${winner || 'sin dato de Gamma'} | strike ${m.strike != null ? `$${m.strike.toFixed(2)}` : 'n/a'}`
-      + ` | ${rows.length} muestras (${withModel} con modelo${m.partial ? ', mercado empezado antes del arranque' : ''}${m.skipped ? `, ${m.skipped} saltadas` : ''}; REST p50 ${p50 ?? 'n/a'} ms)`
+      + ` | ${rows.length} muestras (${withModel} con modelo${m.partial ? ', mercado empezado antes del arranque' : ''}${m.skipped ? `, ${m.skipped} saltadas` : ''}; REST p50 ${p50 ?? 'n/a'} ms`
+      + `, sin respuesta ${m.restFail || 0} de ${m.restReq || 0}${m.restFail ? ` [${Object.entries(m.restCodes).map(([k, v]) => `${k}: ${v}`).join(', ')}]` : ''})`
       + ` | spread medio de Sí ${spreads.length ? (spreads.reduce((a, x) => a + x, 0) / spreads.length * 100).toFixed(1) : 'n/a'}¢ | ${rule}`;
   }
 }

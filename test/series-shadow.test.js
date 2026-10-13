@@ -106,7 +106,7 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   assert.deepStrictEqual([b1.fire, b1.side, b1.ask, b1.sl, b1.win], [true, 'UP', 0.50, 100, true]);
   near(b1.edge, 0.495 + 0.15 - 0.50 - 0.072 * 0.25, 1e-9);
   const sum = s.summary(m, 'UP');
-  assert.ok(sum.includes('Oct 12, 11:00AM-11:15AM ET | ganó UP | strike $100000.00 | 898 muestras (897 con modelo; REST p50 0 ms)'), sum);
+  assert.ok(sum.includes('Oct 12, 11:00AM-11:15AM ET | ganó UP | strike $100000.00 | 898 muestras (897 con modelo; REST p50 0 ms, sin respuesta 0 de 1796)'), sum);
   assert.ok(sum.includes('spread medio de Sí 1.0¢ | regla de B: UP a $0.50 con 12.7 pts a 100 s → gana'), sum);
   // Sin ganador oficial después de los reintentos: no se escribe
   const m2 = s.cur;
@@ -129,6 +129,13 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   s2._tick();
   await pend;
   assert.deepStrictEqual([s2.cur.skipped, s2.cur.rows.length], [1, 1]);
+  // Pedidos REST con error: se cuentan por código en la línea del mercado (429 = demasiados pedidos)
+  const fetch429 = async (url) => (new URL(url).pathname === '/book' ? { ok: false, status: 429 } : fetchFn(url));
+  const s3 = new SeriesShadow({ fetchFn: fetch429, dataDir: dir, now: () => S0 + 2000, strikeFn: () => null, fairFn: () => null });
+  s3._tick(); await s3.cur.done;        // busca el mercado
+  s3._tick(); await s3.cur.done;        // una muestra: los dos libros dan 429
+  assert.deepStrictEqual([s3.cur.restReq, s3.cur.restFail, s3.cur.restCodes['429']], [2, 2, 2]);
+  assert.ok(s3.summary(s3.cur, null).includes('1 muestras (0 con modelo; REST p50 0 ms, sin respuesta 2 de 2 [429: 2])'), s3.summary(s3.cur, null));
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('series-shadow: 34 ok');
+  console.log('series-shadow: 36 ok');
 })().catch(e => { console.error(e); process.exit(1); });
