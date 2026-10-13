@@ -11,7 +11,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { twapFairUp, normCdf } = require('../src/fair-value');
-const { SeriesShadow, COLS } = require('../src/series-shadow');
+const { SeriesShadow, COLS, gammaPriceToBeat } = require('../src/series-shadow');
 const { load, firstFire } = require('../scripts/backtest');
 
 const near = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) < tol, `${a} ≠ ${b}`);
@@ -56,7 +56,7 @@ const tick = () => new Promise(r => setTimeout(r, 0));
     throw new Error(`url inesperada ${url}`);
   };
   let strike = null, pNow = 0.5;
-  const s = new SeriesShadow({ fetchFn, dataDir: dir, now: () => clock, resolveDelayMs: 0, resolveEveryMs: 0, resolveTries: 3,
+  const s = new SeriesShadow({ fetchFn, dataDir: dir, now: () => clock, resolveDelayMs: 0, resolveEveryMs: 0, resolveTries: 3, ptbTries: 0,
     strikeFn: ms => (ms === S0 ? strike : null), fairFn: (K, endMs, now) => ({ p: pNow, sigma: 70e-6, sigmaShort: 50e-6, sigmaLong: 50e-6 }),
     spotFn: () => 100090 });
   const step = async () => { s._tick(); await s.cur.done; };
@@ -136,6 +136,60 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   s3._tick(); await s3.cur.done;        // una muestra: los dos libros dan 429
   assert.deepStrictEqual([s3.cur.restReq, s3.cur.restFail, s3.cur.restCodes['429']], [2, 2, 2]);
   assert.ok(s3.summary(s3.cur, null).includes('1 muestras (0 con modelo; REST p50 0 ms, sin respuesta 2 de 2 [429: 2])'), s3.summary(s3.cur, null));
+  // 3) Sombra de ETH 5 min: slug y período propios; al resolver guarda el priceToBeat de Gamma (si todavía no está,
+  //    espera unos intentos más solo por él) y lo muestra con la diferencia contra el strike
+  assert.deepStrictEqual([gammaPriceToBeat({ eventMetadata: '{"priceToBeat":3999.37,"x":1}' }), gammaPriceToBeat({ eventMetadata: { priceToBeat: '83497.33' } }),
+    gammaPriceToBeat({ eventMetadata: null }), gammaPriceToBeat({}), gammaPriceToBeat(null), gammaPriceToBeat({ eventMetadata: '{"priceToBeat":0}' })],
+    [3999.37, 83497.33, null, null, null, null]);
+  const E = 300000, E0 = Math.floor(S0 / E) * E;
+  const gammaE = new Map();
+  const fetchE = async (url) => {
+    const u = new URL(url);
+    if (u.pathname === '/events') {
+      const g = gammaE.get(u.searchParams.get('slug'));
+      const ev = g ? [{ title: 'Ethereum Up or Down - October 12, 11:00AM-11:05AM ET', eventMetadata: g.meta,
+        markets: [{ clobTokenIds: '["EU", "ED"]', outcomes: '["Up", "Down"]', closed: g.closed, outcomePrices: g.prices }] }] : [];
+      return { ok: true, json: async () => ev };
+    }
+    if (u.pathname === '/book') return { ok: true, json: async () => ({ bids: [{ price: '0.49', size: '10' }], asks: [{ price: '0.51', size: '10' }] }) };
+    throw new Error(`url inesperada ${url}`);
+  };
+  let ce = E0 + 1000;
+  const se = new SeriesShadow({ id: 'eth5m', slugPrefix: 'eth-updown-5m', periodS: 300, fetchFn: fetchE, dataDir: dir, now: () => ce,
+    resolveDelayMs: 0, resolveEveryMs: 0, resolveTries: 3, ptbTries: 2, strikeFn: () => 3999.5, fairFn: () => ({ p: 0.5, sigma: 1e-4 }),
+    spotFn: () => 4000 });
+  gammaE.set(`eth-updown-5m-${E0 / 1000}`, { closed: false, prices: '["0.5", "0.5"]', meta: null });
+  se._tick(); await se.cur.done;          // busca el mercado
+  for (let t = 2; t < 10; t++) { ce = E0 + t * 1000; se._tick(); await se.cur.done; }
+  const me = se.cur;
+  assert.deepStrictEqual([me.slug, me.endTs - me.startTs, me.rows.length, me.tokens], [`eth-updown-5m-${E0 / 1000}`, E, 8, { yes: 'EU', no: 'ED' }]);
+  ce = E0 + E + 100;
+  se._tick();                             // cierra; el siguiente no está en Gamma
+  const g0 = gammaE.get(me.slug);
+  g0.closed = true; g0.prices = '["0", "1"]';
+  await tick(); await me.done;            // ganador sin priceToBeat todavía: espera
+  assert.ok(se.pending.has(me), 'espera el priceToBeat');
+  g0.meta = '{"priceToBeat":3999.37}';
+  await tick(); await me.done;
+  assert.ok(!se.pending.has(me));
+  assert.strictEqual(me.ptb, 3999.37);
+  const sumE = se.summary(me, 'DOWN');
+  assert.ok(sumE.includes('ganó DOWN | strike $3999.50 (priceToBeat $3999.37, Δ +$0.13) | 8 muestras (8 con modelo;'), sumE);
+  await new Promise(r => setTimeout(r, 30)); // escritura en segundo plano
+  const recE = JSON.parse(fs.readFileSync(path.join(dir, 'shadow-ticks-eth5m.jsonl'), 'utf8').trim());
+  assert.deepStrictEqual([recE.series, recE.winner, recE.strike, recE.price_to_beat, recE.samples], ['eth5m', 'DOWN', 3999.5, 3999.37, 8]);
+  // Si Gamma no lo publica en los intentos extra se escribe igual, sin el dato
+  const me2 = se.cur;
+  gammaE.set(me2.slug, { closed: false, prices: '["0.5", "0.5"]', meta: null });
+  for (let t = 1; t < 10; t++) { ce = E0 + E + t * 1000; se._tick(); await se.cur.done; } // lo vuelve a buscar a los 5 s
+  ce = E0 + 2 * E + 100;
+  se._tick();
+  const g1 = gammaE.get(me2.slug);
+  g1.closed = true; g1.prices = '["1", "0"]';
+  for (let i = 0; i < 3; i++) { await tick(); await me2.done; }
+  assert.ok(!se.pending.has(me2));
+  assert.deepStrictEqual([me2.ptb, me2.rows.length, se.stats.written], [undefined, 3, 2]);
+  assert.ok(se.summary(me2, 'UP').includes('ganó UP | strike $3999.50 |'), se.summary(me2, 'UP'));
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('series-shadow: 36 ok');
+  console.log('series-shadow: 46 ok');
 })().catch(e => { console.error(e); process.exit(1); });

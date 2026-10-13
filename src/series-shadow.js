@@ -9,7 +9,9 @@
  * ganador oficial en Gamma y agrega una línea por mercado a DATA_DIR/shadow-ticks-<id>.jsonl con el formato de
  * shadow-ticks.jsonl (el backtest la lee igual: node scripts/backtest.js /data/shadow-ticks-btc15m.jsonl) y deja una
  * línea [SERIE <id>] con el ganador, el libro y qué habría hecho la regla de la cuenta B (anclada, 120-30 s).
- * SERIES_SHADOW=off lo apaga.
+ * Al resolver guarda también el priceToBeat que Gamma publica en eventMetadata (valida el strike).
+ * SERIES_SHADOW=off apaga la de BTC 15 min; SERIES_SHADOW_ETH=off la de ETH 5 min (id eth5m, precio de Chainlink ETH
+ * por PolyBolt, src/aux-price.js; en su archivo la columna "btc" lleva el precio de ETH).
  */
 'use strict';
 const fs = require('fs');
@@ -26,13 +28,20 @@ const I = Object.fromEntries(COLS.map((k, i) => [k, i]));
 const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const rnd = (v, d) => (v == null || !Number.isFinite(v)) ? null : Math.round(v * 10 ** d) / 10 ** d;
 const parseArr = v => { try { const a = typeof v === 'string' ? JSON.parse(v) : v; return Array.isArray(a) ? a : null; } catch { return null; } };
+// priceToBeat que Gamma publica en eventMetadata del evento (al resolver; a veces un rato después del ganador)
+const gammaPriceToBeat = ev => {
+  const meta = ev?.eventMetadata;
+  const txt = typeof meta === 'string' ? meta : meta ? JSON.stringify(meta) : '';
+  const v = parseFloat(/priceToBeat"?\s*:\s*"?([0-9.]+)/.exec(txt)?.[1]);
+  return Number.isFinite(v) && v > 0 ? v : null;
+};
 
 class SeriesShadow {
   // fairFn(K, endMs, nowMs) → { p, sigma, sigmaShort, sigmaLong } | null; strikeFn(startMs) → número | null
   constructor({ id = 'btc15m', slugPrefix = 'btc-updown-15m', periodS = 900, fairFn, strikeFn, spotFn = () => null,
     fetchFn = globalThis.fetch, dataDir = process.env.DATA_DIR || '/data', sampleMs = 1000, now = Date.now,
-    resolveDelayMs = 30000, resolveEveryMs = 20000, resolveTries = 45, env = process.env } = {}) {
-    Object.assign(this, { id, slugPrefix, fairFn, strikeFn, spotFn, sampleMs, now, resolveDelayMs, resolveEveryMs, resolveTries });
+    resolveDelayMs = 30000, resolveEveryMs = 20000, resolveTries = 45, ptbTries = 3, env = process.env } = {}) {
+    Object.assign(this, { id, slugPrefix, fairFn, strikeFn, spotFn, sampleMs, now, resolveDelayMs, resolveEveryMs, resolveTries, ptbTries });
     this.periodMs = periodS * 1000;
     this.fetch = fetchFn;
     this.file = path.join(dataDir, `shadow-ticks-${id}.jsonl`);
@@ -145,8 +154,12 @@ class SeriesShadow {
       const up = parseFloat(prices?.[m.upIdx]), dn = parseFloat(prices?.[1 - m.upIdx]);
       if (r?.mk.closed === true && up >= 0.99) winner = 'UP';
       else if (r?.mk.closed === true && dn >= 0.99) winner = 'DOWN';
+      const ptb = gammaPriceToBeat(r?.ev);
+      if (ptb != null) m.ptb = ptb;
     } catch (_) {}
-    if (!winner && attempt + 1 < this.resolveTries) {
+    // Sin ganador: reintenta; con ganador pero sin priceToBeat todavía: espera unos intentos más solo por él
+    const waitPtb = winner && m.ptb == null && (m.ptbWaits = (m.ptbWaits || 0) + 1) <= this.ptbTries;
+    if ((!winner && attempt + 1 < this.resolveTries) || waitPtb) {
       const t = setTimeout(() => { m.done = this._resolve(m, attempt + 1); }, this.resolveEveryMs);
       t.unref?.();
       return;
@@ -158,7 +171,8 @@ class SeriesShadow {
   _write(m, winner) {
     if (winner) {
       const rec = { v: 1, series: this.id, question: m.question, slug: m.slug, start_ts: m.startTs, end_ts: m.endTs,
-        strike: m.strike, strike_source: m.strike != null ? 'chainlink_twap_60s' : null, winner, winner_source: 'gamma',
+        strike: m.strike, strike_source: m.strike != null ? 'chainlink_twap_60s' : null, price_to_beat: m.ptb ?? null,
+        winner, winner_source: 'gamma',
         partial: m.partial, samples: m.rows.length, skipped: m.skipped, cols: COLS, rows: m.rows };
       fs.promises.appendFile(this.file, JSON.stringify(rec) + '\n').catch(e => logger.warn(`[SERIE ${this.id}] escritura: ${e.message}`));
       this.stats.written++;
@@ -197,11 +211,13 @@ class SeriesShadow {
     const rule = b.fire
       ? `regla de B: ${b.side} a $${b.ask.toFixed(2)} con ${(b.edge * 100).toFixed(1)} pts a ${Math.round(b.sl)} s → ${b.win == null ? 'sin ganador' : b.win ? 'gana' : 'pierde'}`
       : `regla de B: no entra${b.best ? ` (mejor ${(b.best.edge * 100).toFixed(1)} pts, ${b.best.side} a $${b.best.ask.toFixed(2)})` : ''}`;
-    return `[SERIE ${this.id}] ${marketLabel(m.question)} | ganó ${winner || 'sin dato de Gamma'} | strike ${m.strike != null ? `$${m.strike.toFixed(2)}` : 'n/a'}`
+    const d = m.strike != null && m.ptb != null ? m.strike - m.ptb : null;
+    const ptb = m.ptb != null ? ` (priceToBeat $${m.ptb.toFixed(2)}${d != null ? `, Δ ${d >= 0 ? '+' : '−'}$${Math.abs(d).toFixed(2)}` : ''})` : '';
+    return `[SERIE ${this.id}] ${marketLabel(m.question)} | ganó ${winner || 'sin dato de Gamma'} | strike ${m.strike != null ? `$${m.strike.toFixed(2)}` : 'n/a'}${ptb}`
       + ` | ${rows.length} muestras (${withModel} con modelo${m.partial ? ', mercado empezado antes del arranque' : ''}${m.skipped ? `, ${m.skipped} saltadas` : ''}; REST p50 ${p50 ?? 'n/a'} ms`
       + `, sin respuesta ${m.restFail || 0} de ${m.restReq || 0}${m.restFail ? ` [${Object.entries(m.restCodes).map(([k, v]) => `${k}: ${v}`).join(', ')}]` : ''})`
       + ` | spread medio de Sí ${spreads.length ? (spreads.reduce((a, x) => a + x, 0) / spreads.length * 100).toFixed(1) : 'n/a'}¢ | ${rule}`;
   }
 }
 
-module.exports = { SeriesShadow, COLS };
+module.exports = { SeriesShadow, COLS, gammaPriceToBeat };
