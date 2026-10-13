@@ -28,6 +28,27 @@ function probUp(S, K, T, sigma) {
   return normCdf(Math.log(S / K) / (sigma * Math.sqrt(T)));
 }
 
+// Modelo TWAP (Polymarket resuelve con el promedio de Chainlink en [fin − W, fin]): P = proyección de Chainlink,
+// T = segundos hasta el cierre desde el instante que representa P, σp = σ·P (movimiento browniano):
+//  - T ≥ W: E[A] = P, Var = σp²·(T − 2W/3)            (parte futura + promedio de W s)
+//  - T < W: ya pasaron e = W − T s de la ventana con promedio m (realized; sin dato, P):
+//           E[A] = (e·m + T·P)/W, Var = σp²·T³/(3·W²)
+// Devuelve { p = P(A ≥ K), mean, sd }. La usan el FAIR del bot y la sombra de otras series (src/series-shadow.js).
+function twapFairUp(P, K, T, W, sigma, realized = null) {
+  const sp = sigma * P;
+  let mean, sd;
+  if (T >= W) {
+    mean = P;
+    sd = sp * Math.sqrt(T - (2 * W) / 3);
+  } else {
+    const e = W - T;
+    mean = realized != null ? (e * realized + T * P) / W : P;
+    sd = sp * Math.sqrt((T ** 3) / (3 * W * W));
+  }
+  const p = sd > 0 ? normCdf((mean - K) / sd) : (mean >= K ? 1 : 0);
+  return { p, mean, sd };
+}
+
 class FairValue {
   constructor({
     volWindowSec = parseInt(process.env.FV_VOL_WINDOW_SEC || '900'), // 15 min
@@ -107,4 +128,4 @@ class FairValue {
   }
 }
 
-module.exports = { FairValue, probUp, normCdf };
+module.exports = { FairValue, probUp, normCdf, twapFairUp };

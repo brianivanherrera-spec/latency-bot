@@ -9,7 +9,7 @@ const { PolymarketWS } = require('./polymarket-ws');
 const { ChainlinkRTDS } = require('./chainlink-rtds');
 const { ChainlinkSpot } = require('./chainlink-spot');
 const { PriceToBeat } = require('./price-to-beat');
-const { FairValue } = require('./fair-value');
+const { FairValue, twapFairUp } = require('./fair-value');
 const { Shadow, MARKETS_FILE: SHADOW_MARKETS_FILE, TICKS_FILE: SHADOW_TICKS_FILE } = require('./shadow');
 const { MarketRecorder } = require('./market-recorder');
 const marketResearch = require('./market-research');
@@ -1628,6 +1628,7 @@ async function main() {
     //  - T >= 60: E[A] = P, Var = σp²·(T − 40)            (parte futura + promedio de 60 s)
     //  - T <  60: ya pasaron e = 60 − T s de la ventana con promedio m:
     //             E[A] = (e·m + T·P)/60, Var = σp²·T³/(3·60²)
+    // (la fórmula está en twapFairUp, src/fair-value.js; la usa también fairAt)
     const K = twapStrike(cachedMarket);
     const last = clSpot.getLast();
     const P = chainlinkNowcast();
@@ -1637,18 +1638,8 @@ async function main() {
       // Chainlink). Antes endMs − last.ts: el último dato de Chainlink puede tener segundos.
       const T = Math.max(0, (endMs - Date.now() - lagEstimateMs) / 1000);
       if (T <= 0) return null;
-      const sp = sigma * P;
-      let mean, sd;
-      if (T >= W) {
-        mean = P;
-        sd = sp * Math.sqrt(T - (2 * W) / 3);
-      } else {
-        const realized = clSpot.getTwap(last.ts, (W - T) * 1000, 0.5);
-        const e = W - T;
-        mean = realized ? (e * realized.value + T * P) / W : P;
-        sd = sp * Math.sqrt((T ** 3) / (3 * W * W));
-      }
-      const fairUp = sd > 0 ? normCdf((mean - K) / sd) : (mean >= K ? 1 : 0);
+      const realized = T < W ? clSpot.getTwap(last.ts, (W - T) * 1000, 0.5) : null;
+      const { p: fairUp, mean } = twapFairUp(P, K, T, W, sigma, realized ? realized.value : null);
       return out(fairUp, {
         fair_t_rem_s: Math.round(T),
         fair_strike: parseFloat(K.toFixed(2)),
@@ -1667,6 +1658,19 @@ async function main() {
     return out(fairUp, { fair_t_rem_s: Math.round(tRem), fair_strike: strike, fair_src: 'binance' });
   };
 
+  // El mismo modelo TWAP para un strike y un cierre cualesquiera (sombra de otras series, src/series-shadow.js):
+  // { p, sigma (× FAIR_VOL_MULT), sigmaShort, sigmaLong } o null sin Chainlink
+  const fairAt = (K, endMs, nowMs) => {
+    const { raw, sS, sL } = fairSigmas(nowMs);
+    const last = clSpot.getLast(), P = chainlinkNowcast();
+    if (!raw || K == null || !last || P == null) return null;
+    const sigma = raw * FAIR_VOL_MULT, W = TWAP_WINDOW_MS / 1000;
+    const T = Math.max(0, (endMs - Date.now() - lagEstimateMs) / 1000);
+    if (T <= 0) return null;
+    const realized = T < W ? clSpot.getTwap(last.ts, (W - T) * 1000, 0.5) : null;
+    return { p: twapFairUp(P, K, T, W, sigma, realized ? realized.value : null).p, sigma, sigmaShort: sS, sigmaLong: sL };
+  };
+
   // Modo sombra: usar este FAIR (TWAP de Chainlink, σ × FAIR_VOL_MULT) como modelo principal.
   // El modelo propio de shadow.js (spot de Binance) queda solo como respaldo.
   shadow?.setFairFn((gammaId, nowMs) => {
@@ -1676,6 +1680,14 @@ async function main() {
     return f ? { p: f.fair_up, strike: f.fair_strike, src: f.fair_src, sigma: f.fair_sigma_ps,
       sigmaShort: f.fair_sigma_short, sigmaLong: f.fair_sigma_long } : null;
   });
+
+  // Sombra de los mercados de BTC de 15 min (plan del 12/10, b; solo registro): libro por REST, el mismo modelo TWAP y
+  // strike = TWAP 60 s de Chainlink en la apertura (src/series-shadow.js). SERIES_SHADOW=off la apaga.
+  if (process.env.SERIES_SHADOW !== 'off') {
+    const { SeriesShadow } = require('./series-shadow');
+    new SeriesShadow({ fairFn: fairAt, strikeFn: ms => rtdsStrike({ startTime: ms })?.value ?? null,
+      spotFn: () => (btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null) }).start();
+  }
 
   // ─── OPEN-SNAP (sombra): ¿el mercado abre mal valuado? ─────────────────────
   // El strike es el TWAP 60 s del minuto previo a la apertura, así que desde el segundo 0
