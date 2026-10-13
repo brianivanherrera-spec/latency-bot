@@ -924,11 +924,20 @@ async function main() {
     logger.info(`[PAPER-B] ✅ Cuenta B activa — ${paperB.describe()}`);
     logger.info(paperB.summary());
   }
+  // Segunda conexión al WS de Polymarket, solo de medición (src/ws-probe.js): sigue los tokens de la
+  // principal y no entra a ninguna decisión; [WS-DUAL] cada minuto. WS_PROBE=off la apaga.
+  let wsProbe = null;
+  if (process.env.WS_PROBE !== 'off') {
+    const { WsProbe } = require('./ws-probe');
+    wsProbe = new WsProbe().attach(polyWs).start();
+    shutdownHooks.push(async () => wsProbe.stop());
+    logger.info(`[WS-DUAL] ✅ ${wsProbe.describe()}`);
+  }
   // Chequeo del libro: el mejor bid/ask del WS contra la API REST de Polymarket cada 30 s (solo
-  // registro). BOOK_CHECK_MS=0 lo apaga.
+  // registro; con la segunda conexión, también la de ella). BOOK_CHECK_MS=0 lo apaga.
   if (process.env.BOOK_CHECK_MS !== '0') {
     const { BookCheck } = require('./book-check');
-    new BookCheck({ polyWs }).start();
+    new BookCheck({ polyWs, probe: wsProbe }).start();
     logger.info(`[BOOK-CHECK] ✅ Comparando el libro del WS con la API REST de Polymarket cada ${Math.round(parseInt(process.env.BOOK_CHECK_MS || '30000') / 1000)} s`);
   }
   const mRecorder = new MarketRecorder();  // timeline completo por mercado

@@ -11,6 +11,9 @@
  * muestra también cuánto antes que la foto del REST se fijó el top del WS (topTs, hora del servidor).
  * fetchRestBook/restSizeUpTo/restVwapUpTo los usa también el paper para comparar cada intento con el REST.
  * Logs: [BOOK-CHECK] con detalle cuando difiere más de 1¢, y un resumen cada BOOK_CHECK_SUMMARY_MIN (15).
+ * Con la segunda conexión de medición (probe, src/ws-probe.js) también compara su libro con el REST:
+ * en cada diferencia del WS principal muestra el top de la segunda (¿coincide con el REST o con el
+ * WS principal?) y el resumen cuenta cuántas veces la segunda estaba igual al REST.
  */
 'use strict';
 const { Logger } = require('./logger');
@@ -56,9 +59,10 @@ function restVwapUpTo(book, limit, size) {
 }
 
 class BookCheck {
-  constructor({ polyWs, fetchFn = globalThis.fetch, intervalMs = parseInt(process.env.BOOK_CHECK_MS || '30000'),
+  constructor({ polyWs, probe = null, fetchFn = globalThis.fetch, intervalMs = parseInt(process.env.BOOK_CHECK_MS || '30000'),
     summaryMin = parseFloat(process.env.BOOK_CHECK_SUMMARY_MIN || '15'), lagMs = parseInt(process.env.BOOK_CHECK_LAG_MS || '100') } = {}) {
     this.poly = polyWs;
+    this.probe = probe;
     this.fetch = fetchFn;
     this.intervalMs = intervalMs;
     this.summaryMin = summaryMin;
@@ -67,7 +71,10 @@ class BookCheck {
     this._timers = [];
   }
 
-  _reset() { this.s = { n: 0, same: 0, oneCent: 0, more: 0, moreMoving: 0, moreLagged: 0, moreReal: 0, restErr: 0, wsMissing: 0, restMs: [], restAge: [], wsLag: [], since: Date.now() }; }
+  _reset() {
+    this.s = { n: 0, same: 0, oneCent: 0, more: 0, moreMoving: 0, moreLagged: 0, moreReal: 0, restErr: 0, wsMissing: 0, restMs: [], restAge: [], wsLag: [], since: Date.now(),
+      n2: 0, same2: 0, more2: 0, miss2: 0, fix2: 0 }; // segunda conexión: igual al REST, más de 1¢, sin dato, y en las diferencias del principal igual al REST
+  }
 
   start() {
     if (!(this.intervalMs > 0)) return;
@@ -102,28 +109,43 @@ class BookCheck {
     // Retraso del WS: el del último mensaje, si llegó hace menos de 5 s
     const lag = Number.isFinite(P._lastLagMs) && Date.now() - (P._lastLagAt || 0) < 5000 ? P._lastLagMs : null;
     if (lag != null) this.s.wsLag.push(lag);
+    const P2 = this.probe;
     const before = toks.map(([, t]) => this._ws(t));
+    const before2 = P2 ? toks.map(([, t]) => P2.top(t)) : null;
     const rest = await Promise.all(toks.map(([, t]) => this._rest(t).catch(() => null)));
     const after = toks.map(([, t]) => this._ws(t));
+    const after2 = P2 ? toks.map(([, t]) => P2.top(t)) : null;
+    const closest = (arr, r) => arr.reduce((a, w) => (BookCheck.diff(w, r) < BookCheck.diff(a, r) ? w : a));
     toks.forEach(([side], i) => {
       const r = rest[i];
       if (!r) { this.s.restErr++; return; }
       this.s.restMs.push(r.ms);
       if (r.age != null) this.s.restAge.push(r.age);
+      // Segunda conexión contra el mismo REST (antes o después de la consulta, como el principal)
+      const ws2 = P2 ? [before2[i], after2[i]].filter(Boolean) : [];
+      const b2 = ws2.length ? closest(ws2, r) : null;
+      const d2 = b2 ? BookCheck.diff(b2, r) : null;
+      if (P2) {
+        if (!b2) this.s.miss2++;
+        else { this.s.n2++; if (d2 < 0.0005) this.s.same2++; else if (d2 > 0.0105) this.s.more2++; }
+      }
       const ws = [before[i], after[i]].filter(Boolean);
       if (!ws.length) { this.s.wsMissing++; return; }
-      const best = ws.reduce((a, w) => (BookCheck.diff(w, r) < BookCheck.diff(a, r) ? w : a));
+      const best = closest(ws, r);
       const d = BookCheck.diff(best, r);
       this.s.n++;
       if (d < 0.0005) { this.s.same++; return; }
       if (d <= 0.0105) { this.s.oneCent++; return; }
       this.s.more++;
+      if (d2 != null && d2 <= 0.0105) this.s.fix2++;
       const moving = !before[i] || !after[i] || BookCheck.diff(before[i], after[i]) >= 0.0005;
       const lagged = !moving && lag != null && lag >= this.lagMs;
       if (moving) this.s.moreMoving++; else if (lagged) this.s.moreLagged++; else this.s.moreReal++;
       const kind = moving ? '(libro moviéndose)' : lagged ? `(WS atrasado ${lag} ms)` : '(WS al día: diferencia REAL)';
       const topAge = r.ts != null && after[i]?.topTs != null ? r.ts - after[i].topTs : null;
-      logger.warn(`[BOOK-CHECK] ⚠️ ${side} ${kind}: WS antes ${px(before[i]?.bid)}/${px(before[i]?.ask)} después ${px(after[i]?.bid)}/${px(after[i]?.ask)} vs REST ${px(r.bid)}/${px(r.ask)} (respuesta ${r.ms} ms${r.age != null ? `, snapshot de hace ${r.age} ms` : ''}${lag != null ? `, retraso del WS ${lag} ms` : ''}${topAge != null ? `, top del WS fijado ${topAge} ms antes que la foto del REST` : ''})`);
+      const two = !P2 ? '' : !b2 ? ' | WS2 sin dato'
+        : ` | WS2 ${px(b2.bid)}/${px(b2.ask)} (${d2 < 0.0005 ? 'igual al REST' : d2 <= 0.0105 ? 'a 1¢ del REST' : BookCheck.diff(b2, best) < 0.0005 ? 'igual al WS principal' : 'distinto de los dos'}${r.ts != null && b2.topTs != null ? `, fijado ${r.ts - b2.topTs} ms antes que la foto del REST` : ''})`;
+      logger.warn(`[BOOK-CHECK] ⚠️ ${side} ${kind}: WS antes ${px(before[i]?.bid)}/${px(before[i]?.ask)} después ${px(after[i]?.bid)}/${px(after[i]?.ask)} vs REST ${px(r.bid)}/${px(r.ask)} (respuesta ${r.ms} ms${r.age != null ? `, snapshot de hace ${r.age} ms` : ''}${lag != null ? `, retraso del WS ${lag} ms` : ''}${topAge != null ? `, top del WS fijado ${topAge} ms antes que la foto del REST` : ''})${two}`);
     });
   }
 
@@ -133,7 +155,8 @@ class BookCheck {
     const mins = Math.round((Date.now() - s.since) / 60000);
     const ages = [...s.restAge].sort((a, b) => a - b);
     const lags = [...s.wsLag].sort((a, b) => a - b);
-    return `[BOOK-CHECK] últimos ${mins} min, libro del WS vs API REST de Polymarket (Sí y No, cada ${Math.round(this.intervalMs / 1000)} s): n=${s.n} | iguales ${s.same} (${pct(s.same)}) | 1¢ de diferencia ${s.oneCent} (${pct(s.oneCent)}) | más de 1¢ ${s.more} (con el libro moviéndose ${s.moreMoving}, con el WS atrasado ${s.moreLagged}, con el WS al día ${s.moreReal}) | REST sin respuesta ${s.restErr} | WS sin dato ${s.wsMissing} | REST p50 ${ms.length ? ms[Math.floor(ms.length / 2)] : 'n/a'} ms, snapshot REST de hace p50 ${ages.length ? ages[Math.floor(ages.length / 2)] : 'n/a'} ms | retraso del WS al chequear p50 ${lags.length ? lags[Math.floor(lags.length / 2)] : 'n/a'} ms, máx ${lags.length ? lags[lags.length - 1] : 'n/a'} ms`;
+    return `[BOOK-CHECK] últimos ${mins} min, libro del WS vs API REST de Polymarket (Sí y No, cada ${Math.round(this.intervalMs / 1000)} s): n=${s.n} | iguales ${s.same} (${pct(s.same)}) | 1¢ de diferencia ${s.oneCent} (${pct(s.oneCent)}) | más de 1¢ ${s.more} (con el libro moviéndose ${s.moreMoving}, con el WS atrasado ${s.moreLagged}, con el WS al día ${s.moreReal}) | REST sin respuesta ${s.restErr} | WS sin dato ${s.wsMissing} | REST p50 ${ms.length ? ms[Math.floor(ms.length / 2)] : 'n/a'} ms, snapshot REST de hace p50 ${ages.length ? ages[Math.floor(ages.length / 2)] : 'n/a'} ms | retraso del WS al chequear p50 ${lags.length ? lags[Math.floor(lags.length / 2)] : 'n/a'} ms, máx ${lags.length ? lags[lags.length - 1] : 'n/a'} ms` +
+      (this.probe ? ` | WS2 (medición): igual al REST ${s.same2} de ${s.n2}, más de 1¢ ${s.more2}, sin dato ${s.miss2}; en las ${s.more} diferencias de más de 1¢ del WS principal, WS2 coincidía con el REST (±1¢) en ${s.fix2}` : '');
   }
 }
 

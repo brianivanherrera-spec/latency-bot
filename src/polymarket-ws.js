@@ -138,6 +138,10 @@ class PolymarketWS {
 
   onPrice(cb) { this._priceCallback = cb; }
   onResolved(cb) { this._resolvedCallback = cb; }
+  // Segunda conexión de medición (src/ws-probe.js): recibe los tokens de cada subscribe, la hora de
+  // llegada de cada evento y los cortes de esta conexión. Nunca cambia nada de esta conexión.
+  setMirror(m) { this._mirror = m || null; }
+  _toMirror(fn) { if (this._mirror) { try { fn(this._mirror); } catch (_) {} } }
   isConnected() { return this._connected; }
 
   // Devuelve el estado actual del book para un par YES/NO
@@ -664,11 +668,13 @@ class PolymarketWS {
       // setImmediate cede el event loop — evita slow consumer (code=1013)
       loopMonitor.count('poly_msgs');
       loopMonitor.count('poly_kb', raw.length / 1024);
+      const at = Date.now(); // llegada (para comparar con la segunda conexión de medición)
       setImmediate(() => {
+        let events = null;
         try {
           loopMonitor.time('poly_msg', () => {
             const parsed = JSON.parse(raw);
-            const events = Array.isArray(parsed) ? parsed : [parsed];
+            events = Array.isArray(parsed) ? parsed : [parsed];
             for (const msg of events) this._handleMessage(msg);
           });
         } catch (e) {
@@ -676,6 +682,7 @@ class PolymarketWS {
             logger.warn(`Parse error: ${e.message} | raw: ${raw.slice(0, 80)}`);
           }
         }
+        if (events && this._mirror) loopMonitor.time('ws2', () => this._toMirror(m => m.mainEvents(events, at)));
       });
     });
 
@@ -696,6 +703,7 @@ class PolymarketWS {
       if (was) logger.warn(`Desconectado (code=${code}${reason ? ` ${reason}` : ''})`);
       // Estado del event loop en el minuto del corte — para saber qué lo trabó
       if (code === 1013) loopMonitor.log(`corte 1013 | ${loopMonitor.snapshot().text}`);
+      if (was) this._toMirror(m => m.mainClose(code));
       if (!settled && isInitial && reject) {
         settled = true;
         reject(new Error(`WS closed before open (code=${code})`));
@@ -793,6 +801,8 @@ class PolymarketWS {
       // expiran solos (ventana de 30s). Limpiarlos aquí deja en null las
       // primeras señales del mercado nuevo, que son las más valiosas.
     }
+
+    if (yesTokenId && noTokenId) this._toMirror(m => m.mainSubscribe(yesTokenId, noTokenId, endTs));
 
     if (this._connected && yesTokenId && noTokenId) {
       const newKey = `${yesTokenId}|${noTokenId}`;
