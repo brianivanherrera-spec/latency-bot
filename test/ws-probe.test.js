@@ -113,8 +113,40 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
   const r = p.report();
   ok(/^\[WS-DUAL\] retraso p50\/p99\/máx: WS1 \d+\/\d+\/\d+ ms \(n=\d+\), WS2 /.test(r), r);
   ok(/por las dos 4: antes por WS1 2 \(p99 5 ms, máx 5 ms\), antes por WS2 1 \(p99 3000 ms, máx 3000 ms\), empate 1/.test(r), r);
-  ok(/solo por WS1 2, solo por WS2 1 \| top distinto Sí 4 s, No 0 s \(dato más viejo en WS1 4, en WS2 0\) \| cortes WS1 0, WS2 0 \| WS2 sin conexión 0 s$/.test(r), r);
+  ok(/solo por WS1 2, solo por WS2 1 \| top distinto Sí 4 s, No 0 s \(dato más viejo en WS1 4, en WS2 0\) \| cortes WS1 0, WS2 0 \| WS2 sin conexión 0 s \| /.test(r), r);
+  // Agregado al final: ventaja típica y "solo por" por tipo, con su par por la otra conexión
+  ok(/\| ventaja p50: WS1 5 ms, WS2 3000 ms \| /.test(r), r);
+  ok(/\| solo por \(precio\/top\/trade\): WS1 1\/0\/1, WS2 1\/0\/0; con su par por la otra con otro timestamp: WS1 0\/0\/0, WS2 0\/0\/0$/.test(r), r);
   p._reset();
+  eq([p.m.onlyT, p.m.pairT], [[{ p: 0, b: 0, t: 0 }, { p: 0, b: 0, t: 0 }], [{ p: 0, b: 0, t: 0 }, { p: 0, b: 0, t: 0 }]], 'reinicio por minuto');
+  ok(/ventaja p50: WS1 —, WS2 — \| solo por \(precio\/top\/trade\): WS1 0\/0\/0, WS2 0\/0\/0; /.test(p.report()), 'minuto vacío');
+
+  // ─── Mismo contenido con otro timestamp: "solo por" las dos, cada uno con su par ────────────────
+  p._pend.clear(); p._solo.forEach(S => S.clear()); // sin el h9 de la sección anterior
+  const u = clock;
+  p.mainEvents([pc(u, 'Y', 'h7', 0.5, 0.51)], u);
+  clock = u + 3; s1.msg(pc(u + 1, 'Y', 'h7', 0.5, 0.51)); await flush();         // mismo cambio, otro timestamp
+  clock = u + 4; s1.msg({ event_type: 'best_bid_ask', asset_id: 'N', timestamp: String(u), best_bid: '0.3', best_ask: '0.31' }); await flush();
+  clock = u + 10100; p._tick();
+  eq([p.m.only1, p.m.only2], [1, 2], 'tres sin par de clave');
+  eq([p.m.onlyT[0], p.m.onlyT[1]], [{ p: 1, b: 0, t: 0 }, { p: 1, b: 1, t: 0 }], 'por tipo');
+  eq([p.m.pairT[0], p.m.pairT[1]], [{ p: 1, b: 0, t: 0 }, { p: 1, b: 0, t: 0 }], 'el cambio h7 llegó por las dos con otro timestamp; el top solo por WS2');
+  eq([p._solo[0].size, p._solo[1].size], [0, 1], 'queda el top sin par (el par se borra al contarse)');
+  clock += 20001; p._lastData = clock; p._tick(); // con datos: que no salte el control de 20 s sin datos
+  eq([p._solo[0].size, p._solo[1].size], [0, 0], 'los "solo por" vencen a los 2×graceMs');
+  p._reset();
+
+  // ─── Ask de la segunda al decidir (A y B) ─────────────────────────────────────────────────────
+  const sn = p.snap('Y');
+  ok(sn && sn.ask === 0.51 && sn.age === 10100 + 20001 - 3, `snap con libro: ${JSON.stringify(sn)}`);
+  eq(p.snap('X'), { ask: null }, 'token sin libro');
+  eq(p.vs({ ask: 0.43, age: 120 }, 0.40, 0.43), '$0.43 (igual al REST, dato de hace 120 ms)', 'WS principal viejo, la segunda al día');
+  eq(p.vs({ ask: 0.43, age: 5 }, 0.43, 0.43), '$0.43 (igual a los dos, dato de hace 5 ms)', 'las tres iguales');
+  eq(p.vs({ ask: 0.40, age: 900 }, 0.40, 0.43), '$0.40 (igual al WS principal, dato de hace 900 ms)', 'atrasadas las dos');
+  eq(p.vs({ ask: 0.42, age: 1 }, 0.40, 0.43), '$0.42 (a 1¢ del REST, dato de hace 1 ms)', 'a 1¢');
+  eq(p.vs({ ask: 0.45, age: 1 }, 0.40, 0.43), '$0.45 (distinto de los dos, dato de hace 1 ms)', 'distinto');
+  eq(p.vs({ ask: 0.45, age: 1 }, 0.40, null), '$0.45 (distinto del WS principal, sin REST, dato de hace 1 ms)', 'sin REST');
+  eq([p.vs({ down: true }), p.vs({ off: true }), p.vs({ ask: null }), p.vs(null)], ['sin conexión', 'apagada', 'sin libro', 'sin dato'], 'estados');
 
   // ─── Cortes ─────────────────────────────────────────────────────────────────────────────────────
   p.mainClose(1013);

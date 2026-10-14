@@ -300,6 +300,35 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(trendTxt({ ask3: 0.45, trend: 0.01 }), '$0.45 (+1¢: estable)');
   assert.strictEqual(trendTxt({ ask3: 0.45, trend: 0 }), '$0.45 (0¢: estable)');
   assert.strictEqual(trendTxt(nc), 'sin dato');
+  // 18) Segunda conexión al WS (solo registro): su ask al decidir y a +delay en la línea REST, sin tocar el fill
+  const { WsProbe } = require('../src/ws-probe');
+  const probe = new WsProbe({ WebSocketImpl: class {} });
+  probe.live = true; probe.tokens = ['Y', 'N'];
+  probe._top.set('Y', { bestBid: 0.44, bestAsk: 0.47, updatedAt: Date.now(), topTs: null });
+  const lines = [];
+  const capture = async fn => { const orig = console.log; console.log = x => { lines.push(String(x)); }; try { return await fn(); } finally { console.log = orig; } };
+  const pw = new PaperB({ polyWs, probe, stateFile: path.join(dir, 'ws2.json'), env, fetchFn: fakeFetch });
+  book.Y = 0.45; rest.Y = 0.47;
+  const m19 = mkt('g19');
+  await capture(async () => { pw.onSample(m19, sample(150, 0.50)); pw.onSample(m19, sample(100, 0.65)); await pw.markets.get('g19').done; });
+  const rl = lines.find(l => l.includes('[PAPER-B] REST:'));
+  assert.ok(rl && /\| WS2 \(medición\): al decidir \$0\.47 \(igual al REST, dato de hace \d+ ms\); a \+20ms \$0\.47 \(igual al REST, dato de hace \d+ ms\)$/.test(rl), rl);
+  assert.deepStrictEqual([pw.state.attempts, pw.state.filled], [1, 1], 'el fill sigue siendo el del WS principal');
+  // Una segunda conexión que falla no corta el intento ni la línea
+  const bad = { snap() { throw new Error('x'); }, vs() { throw new Error('y'); } };
+  const pz = new PaperB({ polyWs, probe: bad, stateFile: path.join(dir, 'ws2bad.json'), env, fetchFn: fakeFetch });
+  lines.length = 0;
+  const m20 = mkt('g20');
+  await capture(async () => { pz.onSample(m20, sample(150, 0.50)); pz.onSample(m20, sample(100, 0.65)); await pz.markets.get('g20').done; });
+  assert.strictEqual(pz.state.attempts, 1, 'intento registrado');
+  assert.ok(lines.some(l => l.includes('[PAPER-B] REST:') && !l.includes('WS2')), 'línea REST sin la parte de WS2');
+  // Sin segunda conexión la línea queda como antes
+  lines.length = 0;
+  const pq = new PaperB({ polyWs, stateFile: path.join(dir, 'ws2none.json'), env, fetchFn: fakeFetch });
+  const m21 = mkt('g21');
+  await capture(async () => { pq.onSample(m21, sample(150, 0.50)); pq.onSample(m21, sample(100, 0.65)); await pq.markets.get('g21').done; });
+  assert.ok(lines.some(l => l.includes('[PAPER-B] REST:') && !l.includes('WS2')), 'sin probe: sin WS2');
+  delete rest.Y;
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 113 ok');
+  console.log('paper-b: 118 ok');
 })().catch(e => { console.error(e); process.exit(1); });

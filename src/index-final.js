@@ -914,24 +914,25 @@ async function main() {
     shadow.restorePending();
     shutdownHooks.push(async () => { const n = shadow.savePending(); if (n) logger.info(`[SHUTDOWN] shadow: ${n} mercado(s) esperando a Gamma guardados`); });
   }
-  // Paper B: segunda cuenta de paper con la regla anclada, en paralelo (no toca las decisiones
-  // del bot). PAPER_B_ENABLED=false la apaga. Necesita el shadow (muestras y ganador oficial).
-  if (shadow && process.env.PAPER_B_ENABLED !== 'false') {
-    const { PaperB } = require('./paper-b');
-    const paperB = new PaperB({ polyWs });
-    shadow.setPaperB(paperB);
-    paperB.start();
-    logger.info(`[PAPER-B] ✅ Cuenta B activa — ${paperB.describe()}`);
-    logger.info(paperB.summary());
-  }
   // Segunda conexión al WS de Polymarket, solo de medición (src/ws-probe.js): sigue los tokens de la
-  // principal y no entra a ninguna decisión; [WS-DUAL] cada minuto. WS_PROBE=off la apaga.
+  // principal y no entra a ninguna decisión; [WS-DUAL] cada minuto, y su ask al decidir en
+  // [PAPER-REST] (A) y [PAPER-B] REST. WS_PROBE=off la apaga.
   let wsProbe = null;
   if (process.env.WS_PROBE !== 'off') {
     const { WsProbe } = require('./ws-probe');
     wsProbe = new WsProbe().attach(polyWs).start();
     shutdownHooks.push(async () => wsProbe.stop());
     logger.info(`[WS-DUAL] ✅ ${wsProbe.describe()}`);
+  }
+  // Paper B: segunda cuenta de paper con la regla anclada, en paralelo (no toca las decisiones
+  // del bot). PAPER_B_ENABLED=false la apaga. Necesita el shadow (muestras y ganador oficial).
+  if (shadow && process.env.PAPER_B_ENABLED !== 'false') {
+    const { PaperB } = require('./paper-b');
+    const paperB = new PaperB({ polyWs, probe: wsProbe });
+    shadow.setPaperB(paperB);
+    paperB.start();
+    logger.info(`[PAPER-B] ✅ Cuenta B activa — ${paperB.describe()}`);
+    logger.info(paperB.summary());
   }
   // Chequeo del libro: el mejor bid/ask del WS contra la API REST de Polymarket cada 30 s (solo
   // registro; con la segunda conexión, también la de ella). BOOK_CHECK_MS=0 lo apaga.
@@ -3426,6 +3427,10 @@ async function main() {
       const restBook = () => fetchRestBook(globalThis.fetch, tokenId).catch(() => null);
       const rest0 = restCheck ? restBook() : null;
       const lag0 = polyWs._lastLagMs ?? null;
+      // Ask de la segunda conexión al WS al decidir y al llenar (solo registro en [PAPER-REST])
+      const ws2Snap = () => { try { return wsProbe ? wsProbe.snap(tokenId) : null; } catch (_) { return null; } };
+      const ws2d = ws2Snap();
+      let ws2f = null;
       // Tamaño disponible: todo lo ofrecido hasta el precio límite de la orden (antes solo
       // el mejor nivel, y 5 acciones a $0.60 con más a $0.61 daban "sin fill" a una orden de 8 a $0.61)
       const sizeUpTo = () => polyWs.getAskSizeUpTo?.(tokenId, price) ?? polyWs.getBestAskSize?.(tokenId) ?? null;
@@ -3447,6 +3452,7 @@ async function main() {
         await new Promise(r => setTimeout(r, doCheck ? paperDelayMs - checkMs : paperDelayMs));
         fillAsk = polyWs.getBestAskForToken?.(tokenId) ?? null;
         askSize = sizeUpTo();
+        ws2f = ws2Snap();
       }
       const restFill = restCheck ? restBook() : null;
       const fill200 = doCheck ? ask200 != null && ask200 <= price && (size200 == null || size200 >= size) : null;
@@ -3479,7 +3485,9 @@ async function main() {
           const restFills2 = r2 ? r2.ask != null && r2.ask <= price + 1e-9 && (sz2 == null || sz2 >= size) : null;
           const pxs = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
           const age = r => (r?.age != null ? ` (foto de hace ${r.age} ms)` : '');
-          logger.info(`[PAPER-REST] ${sig.direction} | al decidir: WS ${pxs(bestAskWS)} vs REST ${pxs(r0?.ask)}${age(r0)} | a +${paperDelayMs}ms: WS ${pxs(fillAsk)} vs REST ${pxs(r1?.ask)}${age(r1)}, ${sz ?? 'n/a'} tokens hasta $${price} → con REST ${restFills == null ? 'sin dato' : restFills ? 'llenaba' : 'no llenaba'} (paper con WS: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms${doCheck ? ` | REST a +${checkMs}ms: ${pxs(r2?.ask)} (WS ${pxs(ask200)})${age(r2)}, ${sz2 ?? 'n/a'} tokens hasta $${price} → ${restFills2 == null ? 'sin dato' : restFills2 ? 'llenaba' : 'no llenaba'}` : ''}`);
+          let two = '';
+          try { if (wsProbe) two = ` | WS2 (medición): al decidir ${wsProbe.vs(ws2d, bestAskWS, r0?.ask)}; a +${paperDelayMs}ms ${wsProbe.vs(ws2f, fillAsk, r1?.ask)}`; } catch (_) {}
+          logger.info(`[PAPER-REST] ${sig.direction} | al decidir: WS ${pxs(bestAskWS)} vs REST ${pxs(r0?.ask)}${age(r0)} | a +${paperDelayMs}ms: WS ${pxs(fillAsk)} vs REST ${pxs(r1?.ask)}${age(r1)}, ${sz ?? 'n/a'} tokens hasta $${price} → con REST ${restFills == null ? 'sin dato' : restFills ? 'llenaba' : 'no llenaba'} (paper con WS: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms${doCheck ? ` | REST a +${checkMs}ms: ${pxs(r2?.ask)} (WS ${pxs(ask200)})${age(r2)}, ${sz2 ?? 'n/a'} tokens hasta $${price} → ${restFills2 == null ? 'sin dato' : restFills2 ? 'llenaba' : 'no llenaba'}` : ''}${two}`);
         }).catch(() => {});
       }
 

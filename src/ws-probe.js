@@ -18,9 +18,14 @@
  *  - segundos con el top de Sí o de No distinto entre las dos y cuál tenía el dato más viejo
  *    (timestamp del servidor del último mensaje de ese token); si dura 3 s, un WARN con los dos tops;
  *  - cortes de cada una (código) y segundos con la segunda caída.
+ * Al final de la línea: la ventaja típica (p50) de cada una cuando llega primero, y los "solo por" por tipo
+ * (cambio de precio / top / trade) con cuántos tuvieron su par por la otra conexión: el mismo contenido con
+ * otro timestamp, también "solo por" (el servidor armó el mensaje distinto en cada conexión: no es un mensaje
+ * perdido. En "top" el par puede ser casualidad: el mismo bid/ask se repite seguido).
  * En cada corte de la principal, una línea con el estado de la segunda en ese momento.
  * top(token) lo usa [BOOK-CHECK] para mostrar si, cuando el WS principal difiere del REST, la
- * segunda coincide con el REST o con la principal.
+ * segunda coincide con el REST o con la principal; snap(token) y vs() los usan [PAPER-REST] (A) y
+ * [PAPER-B] REST para anotar el ask de la segunda al decidir y al llenar (solo registro).
  *
  * WS_PROBE=off la apaga. Se apaga sola si el servidor la corta más de WS_PROBE_MAX_CLOSES (20) veces
  * en una hora (los reconectes por mercado nuevo no cuentan).
@@ -79,6 +84,7 @@ class WsProbe {
     this._mainCutAt = 0; this._cutAt = 0;
     this._top = new Map();      // token → { bestBid, bestAsk, updatedAt, topTs }
     this._pend = new Map();     // clave del mensaje → { side: 1 | 2, at } (llegó por una, falta la otra)
+    this._solo = [new Map(), new Map()]; // "solo por" recientes de cada conexión: contenido sin timestamp → llegada
     this._diffRun = [0, 0];
     this._timers = [];
     this._invalidLogged = 0;
@@ -91,7 +97,8 @@ class WsProbe {
 
   _reset() {
     this.m = { lag1: new MsHist(), lag2: new MsHist(), both: 0, first1: 0, first2: 0, ties: 0, lead1: new MsHist(), lead2: new MsHist(),
-      only1: 0, only2: 0, topDiff: [0, 0], stale1: 0, stale2: 0, cuts1: [], cuts2: [], down2: 0, warns: 0 };
+      only1: 0, only2: 0, onlyT: [{ p: 0, b: 0, t: 0 }, { p: 0, b: 0, t: 0 }], pairT: [{ p: 0, b: 0, t: 0 }, { p: 0, b: 0, t: 0 }],
+      topDiff: [0, 0], stale1: 0, stale2: 0, cuts1: [], cuts2: [], down2: 0, warns: 0 };
   }
 
   attach(main) {
@@ -133,7 +140,7 @@ class WsProbe {
     const key = `${yes}|${no}`;
     if (key === this.key) return;
     this.tokens = [yes, no]; this.key = key;
-    this._top.clear(); this._pend.clear(); this._diffRun = [0, 0];
+    this._top.clear(); this._pend.clear(); this._solo.forEach(S => S.clear()); this._diffRun = [0, 0];
     this._reconnect();
   }
 
@@ -159,6 +166,33 @@ class WsProbe {
     const r = this._top.get(tokenId);
     if (!r) return null;
     return { bid: r.bestBid, ask: r.bestAsk, age: this.now() - r.updatedAt, topTs: r.topTs };
+  }
+
+  // Ask de la segunda en un momento (decisión o fill de A y B), para compararlo después con el WS principal
+  // y el REST: { ask, age } | { down } (caída) | { off } (apagada) | null (error)
+  snap(tokenId) {
+    try {
+      if (this.stopped) return { off: true };
+      if (!this.live) return { down: true };
+      const r = this._top.get(tokenId);
+      return r ? { ask: r.bestAsk, age: this.now() - r.updatedAt } : { ask: null };
+    } catch (_) { return null; }
+  }
+
+  // "$0.43 (igual al REST, dato de hace 120 ms)": el snap contra el ask del WS principal y el del REST del mismo momento
+  vs(s, wsAsk, restAsk) {
+    try {
+      if (!s) return 'sin dato';
+      if (s.off) return 'apagada';
+      if (s.down) return 'sin conexión';
+      if (s.ask == null) return 'sin libro';
+      const eq = (a, b) => a != null && b != null && Math.abs(a - b) < 0.0005;
+      const rel = eq(s.ask, restAsk) ? (eq(s.ask, wsAsk) ? 'igual a los dos' : 'igual al REST')
+        : eq(s.ask, wsAsk) ? 'igual al WS principal'
+        : restAsk == null ? 'distinto del WS principal, sin REST'
+        : Math.abs(s.ask - restAsk) <= 0.0105 ? 'a 1¢ del REST' : 'distinto de los dos';
+      return `${px(s.ask)} (${rel}, dato de hace ${s.age} ms)`;
+    } catch (_) { return 'sin dato'; }
   }
 
   // ─── Conexión ────────────────────────────────────────────────────────────────────────────────
@@ -294,6 +328,7 @@ class WsProbe {
     if (ts > 1e12) (side === 1 ? this.m.lag1 : this.m.lag2).add(at - ts);
     if (side === 2) this._applyTop(type, e, ts > 1e12 ? ts : null, at);
     if (!both) return;
+    // Clave: tipo|timestamp del servidor|token|contenido
     if (type === 'price_change') {
       for (const c of Array.isArray(e.price_changes) ? e.price_changes : []) {
         if (c && c.asset_id) this._match(side, `p|${e.timestamp}|${c.asset_id}|${c.hash || `${c.price}|${c.size}|${c.side}`}`, at);
@@ -316,6 +351,23 @@ class WsProbe {
     if (lead <= this.tieMs) this.m.ties++;
     else if (first === 1) { this.m.first1++; this.m.lead1.add(lead); }
     else { this.m.first2++; this.m.lead2.add(lead); }
+  }
+
+  // "Solo por" por tipo, y si la otra conexión trajo el mismo contenido con otro timestamp (también "solo por"
+  // en ±graceMs): el servidor armó el mensaje distinto en cada conexión, no se perdió. Solo mira los "solo por"
+  // (1-2 % de los mensajes), así que no suma costo por mensaje. En "top" el par puede ser casualidad
+  _soloPair(k, v) {
+    const s = v.side - 1, t = k[0];
+    if (!(t in this.m.onlyT[s])) return;
+    this.m.onlyT[s][t]++;
+    const i = k.indexOf('|', 2);
+    if (i < 0) return;
+    const ck = t + k.slice(i); // sin el timestamp: "p|token|hash"
+    const other = this._solo[1 - s], at = other.get(ck);
+    if (at != null && Math.abs(at - v.at) <= this.graceMs) {
+      other.delete(ck);
+      this.m.pairT[s][t]++; this.m.pairT[1 - s][t]++;
+    } else this._solo[s].set(ck, v.at);
   }
 
   _setTop(tok, bid, ask, ts, at) {
@@ -348,6 +400,10 @@ class WsProbe {
       if (now - v.at < this.graceMs) break;
       if (v.side === 1) this.m.only1++; else this.m.only2++;
       this._pend.delete(k);
+      this._soloPair(k, v);
+    }
+    for (const S of this._solo) {
+      for (const [k, at] of S) { if (now - at <= 2 * this.graceMs) break; S.delete(k); }
     }
     if (!this.tokens) return;
     const open = !this.endTs || now < this.endTs;
@@ -384,7 +440,10 @@ class WsProbe {
     const lag = h => (h.n ? `${h.q(0.5)}/${h.q(0.99)}/${Math.round(h.max)} ms (n=${h.n})` : 'sin datos');
     const lead = h => (h.n ? ` (p99 ${h.q(0.99)} ms, máx ${Math.round(h.max)} ms)` : '');
     const cuts = a => (a.length ? a.join(', ') : '0');
-    return `[WS-DUAL] retraso p50/p99/máx: WS1 ${lag(m.lag1)}, WS2 ${lag(m.lag2)} | por las dos ${m.both}: antes por WS1 ${m.first1}${lead(m.lead1)}, antes por WS2 ${m.first2}${lead(m.lead2)}, empate ${m.ties} | solo por WS1 ${m.only1}, solo por WS2 ${m.only2} | top distinto Sí ${m.topDiff[0]} s, No ${m.topDiff[1]} s (dato más viejo en WS1 ${m.stale1}, en WS2 ${m.stale2}) | cortes WS1 ${cuts(m.cuts1)}, WS2 ${cuts(m.cuts2)} | WS2 sin conexión ${m.down2} s${this.stopped ? ' | APAGADA' : ''}`;
+    const p50 = h => (h.n ? `${h.q(0.5)} ms` : '—');
+    const ty = o => `${o.p}/${o.b}/${o.t}`;
+    // Lo agregado el 14/10 va al final para no cambiar lo que ya leían los informes
+    return `[WS-DUAL] retraso p50/p99/máx: WS1 ${lag(m.lag1)}, WS2 ${lag(m.lag2)} | por las dos ${m.both}: antes por WS1 ${m.first1}${lead(m.lead1)}, antes por WS2 ${m.first2}${lead(m.lead2)}, empate ${m.ties} | solo por WS1 ${m.only1}, solo por WS2 ${m.only2} | top distinto Sí ${m.topDiff[0]} s, No ${m.topDiff[1]} s (dato más viejo en WS1 ${m.stale1}, en WS2 ${m.stale2}) | cortes WS1 ${cuts(m.cuts1)}, WS2 ${cuts(m.cuts2)} | WS2 sin conexión ${m.down2} s | ventaja p50: WS1 ${p50(m.lead1)}, WS2 ${p50(m.lead2)} | solo por (precio/top/trade): WS1 ${ty(m.onlyT[0])}, WS2 ${ty(m.onlyT[1])}; con su par por la otra con otro timestamp: WS1 ${ty(m.pairT[0])}, WS2 ${ty(m.pairT[1])}${this.stopped ? ' | APAGADA' : ''}`;
   }
 }
 
