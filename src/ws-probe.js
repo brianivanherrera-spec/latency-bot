@@ -23,6 +23,8 @@
  * otro timestamp, también "solo por" (el servidor armó el mensaje distinto en cada conexión: no es un mensaje
  * perdido. En "top" el par puede ser casualidad: el mismo bid/ask se repite seguido).
  * En cada corte de la principal, una línea con el estado de la segunda en ese momento.
+ * Desde el 14/10 (bitácora ~23:40 ARG) la principal le pregunta freshness() antes de reconectarse por atraso:
+ * solo se reconecta si esta está al día (no cambia nada de A ni de B ni de esta conexión).
  * top(token) lo usa [BOOK-CHECK] para mostrar si, cuando el WS principal difiere del REST, la
  * segunda coincide con el REST o con la principal; snap(token) y vs() los usan [PAPER-REST] (A) y
  * [PAPER-B] REST para anotar el ask de la segunda al decidir y al llenar (solo registro).
@@ -88,6 +90,7 @@ class WsProbe {
     this._diffRun = [0, 0];
     this._timers = [];
     this._invalidLogged = 0;
+    this._lag2Cur = null; this._lag2Done = null; // retraso mínimo por segundo de esta conexión (para freshness)
     this._reset();
   }
 
@@ -158,6 +161,28 @@ class WsProbe {
     const state = !this.live ? 'también caída'
       : `conectada, último dato hace ${now - this._lastData} ms${this._cutAt && now - this._cutAt < 30000 ? `, cortada hace ${Math.round((now - this._cutAt) / 1000)} s` : ''}`;
     logger.info(`[WS-DUAL] WS1 cortada (code=${code}) | WS2 ${state}`);
+  }
+
+  // ¿Está al día esta conexión? Lo usa la principal antes de reconectarse por atraso (polymarket-ws.js,
+  // _lagCheck): { live, lastDataAgo (ms), minLag (retraso del dato más fresco del segundo en curso o del
+  // anterior, ms) } | { live: false } | null (error). No cambia nada de ninguna conexión
+  freshness() {
+    try {
+      if (this.stopped || !this.live || !this._gotBook) return { live: false };
+      const now = this.now();
+      const prev = Math.floor(now / 1000) - 1;
+      let minLag = null;
+      for (const b of [this._lag2Cur, this._lag2Done]) if (b && b.sec >= prev && (minLag == null || b.min < minLag)) minLag = b.min;
+      return { live: true, lastDataAgo: now - this._lastData, minLag };
+    } catch (_) { return null; }
+  }
+
+  _noteLag2(at, lag) {
+    if (!Number.isFinite(lag)) return;
+    const sec = Math.floor(at / 1000);
+    const c = this._lag2Cur;
+    if (!c || c.sec !== sec) { if (c) this._lag2Done = c; this._lag2Cur = { sec, min: lag }; }
+    else if (lag < c.min) c.min = lag;
   }
 
   // Top de la segunda conexión, con la misma forma que lee [BOOK-CHECK] de la principal
@@ -326,6 +351,7 @@ class WsProbe {
     const type = e.event_type || e.type || '';
     const ts = Number(e.timestamp);
     if (ts > 1e12) (side === 1 ? this.m.lag1 : this.m.lag2).add(at - ts);
+    if (side === 2 && ts > 1e12 && type !== 'book') this._noteLag2(at, at - ts);
     if (side === 2) this._applyTop(type, e, ts > 1e12 ? ts : null, at);
     if (!both) return;
     // Clave: tipo|timestamp del servidor|token|contenido

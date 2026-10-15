@@ -234,6 +234,110 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
   pw.setMirror(null);
   pw.close();
 
+  // ─── Reconexión de la principal por atraso (bitácora 14/10 ~23:40 ARG) ──────────────────────────
+  // freshness() de la segunda: dato más fresco del segundo en curso o del anterior
+  clock = 1_800_000_100_000;
+  const main3 = { ...main, _socketTokensKey: 'A|B', _yesTokenId: 'A', _noTokenId: 'B', _handshakeAt: clock, _mirror: null };
+  const pf = new WsProbe({ WebSocketImpl: FakeWS, now, maxCloses: 3 });
+  pf.attach(main3);
+  eq(pf.freshness(), { live: false }, 'sin conexión: no está al día');
+  const sf = sockets[sockets.length - 1];
+  sf.open();
+  eq(pf.freshness(), { live: false }, 'sin libro todavía: no cuenta');
+  sf.msg({ event_type: 'book', asset_id: 'A', market: 'M', timestamp: String(clock - 900), bids: [{ price: '0.4', size: '5' }], asks: [{ price: '0.42', size: '5' }] });
+  await flush();
+  ok(pf.freshness().minLag === null, 'el snapshot book no cuenta para el retraso');
+  sf.msg(pc(clock - 40, 'A', 'h1', 0.4, 0.42));
+  await flush();
+  let fr = pf.freshness();
+  eq([fr.live, fr.minLag, fr.lastDataAgo], [true, 40, 0], 'al día: el más fresco del segundo llegó con 40 ms');
+  clock += 1000;
+  ok(pf.freshness().minLag === 40, 'el segundo anterior todavía cuenta');
+  clock += 1500;
+  fr = pf.freshness();
+  eq([fr.minLag, fr.lastDataAgo], [null, 2500], 'sin datos recientes: sin retraso medido');
+  pf.stop();
+  eq(pf.freshness(), { live: false }, 'apagada');
+
+  // La principal: 3 s seguidos con el dato más fresco de cada segundo ≥ 1000 ms y la segunda al día → reconecta
+  const lw = new PolymarketWS();
+  let reconnects = 0;
+  lw._forceReconnect = () => { reconnects++; };
+  let peer = { live: true, lastDataAgo: 100, minLag: 25 };
+  lw.setMirror({ freshness: () => peer });
+  const L0 = 1_800_000_200_000;
+  // segundo s con n mensajes de retraso lag (y uno más fresco si fresh); se evalúa al empezar el segundo s + 2
+  const sec = (s, lag, n = 5) => { for (let i = 0; i < n; i++) lw._noteLag(L0 + s * 1000 + 100 + i * 50, lag + i * 10); };
+  const check = s => lw._lagCheck(L0 + (s + 1) * 1000 + 30);
+  const run = (from, lags, n) => lags.forEach((lag, k) => { sec(from + k, lag, n); check(from + k); });
+  lw._lastWatchdogReconnect = 0;
+  run(0, [1500, 1600], 5);
+  eq([reconnects, lw._lagRun], [0, 2], 'dos segundos atrasados: todavía no');
+  run(2, [1700], 5);
+  eq(reconnects, 1, 'el tercero seguido reconecta');
+  eq([lw._lagRun, lw._lagReconnects.length], [0, 1], 'racha a cero y una reconexión contada');
+  check(2);
+  eq(reconnects, 1, 'el mismo segundo no se evalúa dos veces');
+  // Un segundo al día en el medio corta la racha
+  lw._lastWatchdogReconnect = 0;
+  run(10, [1500, 1500, 900, 1500, 1500], 5);
+  eq([reconnects, lw._lagRun], [1, 2], 'un segundo con el dato más fresco en 900 ms corta la racha');
+  // Un segundo sin mensajes (o con menos de 3) también la corta
+  for (let k = 15; k < 20; k++) check(k); // el watchdog evalúa cada segundo, también los que no traen mensajes
+  eq(lw._lagRun, 0, 'segundos sin mensajes: racha a cero');
+  run(20, [1500, 1500], 5); check(22); run(23, [1500, 1500], 5);
+  eq([reconnects, lw._lagRun], [1, 2], 'un segundo sin mensajes corta la racha');
+  lw._lagRun = 0;
+  run(30, [1500, 1500], 5); run(32, [1500], 2); run(33, [1500, 1500], 5);
+  eq([reconnects, lw._lagRun], [1, 2], 'con 2 mensajes el segundo no cuenta');
+  // La segunda también atrasada, sin datos recientes o caída: no reconecta (sería el servidor o el proceso)
+  lw._lagRun = 0;
+  for (const p2 of [{ live: true, lastDataAgo: 100, minLag: 800 }, { live: true, lastDataAgo: 2500, minLag: 25 }, { live: true, lastDataAgo: 100, minLag: null }, { live: false }, null]) {
+    peer = p2; lw._lagRun = 0;
+    run(40 + 10 * reconnects, [1500, 1500, 1500, 1500], 5);
+  }
+  eq(reconnects, 1, 'sin la segunda al día no reconecta');
+  lw.setMirror(null); lw._lagRun = 0;
+  run(120, [1500, 1500, 1500], 5);
+  eq(reconnects, 1, 'sin segunda conexión no reconecta');
+  // Con la segunda al día de nuevo, la racha que ya venía reconecta al segundo siguiente
+  peer = { live: true, lastDataAgo: 100, minLag: 25 };
+  lw.setMirror({ freshness: () => peer });
+  run(130, [1500], 5);
+  eq(reconnects, 2, 'la racha sigue y reconecta cuando la segunda está al día');
+  // Como mucho una cada 10 s (el watchdog) y 6 por hora
+  run(140, [1500, 1500, 1500], 5);
+  eq(reconnects, 2, 'dentro de los 10 s del watchdog no reconecta otra vez');
+  lw._lagReconnects = Array.from({ length: 6 }, (_, k) => L0 + 150_000 + k);
+  lw._lastWatchdogReconnect = 0; lw._lagRun = 0;
+  run(160, [1500, 1500, 1500], 5);
+  eq([reconnects, lw._lagPausedLogged], [2, true], '6 en la última hora: en pausa');
+  lw._lagReconnects = [L0 - 3_700_000]; lw._lagRun = 0;
+  run(170, [1500, 1500, 1500], 5);
+  eq([reconnects, lw._lagReconnects.length, lw._lagPausedLogged], [3, 1, false], 'las de hace más de una hora no cuentan');
+  // Apagada por variable
+  lw._lagReconnect.enabled = false; lw._lastWatchdogReconnect = 0; lw._lagRun = 0;
+  run(180, [1500, 1500, 1500, 1500], 5);
+  eq(reconnects, 3, 'WS_LAG_RECONNECT=off: no reconecta');
+  // La reconexión limpia los baldes y la racha
+  lw._lagReconnect.enabled = true; lw._lastWatchdogReconnect = 0; lw._lagRun = 0;
+  run(190, [1500, 1500, 1500], 5);
+  eq([reconnects, lw._lagCur, lw._lagDone, lw._lagRun], [4, null, null, 0], 'después de reconectar arranca de cero');
+  // _handleMessage alimenta los baldes con hora local − timestamp del servidor
+  const real = Date.now();
+  lw._handleMessage({ event_type: 'best_bid_ask', asset_id: 'Z', timestamp: String(real - 1234), best_bid: '0.4', best_ask: '0.42' });
+  ok(lw._lagCur && lw._lagCur.n === 1 && lw._lagCur.min >= 1234 && lw._lagCur.min < 1334, 'el mensaje del WS cuenta en el balde del segundo');
+  lw._lagCur = null;
+  lw._msgArrivedAt = real - 1000; // llegó hace 1 s y se procesa ahora: cuenta el retraso a la llegada
+  lw._handleMessage({ event_type: 'best_bid_ask', asset_id: 'Z', timestamp: String(real - 1234), best_bid: '0.4', best_ask: '0.42' });
+  lw._msgArrivedAt = null;
+  ok(lw._lagCur && lw._lagCur.min === 234, 'el retraso es a la llegada, sin la espera del event loop');
+  lw._lagCur = null;
+  lw._handleMessage({ event_type: 'book', asset_id: 'Z', timestamp: String(real - 60000), bids: [], asks: [] });
+  ok(lw._lagCur === null, 'el snapshot book no cuenta (su timestamp puede ser viejo)');
+  lw.setMirror(null);
+  lw.close();
+
   console.log(`ws-probe: ${passed} ok`);
   process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });

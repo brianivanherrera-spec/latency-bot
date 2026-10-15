@@ -26,6 +26,16 @@ const PING_MS = 10_000;
 const RECONNECT_MIN = 1_000;
 const RECONNECT_MAX = 30_000;
 const TRADE_MAP_FILE = path.join(process.env.DATA_DIR || '/data', 'last-trades.json');
+// Reconexión por atraso (bitácora 14/10 ~23:40 ARG): si en LAG_SECS segundos seguidos el dato más fresco de
+// cada segundo llegó con ≥ LAG_MS de retraso y la segunda conexión (ws-probe) confirma que está al día, se
+// reconecta esta (una conexión nueva arranca al día). Como mucho LAG_MAX_PER_HOUR por hora. WS_LAG_RECONNECT=off la apaga
+const envNum = (v, d) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : d);
+const LAG_RECONNECT = process.env.WS_LAG_RECONNECT !== 'off';
+const LAG_MS = envNum(process.env.WS_LAG_RECONNECT_MS, 1000);
+const LAG_SECS = envNum(process.env.WS_LAG_RECONNECT_SECS, 3);
+const LAG_MIN_MSGS = 3;          // mensajes con timestamp en el segundo para que cuente
+const LAG_MAX_PER_HOUR = 6;
+const PEER_FRESH_MS = 300;       // la segunda está al día si su dato más fresco del último segundo llegó con menos de esto
 
 // Cargar trade map persistido (sobrevive reinicios)
 function loadTradeMap() {
@@ -134,6 +144,10 @@ class PolymarketWS {
     // para cambiar de mercado sobre un socket abierto hay que reconectar.
     this._socketTokensKey = null;
     this._invalidOpLogged = 0;
+    // Reconexión por atraso: retraso mínimo de cada segundo (balde en curso y el último cerrado)
+    this._lagReconnect = { enabled: LAG_RECONNECT, ms: LAG_MS, secs: LAG_SECS, maxPerHour: LAG_MAX_PER_HOUR };
+    this._lagCur = null; this._lagDone = null; this._lagRun = 0; this._lagLastMin = null; this._lagEvalSec = null;
+    this._lagReconnects = []; this._lagPausedLogged = false;
   }
 
   onPrice(cb) { this._priceCallback = cb; }
@@ -675,7 +689,8 @@ class PolymarketWS {
           loopMonitor.time('poly_msg', () => {
             const parsed = JSON.parse(raw);
             events = Array.isArray(parsed) ? parsed : [parsed];
-            for (const msg of events) this._handleMessage(msg);
+            this._msgArrivedAt = at; // el retraso para reconectar se mide a la llegada, como en la segunda
+            try { for (const msg of events) this._handleMessage(msg); } finally { this._msgArrivedAt = null; }
           });
         } catch (e) {
           if (raw && raw.length < 120) {
@@ -734,19 +749,69 @@ class PolymarketWS {
         this._watchdogReconnect(`sin 'book' ${Math.round((now - this._handshakeAt) / 1000)} s después del handshake`);
       } else if (now - this._lastDataAt > 15000) {
         this._watchdogReconnect(`sin datos de los tokens hace ${Math.round((now - this._lastDataAt) / 1000)} s`);
+      } else {
+        try { this._lagCheck(now); } catch (_) {} // una falla de este control nunca corta el watchdog
       }
     }, 1000);
     this._dataWatchdog.unref?.();
   }
 
-  // Reconexión por watchdog, como mucho una cada 10 s
+  // Retraso de entrega por segundo: guarda el mínimo (el dato más fresco) y cuántos mensajes llegaron
+  _noteLag(at, lag) {
+    if (!Number.isFinite(lag)) return;
+    const sec = Math.floor(at / 1000);
+    const c = this._lagCur;
+    if (!c || c.sec !== sec) {
+      if (c) this._lagDone = c;
+      this._lagCur = { sec, min: lag, n: 1 };
+    } else {
+      if (lag < c.min) c.min = lag;
+      c.n++;
+    }
+  }
+
+  // Una vez por segundo (watchdog): ¿el último segundo cerrado vino atrasado? Con LAG_SECS seguidos y la
+  // segunda al día, reconecta. Un segundo sin mensajes o con pocos corta la racha (no se sabe el retraso)
+  _lagCheck(now) {
+    const L = this._lagReconnect;
+    if (!L.enabled) return;
+    const prev = Math.floor(now / 1000) - 1;
+    let b = null;
+    if (this._lagCur && this._lagCur.sec === prev) b = this._lagCur;
+    else if (this._lagDone && this._lagDone.sec === prev) b = this._lagDone;
+    if (this._lagEvalSec === prev) return; // ese segundo ya se evaluó
+    this._lagEvalSec = prev;
+    if (!b || b.n < LAG_MIN_MSGS || b.min < L.ms) { this._lagRun = 0; return; }
+    this._lagRun++; this._lagLastMin = b.min;
+    if (this._lagRun < L.secs) return;
+    const peer = this._mirror && typeof this._mirror.freshness === 'function' ? this._mirror.freshness() : null;
+    if (!peer || !peer.live || peer.lastDataAgo == null || peer.lastDataAgo >= 2000 || peer.minLag == null || peer.minLag >= PEER_FRESH_MS) return;
+    while (this._lagReconnects.length && now - this._lagReconnects[0] > 3600000) this._lagReconnects.shift();
+    if (this._lagReconnects.length >= L.maxPerHour) {
+      if (!this._lagPausedLogged) {
+        this._lagPausedLogged = true;
+        logger.warn(`[POLY-WS] [WATCHDOG] reconexión por atraso en pausa: ya hubo ${this._lagReconnects.length} en la última hora`);
+      }
+      return;
+    }
+    this._lagPausedLogged = false;
+    const run = this._lagRun;
+    this._lagRun = 0;
+    if (this._watchdogReconnect(`atrasada: ${run} s seguidos con el dato más fresco de cada segundo llegando con ≥ ${L.ms} ms (último ${Math.round(b.min)} ms) y la segunda al día (${Math.round(peer.minLag)} ms)`)) {
+      this._lagReconnects.push(now);
+    }
+  }
+
+  // Reconexión por watchdog, como mucho una cada 10 s (devuelve si reconectó)
   _watchdogReconnect(reason) {
     const now = Date.now();
-    if (now - this._lastWatchdogReconnect < 10000) return;
+    if (now - this._lastWatchdogReconnect < 10000) return false;
     this._lastWatchdogReconnect = now;
     logger.warn(`[POLY-WS] [WATCHDOG] ${reason} — reconectando`);
     this._handshakeAt = now; this._lastDataAt = now; this._gotBookSinceHandshake = false;
+    this._lagRun = 0; this._lagCur = null; this._lagDone = null;
     this._forceReconnect();
+    return true;
   }
 
   _startPing() {
@@ -898,6 +963,9 @@ class PolymarketWS {
       const now = Date.now();
       this._lastLagMs = now - ts; this._lastLagAt = now;
       loopMonitor.observeWsLag(now - ts);
+      // Para reconectar por atraso: a la llegada (sin la espera del event loop, que no se arregla reconectando);
+      // el snapshot book no cuenta, puede traer la hora del último cambio del libro
+      if (type !== 'book') { const arr = this._msgArrivedAt || now; this._noteLag(arr, arr - ts); }
     }
     this._msgTs = ts > 1e12 ? ts : null; // hora del servidor del mensaje en curso (topTs del top que fije)
 
