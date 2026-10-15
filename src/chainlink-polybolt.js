@@ -31,7 +31,12 @@ const SYMBOL = 'btcusd';
 const HISTORY_MS = 15 * 60 * 1000;
 const PING_MS = 30_000;
 const STALE_MS = 90_000;
-const DATA_STALE_MS = parseInt(process.env.CHAINLINK_STALE_MS || '30000');
+// Autenticado y sin datos de BTC en este tiempo → reconectar. 10 s desde el 14/10 (bitácora ~23:40 ARG; antes
+// CHAINLINK_STALE_MS, 30 s, que siguen usando RTDS y SPOT): cuando se apague RTDS, PolyBolt queda solo y un
+// silencio de 30 s serían 30 s sin Chainlink. POLYBOLT_STALE_MS lo cambia
+const envMs = (v, d) => (v != null && v !== '' && Number(v) > 0 ? Number(v) : d);
+const DATA_STALE_MS = envMs(process.env.POLYBOLT_STALE_MS, 10_000);
+const CHECK_MS = 1000;
 
 class PolyBoltClient {
   // getCreds: async () => ({ key, secret, passphrase }) | null
@@ -79,13 +84,14 @@ class PolyBoltClient {
       this._timer = setInterval(() => {
         if (this.ws !== ws || ws.readyState !== WebSocket.OPEN) return;
         const now = Date.now();
-        if (now - this._lastMsgAt >= STALE_MS || (this.diag.authed && now - this._lastDataAt > DATA_STALE_MS)) {
-          logger.warn(`[POLYBOLT] Sin datos (msg hace ${now - this._lastMsgAt} ms) — reconectando`);
+        const why = this._staleReason(now);
+        if (why) {
+          logger.warn(`[POLYBOLT] Sin datos (${why}) — reconectando`);
           try { ws.terminate(); } catch (_) {}
           return;
         }
         if (now - (this._lastPing || 0) >= PING_MS) { this._lastPing = now; this._send({ op: 'ping' }, false); }
-      }, 5000);
+      }, CHECK_MS);
       this._timer.unref?.();
     });
     ws.on('message', (data) => {
@@ -105,6 +111,16 @@ class PolyBoltClient {
       this._scheduleReconnect(code, String(reason || ''));
     });
     ws.on('error', (e) => { this.diag.last_error = e.message; });
+  }
+
+  // Sin ningún mensaje en STALE_MS, o autenticado y sin datos de BTC en DATA_STALE_MS (contando desde el
+  // último dato o desde la autenticación, lo más nuevo: al reconectar el snapshot tarda unos cientos de ms) → motivo
+  _staleReason(now, dataStaleMs = DATA_STALE_MS) {
+    if (now - this._lastMsgAt >= STALE_MS) return `msg hace ${now - this._lastMsgAt} ms`;
+    if (!this.diag.authed) return null;
+    const since = Math.max(this._lastDataAt || 0, this._authedAt || 0);
+    if (now - since > dataStaleMs) return `msg hace ${now - this._lastMsgAt} ms, último dato de BTC hace ${now - since} ms`;
+    return null;
   }
 
   _scheduleReconnect(code, why) {
@@ -130,6 +146,7 @@ class PolyBoltClient {
     if (typeof msg.op === 'string' && msg.v === undefined) {
       if (msg.op === 'authed') {
         this.diag.authed = true;
+        this._authedAt = Date.now();
         this._attempt = 0;
         logger.info('[POLYBOLT] ✅ Autenticado — suscribiendo price.crypto y price.crypto.twap (btcusd)');
         this._send({ op: 'subscribe', subscriptions: [

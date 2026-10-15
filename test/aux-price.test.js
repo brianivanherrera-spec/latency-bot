@@ -147,6 +147,25 @@ const eq = (a, b, msg) => { assert.deepStrictEqual(a, b, msg); ok++; };
   f3.length = 0;
   pb3._handle({ op: 'authed' });
   eq(f3.map(x => x.subscriptions.map(y => y.filter.symbol)), [['btcusd', 'btcusd']], 'al reconectar solo BTC');
+
+  // "Sin datos" de PolyBolt (bitácora 14/10 ~23:40 ARG): 10 s sin BTC desde el último dato o la autenticación
+  const pb4 = new PolyBoltClient({ getCreds: async () => null });
+  pb4._send = () => '1';
+  const t0 = Date.now();
+  pb4._lastMsgAt = t0;
+  eq(pb4._staleReason(t0 + 60000 - 1), null, 'sin autenticar no mira los datos');
+  check(/^msg hace 90000 ms$/.test(pb4._staleReason(t0 + 90000) || ''), 'sin ningún mensaje en 90 s: reconecta');
+  pb4._handle({ op: 'authed' });
+  const ta = pb4._authedAt;
+  pb4._lastMsgAt = ta;
+  eq(pb4._staleReason(ta + 10000), null, 'recién autenticado: espera 10 s aunque el último dato sea viejo');
+  check(/último dato de BTC hace 10001 ms/.test(pb4._staleReason(ta + 10001) || ''), 'autenticado y 10 s sin datos: reconecta');
+  pb4._lastDataAt = ta + 5000;
+  eq(pb4._staleReason(ta + 15000), null, 'con un dato hace 10 s todavía no');
+  check(pb4._staleReason(ta + 15001) != null, 'con el último dato hace más de 10 s: reconecta');
+  eq(pb4._staleReason(ta + 15001, 30000), null, 'con POLYBOLT_STALE_MS=30000 espera 30 s');
+  pb4._handle({ v: 1, channel: 'price.crypto', payload: { symbol: 'ethusd', timestamp: ta + 20000, value: 3987.5 } });
+  check(pb4._staleReason(ta + 20000) != null, 'el ETH no cuenta como dato de BTC');
 }
 
 console.log(`aux-price: ${ok} ok`);
