@@ -33,11 +33,14 @@ function loadState() {
 
 async function runSelection(date = utcDate()) {
   const st = loadState();
+  const c = config();
   const todayRows = st.candidates.filter((r) => r.date === date);
-  if (todayRows.length) { log(`seleccion de ${date} ya hecha (${todayRows.length} mercados)`); return todayRows.map((r) => r.market); }
+  const done = readJsonl('selections.jsonl').some((r) => r.date === date && r.target >= c.MARKETS_PER_DAY);
+  const remaining = c.MARKETS_PER_DAY - todayRows.length;
+  if (done || remaining <= 0) { log(`seleccion de ${date} ya hecha (${todayRows.length} mercados)`); return []; }
   const events = await gamma.fetchEvents();
-  const todayIds = new Set();
-  const picked = gamma.selectMarkets(events, st.lastForecastMid, todayIds);
+  const todayIds = new Set(todayRows.map((r) => r.market.market_id));
+  const picked = gamma.selectMarkets(events, st.lastForecastMid, todayIds, remaining);
   for (const m of picked) {
     let books = {};
     try {
@@ -50,7 +53,8 @@ async function runSelection(date = utcDate()) {
     // linea de log por mercado (canal de respaldo para la investigacion), sin precios
     log(`CANDIDATO ${date} ${JSON.stringify(gamma.publicCandidate(m))}`);
   }
-  log(`seleccion de ${date}: ${picked.length} mercados de ${events.length} eventos`);
+  appendJsonl('selections.jsonl', { ts: new Date().toISOString(), date, target: c.MARKETS_PER_DAY, nuevos: picked.length });
+  log(`seleccion de ${date}: ${picked.length} mercados nuevos (total hoy ${todayRows.length + picked.length}) de ${events.length} eventos`);
   return picked;
 }
 

@@ -22,7 +22,7 @@ async function tick() {
   try {
     const now = new Date();
     const today = utcDate(now);
-    if (now.getUTCHours() >= config().SELECT_HOUR_UTC && !readJsonl('candidates.jsonl').some((r) => r.date === today)) {
+    if (now.getUTCHours() >= config().SELECT_HOUR_UTC && !readJsonl('selections.jsonl').some((r) => r.date === today && r.target >= config().MARKETS_PER_DAY)) {
       await safe('seleccion', () => pipeline.runSelection(today));
       server.status.lastSelection = new Date().toISOString();
     }

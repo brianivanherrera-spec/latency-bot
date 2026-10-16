@@ -25,7 +25,7 @@ test('flujo completo: seleccion, pronostico, decision, resolucion y endpoints', 
   const date = utcDate();
   const picked = await pipeline.runSelection(date);
   assert.strictEqual(picked.length, 3);
-  assert.strictEqual((await pipeline.runSelection(date)).length, 3); // idempotente
+  assert.strictEqual((await pipeline.runSelection(date)).length, 0); // idempotente
   assert.strictEqual(readJsonl('books.jsonl').length, 3);
 
   const file = path.join(FDIR, `${date}.json`);
@@ -66,6 +66,19 @@ test('flujo completo: seleccion, pronostico, decision, resolucion y endpoints', 
     const n = await pipeline.takeSnapshots(Date.now() + 25 * 36e5);
     assert.ok(n >= 1);
   } finally { fs.rmSync(file, { force: true }); }
+});
+
+test('subir MARKETS_PER_DAY completa la seleccion del dia sin repetir', async () => {
+  setup({ MARKETS_PER_DAY: '1' });
+  const mk = (n, tag) => mkEvent(n, [tag], [mkMarket(n * 10 + 1)]);
+  mockFetch([['/events', [mk(1, 'politics'), mk(2, 'economy'), mk(3, 'tech')]], ['/book', book([[0.48, 5]], [[0.5, 5]])]]);
+  const date = utcDate();
+  assert.strictEqual((await pipeline.runSelection(date)).length, 1);
+  process.env.MARKETS_PER_DAY = '3';
+  const more = await pipeline.runSelection(date);
+  assert.strictEqual(more.length, 2);
+  assert.strictEqual(new Set(readJsonl('candidates.jsonl').map((r) => r.market.market_id)).size, 3);
+  assert.strictEqual((await pipeline.runSelection(date)).length, 0);
 });
 
 test('disputados/anulados no se registran como resolucion', async () => {

@@ -68,8 +68,9 @@ async function fetchEvents() {
 }
 
 // events: salida de Gamma. forecasted: Map market_id -> mid al ultimo pronostico.
-function selectMarkets(events, forecasted = new Map(), todayIds = new Set()) {
+function selectMarkets(events, forecasted = new Map(), todayIds = new Set(), limit) {
   const c = config();
+  limit = limit ?? c.MARKETS_PER_DAY;
   const now = Date.now();
   const byCat = Object.fromEntries(CATEGORIES.map((k) => [k, []]));
   for (const ev of events) {
@@ -94,10 +95,10 @@ function selectMarkets(events, forecasted = new Map(), todayIds = new Set()) {
   const perEvent = new Map();
   const idx = Object.fromEntries(CATEGORIES.map((k) => [k, 0]));
   let progress = true;
-  while (picked.length < c.MARKETS_PER_DAY && progress) {
+  while (picked.length < limit && progress) {
     progress = false;
     for (const k of CATEGORIES) {
-      if (picked.length >= c.MARKETS_PER_DAY) break;
+      if (picked.length >= limit) break;
       while (idx[k] < byCat[k].length) {
         const m = byCat[k][idx[k]++];
         if ((perEvent.get(m.event_id) || 0) >= c.MAX_PER_EVENT_SELECT) continue;
