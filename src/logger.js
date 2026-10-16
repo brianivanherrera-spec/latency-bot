@@ -6,6 +6,7 @@
 const config = require('./config');
 const { append } = require('./async-append');
 const loopMonitor = require('./loop-monitor');
+const logDigest = require('./log-digest');
 
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 const currentLevel = LEVELS[config.LOG_LEVEL] ?? 1;
@@ -18,7 +19,8 @@ class Logger {
   _log(level, ...args) {
     if (LEVELS[level] < currentLevel) return;
     const ts = new Date().toISOString();
-    const msg = `[${ts}] [${level.toUpperCase()}] [${this.prefix}] ${args.join(' ')}`;
+    const body = args.join(' ');
+    const msg = `[${ts}] [${level.toUpperCase()}] [${this.prefix}] ${body}`;
 
     // stdout hacia un pipe (Railway) es sincrónico en Linux: se mide cuánto bloquea
     loopMonitor.count('log_lines');
@@ -30,6 +32,9 @@ class Logger {
     // Escribir a archivo si está configurado
     // (en segundo plano: appendFileSync en cada línea bloqueaba el event loop)
     if (config.LOG_FILE) append(config.LOG_FILE, msg);
+
+    // Resumen por hora [RESUMEN] (solo registro; LOG_DIGEST=off lo apaga)
+    logDigest.observe(level, this.prefix, body);
   }
 
   debug(...args) { this._log('debug', ...args); }
