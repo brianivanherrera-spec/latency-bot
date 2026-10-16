@@ -22,6 +22,13 @@ const COINBASE_URL = 'wss://advanced-trade-ws.coinbase.com';
 const CONNECT_TIMEOUT_MS = 5000;
 // Sin datos en este tiempo → reconectar (aggTrade de BTC llega varias veces por segundo)
 const WATCHDOG_MS = parseInt(process.env.BINANCE_WATCHDOG_MS || '5000');
+// Con el mercado quieto 5 s sin operaciones no es una caída: el 15/10 entre las 16 y las 22 ARG hubo minutos
+// con 16-40 aggTrades de BTC/USDT y hasta 16 reconexiones por hora. Antes de reconectar se manda un ping: si
+// el pong llega, la conexión está viva y se espera. Se reconecta si el pong no llega en WATCHDOG_PONG_MS o si
+// pasan WATCHDOG_HARD_MS sin operaciones. BINANCE_WATCHDOG_PING=off vuelve al corte a los 5 s.
+const WATCHDOG_PING    = process.env.BINANCE_WATCHDOG_PING !== 'off';
+const WATCHDOG_PONG_MS = parseInt(process.env.BINANCE_WATCHDOG_PONG_MS || '3000');
+const WATCHDOG_HARD_MS = parseInt(process.env.BINANCE_WATCHDOG_HARD_MS || '30000');
 
 class BinanceWS {
   constructor({ source = 'binance' } = {}) {
@@ -42,6 +49,9 @@ class BinanceWS {
     this._pingInterval = null;
     this._watchdog = null;
     this._everConnected = false;
+    this._probeAt = 0;     // ping de prueba del watchdog en curso (0: ninguno)
+    this._lastPongAt = 0;
+    this._probeOk = false; // ya se logueó el pong de este tramo sin operaciones
   }
 
   // El callback es async: un rechazo sin .catch quedaba como unhandledRejection
@@ -99,6 +109,8 @@ class BinanceWS {
         this._connected = true;
         this._reconnectDelay = 1000;
         this._lastDataAt = Date.now();
+        this._probeAt = 0;
+        this._probeOk = false;
         if (this.source === 'coinbase') {
           sock.send(JSON.stringify({ type: 'subscribe', product_ids: ['BTC-USD'], channel: 'ticker' }));
           logger.info(`✅ Conectado a Coinbase ticker (BTC-USD) — solo referencia, no entra a la señal`);
@@ -115,6 +127,16 @@ class BinanceWS {
         done();
         if (wasReconnect && this.reconnectCallback) {
           try { this.reconnectCallback(); } catch (_) {}
+        }
+      });
+
+      sock.on('pong', () => {
+        if (this.ws !== sock) return;
+        const now = Date.now();
+        this._lastPongAt = now;
+        if (this._probeAt && !this._probeOk) { // una línea por cada tramo sin operaciones
+          this._probeOk = true;
+          logger.info(`[WATCHDOG] ${this._label()}: ${now - this._lastDataAt} ms sin operaciones, contestó el ping en ${now - this._probeAt} ms — sigue conectado`);
         }
       });
 
@@ -217,21 +239,38 @@ class BinanceWS {
     }, delay);
   }
 
-  // Watchdog de datos: conectado pero sin mensajes en WATCHDOG_MS → cerrar y reconectar.
-  // (Coinbase ticker puede quedar quieto unos segundos: se le da 6× más margen.)
+  // Watchdog de datos: conectado pero sin mensajes en WATCHDOG_MS → ping de prueba (Binance) o reconectar.
+  // (Coinbase ticker puede quedar quieto unos segundos: se le da 6× más margen y no usa el ping.)
+  // Devuelve null (todo bien), 'ping' (mandar el ping de prueba) o el motivo para reconectar.
+  _watchdogCheck(now) {
+    const idle = now - this._lastDataAt;
+    const limit = this.source === 'coinbase' ? WATCHDOG_MS * 6 : WATCHDOG_MS;
+    if (idle <= limit) { this._probeAt = 0; this._probeOk = false; return null; }
+    if (!WATCHDOG_PING || this.source === 'coinbase') return `sin datos hace ${idle}ms`;
+    if (idle > WATCHDOG_HARD_MS) return `sin datos hace ${idle}ms (tope de ${WATCHDOG_HARD_MS} ms aunque conteste el ping)`;
+    if (!this._probeAt) { this._probeAt = now; return 'ping'; }
+    if (this._lastPongAt >= this._probeAt) {
+      // Contestó: la conexión vive. Otro ping cuando pase de nuevo el límite
+      if (now - this._probeAt >= limit) { this._probeAt = now; return 'ping'; }
+      return null;
+    }
+    if (now - this._probeAt >= WATCHDOG_PONG_MS) return `sin datos hace ${idle}ms y sin pong en ${now - this._probeAt}ms`;
+    return null;
+  }
+
   _startWatchdog() {
     if (this._watchdog) return;
-    const limit = this.source === 'coinbase' ? WATCHDOG_MS * 6 : WATCHDOG_MS;
     this._watchdog = setInterval(() => {
       if (!this._connected || !this.ws) return;
-      const idle = Date.now() - this._lastDataAt;
-      if (idle > limit) {
-        logger.warn(`[WATCHDOG] ${this._label()} sin datos hace ${idle}ms — reconectando`);
-        // Estado del event loop / threadpool / disco en ese momento, para compararlo con los cortes 1013
-        loopMonitor.log(`watchdog ${this._label()} | ${loopMonitor.snapshot().text}`);
-        this._lastDataAt = Date.now();
-        try { this.ws.terminate(); } catch (_) {} // dispara 'close' → reconexión
-      }
+      const r = this._watchdogCheck(Date.now());
+      if (!r) return;
+      if (r === 'ping') { try { this.ws.ping(); } catch (_) {} return; }
+      logger.warn(`[WATCHDOG] ${this._label()} ${r} — reconectando`);
+      // Estado del event loop / threadpool / disco en ese momento, para compararlo con los cortes 1013
+      loopMonitor.log(`watchdog ${this._label()} | ${loopMonitor.snapshot().text}`);
+      this._lastDataAt = Date.now();
+      this._probeAt = 0;
+      try { this.ws.terminate(); } catch (_) {} // dispara 'close' → reconexión
     }, 1000);
     this._watchdog.unref?.();
   }
