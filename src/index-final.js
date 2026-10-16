@@ -663,6 +663,19 @@ function runBacktest() {
     { timeout: 10 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
       if (err) logger.warn(`[BACKTEST] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
       else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line);
+      // Después, el mismo backtest sobre la sombra de BTC 15 min: líneas [BACKTEST-15M…] (BACKTEST_15M=off lo apaga)
+      if (process.env.BACKTEST_15M !== 'off') runBacktest15m();
+    });
+}
+function runBacktest15m() {
+  const { execFile } = require('child_process');
+  const dir = process.env.DATA_DIR || '/data';
+  const inFile = path.join(dir, 'shadow-ticks-btc15m.jsonl');
+  if (!fs.existsSync(inFile)) return;
+  execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'backtest.js'), inFile, path.join(dir, 'backtest-report-btc15m.json')],
+    { timeout: 10 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
+      if (err) logger.warn(`[BACKTEST-15M] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
+      else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line.replace(/^\[BACKTEST/, '[BACKTEST-15M'));
     });
 }
 if (process.env.BACKTEST_ENABLED !== 'false') {
