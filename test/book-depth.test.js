@@ -39,5 +39,17 @@ assert.ok(ws._lastLagMs >= 300 && ws._lastLagMs < 2000, 'retraso del último men
 ws._topOfBook.get(T).updatedAt -= 10_000;
 assert.strictEqual(ws.getAskSizeUpTo(T, 0.61), null, 'libro viejo = sin dato');
 assert.strictEqual(ws.getAskSizeUpTo('otro', 0.61), null, 'token sin libro = sin dato');
-console.log('book-depth: 14 ok');
+
+// Top del server distinto del libro local (solo registro en [LOOP]): el 0.60 local ya no está en el server
+const loopMonitor = require('../src/loop-monitor');
+const w2 = new PolymarketWS();
+w2._onBook({ asset_id: T, bids: [{ price: '0.58', size: '100' }], asks: [
+  { price: '0.60', size: '5' }, { price: '0.61', size: '4' }, { price: '0.63', size: '50' },
+] });
+w2._onPriceChange({ price_changes: [{ asset_id: T, price: '0.63', size: '40', side: 'SELL', best_bid: '0.58', best_ask: '0.61' }] });
+assert.strictEqual(w2._topOfBook.get(T).bestAsk, 0.61, 'manda el top del server');
+const lt = loopMonitor.snapshot().text;
+assert.ok(/book_override=1\b/.test(lt) && /book_phantom=1\b/.test(lt), lt);
+assert.strictEqual(w2.getAskSizeUpTo(T, 0.61), 4, 'la profundidad arranca en el top del server: el nivel fantasma no cuenta');
+console.log('book-depth: 17 ok');
 process.exit(0);

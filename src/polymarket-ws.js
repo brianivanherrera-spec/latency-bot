@@ -217,9 +217,24 @@ class PolymarketWS {
     for (const p of lv.bids.keys()) if (bestBid == null || p > bestBid) bestBid = p;
     for (const p of lv.asks.keys()) if (bestAsk == null || p < bestAsk) bestAsk = p;
     if (override) {
+      // Por minuto en [LOOP] (solo registro): book_override = veces que el top del server no coincidía con el
+      // libro local; book_phantom = niveles locales mejores que el top del server (la profundidad del fill de
+      // paper arranca en el top y no los cuenta, pero quedan en el libro local hasta el próximo snapshot)
       const ob = parseFloat(override.best_bid), oa = parseFloat(override.best_ask);
-      if (ob > 0 && ob <= 1 && ob !== bestBid) { this._bookMismatch = (this._bookMismatch || 0) + 1; bestBid = ob; }
-      if (oa > 0 && oa <= 1 && oa !== bestAsk) { this._bookMismatch = (this._bookMismatch || 0) + 1; bestAsk = oa; }
+      if (ob > 0 && ob <= 1 && ob !== bestBid) {
+        this._bookMismatch = (this._bookMismatch || 0) + 1;
+        loopMonitor.count('book_override');
+        let ph = 0; for (const p of lv.bids.keys()) if (p > ob) ph++;
+        if (ph) loopMonitor.count('book_phantom', ph);
+        bestBid = ob;
+      }
+      if (oa > 0 && oa <= 1 && oa !== bestAsk) {
+        this._bookMismatch = (this._bookMismatch || 0) + 1;
+        loopMonitor.count('book_override');
+        let ph = 0; for (const p of lv.asks.keys()) if (p < oa) ph++;
+        if (ph) loopMonitor.count('book_phantom', ph);
+        bestAsk = oa;
+      }
     }
     const ok = this._setTopOfBook(tokenId, {
       bestBid, bestAsk,
