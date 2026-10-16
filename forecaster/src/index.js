@@ -1,0 +1,54 @@
+'use strict';
+const { config } = require('./config');
+const { log, utcDate, readJsonl } = require('./util');
+const pipeline = require('./pipeline');
+const { computeReport, summaryLine } = require('./metrics');
+const server = require('./server');
+
+process.on('uncaughtException', (e) => { log(`excepcion no capturada: ${e.stack || e.message}`); server.status.lastError = e.message; });
+process.on('unhandledRejection', (e) => { log(`promesa rechazada: ${e && e.stack || e}`); server.status.lastError = String(e); });
+
+let busy = false;
+let lastHourly = 0;
+let summaryDate = null;
+
+async function safe(name, fn) {
+  try { return await fn(); } catch (e) { log(`fallo en ${name}: ${e.message}`); server.status.lastError = `${name}: ${e.message}`; }
+}
+
+async function tick() {
+  if (busy) return;
+  busy = true;
+  try {
+    const now = new Date();
+    const today = utcDate(now);
+    if (now.getUTCHours() >= config().SELECT_HOUR_UTC && !readJsonl('candidates.jsonl').some((r) => r.date === today)) {
+      await safe('seleccion', () => pipeline.runSelection(today));
+      server.status.lastSelection = new Date().toISOString();
+    }
+    if (Date.now() - lastHourly >= 36e5) {
+      lastHourly = Date.now();
+      const f = await safe('pronosticos', () => pipeline.ingestForecasts());
+      const r = await safe('resoluciones', () => pipeline.checkResolutions());
+      const s = await safe('snapshots', () => pipeline.takeSnapshots());
+      log(`ciclo horario: pronosticos nuevos=${f ?? 'err'} resoluciones=${r ?? 'err'} snapshots=${s ?? 'err'}`);
+      server.status.lastHourly = new Date().toISOString();
+    }
+    if (summaryDate !== today && now.getUTCHours() >= config().SELECT_HOUR_UTC) {
+      const st = pipeline.loadState();
+      log(summaryLine(st, computeReport(st)));
+      summaryDate = today;
+    }
+  } finally { busy = false; }
+}
+
+function main() {
+  const c = config();
+  log(`iniciando (solo paper, sin ordenes reales). DATA_DIR=${c.DATA_DIR} MARKETS_PER_DAY=${c.MARKETS_PER_DAY}`);
+  server.start();
+  setInterval(() => tick().catch((e) => log(`tick: ${e.message}`)), 60000);
+  tick().catch((e) => log(`tick: ${e.message}`));
+}
+
+if (require.main === module) main();
+module.exports = { tick };

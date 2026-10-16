@@ -1,0 +1,14 @@
+{
+  "name": "forecaster",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot de pronosticos para Polymarket, solo paper (sin ordenes reales)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js",
+    "check": "for f in src/*.js test/*.js; do node --check $f || exit 1; done"
+  },
+  "engines": { "node": "20.x" },
+  "dependencies": {}
+}
