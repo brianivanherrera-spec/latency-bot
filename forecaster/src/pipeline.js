@@ -107,8 +107,8 @@ async function ingestForecasts() {
     if (d.action === 'comprar') {
       st.portfolio.openUsd += d.stake_usd;
       st.portfolio.openByEvent.set(market.event_id, (st.portfolio.openByEvent.get(market.event_id) || 0) + 1);
-      log(`PAPER compra ${d.side} ${id} $${d.stake_usd.toFixed(2)} @${d.avg_price.toFixed(3)} edge=${d.edge.toFixed(3)} (p_yes=${row.p_yes}, mid=${mid_yes.toFixed(3)})`);
-    } else log(`PAPER omitido ${id}: ${d.reason} (p_yes=${row.p_yes}, mid=${mid_yes.toFixed(3)})`);
+      log(`PAPER compra ${d.side} ${id} $${d.stake_usd.toFixed(2)} (detalle de precios solo en /data, no en logs)`);
+    } else log(`PAPER omitido ${id}: ${d.reason}`);
     done.add(key);
     n++;
   }
