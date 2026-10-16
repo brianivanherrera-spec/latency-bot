@@ -204,6 +204,19 @@ class WsProbe {
     } catch (_) { return null; }
   }
 
+  // Control al decidir (bitácora 16/10 ~04:30 ARG): ¿esta conexión muestra otro ask (≥ tol) con un dato al menos ms
+  // más nuevo que el de la principal? → { ask, age, mainAge } o null. Lo usan A y B (STALE_GUARD); nunca tira
+  staleVs(tokenId, mainAsk, mainAge, tol = 0.02, ms = 1000) {
+    try {
+      if (this.stopped || !this.live || mainAsk == null || mainAge == null) return null;
+      const r = this._top.get(tokenId);
+      if (!r || r.bestAsk == null) return null;
+      const age = this.now() - r.updatedAt;
+      if (Math.abs(r.bestAsk - mainAsk) < tol - 1e-9 || mainAge - age < ms) return null;
+      return { ask: r.bestAsk, age, mainAge };
+    } catch (_) { return null; }
+  }
+
   // "$0.43 (igual al REST, dato de hace 120 ms)": el snap contra el ask del WS principal y el del REST del mismo momento
   vs(s, wsAsk, restAsk) {
     try {

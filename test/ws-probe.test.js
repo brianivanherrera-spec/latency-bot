@@ -147,6 +147,11 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
   eq(p.vs({ ask: 0.45, age: 1 }, 0.40, 0.43), '$0.45 (distinto de los dos, dato de hace 1 ms)', 'distinto');
   eq(p.vs({ ask: 0.45, age: 1 }, 0.40, null), '$0.45 (distinto del WS principal, sin REST, dato de hace 1 ms)', 'sin REST');
   eq([p.vs({ down: true }), p.vs({ off: true }), p.vs({ ask: null }), p.vs(null)], ['sin conexión', 'apagada', 'sin libro', 'sin dato'], 'estados');
+  // Control al decidir (STALE_GUARD): otro ask con un dato ≥ 1 s más nuevo que el de la principal
+  const ag = 10100 + 20001 - 3;
+  eq(p.staleVs('Y', 0.49, ag + 10000), { ask: 0.51, age: ag, mainAge: ag + 10000 }, 'principal 10 s más vieja y 2¢ distinta: marca');
+  eq([p.staleVs('Y', 0.50, ag + 10000), p.staleVs('Y', 0.49, ag + 999), p.staleVs('X', 0.49, ag + 10000), p.staleVs('Y', null, 5000), p.staleVs('Y', 0.49, null)],
+    [null, null, null, null, null], 'a 1¢, menos de 1 s más nueva, sin libro o sin dato de la principal: nada');
 
   // ─── Cortes ─────────────────────────────────────────────────────────────────────────────────────
   p.mainClose(1013);

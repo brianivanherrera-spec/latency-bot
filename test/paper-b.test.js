@@ -333,7 +333,36 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   const m21 = mkt('g21');
   await capture(async () => { pq.onSample(m21, sample(150, 0.50)); pq.onSample(m21, sample(100, 0.65)); await pq.markets.get('g21').done; });
   assert.ok(lines.some(l => l.includes('[PAPER-B] REST:') && !l.includes('WS2')), 'sin probe: sin WS2');
+  // 19) Segunda conexión distinta al decidir (bitácora 16/10 ~04:30 ARG): la principal en $0.45 con un dato de hace 5 s y
+  // la segunda en $0.47 recién llegada → por defecto entra igual y se cuenta aparte; con STALE_GUARD=on no entra
   delete rest.Y;
+  polyWs.getTopAge = () => 5000;
+  probe._top.set('Y', { bestBid: 0.44, bestAsk: 0.47, updatedAt: Date.now(), topTs: null });
+  lines.length = 0;
+  const pgw = new PaperB({ polyWs, probe, stateFile: path.join(dir, 'ws2g.json'), env, fetchFn: fakeFetch });
+  const m22 = mkt('g22');
+  await capture(async () => { pgw.onSample(m22, sample(150, 0.50)); pgw.onSample(m22, sample(100, 0.65)); await pgw.markets.get('g22').done; });
+  const gl = lines.find(l => /\[PAPER-B\] (UP|DOWN) /.test(l));
+  assert.ok(gl && /SEGUNDA CONEXIÓN DISTINTA al decidir: la segunda conexión mostraba \$0\.47 con un dato de hace \d+ ms y la principal \$0\.45 de hace 5000 ms; entró igual/.test(gl), gl);
+  assert.deepStrictEqual([pgw.state.attempts, pgw.state.ws2g.n, pgw.state.ws2g.filled, pgw.state.open[0].ws2Stale], [1, 1, 1, true], 'medición: entra y se cuenta');
+  await pgw.onResolved('g22', 'DOWN', 'gamma');
+  assert.deepStrictEqual([pgw.state.ws2g.w, pgw.state.ws2g.l, pgw.state.l], [0, 1, 1], 'el resultado va al P&L y aparte');
+  assert.ok(/segunda conexión distinta al decidir \(≥ 2¢ y dato ≥ 1000 ms más nuevo\): 1, llenaban 1 \(0-1 −\$[\d.]+\), entran igual/.test(pgw.summary()), pgw.summary());
+  const pon = new PaperB({ polyWs, probe, stateFile: path.join(dir, 'ws2on.json'), env: { ...env, STALE_GUARD: 'on' }, fetchFn: fakeFetch });
+  lines.length = 0;
+  const m23 = mkt('g23');
+  await capture(async () => { pon.onSample(m23, sample(150, 0.50)); pon.onSample(m23, sample(100, 0.65)); await pon.markets.get('g23').done; });
+  assert.deepStrictEqual([pon.state.attempts, pon.state.open.length, pon.state.ws2gOpen.length, pon.state.ws2g.n], [0, 0, 1, 1], 'STALE_GUARD=on: no entra, se guarda aparte');
+  assert.ok(lines.some(l => l.includes('NO ENTRA: la segunda conexión mostraba $0.47')), 'línea de no entra');
+  await capture(async () => { await pon.onResolved('g23', 'UP', 'gamma'); });
+  assert.deepStrictEqual([pon.state.ws2gOpen.length, pon.state.ws2g.w, pon.state.w], [0, 1, 0], 'cómo habría salido, sin tocar el P&L');
+  // Con la principal al día (dato de hace 200 ms) no marca nada
+  polyWs.getTopAge = () => 200;
+  const pq2 = new PaperB({ polyWs, probe, stateFile: path.join(dir, 'ws2fresh.json'), env: { ...env, STALE_GUARD: 'on' }, fetchFn: fakeFetch });
+  const m24 = mkt('g24');
+  pq2.onSample(m24, sample(150, 0.50)); pq2.onSample(m24, sample(100, 0.65)); await pq2.markets.get('g24').done;
+  assert.deepStrictEqual([pq2.state.attempts, pq2.state.ws2g.n], [1, 0], 'principal al día: entra normal');
+  delete polyWs.getTopAge;
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 120 ok');
+  console.log('paper-b: 128 ok');
 })().catch(e => { console.error(e); process.exit(1); });

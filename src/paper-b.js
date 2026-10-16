@@ -70,6 +70,9 @@ class PaperB {
       limitMode: env.PAPER_B_LIMIT === 'fair' ? 'fair' : 'buffer', margin: num(env.PAPER_B_LIMIT_MARGIN, 0.02),
       // Precio viejo del WS (REST al decidir con el ask más de restGuardTol arriba del WS): on = no entra; por defecto solo se mide
       restGuard: env.PAPER_B_REST_GUARD === 'on', restGuardTol: num(env.PAPER_B_REST_GUARD_TOL, 0.02),
+      // Segunda conexión al decidir (bitácora 16/10 ~04:30 ARG): otro ask (≥ STALE_GUARD_TOL) con un dato al menos
+      // STALE_GUARD_MS más nuevo que el de la principal = principal congelada. on = no entra; por defecto solo se mide
+      ws2Guard: env.STALE_GUARD === 'on', ws2Tol: num(env.STALE_GUARD_TOL, 0.02), ws2Ms: num(env.STALE_GUARD_MS, 1000),
     };
     c.checkMs = Math.min(c.delayMs, Math.max(0, num(env.PAPER_CHECK_MS, 200)));
     c.cap = round2(c.hi + 0.02);
@@ -88,7 +91,8 @@ class PaperB {
     const lim = c.limitMode === 'fair' ? `límite = precio justo − comisión − ${Math.round(c.margin * 100)} pts` : `límite = ask + ${Math.round(c.buffer * 100)}¢`;
     const tol = Math.round(c.restGuardTol * 100);
     const guard = !this.restCheck ? '' : c.restGuard ? `; no entra si el REST al decidir está más de ${tol}¢ arriba del WS` : `; precio viejo del WS (REST al decidir más de ${tol}¢ arriba): solo se mide`;
-    return `regla anclada: ventaja ≥ ${Math.round(c.edge * 100)} pts neta de comisión, ask $${c.lo.toFixed(2)}-$${c.hi.toFixed(2)}, ${c.tMax}-${c.tMin} s restantes, $${c.stake} por operación (${lim}, tope $${c.cap.toFixed(2)}), fill a +${c.delayMs} ms (registro a +${c.checkMs} ms)${guard}`;
+    const g2 = !this.probe ? '' : `; segunda conexión distinta al decidir (≥ ${Math.round(c.ws2Tol * 100)}¢ y dato ≥ ${c.ws2Ms} ms más nuevo): ${c.ws2Guard ? 'no entra' : 'solo se mide'}`;
+    return `regla anclada: ventaja ≥ ${Math.round(c.edge * 100)} pts neta de comisión, ask $${c.lo.toFixed(2)}-$${c.hi.toFixed(2)}, ${c.tMax}-${c.tMin} s restantes, $${c.stake} por operación (${lim}, tope $${c.cap.toFixed(2)}), fill a +${c.delayMs} ms (registro a +${c.checkMs} ms)${guard}${g2}`;
   }
 
   // Resolución de respaldo (reinicios, o si el shadow no resolvió) y resumen cada 5 min
@@ -162,6 +166,8 @@ class PaperB {
     const lag0 = this.poly?._lastLagMs ?? null;
     const ws2 = () => { try { return this.probe ? this.probe.snap(tokenId) : null; } catch (_) { return null; } };
     const w0 = ws2();
+    let sg = null;
+    try { sg = this.probe?.staleVs ? this.probe.staleVs(tokenId, ask, this.poly?.getTopAge?.(tokenId) ?? null, c.ws2Tol, c.ws2Ms) : null; } catch (_) { sg = null; }
     await wait(c.checkMs);
     const b200 = book();
     const r2 = restOn ? restBook() : null;
@@ -189,7 +195,17 @@ class PaperB {
       side, t: Date.now(), secsLeft: Math.round(T), ask, pa: +pa.toFixed(4), edge: +edge.toFixed(4),
       limit, size, ask200: b200.ask, ask400: b400.ask, fill200: fills(b200), filled, paid, edgePaid,
       restAsk0, restMs0: d0?.ms ?? null, phantom, ask3, trend: ask3 != null ? round2(ask - ask3) : null,
+      ws2Stale: !!sg, ws2Ask: sg?.ask ?? null, ws2Age: sg?.age ?? null, mainAge: sg?.mainAge ?? null,
     };
+    const sgTxt = sg ? `la segunda conexión mostraba ${px(sg.ask)} con un dato de hace ${Math.round(sg.age)} ms y la principal ${px(ask)} de hace ${Math.round(sg.mainAge)} ms` : '';
+    if (sg) { S.ws2g.n++; if (filled) S.ws2g.filled++; }
+    if (sg && c.ws2Guard) {
+      // No se manda la orden; si con el WS llenaba, se guarda para ver cómo habría salido (no cuenta en el P&L)
+      if (filled) S.ws2gOpen.push(pos);
+      this._save();
+      logger.info(`[PAPER-B] ${side} ${pos.market} | ${pos.secsLeft} s restantes | ask ${px(ask)} vs precio justo anclado ${(pa * 100).toFixed(1)}% (ventaja ${(edge * 100).toFixed(1)} pts) | NO ENTRA: ${sgTxt} | orden ${size} a $${limit} ${filled ? `habría llenado a $${paid}` : 'no habría llenado'}`);
+      return pos;
+    }
     if (phantom) { S.phantom.n++; if (filled) S.phantom.filled++; }
     if (phantom && c.restGuard) {
       // No se manda la orden; si con el WS llenaba, se guarda para ver cómo habría salido (no cuenta en el P&L)
@@ -203,7 +219,7 @@ class PaperB {
     if (filled) { S.filled++; S.open.push(pos); } else { S.noFill++; if (pos.fill200) S.only200.push(pos); }
     if (S.only200.length > 200) S.only200.shift();
     this._save();
-    logger.info(`[PAPER-B] ${side} ${pos.market} | ${pos.secsLeft} s restantes | ask ${px(ask)} vs precio justo anclado ${(pa * 100).toFixed(1)}% (ventaja ${(edge * 100).toFixed(1)} pts) | ask hace 3 s ${trendTxt(pos)} | ask a +${c.checkMs}ms ${px(b200.ask)} → +${c.delayMs}ms ${px(b400.ask)} | orden ${size} a $${limit} | ${filled ? `lleno a $${paid} (ventaja al precio pagado ${(edgePaid * 100).toFixed(1)} pts)` : 'no'}`);
+    logger.info(`[PAPER-B] ${side} ${pos.market} | ${pos.secsLeft} s restantes | ask ${px(ask)} vs precio justo anclado ${(pa * 100).toFixed(1)}% (ventaja ${(edge * 100).toFixed(1)} pts) | ask hace 3 s ${trendTxt(pos)} | ask a +${c.checkMs}ms ${px(b200.ask)} → +${c.delayMs}ms ${px(b400.ask)} | orden ${size} a $${limit} | ${filled ? `lleno a $${paid} (ventaja al precio pagado ${(edgePaid * 100).toFixed(1)} pts)` : 'no'}${sg ? ` | SEGUNDA CONEXIÓN DISTINTA al decidir: ${sgTxt}; entró igual (se cuenta aparte)` : ''}`);
     if (restOn) {
       const [b, b2] = await Promise.all([r1, r2]);
       const sz = restSizeUpTo(b, limit);
@@ -240,6 +256,7 @@ class PaperB {
     for (const p of this.state.restOpen.filter(x => x.gammaId === gammaId)) this._closeRestOnly(p, winner);
     for (const p of this.state.rest200Open.filter(x => x.gammaId === gammaId)) this._closeRest200Only(p, winner);
     for (const p of this.state.phantomOpen.filter(x => x.gammaId === gammaId)) this._closePhantom(p, winner);
+    for (const p of this.state.ws2gOpen.filter(x => x.gammaId === gammaId)) this._closeWs2g(p, winner);
     const o2 = this.state.only200.filter(x => x.gammaId === gammaId && x.winner == null);
     for (const p of o2) p.winner = winner;
     if (o2.length) this._save(); // si en ese mercado no había otra posición, nadie más guarda y se perdía al reiniciar
@@ -283,13 +300,24 @@ class PaperB {
     logger.info(`[PAPER-B] solo con el REST a +${this.cfg.checkMs}ms: ${p.side === winner ? 'WIN' : 'LOSS'} ${p.side} ${p.market} @ $${p.restPaid200} ×${p.size} → ${usd(pnl)} (el WS no llenó) | P&L con REST a +${this.cfg.checkMs}ms ${usd(S.rest200.pnl)}`);
   }
 
-  // Resultado de un disparo con precio viejo del WS, al precio del paper con el WS (cuenta aparte)
-  _phantomResult(p, winner) {
-    const X = this.state.phantom, win = p.side === winner;
+  // Resultado de un disparo marcado (precio viejo del WS o segunda conexión distinta), al precio del paper con el WS (cuenta aparte)
+  _asideResult(X, p, winner) {
+    const win = p.side === winner;
     const pnl = (win ? p.size * (1 - p.paid) : -p.size * p.paid) - this.fee(p.paid) * p.size;
     if (win) X.w++; else X.l++;
     X.pnl = +(X.pnl + pnl).toFixed(4);
     return pnl;
+  }
+  _phantomResult(p, winner) { return this._asideResult(this.state.phantom, p, winner); }
+
+  // Disparo descartado por la segunda conexión (STALE_GUARD=on) que con el WS llenaba: cómo habría salido (no cuenta)
+  _closeWs2g(p, winner) {
+    const S = this.state;
+    if (!S.ws2gOpen.some(x => x.id === p.id)) return;
+    S.ws2gOpen = S.ws2gOpen.filter(x => x.id !== p.id);
+    const pnl = this._asideResult(S.ws2g, p, winner);
+    this._save();
+    logger.info(`[PAPER-B] sin entrada por la segunda conexión: habría sido ${p.side === winner ? 'WIN' : 'LOSS'} ${p.side} ${p.market} @ $${p.paid} ×${p.size} → ${usd(pnl)} (no cuenta) | descartadas que llenaban: ${S.ws2g.w}-${S.ws2g.l} ${usd(S.ws2g.pnl)}`);
   }
 
   // Disparo descartado por precio viejo del WS que con el WS llenaba: cómo habría salido (no cuenta en el P&L)
@@ -320,6 +348,7 @@ class PaperB {
     if (p.restFill200 === false) S.rest200.no++;
     else if (p.restFill200 !== undefined) this._rest200Result(p, winner, false);
     if (p.phantom) this._phantomResult(p, winner);
+    if (p.ws2Stale) this._asideResult(S.ws2g, p, winner);
     S.recent.push({ ...p, winner, win, pnl: +pnl.toFixed(4), source, closedAt: Date.now() });
     if (S.recent.length > 50) S.recent.shift();
     this._save();
@@ -329,7 +358,7 @@ class PaperB {
   // Posiciones abiertas cuyo mercado cerró hace > 5 min y el shadow no resolvió (p. ej. hubo un
   // reinicio): se consulta Gamma, como hace el shadow
   async _resolveStale(now = Date.now()) {
-    const stale = [...this.state.open, ...this.state.restOpen, ...this.state.rest200Open, ...this.state.phantomOpen].filter(x => now - x.endTs > 5 * 60000);
+    const stale = [...this.state.open, ...this.state.restOpen, ...this.state.rest200Open, ...this.state.phantomOpen, ...this.state.ws2gOpen].filter(x => now - x.endTs > 5 * 60000);
     for (const gammaId of new Set(stale.map(x => x.gammaId))) {
       try {
         const res = await this.fetch(`${GAMMA}/markets/${gammaId}`, { signal: AbortSignal.timeout(5000) });
@@ -347,7 +376,9 @@ class PaperB {
     const S = this.state, n = S.w + S.l;
     const o2 = S.only200.filter(x => x.winner), o2w = o2.filter(x => x.winner === x.side).length;
     const R = S.rest, X = S.phantom, R2 = S.rest200, c = this.cfg;
-    const ph = ` | precio viejo del WS al decidir (REST > WS + ${Math.round(c.restGuardTol * 100)}¢): ${X.n}, llenaban ${X.filled}${X.w + X.l ? ` (${X.w}-${X.l} ${usd(X.pnl)})` : ''}, ${c.restGuard ? 'sin entrada' : 'entran igual'}`;
+    const G = S.ws2g;
+    const ph = ` | precio viejo del WS al decidir (REST > WS + ${Math.round(c.restGuardTol * 100)}¢): ${X.n}, llenaban ${X.filled}${X.w + X.l ? ` (${X.w}-${X.l} ${usd(X.pnl)})` : ''}, ${c.restGuard ? 'sin entrada' : 'entran igual'}` +
+      ` | segunda conexión distinta al decidir (≥ ${Math.round(c.ws2Tol * 100)}¢ y dato ≥ ${c.ws2Ms} ms más nuevo): ${G.n}, llenaban ${G.filled}${G.w + G.l ? ` (${G.w}-${G.l} ${usd(G.pnl)})` : ''}, ${c.ws2Guard ? 'sin entrada' : 'entran igual'}`;
     return `[PAPER-B] Balance B: ${usd(S.pnl)} | W:${S.w} L:${S.l}${n ? ` (${(S.w / n * 100).toFixed(1)}%)` : ''} | intentos ${S.attempts}, llenadas ${S.filled}, sin fill ${S.noFill}, abiertas ${S.open.length} | a +${this.cfg.checkMs}ms llenaban ${S.fill200} (solo a ${this.cfg.checkMs} ms: ${S.only200.length}${o2.length ? `, ganaban ${o2w}/${o2.length}` : ''}) | con el libro REST: ${usd(R.pnl)} (${R.w}-${R.n - R.w}); ${S.restNo.n} llenadas que con REST no llenaban, ${R.only} que solo llenaba el REST | límite ${this.cfg.limitMode}${ph} | con el REST a +${c.checkMs}ms: ${usd(R2.pnl)} (${R2.w}-${R2.n - R2.w}); ${R2.no} llenadas que con el REST a +${c.checkMs}ms no llenaban, ${R2.only} que solo llenaba ese REST (desde ${new Date(R2.since).toISOString().slice(0, 16)} UTC) | desde ${new Date(S.startedAt).toISOString().slice(0, 16)} UTC`;
   }
 
@@ -355,7 +386,8 @@ class PaperB {
     const fresh = { v: 1, startedAt: Date.now(), attempts: 0, filled: 0, noFill: 0, fill200: 0, w: 0, l: 0, pnl: 0, fees: 0, open: [], recent: [], only200: [],
       restNo: { n: 0, w: 0, pnl: 0 }, rest: { n: 0, w: 0, pnl: 0, only: 0 }, restOpen: [],
       rest200: { n: 0, w: 0, pnl: 0, only: 0, no: 0, since: Date.now() }, rest200Open: [],
-      phantom: { n: 0, filled: 0, w: 0, l: 0, pnl: 0 }, phantomOpen: [] };
+      phantom: { n: 0, filled: 0, w: 0, l: 0, pnl: 0 }, phantomOpen: [],
+      ws2g: { n: 0, filled: 0, w: 0, l: 0, pnl: 0, since: Date.now() }, ws2gOpen: [] };
     try {
       if (fs.existsSync(this.stateFile)) {
         const saved = JSON.parse(fs.readFileSync(this.stateFile, 'utf8'));

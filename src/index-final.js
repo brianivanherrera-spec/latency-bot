@@ -2822,6 +2822,22 @@ async function main() {
       }
     }
 
+    // Segunda conexión al decidir (bitácora 16/10 ~04:30 ARG): si muestra otro ask (≥ STALE_GUARD_TOL) con un dato al
+    // menos STALE_GUARD_MS más nuevo que el de la principal, la principal está congelada (16/10 00:28 ARG: $0.61 contra
+    // $0.86). STALE_GUARD=on no entra; por defecto solo se registra y entra igual
+    if (wsProbe && bestAskWS != null) {
+      let sg = null;
+      try {
+        sg = wsProbe.staleVs(tokenId, bestAskWS, polyWs.getTopAge?.(tokenId) ?? null,
+          parseFloat(process.env.STALE_GUARD_TOL || '0.02'), parseFloat(process.env.STALE_GUARD_MS || '1000'));
+      } catch (_) { sg = null; }
+      if (sg) {
+        const on = process.env.STALE_GUARD === 'on';
+        logger.warn(`[STALE-GUARD] A ${sig.direction} ${posId}: la segunda conexión mostraba $${sg.ask.toFixed(2)} con un dato de hace ${Math.round(sg.age)} ms y la principal $${bestAskWS.toFixed(2)} de hace ${Math.round(sg.mainAge)} ms → ${on ? 'no entra' : 'entra igual (solo medición)'}`);
+        if (on) { activePositions.delete(posId); return; }
+      }
+    }
+
     // Fix 1: size check ANTES del Discord alert — no alertar órdenes que no van a ejecutarse
     if (size < 5) {
       logger.warn(`[SKIP] Size ${size} < mínimo 5 tokens de Polymarket (ORDER_SIZE_USDC=$${exposure} muy bajo)`);
