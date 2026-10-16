@@ -1,0 +1,431 @@
+From 32fa34be9411315b54e025876ecf2080aa16da34 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 13:30:31 +0000
+Subject: [PATCH 2/2] Resumen por hora de los logs ([RESUMEN]) para el chequeo
+ cada 6 h
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+El chequeo programado pasa de cada hora a cada 6 h. En vez de leer cientos de líneas
+por tema ([LOOP] y [WS-DUAL] salen cada minuto), el bot deja a los :20 UTC dos líneas
+por hora: cuentas (A y B de la hora, totales, pérdidas de B con T y ventaja) y salud
+(reconexiones de la principal, cortes 1013, PolyBolt, Binance, strike, PTB-CHECK,
+BOOK-CHECK, máximos del [LOOP], series, backtest/ejecución y WARN/ERROR desconocidos
+agrupados). Solo mira las líneas que pasan por el Logger; no cambia nada del bot.
+LOG_DIGEST=off lo apaga.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VAfMq1uvFnaNaEiv9UKKCe
+---
+ src/log-digest.js       | 258 ++++++++++++++++++++++++++++++++++++++++
+ src/logger.js           |   7 +-
+ test/log-digest.test.js |  99 +++++++++++++++
+ 3 files changed, 363 insertions(+), 1 deletion(-)
+ create mode 100644 src/log-digest.js
+ create mode 100644 test/log-digest.test.js
+
+diff --git a/src/log-digest.js b/src/log-digest.js
+new file mode 100644
+index 0000000..13977e5
+--- /dev/null
++++ b/src/log-digest.js
+@@ -0,0 +1,258 @@
++/**
++ * Resumen por hora de los logs — [RESUMEN] (solo registro).
++ *
++ * El chequeo programado pasó a cada 6 h: en vez de leer cientos de líneas por tema
++ * ([LOOP] y [WS-DUAL] salen cada minuto), lee estas dos líneas por hora. Mira cada línea
++ * que pasa por el Logger, cuenta eventos y guarda máximos; no cambia nada del bot.
++ *
++ *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B …
++ *   [RESUMEN] salud HH:20-HH:20 UTC | reconexiones … | 1013 … | BOOK-CHECK … | LOOP … | WARN/ERROR …
++ *
++ * Sale a los :20 UTC de cada hora (el chequeo corre a los :22). LOG_DIGEST=off lo apaga.
++ */
++'use strict';
++
++const ENABLED = String(process.env.LOG_DIGEST || 'on').toLowerCase() !== 'off';
++const EMIT_MINUTE = 20;
++
++// logger.js usa este módulo, así que el Logger se pide recién al emitir
++let _logger = null;
++const emitLine = msg => {
++  if (!_logger) { const { Logger } = require('./logger'); _logger = new Logger('RESUMEN'); }
++  _logger.info(msg);
++};
++
++const num = s => Number(String(s).replace('−', '-').replace(',', '.'));
++const signed = (sign, v) => (sign === '−' || sign === '-' ? -1 : 1) * num(v);
++const usd = v => `${v >= 0 ? '+' : '−'}$${Math.abs(v).toFixed(2)}`;
++const hhmm = t => new Date(t).toISOString().slice(11, 16);
++
++// Contadores simples: clave → patrón sobre "[PREFIJO] cuerpo"
++const COUNTS = [
++  ['atrasada', /\[WATCHDOG\] atrasada:/],
++  ['muda', /\[WATCHDOG\] muda:/],
++  ['topViejo', /\[WATCHDOG\] top viejo:/],
++  ['pausa', /reconexión por atraso en pausa/],
++  ['ws1_1013', /\[LOOP\] corte 1013/],
++  ['ws1Cortes', /\[WS-DUAL\] WS1 cortada/],
++  ['ws2Caidas', /WS2 \(medición\) desconectada/],
++  ['polybolt', /\[POLYBOLT\] Sin datos/],
++  ['bnReco', /\[WATCHDOG\] Binance .*reconectando/],
++  ['bnTope', /\[WATCHDOG\] Binance .*tope de .*reconectando/],
++  ['bnSinPong', /\[WATCHDOG\] Binance .*sin pong.*reconectando/],
++  ['bnPingOk', /\[WATCHDOG\] Binance: .*contestó el ping/],
++  ['staleGuard', /\[STALE-GUARD\]/],
++  ['distinto3s', /distinto hace 3 s entre las dos conexiones/],
++  ['skipStrike', /\[SKIP\] .*Strike sin TWAP/],
++  ['serieBtc15m', /\[SERIE btc15m\] .* muestras/],
++  ['serieEth5m', /\[SERIE eth5m\] .* muestras/],
++  ['eth0modelo', /\[SERIE eth5m\] .*muestras \(0 con modelo/],
++  ['serie429', /respondió 429/],
++  ['bookReal', /diferencia REAL/],
++  ['backtest', /\[BACKTEST-B-HIPOTESIS\]/],
++  ['ejecucion', /\[EJECUCION\] PAPER a \+/],
++];
++
++// WARN/ERROR conocidos (ver el prompt del chequeo): se cuentan pero no van a "otros"
++const KNOWN = [
++  /Alta latencia/, /Gap .* en TWAP/, /getBalanceAllowance falló/, /Binance sin datos hace siempre/,
++  /Libro cruzado descartado/, /Mercado ya cerrado/, /MIN_ENTRY_PRICE/, /Segunda entrada/, /LATE_ENTRY/,
++  /code=(1000|1001|1005|1006|1013|4003)\b/, /Sin TWAP del RTDS hace/, /Sin precios del RTDS hace/,
++  /libro moviéndose/, /diferencia REAL/, /Error actualizando precio/, /sin datos de los tokens hace 15 s/,
++  /\[WATCHDOG\] (atrasada|muda|top viejo):/, /reconexión por atraso en pausa/, /\[POLYBOLT\] Sin datos/,
++  /\[WATCHDOG\] (Binance|Coinbase) .*reconectando/, /\[STALE-GUARD\]/, /distinto hace 3 s/,
++  /WS2 \(medición\) desconectada/, /\[STRIKE\] /, /\[SKIP\] /,
++];
++
++class LogDigest {
++  constructor(now = Date.now()) {
++    this.bootAt = now;
++    this.lastA = null;      // último "P&L Total acumulado" de A
++    this.lastB = null;      // último "Balance B" parseado
++    this.baseB = null;      // Balance B al cerrar la ventana anterior (para las diferencias)
++    this.attempts = new Map(); // "UP mercado" → {secs, edge} del intento de B
++    this._reset(now);
++  }
++
++  _reset(now) {
++    this.since = now;
++    this.c = Object.fromEntries(COUNTS.map(([k]) => [k, 0]));
++    this.warn = 0; this.error = 0;
++    this.others = new Map(); // clave normalizada → {n, ex, level}
++    this.a = { w: 0, l: 0, pnl: 0 };
++    this.b = { w: 0, l: 0, pnl: 0, losses: [] };
++    this._aPending = false;
++    this.strike = { n: 0, notCl: 0, maxWait: null };
++    this.ptb = { n: 0, maxRtds: null, maxPb: null, nonZero: 0 };
++    this.book = { n: 0, min: null, sum: 0 };
++    this.loop = { n: 0, lagP99: null, cpu: null, wsP99: null, wsMax: null, bad: 0 };
++  }
++
++  observe(level, prefix, body) {
++    if (prefix === 'RESUMEN') return;
++    const line = `[${prefix}] ${body}`;
++    for (const [k, re] of COUNTS) if (re.test(line)) this.c[k]++;
++    if (level === 'warn' || level === 'error') this._warnError(level, line);
++    if (prefix === 'TRACKER') this._a(line);
++    else if (prefix === 'PAPER-B') this._b(line);
++    else if (prefix === 'LOOP') this._loop(line);
++    else if (prefix === 'BOOK-CHECK') this._book(line);
++    else if (line.includes('[PTB-CHECK]')) this._ptb(line);
++    else if (line.includes('[STRIKE] ')) this._strike(line);
++  }
++
++  _warnError(level, line) {
++    if (level === 'warn') this.warn++; else this.error++;
++    if (level === 'warn' && KNOWN.some(re => re.test(line))) return;
++    const key = line.replace(/\d+([.,]\d+)?/g, '#').slice(0, 90);
++    const o = this.others.get(key);
++    if (o) { o.n++; return; }
++    if (this.others.size < 50) this.others.set(key, { n: 1, ex: line.slice(0, 160), level });
++  }
++
++  _a(line) {
++    if (/\[(WIN|LOSS)\] .*Posicion cerrada/.test(line)) { this._aPending = true; return; }
++    let m;
++    if (this._aPending && (m = /(?:Resultado: \S+|Razón: .*?) \| PnL: \+?\$(-?[\d.]+)/.exec(line))) {
++      const v = num(m[1]);
++      this.a.pnl += v; if (v >= 0) this.a.w++; else this.a.l++;
++      this._aPending = false;
++    } else if ((m = /P&L Total acumulado: \+?\$(-?[\d.]+) \| W:(\d+) L:(\d+)/.exec(line))) {
++      this.lastA = { pnl: num(m[1]), w: +m[2], l: +m[3] };
++    }
++  }
++
++  _b(line) {
++    let m;
++    if ((m = /\[PAPER-B\] (UP|DOWN) (.+?) \| (\d+) s restantes \| .*?\(ventaja (-?[\d.]+) pts\)/.exec(line)) && !line.includes('NO ENTRA')) {
++      this.attempts.set(`${m[1]} ${m[2]}`, { secs: +m[3], edge: num(m[4]) });
++      if (this.attempts.size > 20) this.attempts.delete(this.attempts.keys().next().value);
++    } else if ((m = /\[PAPER-B\] (WIN|LOSS) (UP|DOWN) (.+?) @ \$([\d.]+) ×[\d.]+ → ([+−-])\$([\d.]+)/.exec(line))) {
++      const v = signed(m[5], m[6]);
++      this.b.pnl += v;
++      if (m[1] === 'WIN') this.b.w++;
++      else {
++        this.b.l++;
++        const at = this.attempts.get(`${m[2]} ${m[3]}`);
++        if (this.b.losses.length < 8) this.b.losses.push(`${m[2]} ${m[3]} a $${m[4]}${at ? ` (${at.secs} s, ${at.edge} pts)` : ''} ${usd(v)}`);
++      }
++    } else if ((m = /Balance B: ([+−-])\$([\d.]+) \| W:(\d+) L:(\d+)/.exec(line))) {
++      const s = { pnl: signed(m[1], m[2]), w: +m[3], l: +m[4] };
++      const t = /intentos (\d+), llenadas (\d+), sin fill (\d+), abiertas (\d+)/.exec(line);
++      if (t) Object.assign(s, { attempts: +t[1], filled: +t[2], noFill: +t[3], open: +t[4] });
++      const r = /con el libro REST: ([+−-])\$([\d.]+) \((\d+)-(\d+)\)/.exec(line);
++      if (r) s.rest = { pnl: signed(r[1], r[2]), w: +r[3], l: +r[4] };
++      const r2 = /con el REST a \+(\d+)ms: ([+−-])\$([\d.]+) \((\d+)-(\d+)\)/.exec(line);
++      if (r2) s.rest2 = { ms: +r2[1], pnl: signed(r2[2], r2[3]), w: +r2[4], l: +r2[5] };
++      if (!this.baseB) this.baseB = s; // primera del arranque: base de la primera ventana
++      this.lastB = s;
++    }
++  }
++
++  _loop(line) {
++    if (line.includes('corte 1013')) return;
++    const L = this.loop;
++    const mx = (k, v) => { if (Number.isFinite(v) && (L[k] == null || v > L[k])) L[k] = v; };
++    let m;
++    const lag = (m = /lag p50=\S+ p99=([\d.]+)ms/.exec(line)) ? num(m[1]) : null;
++    const cpu = (m = /CPU (\d+)%/.exec(line)) ? +m[1] : null;
++    const ws = /retraso WS p50=\d+ms p99=(\d+)ms máx=(\d+)ms/.exec(line);
++    if (lag == null && cpu == null && !ws) return;
++    L.n++;
++    mx('lagP99', lag); mx('cpu', cpu);
++    if (ws) { mx('wsP99', +ws[1]); mx('wsMax', +ws[2]); }
++    if ((lag != null && lag > 50) || (cpu != null && cpu > 25) || (ws && (+ws[1] > 1000 || +ws[2] > 3000))) L.bad++;
++  }
++
++  _book(line) {
++    const m = /iguales \d+ \(([\d.]+)%\)/.exec(line);
++    if (!m) return;
++    const v = num(m[1]);
++    this.book.n++; this.book.sum += v;
++    if (this.book.min == null || v < this.book.min) this.book.min = v;
++  }
++
++  _ptb(line) {
++    const P = this.ptb;
++    P.n++;
++    const abs = re => { const m = re.exec(line); return m && m[1] !== 'n/a' ? Math.abs(num(m[1])) : null; };
++    const rt = abs(/RTDS=([+-]?[\d.]+|n\/a) \|/);
++    const pb = abs(/PolyBolt=([+-]?[\d.]+|n\/a)/);
++    if (rt != null && (P.maxRtds == null || rt > P.maxRtds)) P.maxRtds = rt;
++    if (pb != null && (P.maxPb == null || pb > P.maxPb)) P.maxPb = pb;
++    if ((rt != null && rt >= 0.005) || (pb != null && pb >= 0.005)) P.nonZero++;
++  }
++
++  _strike(line) {
++    const S = this.strike;
++    const src = /strike_source=(\S+)/.exec(line);
++    if (!src) return;
++    S.n++;
++    if (src[1] !== 'chainlink_twap') S.notCl++;
++    const w = /espera=([\d.]+)s/.exec(line);
++    if (w && (S.maxWait == null || num(w[1]) > S.maxWait)) S.maxWait = num(w[1]);
++  }
++
++  // Devuelve las dos líneas de la ventana [since, now) y empieza la siguiente
++  report(now = Date.now()) {
++    const c = this.c;
++    const win = `${hhmm(this.since)}-${hhmm(now)} UTC${this.since === this.bootAt ? ' (desde el arranque)' : ''}`;
++    const A = this.lastA ? `total ${usd(this.lastA.pnl)} (${this.lastA.w}-${this.lastA.l})` : 'total sin dato';
++    const cuentas = [`[RESUMEN] cuentas ${win}`,
++      `A: ${this.a.w}-${this.a.l} ${usd(this.a.pnl)}; ${A}`,
++      `B: ${this.b.w}-${this.b.l} ${usd(this.b.pnl)}${this._bWindow()}; ${this._bTotal()}`,
++      `pérdidas B: ${this.b.losses.length ? this.b.losses.join('; ') : 'ninguna'}`];
++    const top = [...this.others.values()].sort((x, y) => y.n - x.n).slice(0, 4)
++      .map(o => `${o.level === 'error' ? 'ERROR ' : ''}×${o.n} "${o.ex}"`);
++    const f = (v, d = 0) => (v == null ? 'n/a' : v.toFixed(d));
++    const L = this.loop, P = this.ptb, S = this.strike, K = this.book;
++    const salud = [`[RESUMEN] salud ${win}`,
++      `principal: atrasada ${c.atrasada}, muda ${c.muda}, top viejo ${c.topViejo}, en pausa ${c.pausa}; cortes WS1 ${c.ws1Cortes} (1013 ${c.ws1_1013}); WS2 desconectada ${c.ws2Caidas}; Sí/No distinto 3 s ${c.distinto3s}; STALE-GUARD ${c.staleGuard}`,
++      `PolyBolt silencios ${c.polybolt}; Binance reconexiones ${c.bnReco} (tope ${c.bnTope}, sin pong ${c.bnSinPong}), ping contestado ${c.bnPingOk}`,
++      `strike ${S.n} (no chainlink ${S.notCl}, espera máx ${f(S.maxWait, 1)} s); sin TWAP salteado ${c.skipStrike}; PTB-CHECK ${P.n} (Δ≠0 ${P.nonZero}, máx RTDS ${f(P.maxRtds, 2)}, PolyBolt ${f(P.maxPb, 2)})`,
++      `BOOK-CHECK ${K.n ? `mín ${f(K.min, 1)}% prom ${(K.sum / K.n).toFixed(1)}%` : 'n/a'}, diferencias REALES ${c.bookReal}`,
++      `LOOP ${L.n} min: retraso WS p99 máx ${f(L.wsP99)} ms, máx ${f(L.wsMax)} ms; lag p99 máx ${f(L.lagP99)} ms; CPU máx ${f(L.cpu)}%; minutos fuera de umbral ${L.bad}`,
++      `SERIE btc15m ${c.serieBtc15m}, eth5m ${c.serieEth5m} (0 con modelo ${c.eth0modelo}), 429 ${c.serie429}; corrió backtest ${c.backtest ? 'sí' : 'no'}, ejecución ${c.ejecucion ? 'sí' : 'no'}`,
++      `WARN ${this.warn}, ERROR ${this.error}; otros: ${top.length ? top.join('; ') : 'ninguno'}`];
++    this.baseB = this.lastB;
++    this._reset(now);
++    return [cuentas.join(' | '), salud.join(' | ')];
++  }
++
++  _bWindow() {
++    const s = this.lastB, b = this.baseB;
++    if (!s || !b || s.attempts == null || b.attempts == null) return '';
++    const d = (k) => (s[k] && b[k] ? `${usd(s[k].pnl - b[k].pnl)} (${s[k].w - b[k].w}-${s[k].l - b[k].l})` : 'n/a');
++    return ` (intentos ${s.attempts - b.attempts}, llenadas ${s.filled - b.filled}; REST ${d('rest')}, REST +${s.rest2?.ms ?? '?'}ms ${d('rest2')})`;
++  }
++
++  _bTotal() {
++    const s = this.lastB;
++    if (!s) return 'total sin dato';
++    return `total ${usd(s.pnl)} (${s.w}-${s.l})${s.rest ? `, REST ${usd(s.rest.pnl)} (${s.rest.w}-${s.rest.l})` : ''}${s.rest2 ? `, REST +${s.rest2.ms}ms ${usd(s.rest2.pnl)} (${s.rest2.w}-${s.rest2.l})` : ''}${s.open != null ? `, abiertas ${s.open}` : ''}`;
++  }
++}
++
++// ms hasta el próximo HH:20:00 UTC
++function msToNextEmit(now = Date.now()) {
++  const d = new Date(now);
++  d.setUTCMinutes(EMIT_MINUTE, 0, 0);
++  if (d.getTime() <= now) d.setUTCHours(d.getUTCHours() + 1);
++  return d.getTime() - now;
++}
++
++const digest = new LogDigest();
++let timer = null;
++function schedule() {
++  timer = setTimeout(() => {
++    try { for (const l of digest.report()) emitLine(l); } catch (_) { /* solo registro */ }
++    schedule();
++  }, msToNextEmit());
++  if (timer.unref) timer.unref();
++}
++if (ENABLED) schedule();
++
++module.exports = {
++  observe: ENABLED ? (level, prefix, body) => { try { digest.observe(level, prefix, body); } catch (_) { /* solo registro */ } } : () => {},
++  LogDigest, msToNextEmit,
++};
+diff --git a/src/logger.js b/src/logger.js
+index b940a2f..5b71ede 100644
+--- a/src/logger.js
++++ b/src/logger.js
+@@ -6,6 +6,7 @@
+ const config = require('./config');
+ const { append } = require('./async-append');
+ const loopMonitor = require('./loop-monitor');
++const logDigest = require('./log-digest');
+ 
+ const LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
+ const currentLevel = LEVELS[config.LOG_LEVEL] ?? 1;
+@@ -18,7 +19,8 @@ class Logger {
+   _log(level, ...args) {
+     if (LEVELS[level] < currentLevel) return;
+     const ts = new Date().toISOString();
+-    const msg = `[${ts}] [${level.toUpperCase()}] [${this.prefix}] ${args.join(' ')}`;
++    const body = args.join(' ');
++    const msg = `[${ts}] [${level.toUpperCase()}] [${this.prefix}] ${body}`;
+ 
+     // stdout hacia un pipe (Railway) es sincrónico en Linux: se mide cuánto bloquea
+     loopMonitor.count('log_lines');
+@@ -30,6 +32,9 @@ class Logger {
+     // Escribir a archivo si está configurado
+     // (en segundo plano: appendFileSync en cada línea bloqueaba el event loop)
+     if (config.LOG_FILE) append(config.LOG_FILE, msg);
++
++    // Resumen por hora [RESUMEN] (solo registro; LOG_DIGEST=off lo apaga)
++    logDigest.observe(level, this.prefix, body);
+   }
+ 
+   debug(...args) { this._log('debug', ...args); }
+diff --git a/test/log-digest.test.js b/test/log-digest.test.js
+new file mode 100644
+index 0000000..e694ea3
+--- /dev/null
++++ b/test/log-digest.test.js
+@@ -0,0 +1,99 @@
++/**
++ * Resumen por hora de los logs [RESUMEN] (src/log-digest.js).
++ * Uso: node test/log-digest.test.js
++ */
++'use strict';
++const assert = require('assert');
++const { LogDigest, msToNextEmit } = require('../src/log-digest');
++
++let n = 0;
++const ok = (cond, msg) => { assert.ok(cond, msg); n++; };
++const has = (txt, part, msg) => ok(txt.includes(part), `${msg || part}\n  en: ${txt}`);
++
++const T0 = Date.UTC(2026, 9, 16, 13, 20, 0);
++const d = new LogDigest(T0);
++const mkt = 'Oct 16, 9:35AM-9:40AM ET';
++const bal = (pnl, w, l, at, fi, r, rw, rl, r2, r2w, r2l, open = 0) =>
++  `[PAPER-B] Balance B: ${pnl} | W:${w} L:${l} (58.5%) | intentos ${at}, llenadas ${fi}, sin fill ${at - fi}, abiertas ${open} | a +400ms llenaban 80 (solo a 400 ms: 1) | con el libro REST: ${r} (${rw}-${rl}); 2 llenadas que con REST no llenaban, 0 que solo llenaba el REST | límite justo | con el REST a +200ms: ${r2} (${r2w}-${r2l}); 1 llenadas que con el REST a +200ms no llenaban, 0 que solo llenaba ese REST (desde 2026-10-12T12:35 UTC) | desde 2026-10-08T14:49 UTC`;
++
++// Balance B al arrancar = base de la primera ventana
++d.observe('info', 'PAPER-B', bal('+$21.88', 48, 34, 93, 82, '+$6.85', 44, 33, '+$10.26', 41, 30).slice('[PAPER-B] '.length));
++// B: un intento que pierde y uno que gana
++d.observe('info', 'PAPER-B', `DOWN ${mkt} | 45 s restantes | ask $0.49 vs precio justo anclado 60.1% (ventaja 9.6 pts) | ask hace 3 s $0.48 | ask a +400ms $0.49`);
++d.observe('info', 'PAPER-B', `LOSS DOWN ${mkt} @ $0.49 ×10 → −$4.57 (comisión $0.18) | P&L B +$17.31 (48-35)`);
++d.observe('info', 'PAPER-B', `UP Oct 16, 9:40AM-9:45AM ET | 60 s restantes | ask $0.40 vs precio justo anclado 55.0% (ventaja 12.0 pts) | NO ENTRA: segunda conexión distinta`);
++d.observe('info', 'PAPER-B', `WIN UP Oct 16, 9:45AM-9:50AM ET @ $0.55 ×10 → +$4.32 (comisión $0.18) | P&L B +$21.63 (49-35)`);
++d.observe('info', 'PAPER-B', bal('+$21.63', 49, 35, 95, 84, '+$7.10', 45, 34, '+$10.01', 42, 31).slice('[PAPER-B] '.length));
++// A: una ganada y una pérdida anticipada
++d.observe('info', 'TRACKER', '[WIN] Posicion cerrada: POS_1');
++d.observe('info', 'TRACKER', '   Resultado: YES | PnL: +$1.2 | comisión $0.0500');
++d.observe('info', 'TRACKER', '   P&L Total acumulado: +$14.10 | W:270 L:101');
++d.observe('info', 'TRACKER', '[LOSS] [POSITION-MONITOR] Posicion cerrada anticipadamente: POS_2');
++d.observe('info', 'TRACKER', '   Razón: stop | PnL: $-3.2');
++d.observe('info', 'TRACKER', '   P&L Total acumulado: +$10.90 | W:270 L:102');
++// Salud
++d.observe('warn', 'POLY-WS', '[WATCHDOG] muda: 2100 ms sin datos de los tokens y la segunda recibió datos hace 120 ms — reconectando');
++d.observe('warn', 'POLY-WS', '[WATCHDOG] top viejo: Sí $0.51 con un dato del servidor de hace 4200 ms y la segunda $0.55 de hace 80 ms, 3 s seguidos — reconectando');
++d.observe('warn', 'POLY-WS', 'Desconectado (code=1013 slow consumer)');
++d.observe('info', 'LOOP', 'corte 1013 | lag p50=1ms p99=900ms máx=900ms | CPU 99%');
++d.observe('info', 'WS-DUAL', 'WS1 cortada (code=1013) | WS2 conectada');
++d.observe('warn', 'BINANCE-WS', '[WATCHDOG] Binance sin datos hace 12000ms y sin pong en 3000ms — reconectando');
++d.observe('info', 'BINANCE-WS', '[WATCHDOG] Binance: 6000 ms sin operaciones, contestó el ping en 40 ms — sigue conectado');
++d.observe('warn', 'POLYBOLT', '[POLYBOLT] Sin datos (10 s) — reconectando');
++d.observe('info', 'MAIN', `[STRIKE] ${mkt} | strike_source=chainlink_twap (rtds) | strike TWAP=$67000.00 | Binance@apertura=$67010.00 | diferencia=+10.00 | base BN−CL=$9.00 | strike=$67000.00 | espera=1.4s`);
++d.observe('warn', 'MAIN', `[STRIKE] ${mkt} | strike_source=binance | strike TWAP=n/a | Binance@apertura=$67010.00 | diferencia=n/a | base BN−CL=n/a | strike=$67001.00 | espera=2.3s`);
++d.observe('info', 'PTB', `[PTB-CHECK] ${mkt} | real=UP | priceToBeat=67000.00 | Δ vs spot=+3.10 TWAP60=+0.00 RTDS=+0.00 | predice: spot=UP TWAP60=UP RTDS=UP ptb+TWAP=UP ptb+RTDS=UP | PolyBolt=+0.00 (pred. UP)`);
++d.observe('info', 'PTB', `[PTB-CHECK] ${mkt} | real=DOWN | priceToBeat=67000.00 | Δ vs spot=−1.00 TWAP60=-1.20 RTDS=-1.20 | predice: spot=DOWN TWAP60=DOWN RTDS=DOWN ptb+TWAP=DOWN ptb+RTDS=DOWN | PolyBolt=-1.20 (pred. DOWN)`);
++d.observe('info', 'BOOK-CHECK', '[BOOK-CHECK] últimos 15 min, libro del WS vs API REST de Polymarket (Sí y No, cada 30 s): n=60 | iguales 58 (96.7%) | 1¢ de diferencia 2 (3.3%)');
++d.observe('info', 'BOOK-CHECK', '[BOOK-CHECK] últimos 15 min, libro del WS vs API REST de Polymarket (Sí y No, cada 30 s): n=60 | iguales 59 (98.3%) | 1¢ de diferencia 1 (1.7%)');
++d.observe('warn', 'BOOK-CHECK', '[BOOK-CHECK] ⚠️ Sí WS $0.50 vs REST $0.52 (WS al día: diferencia REAL)');
++d.observe('info', 'LOOP', 'lag p50=1.1ms p99=12.4ms máx=30ms | bloqueos>200ms=0 (peor 0ms) | CPU 7% | heap 80MB | retraso WS p50=40ms p99=300ms máx=900ms (n=500)');
++d.observe('info', 'LOOP', 'lag p50=1.1ms p99=60.0ms máx=90ms | bloqueos>200ms=0 (peor 0ms) | CPU 9% | heap 80MB | retraso WS p50=40ms p99=1200ms máx=3500ms (n=500)');
++d.observe('info', 'SERIE', `[SERIE btc15m] ${mkt} | ganó UP | strike $67000.00 | 900 muestras (890 con modelo; REST p50 80 ms`);
++d.observe('info', 'SERIE', `[SERIE eth5m] ${mkt} | ganó DOWN | strike $2500.00 | 300 muestras (0 con modelo; REST p50 80 ms`);
++d.observe('info', 'BACKTEST', '[BACKTEST-B-HIPOTESIS] (i) n=16 …');
++d.observe('warn', 'RTDS', 'Alta latencia: 900ms');
++d.observe('warn', 'FOO', 'algo raro 1 pasó');
++d.observe('warn', 'FOO', 'algo raro 2 pasó');
++d.observe('error', 'MAIN', '[ERROR] se rompió algo');
++d.observe('info', 'RESUMEN', '[RESUMEN] cuentas — no se cuenta a sí mismo: [WATCHDOG] muda:');
++
++const [c1, s1] = d.report(T0 + 3600000);
++has(c1, '[RESUMEN] cuentas 13:20-14:20 UTC (desde el arranque)', 'ventana y arranque');
++has(c1, 'A: 1-1 −$2.00; total +$10.90 (270-102)', 'A de la hora y total');
++has(c1, 'B: 1-1 −$0.25 (', 'B de la hora');
++has(c1, '(intentos 2, llenadas 2; REST +$0.25 (1-1), REST +200ms −$0.25 (1-1))', 'diferencias del Balance B');
++has(c1, 'total +$21.63 (49-35), REST +$7.10 (45-34), REST +200ms +$10.01 (42-31), abiertas 0', 'B total');
++has(c1, `pérdidas B: DOWN ${mkt} a $0.49 (45 s, 9.6 pts) −$4.57`, 'pérdida de B con T y ventaja');
++ok(!c1.includes('9:40AM-9:45AM'), 'el NO ENTRA no cuenta como intento');
++has(s1, 'atrasada 0, muda 1, top viejo 1, en pausa 0', 'reconexiones (y no se cuenta a sí mismo)');
++has(s1, 'cortes WS1 1 (1013 1)', 'cortes de la principal');
++has(s1, 'PolyBolt silencios 1; Binance reconexiones 1 (tope 0, sin pong 1), ping contestado 1', 'feeds');
++has(s1, 'strike 2 (no chainlink 1, espera máx 2.3 s)', 'strike');
++has(s1, 'PTB-CHECK 2 (Δ≠0 1, máx RTDS 1.20, PolyBolt 1.20)', 'PTB');
++has(s1, 'BOOK-CHECK mín 96.7% prom 97.5%, diferencias REALES 1', 'BOOK-CHECK');
++has(s1, 'LOOP 2 min: retraso WS p99 máx 1200 ms, máx 3500 ms; lag p99 máx 60 ms; CPU máx 9%; minutos fuera de umbral 1', 'LOOP sin la línea del corte');
++has(s1, 'SERIE btc15m 1, eth5m 1 (0 con modelo 1), 429 0; corrió backtest sí, ejecución no', 'series y corridas');
++has(s1, 'WARN 10, ERROR 1', 'conteo de WARN/ERROR');
++has(s1, '×2 "[FOO] algo raro 1 pasó"', 'WARN desconocidos agrupados');
++has(s1, 'ERROR ×1 "[MAIN] [ERROR] se rompió algo"', 'ERROR en otros');
++ok(!s1.includes('Alta latencia') && !s1.includes('code=1013'), 'los WARN conocidos no van a otros');
++
++// Segunda ventana: vacía, la base del B pasa al último Balance B
++d.observe('info', 'PAPER-B', bal('+$21.63', 49, 35, 96, 84, '+$7.10', 45, 34, '+$10.01', 42, 31, 1).slice('[PAPER-B] '.length));
++const [c2, s2] = d.report(T0 + 7200000);
++has(c2, '[RESUMEN] cuentas 14:20-15:20 UTC |', 'segunda ventana sin "desde el arranque"');
++has(c2, 'B: 0-0 +$0.00 (intentos 1, llenadas 0; REST +$0.00 (0-0), REST +200ms +$0.00 (0-0))', 'base = último Balance B de la ventana anterior');
++has(c2, 'abiertas 1', 'posición abierta');
++has(c2, 'pérdidas B: ninguna');
++has(s2, 'muda 0, top viejo 0', 'contadores en cero');
++has(s2, 'LOOP 0 min: retraso WS p99 máx n/a', 'sin datos: n/a');
++has(s2, 'BOOK-CHECK n/a');
++has(s2, 'otros: ninguno');
++
++// Próxima emisión a los :20 UTC
++ok(msToNextEmit(Date.UTC(2026, 9, 16, 13, 19, 0)) === 60000, 'falta 1 min');
++ok(msToNextEmit(Date.UTC(2026, 9, 16, 13, 20, 0)) === 3600000, 'justo a los :20 → la próxima hora');
++ok(msToNextEmit(Date.UTC(2026, 9, 16, 23, 50, 0)) === 30 * 60000, 'pasa de día');
++
++console.log(`log-digest: ${n} ok`);
+-- 
+2.43.0
+

@@ -1,0 +1,162 @@
+From 56dda59820d92156fc6b31a9ad4b7f4c57438c63 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 16 Oct 2026 12:32:39 +0000
+Subject: [PATCH 1/2] =?UTF-8?q?Principal=20con=20top=20viejo:=20reconectar?=
+ =?UTF-8?q?=20si=20la=20segunda=20ve=203=20s=20otro=20top=20con=20un=20dat?=
+ =?UTF-8?q?o=20=E2=89=A5=201=20s=20m=C3=A1s=20nuevo?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+El 16/10 de 08:55:00 a 08:57:31 ARG, después del cambio de mercado, la conexión nueva llegó atrasada
+(p99 1,8-2,4 s; la segunda 0,2 s) pero con algunos mensajes al día, así que la reconexión por atraso
+(3 s seguidos con el dato más fresco ≥ 1 s) tardó 2,5 min. El aviso "Sí distinto hace 3 s" ya había
+salido a las 08:55:05 con el dato de la principal 1,78 s más viejo, y a las 08:57:29 la principal mostraba
+Sí $0.43/$0.44 contra $0.59/$0.60 de la segunda.
+
+- ws-probe: desde los 3 s de top distinto le avisa a la principal (onStaleTop) con los dos tops, la edad
+  de cada dato del servidor y la diferencia entre sus timestamps.
+- polymarket-ws: reconecta si el dato de la principal es ≥ WS_STALE_TOP_RECONNECT_MS (1000; 0 lo apaga)
+  más viejo, solo después del primer book del handshake; mismo interruptor (WS_LAG_RECONNECT) y mismo
+  tope de 6 por hora que atraso y muda, y como mucho una cada 10 s (watchdog).
+- test/ws-probe: 120 (antes 107).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VAfMq1uvFnaNaEiv9UKKCe
+---
+ src/polymarket-ws.js  | 21 ++++++++++++++++++++-
+ src/ws-probe.js       |  8 ++++++++
+ test/ws-probe.test.js | 37 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 65 insertions(+), 1 deletion(-)
+
+diff --git a/src/polymarket-ws.js b/src/polymarket-ws.js
+index fce827f..d14cd31 100644
+--- a/src/polymarket-ws.js
++++ b/src/polymarket-ws.js
+@@ -42,6 +42,12 @@ const PEER_FRESH_MS = 300;       // la segunda está al día si su dato más fre
+ // real estaba en $0.86-0.88, y A y B decidieron con ese precio. 0 lo apaga (queda el watchdog de 15 s)
+ const SILENT_MS = envNum(process.env.WS_SILENT_RECONNECT_MS, 2000);
+ const PEER_LIVE_MS = 500;
++// Top viejo (bitácora 16/10 ~09:30 ARG): la segunda ve 3 s seguidos otro top de Sí o No con un dato del servidor al menos
++// STALE_TOP_MS más nuevo que el de la principal → reconectar (mismo interruptor y mismo tope por hora que atraso y muda).
++// El 16/10 de 08:55:00 a 08:57:31 ARG la principal llegó atrasada después del cambio de mercado (p99 1,8-2,4 s) pero con
++// algunos mensajes al día, así que la reconexión por atraso tardó 2,5 min; el aviso "Sí distinto hace 3 s" salió a las
++// 08:55:05 (dato de la principal 1,78 s más viejo) y a las 08:57:29 mostraba Sí $0.43/$0.44 contra $0.59/$0.60. 0 lo apaga
++const STALE_TOP_MS = envNum(process.env.WS_STALE_TOP_RECONNECT_MS, 1000);
+ 
+ // Cargar trade map persistido (sobrevive reinicios)
+ function loadTradeMap() {
+@@ -831,7 +837,20 @@ class PolymarketWS {
+     return false;
+   }
+ 
+-  // Tope por hora de las reconexiones por atraso o principal muda (devuelve si queda lugar)
++  // Aviso de la segunda (ws-probe, _compareTops): top distinto 3 s o más con el dato de esta más viejo (ver STALE_TOP_MS).
++  // info = { side, main, peer, mainAge, peerAge, gap (ms entre los timestamps del servidor) }. Reconecta y devuelve true
++  onStaleTop(info, now = Date.now()) {
++    const L = this._lagReconnect;
++    if (!L.enabled || !STALE_TOP_MS || !this._gotBookSinceHandshake || !info || !(info.gap >= STALE_TOP_MS)) return false;
++    if (!this._lagBudget(now)) return false;
++    if (this._watchdogReconnect(`top viejo: ${info.side} ${info.main} con un dato del servidor de hace ${Math.round(info.mainAge)} ms y la segunda ${info.peer} de hace ${Math.round(info.peerAge)} ms, 3 s seguidos`)) {
++      this._lagReconnects.push(now);
++      return true;
++    }
++    return false;
++  }
++
++  // Tope por hora de las reconexiones por atraso, principal muda o top viejo (devuelve si queda lugar)
+   _lagBudget(now) {
+     const L = this._lagReconnect;
+     while (this._lagReconnects.length && now - this._lagReconnects[0] > 3600000) this._lagReconnects.shift();
+diff --git a/src/ws-probe.js b/src/ws-probe.js
+index b8a2271..317748c 100644
+--- a/src/ws-probe.js
++++ b/src/ws-probe.js
+@@ -471,6 +471,14 @@ class WsProbe {
+         const age = r => (r.topTs != null ? `dato del servidor de hace ${now - r.topTs} ms` : 'sin hora del servidor');
+         logger.warn(`[WS-DUAL] ⚠️ ${i === 0 ? 'Sí' : 'No'} distinto hace 3 s entre las dos conexiones: WS1 ${px(a.bestBid)}/${px(a.bestAsk)} (${age(a)}) vs WS2 ${px(b.bestBid)}/${px(b.bestAsk)} (${age(b)})`);
+       }
++      // Top viejo en la principal (bitácora 16/10 ~09:30 ARG): desde los 3 s de racha le avisa a la principal, que reconecta
++      // si su dato del servidor es ≥ WS_STALE_TOP_RECONNECT_MS más viejo que el de esta (polymarket-ws.js, onStaleTop)
++      if (this._diffRun[i] >= 3 && a.topTs != null && b.topTs != null && typeof this.main.onStaleTop === 'function') {
++        try {
++          this.main.onStaleTop({ side: i === 0 ? 'Sí' : 'No', main: `${px(a.bestBid)}/${px(a.bestAsk)}`, peer: `${px(b.bestBid)}/${px(b.bestAsk)}`,
++            mainAge: now - a.topTs, peerAge: now - b.topTs, gap: b.topTs - a.topTs }, now);
++        } catch (_) {}
++      }
+     });
+   }
+ 
+diff --git a/test/ws-probe.test.js b/test/ws-probe.test.js
+index c1f84eb..d30e126 100644
+--- a/test/ws-probe.test.js
++++ b/test/ws-probe.test.js
+@@ -100,14 +100,23 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
+   // ─── Top distinto entre las dos ─────────────────────────────────────────────────────────────────
+   main._topOfBook.set('Y', { bestBid: 0.67, bestAsk: 0.68, topTs: clock - 2400 });
+   main._topOfBook.set('N', { bestBid: 0.49, bestAsk: 0.50, topTs: clock - 10 });
++  const staleCalls = [];
++  main.onStaleTop = info => { staleCalls.push(info); };
+   s1.msg(pc(clock - 100, 'Y', 'h9', 0.60, 0.62)); await flush();
++  const tTop = clock;
+   p._tick(); clock += 1000; p._tick(); clock += 1000; p._tick(); clock += 1000; p._tick();
+   eq(p.m.topDiff, [4, 0], 'Sí distinto 4 s, No igual');
+   eq([p.m.stale1, p.m.stale2], [4, 0], 'el dato más viejo era el de WS1');
+   eq(p.m.warns, 1, 'un aviso a los 3 s');
++  // Top viejo (bitácora 16/10 ~09:30 ARG): desde los 3 s de racha le avisa a la principal cada segundo
++  eq(staleCalls.length, 2, 'avisa a la principal a los 3 y 4 s de racha');
++  eq(staleCalls[0], { side: 'Sí', main: '$0.67/$0.68', peer: '$0.60/$0.62', mainAge: 2400 + 2000, peerAge: 100 + 2000, gap: 2300 },
++    'con los dos tops, la edad de cada dato del servidor y la diferencia entre los timestamps');
++  ok(clock - tTop === 3000, 'reloj de la prueba');
+   main._topOfBook.set('Y', { bestBid: 0.60, bestAsk: 0.62, topTs: clock });
+   p._tick();
+   eq(p._diffRun, [0, 0], 'igual de nuevo: se reinicia la racha');
++  eq(staleCalls.length, 2, 'con el top igual no avisa');
+ 
+   // ─── Línea por minuto ─────────────────────────────────────────────────────────────────────────
+   const r = p.report();
+@@ -120,6 +129,13 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
+   p._reset();
+   eq([p.m.onlyT, p.m.pairT], [[{ p: 0, b: 0, t: 0 }, { p: 0, b: 0, t: 0 }], [{ p: 0, b: 0, t: 0 }, { p: 0, b: 0, t: 0 }]], 'reinicio por minuto');
+   ok(/ventaja p50: WS1 —, WS2 — \| solo por \(precio\/top\/trade\): WS1 0\/0\/0, WS2 0\/0\/0; /.test(p.report()), 'minuto vacío');
++  main._topOfBook.set('N', { bestBid: 0.40, bestAsk: 0.41, topTs: clock + 500 }); // la principal más nueva que la segunda
++  s1.msg(pc(clock - 600, 'N', 'h10', 0.49, 0.5)); await flush();
++  p._tick(); clock += 1000; p._tick(); clock += 1000; p._tick();
++  ok(staleCalls.length === 3 && staleCalls[2].side === 'No' && staleCalls[2].gap < 0, 'si la vieja es la segunda, el gap sale negativo (la principal no reconecta)');
++  main._topOfBook.set('N', { bestBid: 0.49, bestAsk: 0.50, topTs: clock });
++  p._tick();
++  delete main.onStaleTop;
+ 
+   // ─── Mismo contenido con otro timestamp: "solo por" las dos, cada uno con su par ────────────────
+   p._pend.clear(); p._solo.forEach(S => S.clear()); // sin el h9 de la sección anterior
+@@ -364,6 +380,27 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
+   eq([sw._silentCheck(S0), sw._lagPausedLogged], [false, true], 'el tope de 6 por hora es el mismo de la reconexión por atraso');
+   sw._lagReconnects = []; sw._lagReconnect.enabled = false;
+   eq(sw._silentCheck(S0), false, 'WS_LAG_RECONNECT=off: tampoco');
++  // Top viejo (bitácora 16/10 ~09:30 ARG): la segunda avisa top distinto 3 s con el dato de la principal ≥ 1 s más viejo
++  const tw = new PolymarketWS();
++  let tre = 0;
++  tw._forceReconnect = () => { tre++; };
++  const U0 = Date.now();
++  tw._gotBookSinceHandshake = true; tw._lastWatchdogReconnect = 0;
++  const inf = g => ({ side: 'Sí', main: '$0.43/$0.44', peer: '$0.59/$0.60', mainAge: 2445, peerAge: 25, gap: g });
++  eq([tw.onStaleTop(inf(999), U0), tre], [false, 0], 'dato de la principal menos de 1 s más viejo: no reconecta');
++  eq([tw.onStaleTop(inf(-400), U0), tre], [false, 0], 'la vieja es la segunda: no reconecta');
++  eq([tw.onStaleTop(inf(2420), U0), tre, tw._lagReconnects.length], [true, 1, 1], '2,4 s más viejo: reconecta y cuenta en el tope por hora');
++  tw._gotBookSinceHandshake = true;
++  eq([tw.onStaleTop(inf(2420), U0), tre], [false, 1], 'dentro de los 10 s del watchdog no repite');
++  tw._lastWatchdogReconnect = 0; tw._gotBookSinceHandshake = false;
++  eq(tw.onStaleTop(inf(2420), U0), false, 'antes del primer book del handshake no actúa');
++  tw._gotBookSinceHandshake = true; tw._lagReconnects = Array.from({ length: 6 }, () => U0 - 1000);
++  eq([tw.onStaleTop(inf(2420), U0), tw._lagPausedLogged], [false, true], 'mismo tope de 6 por hora que atraso y muda');
++  tw._lagReconnects = []; tw._lagReconnect.enabled = false;
++  eq(tw.onStaleTop(inf(2420), U0), false, 'WS_LAG_RECONNECT=off: tampoco');
++  tw._lagReconnect.enabled = true;
++  eq([tw.onStaleTop(null, U0), tw.onStaleTop({ gap: NaN }, U0), tre], [false, false, 1], 'sin datos: no');
++  tw.close();
+   sw._topOfBook.set('T', { bestAsk: 0.5, updatedAt: Date.now() - 1500 });
+   ok(sw.getTopAge('T') >= 1500 && sw.getTopAge('T') < 1700 && sw.getTopAge('X') === null, 'edad del top de la principal');
+   sw.setMirror(null);
+-- 
+2.43.0
+
