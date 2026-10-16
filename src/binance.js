@@ -134,7 +134,8 @@ class BinanceWS {
         if (this.ws !== sock) return;
         const now = Date.now();
         this._lastPongAt = now;
-        if (this._probeAt && !this._probeOk) { // una línea por cada tramo sin operaciones
+        // Una línea por cada tramo sin operaciones (si llegó una operación antes que el pong, no hace falta)
+        if (this._probeAt && !this._probeOk && now - this._lastDataAt > WATCHDOG_MS) {
           this._probeOk = true;
           logger.info(`[WATCHDOG] ${this._label()}: ${now - this._lastDataAt} ms sin operaciones, contestó el ping en ${now - this._probeAt} ms — sigue conectado`);
         }
