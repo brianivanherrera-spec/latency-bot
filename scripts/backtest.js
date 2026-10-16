@@ -34,6 +34,9 @@ const { normCdf } = require('../src/fair-value');
 // Piso de σ del modo blend del modelo FAIR (src/index-final.js), en unidades de las columnas sigma_*_e6
 const SIGMA_FLOOR_E6 = parseFloat(process.env.FAIR_SIGMA_FLOOR || '3e-5') * 1e6;
 const fee = p => FEE * p * (1 - p);
+// Acierto que hace falta para empatar comprando a p como taker: p + comisión. Las z comparan el acierto con
+// esto (hasta el 16/10 lo comparaban con p, sin la comisión, y salían ~0,2-0,3 más altas con n = 30-60)
+const breakEven = p => p + fee(p);
 const STAKE = 5;
 
 // Φ⁻¹(p) — inversa de la normal estándar (Acklam, error relativo < 1.2e-9)
@@ -184,7 +187,8 @@ function evaluate(markets, cfg) {
     const ps = (win ? 1 - e.price : -e.price) - fee(e.price);
     n++; if (win) w++;
     pnl += sh * ps; perShare += ps;
-    exp += e.price; varr += e.price * (1 - e.price);
+    const q = breakEven(e.price);
+    exp += q; varr += q * (1 - q);
   }
   return { n, wr: n ? +(w / n).toFixed(3) : null, avgPrice: n ? +(exp / n).toFixed(3) : null,
     evPerShare: n ? +(perShare / n).toFixed(4) : null, pnl: +pnl.toFixed(2),
@@ -219,10 +223,10 @@ function trendSplit(population, cfg, series, thr = 0.1, horizonMs = 7200000) {
   return { fav: groupStat(g.fav), neu: groupStat(g.neu), against: groupStat(g.against), noData, ...diffOf(g.fav, g.against) };
 }
 
-// Grupo de entradas ({ win, price, ps }): n, acierto, EV por acción y z del acierto contra el precio pagado
+// Grupo de entradas ({ win, price, ps }): n, acierto, EV por acción y z del acierto contra el de empate (precio + comisión)
 function groupStat(a) {
-  const n = a.length, w = a.filter(x => x.win).length, exp = a.reduce((s, x) => s + x.price, 0);
-  const varr = a.reduce((s, x) => s + x.price * (1 - x.price), 0);
+  const n = a.length, w = a.filter(x => x.win).length, exp = a.reduce((s, x) => s + breakEven(x.price), 0);
+  const varr = a.reduce((s, x) => { const q = breakEven(x.price); return s + q * (1 - q); }, 0);
   return { n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(a.reduce((s, x) => s + x.ps, 0) / n).toFixed(4) : null,
     z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
 }
@@ -270,7 +274,8 @@ function limitExec(markets, cfg, buffer) {
     if (a2 > f.ask + buffer + 1e-9) { moved++; continue; }
     const price = Math.max(f.ask, a2), win = f.side === mk.winner;
     const x = (win ? 1 - price : -price) - fee(price);
-    n++; if (win) w++; ps += x; pnl += Math.floor(STAKE / price) * x; exp += price; varr += price * (1 - price);
+    const q = breakEven(price);
+    n++; if (win) w++; ps += x; pnl += Math.floor(STAKE / price) * x; exp += q; varr += q * (1 - q);
   }
   return { fires, moved, n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(ps / n).toFixed(4) : null,
     pnl: +pnl.toFixed(2), z: varr ? +((w - exp) / Math.sqrt(varr)).toFixed(2) : null };
@@ -303,7 +308,8 @@ function fairLimitExec(markets, cfg, margin, cap) {
       if (price < 0.99) { mn++; if (win) mw++; mps += x; }
       continue;
     }
-    n++; if (win) w++; ps += x; pnl += Math.floor(STAKE / L) * x; exp += price; varr += price * (1 - price);
+    const q = breakEven(price);
+    n++; if (win) w++; ps += x; pnl += Math.floor(STAKE / L) * x; exp += q; varr += q * (1 - q);
     if (a2 - f.ask >= 0.03 - 1e-9) { jn++; if (win) jw++; jps += x; }
   }
   return { fires, n, wr: n ? +(w / n).toFixed(3) : null, evPerShare: n ? +(ps / n).toFixed(4) : null,

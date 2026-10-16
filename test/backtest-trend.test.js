@@ -83,6 +83,9 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const lim = limitExec([mEsc, mOk], bCfg, 0.02);
   assert.deepStrictEqual([lim.fires, lim.moved, lim.n, lim.wr], [2, 1, 1, 1]);
   assert.strictEqual(lim.evPerShare, +((1 - 0.50) - fee(0.50)).toFixed(4));
+  // z contra el acierto de empate con comisión (0.50 + comisión), no contra el precio solo
+  const q = 0.50 + fee(0.50);
+  assert.strictEqual(lim.z, +((1 - q) / Math.sqrt(q * (1 - q))).toFixed(2), 'z neta de comisión');
   // Límite por precio justo: pAdj = 0.495 + 0.15 = 0.645 → margen 2 pts: floor((0.625 − comisión(0.625))·100)/100 = 0.60.
   // El salto a 0.80 tampoco llena; con margen 0: 0.62
   assert.strictEqual(fairLimitOf(f, mEsc, bCfg, 0.02), 0.60);
@@ -152,5 +155,5 @@ fs.writeFileSync(file, mks.map(m => JSON.stringify(m)).join('\n') + '\n');
   const d20 = anchorSplit(gm, cur, [0.08, 0.20]);
   assert.deepStrictEqual([d20.lo.n, d20.mid.n, d20.hi.n, d20.agree.n], [3, 0, 2, 2]);
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-trend: 46 ok');
+  console.log('backtest-trend: 47 ok');
 })().catch(err => { console.error(err); process.exit(1); });
