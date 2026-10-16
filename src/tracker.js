@@ -26,10 +26,10 @@ const ADJUSTMENTS = [
 const RESTORE_MAX_AGE_MIN = parseInt(process.env.RESTORE_MAX_AGE_MIN || '120');
 const PAPER_FEE = config.DRY_RUN ? (parseFloat(process.env.PAPER_FEE_PCT || '0') || 0) / 100 : 0;
 const fee = (notional) => parseFloat((notional * PAPER_FEE).toFixed(4));
-// Comisión taker de Polymarket en mercados cripto: 0.07·p·(1−p) USDC por acción, se paga
+// Comisión taker de Polymarket en mercados cripto: 0.072·p·(1−p) USDC por acción, se paga
 // al comprar. Se aplica al P&L de paper (PAPER_TAKER_FEE=false la apaga); en real ya la
 // cobra el exchange.
-const TAKER_FEE_RATE = parseFloat(process.env.TAKER_FEE_RATE || '0.07');
+const TAKER_FEE_RATE = parseFloat(process.env.TAKER_FEE_RATE || '0.072');
 const PAPER_TAKER_FEE = config.DRY_RUN && process.env.PAPER_TAKER_FEE !== 'false';
 const takerFee = (p, shares) => PAPER_TAKER_FEE
   ? parseFloat((TAKER_FEE_RATE * p * (1 - p) * shares).toFixed(4)) : 0;

@@ -41,10 +41,10 @@ row = sh.cur.rows.at(-1);
 assert.strictEqual(col('sig'), 0, 'la señal se resetea cada segundo');
 assert.strictEqual(col('pass'), 1, 'intento de compra UP registrado');
 
-// P ajustada = 0.60 + (0.72 − 0.60) = 0.72; ventaja = 0.72 − 0.61 − 0.07·0.61·0.39 ≈ 0.093
+// P ajustada = 0.60 + (0.72 − 0.60) = 0.72; ventaja = 0.72 − 0.61 − 0.072·0.61·0.39 ≈ 0.093
 let g = sh.evaluateEntryAnchored({ gammaId: 'g', direction: 'UP', ask: 0.61, actualOk: false });
 assert.ok(g && g.ok && Math.abs(g.pSide - 0.72) < 1e-9, `ancla UP: ${JSON.stringify(g)}`);
-assert.ok(Math.abs(g.edge - (0.72 - 0.61 - 0.07 * 0.61 * 0.39)) < 1e-9);
+assert.ok(Math.abs(g.edge - (0.72 - 0.61 - 0.072 * 0.61 * 0.39)) < 1e-9);
 // DOWN con la misma ancla: 0.28 − 0.41 − comisión < 0
 g = sh.evaluateEntryAnchored({ gammaId: 'g', direction: 'DOWN', ask: 0.41, actualOk: false });
 assert.ok(g && !g.ok);

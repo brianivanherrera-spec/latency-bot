@@ -34,10 +34,10 @@ const DECISION_EDGE = parseFloat(process.env.SHADOW_EDGE || '0.05');  // umbral 
 // 8 pts: en 29/09 (180 mercados, ~6.300 señales) mejoró a 5 pts en los tres tramos del día;
 // el modelo sobreestima ~5-10 pts su probabilidad, con 5 pts la ventaja era casi toda ruido.
 const GATE_EDGE = parseFloat(process.env.FAIR_GATE_EDGE || '0.08');
-// FAIR_GATE_FEE=true descuenta la comisión taker (0.07·p·(1−p) por acción) de la ventaja.
+// FAIR_GATE_FEE=true descuenta la comisión taker (0.072·p·(1−p) por acción) de la ventaja.
 // Default false = como antes.
 const GATE_FEE = process.env.FAIR_GATE_FEE === 'true';
-const GATE_FEE_RATE = parseFloat(process.env.TAKER_FEE_RATE || '0.07');
+const GATE_FEE_RATE = parseFloat(process.env.TAKER_FEE_RATE || '0.072');
 const MIN_SECS = parseInt(process.env.SHADOW_MIN_SECS || '10');       // no contar oportunidades con <10s
 // Con P(UP) ≈ 0.50 el modelo no sabe nada (spot ≈ strike al abrir) y la "ventaja" es solo la
 // inclinación del mercado, que resultó informada: en 200 mercados esas entradas acertaron 19%.
