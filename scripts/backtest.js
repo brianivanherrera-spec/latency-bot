@@ -682,7 +682,13 @@ if (require.main === module) (async () => {
     const variants = [['B como está', bCfg], ['(i) modelo en modo blend', blendCfg], ['(ii) ask del lado comprado subiendo ≥ 2¢ en los 3 s previos', { ...bCfg, minTrend: 0.02 }],
       ['(iii) las dos juntas', { ...blendCfg, minTrend: 0.02 }]];
     report.paperBHyp = { from: new Date(hFrom).toISOString(), markets: hMk.length,
-      variants: variants.map(([label, cfg]) => ({ label, hold: fl(hMk, cfg), all: fl(markets, cfg) })) }; }
+      variants: variants.map(([label, cfg]) => ({ label, hold: fl(hMk, cfg), all: fl(markets, cfg) })) };
+    // Hipótesis (iv), registrada el 16/10 (bitácora ~00:30 ARG) con [BACKTEST-B-CORTES]: en el tramo de prueba las de
+    // 8-15 pts dieron n=31 −17¢ z −1,97 y las ≥ 15 pts n=25 ~+4¢. B solo con ventaja ≥ 15 pts al decidir; se juzga
+    // solo con mercados desde HIPOTESIS4_DESDE (el arranque en que se registró) y con la misma vara (z ≥ 2, ≥ 30 llenadas)
+    const h4From = Date.parse(process.env.HIPOTESIS4_DESDE || '2026-10-16T03:24:00Z'), h4Mk = markets.filter(m => m.start >= h4From);
+    const c15 = { ...bCfg, e: 0.15 };
+    report.paperBHyp4 = { from: new Date(h4From).toISOString(), markets: h4Mk.length, hold: fl(h4Mk, c15), base: fl(h4Mk, bCfg), all: fl(markets, c15) }; }
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -728,6 +734,8 @@ if (require.main === module) (async () => {
     const mx = x => `disparos ${x.fires}, llenadas ${x.n} (${x.fires ? Math.round(x.n / x.fires * 100) : 0} %), canceladas ${x.canc}, WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
     const H = report.paperBHyp, hx = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl} (disparos ${x.fires})`;
     console.log(`[BACKTEST-B-HIPOTESIS] fuera de muestra desde ${H.from.slice(0, 16).replace('T', ' ')} UTC (${H.markets} mercados; límite justo margen ${Math.round(bMargin * 100)}; se adopta en paper con z ≥ 2 y ≥ 30 llenadas acá): ${H.variants.map(v => `${v.label}: ${hx(v.hold)}`).join(' | ')} || todos los datos (con los que se eligió, solo referencia): ${H.variants.map(v => `${v.label.split(' ')[0]} ${hx(v.all)}`).join(' | ')}`);
+    const H4 = report.paperBHyp4;
+    console.log(`[BACKTEST-B-HIPOTESIS] (iv) ventaja ≥ 15 pts, fuera de muestra desde ${H4.from.slice(0, 16).replace('T', ' ')} UTC (${H4.markets} mercados; se adopta en paper con z ≥ 2 y ≥ 30 llenadas acá): ${hx(H4.hold)} | B como está en esos mercados: ${hx(H4.base)} || todos los datos (con los que se eligió, solo referencia): ${hx(H4.all)}`);
     console.log(`[BACKTEST-B-MAKER] regla de la cuenta B como maker (compra límite sin comisión; se cancela si el precio justo anclado baja de la orden; llena si el ask baja hasta la orden antes de los últimos 10 s): ${P.maker.map(m => `${m.mode === 'near' ? '1¢ debajo del ask (o en el bid)' : '3¢ debajo del ask'}: todos ${mx(m.all)} | test ${mx(m.test)} | fuera de muestra ${mx(m.holdout)}`).join(' || ')}`); }
   { const t = report.trend2h, sd3 = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare}`;
     const ln = (lab, x) => `[BACKTEST-TEND2H] ${lab}: a favor ${sd3(x.fav)} | neutra ${sd3(x.neu)} | en contra ${sd3(x.against)} | a favor − en contra ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}${x.noData ? ` | sin dato de 2 h: ${x.noData}` : ''}`;
