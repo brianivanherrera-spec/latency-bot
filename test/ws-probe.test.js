@@ -100,14 +100,23 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
   // ─── Top distinto entre las dos ─────────────────────────────────────────────────────────────────
   main._topOfBook.set('Y', { bestBid: 0.67, bestAsk: 0.68, topTs: clock - 2400 });
   main._topOfBook.set('N', { bestBid: 0.49, bestAsk: 0.50, topTs: clock - 10 });
+  const staleCalls = [];
+  main.onStaleTop = info => { staleCalls.push(info); };
   s1.msg(pc(clock - 100, 'Y', 'h9', 0.60, 0.62)); await flush();
+  const tTop = clock;
   p._tick(); clock += 1000; p._tick(); clock += 1000; p._tick(); clock += 1000; p._tick();
   eq(p.m.topDiff, [4, 0], 'Sí distinto 4 s, No igual');
   eq([p.m.stale1, p.m.stale2], [4, 0], 'el dato más viejo era el de WS1');
   eq(p.m.warns, 1, 'un aviso a los 3 s');
+  // Top viejo (bitácora 16/10 ~09:30 ARG): desde los 3 s de racha le avisa a la principal cada segundo
+  eq(staleCalls.length, 2, 'avisa a la principal a los 3 y 4 s de racha');
+  eq(staleCalls[0], { side: 'Sí', main: '$0.67/$0.68', peer: '$0.60/$0.62', mainAge: 2400 + 2000, peerAge: 100 + 2000, gap: 2300 },
+    'con los dos tops, la edad de cada dato del servidor y la diferencia entre los timestamps');
+  ok(clock - tTop === 3000, 'reloj de la prueba');
   main._topOfBook.set('Y', { bestBid: 0.60, bestAsk: 0.62, topTs: clock });
   p._tick();
   eq(p._diffRun, [0, 0], 'igual de nuevo: se reinicia la racha');
+  eq(staleCalls.length, 2, 'con el top igual no avisa');
 
   // ─── Línea por minuto ─────────────────────────────────────────────────────────────────────────
   const r = p.report();
@@ -120,6 +129,13 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
   p._reset();
   eq([p.m.onlyT, p.m.pairT], [[{ p: 0, b: 0, t: 0 }, { p: 0, b: 0, t: 0 }], [{ p: 0, b: 0, t: 0 }, { p: 0, b: 0, t: 0 }]], 'reinicio por minuto');
   ok(/ventaja p50: WS1 —, WS2 — \| solo por \(precio\/top\/trade\): WS1 0\/0\/0, WS2 0\/0\/0; /.test(p.report()), 'minuto vacío');
+  main._topOfBook.set('N', { bestBid: 0.40, bestAsk: 0.41, topTs: clock + 500 }); // la principal más nueva que la segunda
+  s1.msg(pc(clock - 600, 'N', 'h10', 0.49, 0.5)); await flush();
+  p._tick(); clock += 1000; p._tick(); clock += 1000; p._tick();
+  ok(staleCalls.length === 3 && staleCalls[2].side === 'No' && staleCalls[2].gap < 0, 'si la vieja es la segunda, el gap sale negativo (la principal no reconecta)');
+  main._topOfBook.set('N', { bestBid: 0.49, bestAsk: 0.50, topTs: clock });
+  p._tick();
+  delete main.onStaleTop;
 
   // ─── Mismo contenido con otro timestamp: "solo por" las dos, cada uno con su par ────────────────
   p._pend.clear(); p._solo.forEach(S => S.clear()); // sin el h9 de la sección anterior
@@ -364,6 +380,27 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
   eq([sw._silentCheck(S0), sw._lagPausedLogged], [false, true], 'el tope de 6 por hora es el mismo de la reconexión por atraso');
   sw._lagReconnects = []; sw._lagReconnect.enabled = false;
   eq(sw._silentCheck(S0), false, 'WS_LAG_RECONNECT=off: tampoco');
+  // Top viejo (bitácora 16/10 ~09:30 ARG): la segunda avisa top distinto 3 s con el dato de la principal ≥ 1 s más viejo
+  const tw = new PolymarketWS();
+  let tre = 0;
+  tw._forceReconnect = () => { tre++; };
+  const U0 = Date.now();
+  tw._gotBookSinceHandshake = true; tw._lastWatchdogReconnect = 0;
+  const inf = g => ({ side: 'Sí', main: '$0.43/$0.44', peer: '$0.59/$0.60', mainAge: 2445, peerAge: 25, gap: g });
+  eq([tw.onStaleTop(inf(999), U0), tre], [false, 0], 'dato de la principal menos de 1 s más viejo: no reconecta');
+  eq([tw.onStaleTop(inf(-400), U0), tre], [false, 0], 'la vieja es la segunda: no reconecta');
+  eq([tw.onStaleTop(inf(2420), U0), tre, tw._lagReconnects.length], [true, 1, 1], '2,4 s más viejo: reconecta y cuenta en el tope por hora');
+  tw._gotBookSinceHandshake = true;
+  eq([tw.onStaleTop(inf(2420), U0), tre], [false, 1], 'dentro de los 10 s del watchdog no repite');
+  tw._lastWatchdogReconnect = 0; tw._gotBookSinceHandshake = false;
+  eq(tw.onStaleTop(inf(2420), U0), false, 'antes del primer book del handshake no actúa');
+  tw._gotBookSinceHandshake = true; tw._lagReconnects = Array.from({ length: 6 }, () => U0 - 1000);
+  eq([tw.onStaleTop(inf(2420), U0), tw._lagPausedLogged], [false, true], 'mismo tope de 6 por hora que atraso y muda');
+  tw._lagReconnects = []; tw._lagReconnect.enabled = false;
+  eq(tw.onStaleTop(inf(2420), U0), false, 'WS_LAG_RECONNECT=off: tampoco');
+  tw._lagReconnect.enabled = true;
+  eq([tw.onStaleTop(null, U0), tw.onStaleTop({ gap: NaN }, U0), tre], [false, false, 1], 'sin datos: no');
+  tw.close();
   sw._topOfBook.set('T', { bestAsk: 0.5, updatedAt: Date.now() - 1500 });
   ok(sw.getTopAge('T') >= 1500 && sw.getTopAge('T') < 1700 && sw.getTopAge('X') === null, 'edad del top de la principal');
   sw.setMirror(null);

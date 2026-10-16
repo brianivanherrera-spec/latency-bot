@@ -42,6 +42,12 @@ const PEER_FRESH_MS = 300;       // la segunda está al día si su dato más fre
 // real estaba en $0.86-0.88, y A y B decidieron con ese precio. 0 lo apaga (queda el watchdog de 15 s)
 const SILENT_MS = envNum(process.env.WS_SILENT_RECONNECT_MS, 2000);
 const PEER_LIVE_MS = 500;
+// Top viejo (bitácora 16/10 ~09:30 ARG): la segunda ve 3 s seguidos otro top de Sí o No con un dato del servidor al menos
+// STALE_TOP_MS más nuevo que el de la principal → reconectar (mismo interruptor y mismo tope por hora que atraso y muda).
+// El 16/10 de 08:55:00 a 08:57:31 ARG la principal llegó atrasada después del cambio de mercado (p99 1,8-2,4 s) pero con
+// algunos mensajes al día, así que la reconexión por atraso tardó 2,5 min; el aviso "Sí distinto hace 3 s" salió a las
+// 08:55:05 (dato de la principal 1,78 s más viejo) y a las 08:57:29 mostraba Sí $0.43/$0.44 contra $0.59/$0.60. 0 lo apaga
+const STALE_TOP_MS = envNum(process.env.WS_STALE_TOP_RECONNECT_MS, 1000);
 
 // Cargar trade map persistido (sobrevive reinicios)
 function loadTradeMap() {
@@ -831,7 +837,20 @@ class PolymarketWS {
     return false;
   }
 
-  // Tope por hora de las reconexiones por atraso o principal muda (devuelve si queda lugar)
+  // Aviso de la segunda (ws-probe, _compareTops): top distinto 3 s o más con el dato de esta más viejo (ver STALE_TOP_MS).
+  // info = { side, main, peer, mainAge, peerAge, gap (ms entre los timestamps del servidor) }. Reconecta y devuelve true
+  onStaleTop(info, now = Date.now()) {
+    const L = this._lagReconnect;
+    if (!L.enabled || !STALE_TOP_MS || !this._gotBookSinceHandshake || !info || !(info.gap >= STALE_TOP_MS)) return false;
+    if (!this._lagBudget(now)) return false;
+    if (this._watchdogReconnect(`top viejo: ${info.side} ${info.main} con un dato del servidor de hace ${Math.round(info.mainAge)} ms y la segunda ${info.peer} de hace ${Math.round(info.peerAge)} ms, 3 s seguidos`)) {
+      this._lagReconnects.push(now);
+      return true;
+    }
+    return false;
+  }
+
+  // Tope por hora de las reconexiones por atraso, principal muda o top viejo (devuelve si queda lugar)
   _lagBudget(now) {
     const L = this._lagReconnect;
     while (this._lagReconnects.length && now - this._lagReconnects[0] > 3600000) this._lagReconnects.shift();

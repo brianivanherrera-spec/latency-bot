@@ -471,6 +471,14 @@ class WsProbe {
         const age = r => (r.topTs != null ? `dato del servidor de hace ${now - r.topTs} ms` : 'sin hora del servidor');
         logger.warn(`[WS-DUAL] ⚠️ ${i === 0 ? 'Sí' : 'No'} distinto hace 3 s entre las dos conexiones: WS1 ${px(a.bestBid)}/${px(a.bestAsk)} (${age(a)}) vs WS2 ${px(b.bestBid)}/${px(b.bestAsk)} (${age(b)})`);
       }
+      // Top viejo en la principal (bitácora 16/10 ~09:30 ARG): desde los 3 s de racha le avisa a la principal, que reconecta
+      // si su dato del servidor es ≥ WS_STALE_TOP_RECONNECT_MS más viejo que el de esta (polymarket-ws.js, onStaleTop)
+      if (this._diffRun[i] >= 3 && a.topTs != null && b.topTs != null && typeof this.main.onStaleTop === 'function') {
+        try {
+          this.main.onStaleTop({ side: i === 0 ? 'Sí' : 'No', main: `${px(a.bestBid)}/${px(a.bestAsk)}`, peer: `${px(b.bestBid)}/${px(b.bestAsk)}`,
+            mainAge: now - a.topTs, peerAge: now - b.topTs, gap: b.topTs - a.topTs }, now);
+        } catch (_) {}
+      }
     });
   }
 
