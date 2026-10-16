@@ -10,6 +10,10 @@
  * shadow-ticks.jsonl (el backtest la lee igual: node scripts/backtest.js /data/shadow-ticks-btc15m.jsonl) y deja una
  * línea [SERIE <id>] con el ganador, el libro y qué habría hecho la regla de la cuenta B (anclada, 120-30 s).
  * Al resolver guarda también el priceToBeat que Gamma publica en eventMetadata (valida el strike).
+ * Cuenta B15 (paper, solo con paper: true; PAPER_B15=off la apaga): la misma regla de B evaluada en vivo en cada muestra,
+ * una entrada por mercado, orden con el límite justo de B (margen 2, tope $0.72, ~$5) y fill con el libro REST a
+ * +PAPER_CHECK_MS (200 ms, lo más parecido a una orden real); se resuelve con el ganador oficial y guarda su estado en
+ * DATA_DIR/paper-b15-<id>.json (sigue después de un reinicio). Líneas [PAPER-B15] con cada intento, WIN/LOSS y el balance.
  * SERIES_SHADOW=off apaga la de BTC 15 min; SERIES_SHADOW_ETH=off la de ETH 5 min (id eth5m, precio de Chainlink ETH
  * por PolyBolt, src/aux-price.js; en su archivo la columna "btc" lleva el precio de ETH).
  */
@@ -27,6 +31,7 @@ const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', '
 const I = Object.fromEntries(COLS.map((k, i) => [k, i]));
 const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const rnd = (v, d) => (v == null || !Number.isFinite(v)) ? null : Math.round(v * 10 ** d) / 10 ** d;
+const usd = v => `${v >= 0 ? '+' : '−'}$${Math.abs(v).toFixed(2)}`;
 const parseArr = v => { try { const a = typeof v === 'string' ? JSON.parse(v) : v; return Array.isArray(a) ? a : null; } catch { return null; } };
 // priceToBeat que Gamma publica en eventMetadata del evento (al resolver; a veces un rato después del ganador)
 const gammaPriceToBeat = ev => {
@@ -40,8 +45,8 @@ class SeriesShadow {
   // fairFn(K, endMs, nowMs) → { p, sigma, sigmaShort, sigmaLong } | null; strikeFn(startMs) → número | null
   constructor({ id = 'btc15m', slugPrefix = 'btc-updown-15m', periodS = 900, fairFn, strikeFn, spotFn = () => null,
     fetchFn = globalThis.fetch, dataDir = process.env.DATA_DIR || '/data', sampleMs = 1000, now = Date.now,
-    resolveDelayMs = 30000, resolveEveryMs = 20000, resolveTries = 45, ptbTries = 3, env = process.env } = {}) {
-    Object.assign(this, { id, slugPrefix, fairFn, strikeFn, spotFn, sampleMs, now, resolveDelayMs, resolveEveryMs, resolveTries, ptbTries });
+    resolveDelayMs = 30000, resolveEveryMs = 20000, resolveTries = 45, ptbTries = 3, env = process.env, paper = false } = {}) {
+    Object.assign(this, { id, slugPrefix, fairFn, strikeFn, spotFn, sampleMs, now, resolveDelayMs, resolveEveryMs, resolveTries, ptbTries, dataDir });
     this.periodMs = periodS * 1000;
     this.fetch = fetchFn;
     this.file = path.join(dataDir, `shadow-ticks-${id}.jsonl`);
@@ -52,6 +57,7 @@ class SeriesShadow {
     this.pending = new Set();
     this.timer = null;
     this.stats = { markets: 0, written: 0, unresolved: 0, noMarket: 0, restErrors: 0 };
+    this.paper = paper ? this._paperInit(env) : null;
   }
 
   start() {
@@ -59,6 +65,11 @@ class SeriesShadow {
     this.timer = setInterval(() => { try { this._tick(); } catch (e) { logger.warn(`[SERIE ${this.id}] ${e.message}`); } }, this.sampleMs);
     this.timer.unref?.();
     logger.info(`[SERIE ${this.id}] ✅ Sombra de ${this.slugPrefix} (${this.periodMs / 60000} min): libro REST cada ${this.sampleMs} ms y modelo TWAP de Chainlink → ${this.file} (solo registro)`);
+    if (this.paper) {
+      const c = this.paper.cfg;
+      logger.info(`[SERIE ${this.id}] [PAPER-B15] ✅ cuenta en paper con la regla de B en vivo: límite justo margen ${Math.round(c.margin * 100)} pts, tope $${c.cap.toFixed(2)}, $${c.stake} por operación, fill con el libro REST a +${c.checkMs} ms | ${this._paperBalance()}`);
+      this._paperResume();
+    }
     return this;
   }
 
@@ -129,6 +140,7 @@ class SeriesShadow {
       m.rows.push([Math.round((now - m.startTs) / 1000), rnd((m.endTs - now) / 1000, 1), rnd(btc, 2), rnd(F?.p, 4),
         Y?.bid ?? null, Y?.ask ?? null, N?.bid ?? null, N?.ask ?? null, e6(F?.sigma), null, F?.p != null ? 1 : null,
         e6(F?.sigmaShort), e6(F?.sigmaLong)]);
+      if (this.paper) { try { this._paperStep(m, m.rows[m.rows.length - 1], now); } catch (e) { logger.warn(`[SERIE ${this.id}] [PAPER-B15] ${e.message}`); } }
     } finally { m.inFlight = false; }
   }
 
@@ -178,29 +190,146 @@ class SeriesShadow {
       this.stats.written++;
     } else this.stats.unresolved++;
     logger.info(this.summary(m, winner));
+    if (this.paper && m.b15?.filled) this._paperSettle(m.slug, winner);
   }
 
-  // Primera entrada de la regla de B (como el backtest con kind 'anchored'): precio justo anclado = mid de Sí + (p del
-  // modelo − p cuando el mid tomó su valor actual); el ancla se reinicia sin libro de Sí o sin modelo de Chainlink
-  bRule(m, winner) {
+  // Un paso de la regla de B sobre una muestra: precio justo anclado = mid de Sí + (p del modelo − p cuando el mid tomó
+  // su valor actual); el ancla (st) se reinicia sin libro de Sí o sin modelo de Chainlink
+  _bStep(st, r) {
     const R = this.rule;
-    let aMid = null, aP = null, best = null;
+    const p = r[I.p_up], yb = r[I.yes_bid], ya = r[I.yes_ask], sl = r[I.secs_left];
+    if (p == null || r[I.src] !== 1 || yb == null || ya == null) { st.aMid = null; return null; }
+    const mid = (yb + ya) / 2;
+    if (st.aMid == null || Math.abs(mid - st.aMid) > 1e-9) { st.aMid = mid; st.aP = p; }
+    if (sl > R.tMax || sl < R.tMin) return null;
+    const pAdj = Math.min(0.999, Math.max(0.001, mid + (p - st.aP)));
+    let best = null;
+    for (const side of ['UP', 'DOWN']) {
+      const ask = side === 'UP' ? ya : r[I.no_ask];
+      if (ask == null || ask < R.lo || ask > R.hi) continue;
+      const pa = side === 'UP' ? pAdj : 1 - pAdj;
+      const edge = pa - ask - R.fee * ask * (1 - ask);
+      if (edge >= R.edge) return { fire: true, side, ask, edge, sl, pa };
+      if (!best || edge > best.edge) best = { fire: false, side, ask, edge, sl, pa };
+    }
+    return best;
+  }
+
+  // Primera entrada de la regla de B (como el backtest con kind 'anchored')
+  bRule(m, winner) {
+    const st = {};
+    let best = null;
     for (const r of m.rows) {
-      const p = r[I.p_up], yb = r[I.yes_bid], ya = r[I.yes_ask], sl = r[I.secs_left];
-      if (p == null || r[I.src] !== 1 || yb == null || ya == null) { aMid = null; continue; }
-      const mid = (yb + ya) / 2;
-      if (aMid == null || Math.abs(mid - aMid) > 1e-9) { aMid = mid; aP = p; }
-      if (sl > R.tMax || sl < R.tMin) continue;
-      const pAdj = Math.min(0.999, Math.max(0.001, mid + (p - aP)));
-      for (const side of ['UP', 'DOWN']) {
-        const ask = side === 'UP' ? ya : r[I.no_ask];
-        if (ask == null || ask < R.lo || ask > R.hi) continue;
-        const edge = (side === 'UP' ? pAdj : 1 - pAdj) - ask - R.fee * ask * (1 - ask);
-        if (!best || edge > best.edge) best = { side, ask, edge, sl };
-        if (edge >= R.edge) return { fire: true, side, ask, edge, sl, win: winner ? side === winner : null };
-      }
+      const b = this._bStep(st, r);
+      if (!b) continue;
+      if (b.fire) return { fire: true, side: b.side, ask: b.ask, edge: b.edge, sl: b.sl, win: winner ? b.side === winner : null };
+      if (!best || b.edge > best.edge) best = { side: b.side, ask: b.ask, edge: b.edge, sl: b.sl };
     }
     return { fire: false, best };
+  }
+
+  // ── Cuenta B15 (paper) ──────────────────────────────────────────────────────────────────────────────
+  _paperInit(env) {
+    const file = path.join(this.dataDir, `paper-b15-${this.id}.json`);
+    const cfg = { stake: num(env.PAPER_B_STAKE, 5), margin: num(env.PAPER_B_LIMIT_MARGIN, 0.02), checkMs: num(env.PAPER_CHECK_MS, 200),
+      cap: Math.round((this.rule.hi + 0.02) * 100) / 100 };
+    let st = null;
+    try { st = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) {}
+    if (!st || typeof st !== 'object') st = { pnl: 0, w: 0, l: 0, attempts: 0, filled: 0, noFill: 0, unresolved: 0, open: [], startedAt: this.now() };
+    if (!Array.isArray(st.open)) st.open = [];
+    return { file, cfg, st, chain: Promise.resolve() };
+  }
+
+  _paperBalance() {
+    const st = this.paper.st;
+    return `Balance B15: ${usd(st.pnl)} (${st.w}-${st.l}), intentos ${st.attempts}, llenadas ${st.filled}, sin fill ${st.noFill}, abiertas ${st.open.length}`
+      + `${st.unresolved ? `, sin ganador ${st.unresolved}` : ''} | desde ${new Date(st.startedAt).toISOString().slice(0, 16)} UTC`;
+  }
+
+  // Escritura en orden (una a la vez) a un temporal y rename
+  _paperSave() {
+    const P = this.paper, tmp = `${P.file}.tmp`;
+    P.chain = P.chain.then(() => fs.promises.writeFile(tmp, JSON.stringify(P.st)).then(() => fs.promises.rename(tmp, P.file)))
+      .catch(e => logger.warn(`[SERIE ${this.id}] [PAPER-B15] no se pudo guardar: ${e.message}`));
+    return P.chain;
+  }
+
+  // En cada muestra: si la regla de B entra (una vez por mercado), orden al límite justo y fill con el REST a +checkMs
+  _paperStep(m, r, now) {
+    m.anc = m.anc || {};
+    const b = this._bStep(m.anc, r);
+    const P = this.paper, c = P.cfg;
+    if (!b?.fire || m.b15 || P.st.open.some(o => o.slug === m.slug)) return;
+    const l0 = b.pa - c.margin;
+    const limit = Math.max(0.01, Math.min(c.cap, Math.floor((l0 - this.rule.fee * l0 * (1 - l0)) * 100 + 1e-9) / 100));
+    const att = m.b15 = { side: b.side, ask: b.ask, edge: b.edge, pa: b.pa, sl: Math.round(b.sl), limit, size: Math.floor(c.stake / limit), t: now };
+    P.st.attempts++;
+    const tok = b.side === 'UP' ? m.tokens.yes : m.tokens.no;
+    const t = setTimeout(() => { att.done = this._paperFill(m, att, tok); }, c.checkMs);
+    t.unref?.();
+  }
+
+  async _paperFill(m, att, tok) {
+    const P = this.paper, st = P.st, fee = p => this.rule.fee * p * (1 - p);
+    let bk = null;
+    try { bk = await fetchRestBook(this.fetch, tok); } catch (_) {}
+    att.ask200 = bk?.ask ?? null;
+    // Llena si a +checkMs el REST ofrece todas las acciones hasta el límite; paga el promedio de esos niveles
+    let need = att.size, cost = 0;
+    for (const [p, z] of bk?.asks || []) { if (p > att.limit + 1e-9 || need <= 0) break; const q = Math.min(need, z); cost += q * p; need -= q; }
+    att.filled = att.size > 0 && need <= 1e-9;
+    const label = marketLabel(m.question);
+    if (att.filled) {
+      att.paid = Math.round(cost / att.size * 1e4) / 1e4;
+      st.filled++;
+      st.open.push({ slug: m.slug, label, side: att.side, paid: att.paid, size: att.size, upIdx: m.upIdx, end: m.endTs });
+    } else st.noFill++;
+    const px = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
+    logger.info(`[SERIE ${this.id}] [PAPER-B15] ${att.side} ${label} | ${att.sl} s restantes | ask ${px(att.ask)} vs precio justo anclado ${(att.pa * 100).toFixed(1)}% (ventaja ${(att.edge * 100).toFixed(1)} pts) | orden ${att.size} a ${px(att.limit)} | ask a +${P.cfg.checkMs}ms ${px(att.ask200)} → `
+      + `${att.filled ? `lleno a ${px(att.paid)} (ventaja al precio pagado ${((att.pa - att.paid - fee(att.paid)) * 100).toFixed(1)} pts)` : 'no llena'} | ${this._paperBalance()}`);
+    return this._paperSave();
+  }
+
+  _paperSettle(slug, winner) {
+    const st = this.paper.st;
+    const i = st.open.findIndex(o => o.slug === slug);
+    if (i < 0) return null;
+    const o = st.open.splice(i, 1)[0];
+    if (!winner) {
+      st.unresolved++;
+      logger.warn(`[SERIE ${this.id}] [PAPER-B15] ${o.side} ${o.label}: sin ganador oficial en Gamma, queda afuera del balance | ${this._paperBalance()}`);
+      return this._paperSave();
+    }
+    const win = o.side === winner, fee = this.rule.fee * o.paid * (1 - o.paid) * o.size;
+    const pnl = (win ? o.size * (1 - o.paid) : -o.size * o.paid) - fee;
+    st.pnl = Math.round((st.pnl + pnl) * 1e4) / 1e4;
+    if (win) st.w++; else st.l++;
+    logger.info(`[SERIE ${this.id}] [PAPER-B15] ${win ? 'WIN' : 'LOSS'} ${o.side} ${o.label} @ $${o.paid.toFixed(2)} ×${o.size} → ${usd(pnl)} (comisión $${fee.toFixed(2)}) | ${this._paperBalance()}`);
+    return this._paperSave();
+  }
+
+  // Al arrancar: las posiciones que quedaron abiertas se resuelven con Gamma después del cierre de su mercado
+  _paperResume() {
+    for (const o of this.paper.st.open) {
+      const t = setTimeout(() => { o.done = this._paperResolveOpen(o, 0); }, Math.max(0, o.end + this.resolveDelayMs - this.now()));
+      t.unref?.();
+    }
+  }
+
+  async _paperResolveOpen(o, attempt) {
+    let winner = null;
+    try {
+      const r = await this._gammaMarket(o.slug);
+      const pr = parseArr(r?.mk.outcomePrices), up = parseFloat(pr?.[o.upIdx]), dn = parseFloat(pr?.[1 - o.upIdx]);
+      if (r?.mk.closed === true && up >= 0.99) winner = 'UP';
+      else if (r?.mk.closed === true && dn >= 0.99) winner = 'DOWN';
+    } catch (_) {}
+    if (!winner && attempt + 1 < this.resolveTries) {
+      const t = setTimeout(() => { o.done = this._paperResolveOpen(o, attempt + 1); }, this.resolveEveryMs);
+      t.unref?.();
+      return null;
+    }
+    return this._paperSettle(o.slug, winner);
   }
 
   summary(m, winner) {

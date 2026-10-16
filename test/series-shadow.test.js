@@ -190,6 +190,82 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   assert.ok(!se.pending.has(me2));
   assert.deepStrictEqual([me2.ptb, me2.rows.length, se.stats.written], [undefined, 3, 2]);
   assert.ok(se.summary(me2, 'UP').includes('ganó UP | strike $3999.50 |'), se.summary(me2, 'UP'));
+  // 4) Cuenta B15 (paper): la regla de B en vivo (una entrada por mercado), orden al límite justo y fill con el REST
+  //    a +checkMs; WIN/LOSS con el ganador oficial; estado en disco y posiciones abiertas que se resuelven al arrancar
+  const dirP = fs.mkdtempSync(path.join(os.tmpdir(), 'b15-'));
+  const Q0 = S0 + 10 * P;
+  let cq = Q0 + 1000, pq = 0.5;
+  const gq = new Map(), bq = { QU: [0.49, 0.50], QD: [0.50, 0.51] };
+  const fetchQ = async (url) => {
+    const u = new URL(url);
+    if (u.pathname === '/events') {
+      const g = gq.get(u.searchParams.get('slug'));
+      const ev = g ? [{ title: 'Bitcoin Up or Down - October 12, 1:30PM-1:45PM ET',
+        markets: [{ clobTokenIds: '["QU", "QD"]', outcomes: '["Up", "Down"]', closed: g.closed, outcomePrices: g.prices }] }] : [];
+      return { ok: true, json: async () => ev };
+    }
+    if (u.pathname === '/book') {
+      const [bid, ask] = bq[u.searchParams.get('token_id')];
+      return { ok: true, json: async () => ({ bids: [{ price: String(bid), size: '100' }], asks: [{ price: String(ask), size: '100' }] }) };
+    }
+    throw new Error(`url inesperada ${url}`);
+  };
+  const mkQ = d => new SeriesShadow({ fetchFn: fetchQ, dataDir: d, now: () => cq, resolveDelayMs: 0, resolveEveryMs: 0, resolveTries: 3,
+    ptbTries: 0, env: { PAPER_CHECK_MS: '0' }, paper: true, strikeFn: () => 100000, fairFn: () => ({ p: pq, sigma: 70e-6 }) });
+  const sq = mkQ(dirP);
+  const stepQ = async () => { sq._tick(); await sq.cur.done; };
+  // Un mercado entero: el modelo sube a 0.65 a 100 s del cierre; onFire(m) corre antes del chequeo a +checkMs
+  const runQ = async (start, onFire) => {
+    gq.set(slug(start), { closed: false, prices: '["0.5", "0.5"]' });
+    pq = 0.5;
+    for (let t = 1; t < 900; t++) {
+      cq = start + t * 1000;
+      if (t === 800) pq = 0.65;
+      await stepQ();
+      if (t === 800) { onFire?.(sq.cur); await tick(); await sq.cur.b15.done; }
+    }
+    return sq.cur;
+  };
+  const q1 = await runQ(Q0);
+  assert.deepStrictEqual([q1.b15.side, q1.b15.ask, q1.b15.limit, q1.b15.size, q1.b15.ask200, q1.b15.filled, q1.b15.paid, q1.b15.sl],
+    ['UP', 0.50, 0.60, 8, 0.50, true, 0.5, 100], 'entra UP a $0.50, límite justo $0.60 (0.645 − 2 pts − comisión), 8 acciones, llena a +0 ms');
+  assert.deepStrictEqual([sq.paper.st.attempts, sq.paper.st.filled, sq.paper.st.open.length], [1, 1, 1], 'una sola entrada por mercado');
+  // Cierra con Up en 1: WIN de 8 × (1 − 0.50) − comisión 0.072·0.5·0.5·8
+  gq.set(slug(Q0 + P), { closed: false, prices: '["0.5", "0.5"]' });
+  cq = Q0 + P + 500;
+  await stepQ();
+  gq.get(slug(Q0)).closed = true; gq.get(slug(Q0)).prices = '["1", "0"]';
+  await tick(); await q1.done;
+  await sq.paper.chain;
+  near(sq.paper.st.pnl, 8 * 0.5 - 0.072 * 0.25 * 8, 1e-9);
+  assert.deepStrictEqual([sq.paper.st.w, sq.paper.st.l, sq.paper.st.open.length], [1, 0, 0]);
+  assert.ok(sq._paperBalance().startsWith('Balance B15: +$3.86 (1-0), intentos 1, llenadas 1, sin fill 0, abiertas 0'), sq._paperBalance());
+  const saved = JSON.parse(fs.readFileSync(path.join(dirP, 'paper-b15-btc15m.json'), 'utf8'));
+  assert.deepStrictEqual([saved.w, saved.filled, saved.open.length], [1, 1, 0], 'estado en disco');
+  // Segundo mercado: a +checkMs el ask ya subió a $0.65 (arriba del límite $0.60) → no llena
+  const q2 = await runQ(Q0 + P, () => { bq.QU = [0.64, 0.65]; });
+  bq.QU = [0.49, 0.50];
+  assert.deepStrictEqual([q2.b15.filled, q2.b15.ask200, sq.paper.st.attempts, sq.paper.st.noFill, sq.paper.st.open.length], [false, 0.65, 2, 1, 0]);
+  // Reinicio con una posición abierta (DOWN a $0.40 × 12 en el primer mercado, que ganó Up): se resuelve sola → LOSS
+  const dirR = fs.mkdtempSync(path.join(os.tmpdir(), 'b15r-'));
+  fs.writeFileSync(path.join(dirR, 'paper-b15-btc15m.json'), JSON.stringify({ pnl: 0, w: 0, l: 0, attempts: 1, filled: 1, noFill: 0, unresolved: 0,
+    open: [{ slug: slug(Q0), label: 'x', side: 'DOWN', paid: 0.4, size: 12, upIdx: 0, end: Q0 + P }], startedAt: Q0 }));
+  const sr = mkQ(dirR), o = sr.paper.st.open[0];
+  sr._paperResume();
+  await tick(); await o.done;
+  near(sr.paper.st.pnl, -12 * 0.4 - 0.072 * 0.4 * 0.6 * 12, 1e-4); // el balance se guarda con 4 decimales
+  assert.deepStrictEqual([sr.paper.st.l, sr.paper.st.open.length], [1, 0]);
+  // Sin el ganador después de los intentos: queda afuera del balance
+  const dirU = fs.mkdtempSync(path.join(os.tmpdir(), 'b15u-'));
+  fs.writeFileSync(path.join(dirU, 'paper-b15-btc15m.json'), JSON.stringify({ pnl: 1, w: 1, l: 0, attempts: 2, filled: 2, noFill: 0, unresolved: 0,
+    open: [{ slug: 'btc-updown-15m-no-existe', label: 'y', side: 'UP', paid: 0.5, size: 10, upIdx: 0, end: Q0 }], startedAt: Q0 }));
+  const su = mkQ(dirU), ou = su.paper.st.open[0];
+  su._paperResume();
+  for (let i = 0; i < 4; i++) { await tick(); await ou.done; }
+  assert.deepStrictEqual([su.paper.st.unresolved, su.paper.st.pnl, su.paper.st.open.length], [1, 1, 0]);
+  // Sin paper (por defecto) no hay cuenta B15
+  assert.strictEqual(s.paper, null);
+  for (const d of [dirP, dirR, dirU]) fs.rmSync(d, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('series-shadow: 46 ok');
+  console.log('series-shadow: 59 ok');
 })().catch(e => { console.error(e); process.exit(1); });

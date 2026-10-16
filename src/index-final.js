@@ -1716,8 +1716,10 @@ async function main() {
   // strike = TWAP 60 s de Chainlink en la apertura (src/series-shadow.js). SERIES_SHADOW=off la apaga.
   if (process.env.SERIES_SHADOW !== 'off') {
     const { SeriesShadow } = require('./series-shadow');
+    // paper: cuenta B15, la regla de B en vivo en los de 15 min con fill por REST a +200 ms (PAPER_B15=off la apaga)
     new SeriesShadow({ fairFn: fairAt, strikeFn: ms => rtdsStrike({ startTime: ms })?.value ?? null,
-      spotFn: () => (btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null) }).start();
+      spotFn: () => (btcPriceHistory.length ? btcPriceHistory[btcPriceHistory.length - 1].price : null),
+      paper: process.env.PAPER_B15 !== 'off' }).start();
   }
   // Sombra de ETH 5 min (plan del 12/10, b; solo registro): mismo módulo, Chainlink ETH/USD por PolyBolt (src/aux-price.js)
   if (ethPrice) {
