@@ -56,6 +56,10 @@ d.observe('warn', 'RTDS', 'Alta latencia: 900ms');
 d.observe('warn', 'FOO', 'algo raro 1 pasó');
 d.observe('warn', 'FOO', 'algo raro 2 pasó');
 d.observe('error', 'MAIN', '[ERROR] se rompió algo');
+d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] ✅ cuenta en paper con la regla de B en vivo: límite justo margen 2 pts | Balance B15: +$0.00 (0-0), intentos 0, llenadas 0, sin fill 0, abiertas 0 | desde 2026-10-16T15:00 UTC');
+d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] UP Oct 16, 1:30PM-1:45PM ET | 100 s restantes | ask $0.50 vs precio justo anclado 64.5% (ventaja 12.7 pts) | orden 8 a $0.60 | ask a +200ms $0.50 → lleno a $0.50 (ventaja al precio pagado 12.7 pts) | Balance B15: +$0.00 (0-0), intentos 1, llenadas 1, sin fill 0, abiertas 1 | desde 2026-10-16T15:00 UTC');
+d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] DOWN Oct 16, 1:45PM-2:00PM ET | 90 s restantes | ask $0.45 vs precio justo anclado 60.0% (ventaja 11.2 pts) | orden 9 a $0.56 | ask a +200ms $0.60 → no llena | Balance B15: +$0.00 (0-0), intentos 2, llenadas 1, sin fill 1, abiertas 1 | desde 2026-10-16T15:00 UTC');
+d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] LOSS UP Oct 16, 1:30PM-1:45PM ET @ $0.50 ×8 → −$4.14 (comisión $0.14) | Balance B15: −$4.14 (0-1), intentos 2, llenadas 1, sin fill 1, abiertas 0 | desde 2026-10-16T15:00 UTC');
 d.observe('info', 'RESUMEN', '[RESUMEN] cuentas — no se cuenta a sí mismo: [WATCHDOG] muda:');
 
 const [c1, s1] = d.report(T0 + 3600000);
@@ -66,6 +70,7 @@ has(c1, '(intentos 2, llenadas 2; REST +$0.25 (1-1), REST +200ms −$0.25 (1-1))
 has(c1, 'total +$21.63 (49-35), REST +$7.10 (45-34), REST +200ms +$10.01 (42-31), abiertas 0', 'B total');
 has(c1, `pérdidas B: DOWN ${mkt} a $0.49 (45 s, 9.6 pts) −$4.57`, 'pérdida de B con T y ventaja');
 ok(!c1.includes('9:40AM-9:45AM'), 'el NO ENTRA no cuenta como intento');
+has(c1, 'B15: intentos 2, llenadas 1, 0-1 −$4.14; total −$4.14 (0-1), intentos 2, llenadas 1, abiertas 0; pérdidas: UP Oct 16, 1:30PM-1:45PM ET a $0.50 −$4.14', 'cuenta B15');
 has(s1, 'atrasada 0, muda 1, top viejo 1, en pausa 0', 'reconexiones (y no se cuenta a sí mismo)');
 has(s1, 'cortes WS1 1 (1013 1)', 'cortes de la principal');
 has(s1, 'PolyBolt silencios 1; Binance reconexiones 1 (tope 0, sin pong 1), ping contestado 1', 'feeds');
@@ -86,6 +91,7 @@ has(c2, '[RESUMEN] cuentas 14:20-15:20 UTC |', 'segunda ventana sin "desde el ar
 has(c2, 'B: 0-0 +$0.00 (intentos 1, llenadas 0; REST +$0.00 (0-0), REST +200ms +$0.00 (0-0))', 'base = último Balance B de la ventana anterior');
 has(c2, 'abiertas 1', 'posición abierta');
 has(c2, 'pérdidas B: ninguna');
+has(c2, 'B15: intentos 0, llenadas 0, 0-0 +$0.00; total −$4.14 (0-1)', 'B15 sin movimiento: queda el total');
 has(s2, 'muda 0, top viejo 0', 'contadores en cero');
 has(s2, 'LOOP 0 min: retraso WS p99 máx n/a', 'sin datos: n/a');
 has(s2, 'BOOK-CHECK n/a');

@@ -5,7 +5,7 @@
  * ([LOOP] y [WS-DUAL] salen cada minuto), lee estas dos líneas por hora. Mira cada línea
  * que pasa por el Logger, cuenta eventos y guarda máximos; no cambia nada del bot.
  *
- *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B …
+ *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B … | B15 (paper de 15 min) …
  *   [RESUMEN] salud HH:20-HH:20 UTC | reconexiones … | 1013 … | BOOK-CHECK … | LOOP … | WARN/ERROR …
  *
  * Sale a los :20 UTC de cada hora (el chequeo corre a los :22). LOG_DIGEST=off lo apaga.
@@ -71,6 +71,7 @@ class LogDigest {
     this.lastB = null;      // último "Balance B" parseado
     this.baseB = null;      // Balance B al cerrar la ventana anterior (para las diferencias)
     this.attempts = new Map(); // "UP mercado" → {secs, edge} del intento de B
+    this.lastB15 = null;    // último "Balance B15" (cuenta en paper de 15 min)
     this._reset(now);
   }
 
@@ -81,6 +82,7 @@ class LogDigest {
     this.others = new Map(); // clave normalizada → {n, ex, level}
     this.a = { w: 0, l: 0, pnl: 0 };
     this.b = { w: 0, l: 0, pnl: 0, losses: [] };
+    this.b15 = { att: 0, fill: 0, w: 0, l: 0, pnl: 0, losses: [] };
     this._aPending = false;
     this.strike = { n: 0, notCl: 0, maxWait: null };
     this.ptb = { n: 0, maxRtds: null, maxPb: null, nonZero: 0 };
@@ -93,7 +95,8 @@ class LogDigest {
     const line = `[${prefix}] ${body}`;
     for (const [k, re] of COUNTS) if (re.test(line)) this.c[k]++;
     if (level === 'warn' || level === 'error') this._warnError(level, line);
-    if (prefix === 'TRACKER') this._a(line);
+    if (line.includes('[PAPER-B15]')) this._b15(line);
+    else if (prefix === 'TRACKER') this._a(line);
     else if (prefix === 'PAPER-B') this._b(line);
     else if (prefix === 'LOOP') this._loop(line);
     else if (prefix === 'BOOK-CHECK') this._book(line);
@@ -149,6 +152,22 @@ class LogDigest {
     }
   }
 
+  _b15(line) {
+    let m;
+    const B = this.b15;
+    if ((m = /\[PAPER-B15\] (WIN|LOSS) (UP|DOWN) (.+?) @ \$([\d.]+) ×\d+ → ([+−-])\$([\d.]+)/.exec(line))) {
+      const v = signed(m[5], m[6]);
+      B.pnl += v;
+      if (m[1] === 'WIN') B.w++; else { B.l++; if (B.losses.length < 8) B.losses.push(`${m[2]} ${m[3]} a $${m[4]} ${usd(v)}`); }
+    } else if (/\[PAPER-B15\] (UP|DOWN) .* s restantes/.test(line)) {
+      B.att++;
+      if (/ → lleno a /.test(line)) B.fill++;
+    }
+    if ((m = /Balance B15: ([+−-])\$([\d.]+) \((\d+)-(\d+)\), intentos (\d+), llenadas (\d+), sin fill (\d+), abiertas (\d+)/.exec(line))) {
+      this.lastB15 = { pnl: signed(m[1], m[2]), w: +m[3], l: +m[4], attempts: +m[5], filled: +m[6], open: +m[8] };
+    }
+  }
+
   _loop(line) {
     if (line.includes('corte 1013')) return;
     const L = this.loop;
@@ -201,7 +220,8 @@ class LogDigest {
     const cuentas = [`[RESUMEN] cuentas ${win}`,
       `A: ${this.a.w}-${this.a.l} ${usd(this.a.pnl)}; ${A}`,
       `B: ${this.b.w}-${this.b.l} ${usd(this.b.pnl)}${this._bWindow()}; ${this._bTotal()}`,
-      `pérdidas B: ${this.b.losses.length ? this.b.losses.join('; ') : 'ninguna'}`];
+      `pérdidas B: ${this.b.losses.length ? this.b.losses.join('; ') : 'ninguna'}`,
+      `B15: intentos ${this.b15.att}, llenadas ${this.b15.fill}, ${this.b15.w}-${this.b15.l} ${usd(this.b15.pnl)}; ${this._b15Total()}${this.b15.losses.length ? `; pérdidas: ${this.b15.losses.join('; ')}` : ''}`];
     const top = [...this.others.values()].sort((x, y) => y.n - x.n).slice(0, 4)
       .map(o => `${o.level === 'error' ? 'ERROR ' : ''}×${o.n} "${o.ex}"`);
     const f = (v, d = 0) => (v == null ? 'n/a' : v.toFixed(d));
@@ -224,6 +244,11 @@ class LogDigest {
     if (!s || !b || s.attempts == null || b.attempts == null) return '';
     const d = (k) => (s[k] && b[k] ? `${usd(s[k].pnl - b[k].pnl)} (${s[k].w - b[k].w}-${s[k].l - b[k].l})` : 'n/a');
     return ` (intentos ${s.attempts - b.attempts}, llenadas ${s.filled - b.filled}; REST ${d('rest')}, REST +${s.rest2?.ms ?? '?'}ms ${d('rest2')})`;
+  }
+
+  _b15Total() {
+    const s = this.lastB15;
+    return s ? `total ${usd(s.pnl)} (${s.w}-${s.l}), intentos ${s.attempts}, llenadas ${s.filled}, abiertas ${s.open}` : 'total sin dato';
   }
 
   _bTotal() {
