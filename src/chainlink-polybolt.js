@@ -87,6 +87,7 @@ class PolyBoltClient {
         const why = this._staleReason(now);
         if (why) {
           logger.warn(`[POLYBOLT] Sin datos (${why}) — reconectando`);
+          ws._selfClose = true; // corte nuestro: no cuenta para el resguardo de los símbolos extra
           try { ws.terminate(); } catch (_) {}
           return;
         }
@@ -106,7 +107,7 @@ class PolyBoltClient {
       this.ws = null;
       this.diag.authed = false;
       this.diag.subscribed = [];
-      this._extraGuard(code);
+      this._extraGuard(code, !!ws._selfClose);
       if (this._closed) return;
       this._scheduleReconnect(code, String(reason || ''));
     });
@@ -218,8 +219,12 @@ class PolyBoltClient {
     while (h.length && h[0].ts < received - HISTORY_MS) h.shift();
   }
 
-  // Si el server corta dos veces a menos de 15 s de suscribir los símbolos extra, se dejan de pedir (protege a BTC)
-  _extraGuard(code) {
+  // Si el server corta dos veces a menos de 15 s de suscribir los símbolos extra, se dejan de pedir (protege a BTC).
+  // Los cortes nuestros por "Sin datos" no cuentan: el 15/10 a las 22:25 ARG (01:25 UTC) el server dejó de mandar BTC ~40 s,
+  // las dos reconexiones por silencio cayeron a menos de 15 s de suscribir ETH y apagaron la sombra de ETH
+  // (y el silencio de BTC volvió a las 22:31 ya sin ETH: no lo causaba ETH)
+  _extraGuard(code, selfClose = false) {
+    if (selfClose) return;
     if (!this.extraSymbols.length || !this._extraSentAt || Date.now() - this._extraSentAt > 15000) return;
     this._extraCloses = (this._extraCloses || 0) + 1;
     if (this._extraCloses >= 2) {

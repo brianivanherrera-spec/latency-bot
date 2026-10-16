@@ -147,6 +147,18 @@ const eq = (a, b, msg) => { assert.deepStrictEqual(a, b, msg); ok++; };
   f3.length = 0;
   pb3._handle({ op: 'authed' });
   eq(f3.map(x => x.subscriptions.map(y => y.filter.symbol)), [['btcusd', 'btcusd']], 'al reconectar solo BTC');
+  // Los cortes nuestros por "Sin datos" no cuentan (15/10 22:25 ARG: dos reconexiones por silencio de BTC apagaron ETH)
+  const pb5 = new PolyBoltClient({ getCreds: async () => null, extraSymbols: ['ethusd'] });
+  pb5._send = () => '1';
+  pb5._handle({ op: 'authed' });
+  pb5._extraGuard(1006, true);
+  pb5._handle({ op: 'authed' });
+  pb5._extraGuard(1006, true);
+  eq([pb5.extraSymbols, pb5._extraCloses || 0], [['ethusd'], 0], 'dos cortes nuestros por silencio: ETH sigue');
+  pb5._extraGuard(1006);
+  pb5._handle({ op: 'authed' });
+  pb5._extraGuard(1006);
+  eq(pb5.extraSymbols, [], 'dos cortes del server: deja de pedir ETH como antes');
 
   // "Sin datos" de PolyBolt (bitácora 14/10 ~23:40 ARG): 10 s sin BTC desde el último dato o la autenticación
   const pb4 = new PolyBoltClient({ getCreds: async () => null });
