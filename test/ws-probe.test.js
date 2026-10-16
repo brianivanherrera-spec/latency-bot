@@ -338,6 +338,32 @@ const pc = (ts, asset, hash, bid, ask) => ({ event_type: 'price_change', market:
   lw.setMirror(null);
   lw.close();
 
+  // Principal muda (bitácora 16/10 ~04:30 ARG): 2 s sin datos de los tokens con la segunda recibiendo → reconecta
+  const sw = new PolymarketWS();
+  let sre = 0;
+  sw._forceReconnect = () => { sre++; };
+  let sp = { live: true, lastDataAgo: 80, minLag: 20 };
+  sw.setMirror({ freshness: () => sp });
+  const S0 = Date.now();
+  sw._gotBookSinceHandshake = true; sw._lastWatchdogReconnect = 0;
+  sw._lastDataAt = S0 - 1999;
+  eq([sw._silentCheck(S0), sre], [false, 0], '1,999 s sin datos: todavía no');
+  sw._lastDataAt = S0 - 2000;
+  eq([sw._silentCheck(S0), sre, sw._lagReconnects.length], [true, 1, 1], '2 s muda con la segunda recibiendo: reconecta y cuenta en el tope por hora');
+  sw._lastWatchdogReconnect = 0;
+  for (const p2 of [{ live: true, lastDataAgo: 600, minLag: 20 }, { live: false }, null]) { sp = p2; sw._lastDataAt = S0 - 5000; eq(sw._silentCheck(S0), false); }
+  eq(sre, 1, 'con la segunda también callada o caída no reconecta (mercado quieto o el servidor)');
+  sp = { live: true, lastDataAgo: 80, minLag: 20 }; sw._gotBookSinceHandshake = false; sw._lastDataAt = S0 - 5000;
+  eq(sw._silentCheck(S0), false, 'antes del primer book del handshake no actúa (lo cubre el control de 5 s)');
+  sw._gotBookSinceHandshake = true; sw._lagReconnects = Array.from({ length: 6 }, () => S0 - 1000);
+  eq([sw._silentCheck(S0), sw._lagPausedLogged], [false, true], 'el tope de 6 por hora es el mismo de la reconexión por atraso');
+  sw._lagReconnects = []; sw._lagReconnect.enabled = false;
+  eq(sw._silentCheck(S0), false, 'WS_LAG_RECONNECT=off: tampoco');
+  sw._topOfBook.set('T', { bestAsk: 0.5, updatedAt: Date.now() - 1500 });
+  ok(sw.getTopAge('T') >= 1500 && sw.getTopAge('T') < 1700 && sw.getTopAge('X') === null, 'edad del top de la principal');
+  sw.setMirror(null);
+  sw.close();
+
   console.log(`ws-probe: ${passed} ok`);
   process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });

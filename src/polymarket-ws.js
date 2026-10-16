@@ -36,6 +36,12 @@ const LAG_SECS = envNum(process.env.WS_LAG_RECONNECT_SECS, 3);
 const LAG_MIN_MSGS = 3;          // mensajes con timestamp en el segundo para que cuente
 const LAG_MAX_PER_HOUR = 6;
 const PEER_FRESH_MS = 300;       // la segunda está al día si su dato más fresco del último segundo llegó con menos de esto
+// Principal muda (bitácora 16/10 ~04:30 ARG): sin ningún mensaje de los tokens en SILENT_MS mientras la segunda recibió
+// datos hace menos de PEER_LIVE_MS → reconectar (mismo interruptor y mismo tope por hora que la reconexión por atraso).
+// El 16/10 a las 00:28 ARG la principal quedó 15 s muda con la segunda al día: el ask de UP siguió en $0.61 mientras el
+// real estaba en $0.86-0.88, y A y B decidieron con ese precio. 0 lo apaga (queda el watchdog de 15 s)
+const SILENT_MS = envNum(process.env.WS_SILENT_RECONNECT_MS, 2000);
+const PEER_LIVE_MS = 500;
 
 // Cargar trade map persistido (sobrevive reinicios)
 function loadTradeMap() {
@@ -765,7 +771,7 @@ class PolymarketWS {
       } else if (now - this._lastDataAt > 15000) {
         this._watchdogReconnect(`sin datos de los tokens hace ${Math.round((now - this._lastDataAt) / 1000)} s`);
       } else {
-        try { this._lagCheck(now); } catch (_) {} // una falla de este control nunca corta el watchdog
+        try { if (!this._silentCheck(now)) this._lagCheck(now); } catch (_) {} // una falla de estos controles nunca corta el watchdog
       }
     }, 1000);
     this._dataWatchdog.unref?.();
@@ -801,20 +807,49 @@ class PolymarketWS {
     if (this._lagRun < L.secs) return;
     const peer = this._mirror && typeof this._mirror.freshness === 'function' ? this._mirror.freshness() : null;
     if (!peer || !peer.live || peer.lastDataAgo == null || peer.lastDataAgo >= 2000 || peer.minLag == null || peer.minLag >= PEER_FRESH_MS) return;
+    if (!this._lagBudget(now)) return;
+    const run = this._lagRun;
+    this._lagRun = 0;
+    if (this._watchdogReconnect(`atrasada: ${run} s seguidos con el dato más fresco de cada segundo llegando con ≥ ${L.ms} ms (último ${Math.round(b.min)} ms) y la segunda al día (${Math.round(peer.minLag)} ms)`)) {
+      this._lagReconnects.push(now);
+    }
+  }
+
+  // Principal muda con la segunda recibiendo datos (ver SILENT_MS): reconecta y devuelve true
+  _silentCheck(now) {
+    const L = this._lagReconnect;
+    if (!L.enabled || !SILENT_MS || !this._gotBookSinceHandshake) return false;
+    const quiet = now - this._lastDataAt;
+    if (quiet < SILENT_MS) return false;
+    const peer = this._mirror && typeof this._mirror.freshness === 'function' ? this._mirror.freshness() : null;
+    if (!peer || !peer.live || peer.lastDataAgo == null || peer.lastDataAgo >= PEER_LIVE_MS) return false;
+    if (!this._lagBudget(now)) return false;
+    if (this._watchdogReconnect(`muda: ${quiet} ms sin datos de los tokens y la segunda recibió datos hace ${Math.round(peer.lastDataAgo)} ms`)) {
+      this._lagReconnects.push(now);
+      return true;
+    }
+    return false;
+  }
+
+  // Tope por hora de las reconexiones por atraso o principal muda (devuelve si queda lugar)
+  _lagBudget(now) {
+    const L = this._lagReconnect;
     while (this._lagReconnects.length && now - this._lagReconnects[0] > 3600000) this._lagReconnects.shift();
     if (this._lagReconnects.length >= L.maxPerHour) {
       if (!this._lagPausedLogged) {
         this._lagPausedLogged = true;
         logger.warn(`[POLY-WS] [WATCHDOG] reconexión por atraso en pausa: ya hubo ${this._lagReconnects.length} en la última hora`);
       }
-      return;
+      return false;
     }
     this._lagPausedLogged = false;
-    const run = this._lagRun;
-    this._lagRun = 0;
-    if (this._watchdogReconnect(`atrasada: ${run} s seguidos con el dato más fresco de cada segundo llegando con ≥ ${L.ms} ms (último ${Math.round(b.min)} ms) y la segunda al día (${Math.round(peer.minLag)} ms)`)) {
-      this._lagReconnects.push(now);
-    }
+    return true;
+  }
+
+  // Edad del top de un token en la principal (ms desde el último mensaje que lo fijó; null sin top)
+  getTopAge(tokenId) {
+    const r = this._topOfBook.get(tokenId);
+    return r ? Date.now() - r.updatedAt : null;
   }
 
   // Reconexión por watchdog, como mucho una cada 10 s (devuelve si reconectó)
