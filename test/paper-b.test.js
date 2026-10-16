@@ -314,6 +314,11 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   const rl = lines.find(l => l.includes('[PAPER-B] REST:'));
   assert.ok(rl && /\| WS2 \(medición\): al decidir \$0\.47 \(igual al REST, dato de hace \d+ ms\); a \+20ms \$0\.47 \(igual al REST, dato de hace \d+ ms\)$/.test(rl), rl);
   assert.deepStrictEqual([pw.state.attempts, pw.state.filled], [1, 1], 'el fill sigue siendo el del WS principal');
+  // Ventaja al precio pagado en la línea del intento y en la posición
+  const il = lines.find(l => /\[PAPER-B\] (UP|DOWN) /.test(l));
+  const pp = pw.state.open[0];
+  assert.ok(il && /\| lleno a \$[\d.]+ \(ventaja al precio pagado -?[\d.]+ pts\)$/.test(il), il);
+  assert.strictEqual(pp.edgePaid, +(pp.pa - pp.paid - pw.fee(pp.paid)).toFixed(4), 'edgePaid = P − pagado − comisión');
   // Una segunda conexión que falla no corta el intento ni la línea
   const bad = { snap() { throw new Error('x'); }, vs() { throw new Error('y'); } };
   const pz = new PaperB({ polyWs, probe: bad, stateFile: path.join(dir, 'ws2bad.json'), env, fetchFn: fakeFetch });
@@ -330,5 +335,5 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.ok(lines.some(l => l.includes('[PAPER-B] REST:') && !l.includes('WS2')), 'sin probe: sin WS2');
   delete rest.Y;
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 118 ok');
+  console.log('paper-b: 120 ok');
 })().catch(e => { console.error(e); process.exit(1); });

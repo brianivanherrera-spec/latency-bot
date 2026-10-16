@@ -175,6 +175,9 @@ class PaperB {
       const v = this.poly?.getAskVwapUpTo?.(tokenId, limit, size);
       paid = v?.vwap != null && v.filled >= size ? Math.min(limit, Math.max(minPx, +v.vwap.toFixed(4))) : limit;
     }
+    // Ventaja contra el precio pagado (la del intento es contra el ask al decidir: el 15/10 22:13 ARG decidió con
+    // 19,6 pts a $0.42 y pagó $0.49, ~12 pts)
+    const edgePaid = paid != null ? +(pa - paid - this.fee(paid)).toFixed(4) : null;
     // Libro REST al decidir (ya llegó: tarda ~40 ms): si tenía el ask más de restGuardTol arriba del WS,
     // el disparo salió de un precio viejo del WS
     const d0 = r0 ? await r0 : null;
@@ -184,7 +187,7 @@ class PaperB {
     const pos = {
       id: `PB_${Date.now()}`, gammaId: m.gammaId, market: marketLabel(m.question), endTs: m.endTs,
       side, t: Date.now(), secsLeft: Math.round(T), ask, pa: +pa.toFixed(4), edge: +edge.toFixed(4),
-      limit, size, ask200: b200.ask, ask400: b400.ask, fill200: fills(b200), filled, paid,
+      limit, size, ask200: b200.ask, ask400: b400.ask, fill200: fills(b200), filled, paid, edgePaid,
       restAsk0, restMs0: d0?.ms ?? null, phantom, ask3, trend: ask3 != null ? round2(ask - ask3) : null,
     };
     if (phantom) { S.phantom.n++; if (filled) S.phantom.filled++; }
@@ -200,7 +203,7 @@ class PaperB {
     if (filled) { S.filled++; S.open.push(pos); } else { S.noFill++; if (pos.fill200) S.only200.push(pos); }
     if (S.only200.length > 200) S.only200.shift();
     this._save();
-    logger.info(`[PAPER-B] ${side} ${pos.market} | ${pos.secsLeft} s restantes | ask ${px(ask)} vs precio justo anclado ${(pa * 100).toFixed(1)}% (ventaja ${(edge * 100).toFixed(1)} pts) | ask hace 3 s ${trendTxt(pos)} | ask a +${c.checkMs}ms ${px(b200.ask)} → +${c.delayMs}ms ${px(b400.ask)} | orden ${size} a $${limit} | ${filled ? `lleno a $${paid}` : 'no'}`);
+    logger.info(`[PAPER-B] ${side} ${pos.market} | ${pos.secsLeft} s restantes | ask ${px(ask)} vs precio justo anclado ${(pa * 100).toFixed(1)}% (ventaja ${(edge * 100).toFixed(1)} pts) | ask hace 3 s ${trendTxt(pos)} | ask a +${c.checkMs}ms ${px(b200.ask)} → +${c.delayMs}ms ${px(b400.ask)} | orden ${size} a $${limit} | ${filled ? `lleno a $${paid} (ventaja al precio pagado ${(edgePaid * 100).toFixed(1)} pts)` : 'no'}`);
     if (restOn) {
       const [b, b2] = await Promise.all([r1, r2]);
       const sz = restSizeUpTo(b, limit);
