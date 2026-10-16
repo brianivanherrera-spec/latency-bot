@@ -1,0 +1,158 @@
+[
+ {
+  "market_id": "562828",
+  "p_yes": 0.48,
+  "confidence": "medium",
+  "reasoning": "Modelos dan a los demócratas ~77-93% en Diputados y ~35-75% en el Senado (consenso ~55-60%). Ambos resultados están correlacionados: P(ambos) ~ 0.85 x 0.57.",
+  "key_uncertainties": [
+   "Senado cerca de cara o cruz",
+   "Dispersión entre modelos",
+   "Eventos hasta el 3 de noviembre"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.newsweek.com/democrat-chances-of-winning-house-senate-hit-new-high-nate-silver-forecast-12545290",
+   "https://www.poliwave.com/us/fed/projection"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4620900",
+  "p_yes": 0.78,
+  "confidence": "medium",
+  "reasoning": "16 de 18 oficiales proyectan otra suba este año, el acta lo confirma, el CPI de septiembre fue 3.7% y la Fed ya subió en septiembre. Hay dos reuniones (28 oct y 9 dic) para que ocurra.",
+  "key_uncertainties": [
+   "Jefferson y Williams prefieren esperar datos",
+   "CPI del 10 de noviembre",
+   "Precio del petróleo"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/07/fed-officials-see-another-hike-coming-but-no-sign-as-to-when-minutes-show.html",
+   "https://www.forbes.com/sites/digital-assets/2026/10/14/fed-66-likely-to-hold-rates-steady-following-high-inflation-data/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554657",
+  "p_yes": 0.14,
+  "confidence": "low",
+  "reasoning": "El Text Arena del 8 de octubre muestra a Gemini 4 Argon primero (~1525) y a Claude Opus 5.5 segundo (~1507), con barras de error solapadas. Fuentes discrepan y una cita a un modelo restringido no es fiable.",
+  "key_uncertainties": [
+   "Fuentes agregadoras contradictorias",
+   "Nuevos lanzamientos antes del 31 de octubre",
+   "Desempate y reglas de AutoEval"
+  ],
+  "sources": [
+   "https://thesweat.com/predictions/best-ai-model-of-2026/",
+   "https://www.therevenueaireport.com/blog/ai-model-performance-october-2026",
+   "https://llmrun.dev/benchmark/lmarena-text"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "562794",
+  "p_yes": 0.45,
+  "confidence": "medium",
+  "reasoning": "Los modelos dan a los demócratas entre ~35% y ~75% de controlar el Senado (centro ~55-60%); Fox lo ve cara o cruz. Republicanos ~45%.",
+  "key_uncertainties": [
+   "Dispersión entre modelos",
+   "Carreras clave: Maine, Texas, Alaska, Iowa, Ohio, Michigan"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.newsweek.com/democrat-chances-of-winning-house-senate-hit-new-high-nate-silver-forecast-12545290",
+   "https://www.pollsmax.com/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "562830",
+  "p_yes": 0.33,
+  "confidence": "medium",
+  "reasoning": "P(D Diputados) ~0.85 y P(Senado R | D Diputados) ~0.38: ~0.32. Consistente con el pronóstico de Senado D + Diputados D.",
+  "key_uncertainties": [
+   "Correlación Senado-Diputados",
+   "Dispersión entre modelos"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.poliwave.com/us/fed/projection"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4951229",
+  "p_yes": 0.08,
+  "confidence": "medium",
+  "reasoning": "WTI en ~$97 (contrato de noviembre). Llegar a $115 (+18%) en unas 11 ruedas requiere ~1.6 desvíos con vol ~50% anual: ~10% por barrera, ajustado a la baja.",
+  "key_uncertainties": [
+   "Volatilidad alta del petróleo",
+   "Shock geopolítico"
+  ],
+  "sources": [
+   "https://www.investing.com/commodities/crude-oil",
+   "https://oilprice.com/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936101",
+  "p_yes": 0.035,
+  "confidence": "medium",
+  "reasoning": "WTI en ~$97. $120 (+24%) en ~11 ruedas son ~2 desvíos: ~4% por barrera.",
+  "key_uncertainties": [
+   "Shock geopolítico de oferta"
+  ],
+  "sources": [
+   "https://www.investing.com/commodities/crude-oil",
+   "https://oilprice.com/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "668591",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "El CEO de Take-Two dijo en mayo de 2026 que no habrá otro retraso; fecha 19-nov-2026 a 5 semanas sin noticias de cambio. No encontré cobertura posterior a mayo.",
+  "key_uncertainties": [
+   "No vi la llamada de resultados de agosto",
+   "Cola de riesgo de último momento"
+  ],
+  "sources": [
+   "https://www.vice.com/en/article/take-two-ceo-confirms-gta-6-wont-be-delayed-again-and-teases-next-trailer-date/",
+   "https://insider-gaming.com/everything-learned-may-2026-take-two-earnings-call-for-gta-6/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166819",
+  "p_yes": 0.33,
+  "confidence": "low",
+  "reasoning": "Promedio móvil de 7 días de PortWatch ~30 el 4-oct, agosto ~28, otras fuentes ~26; el tramo 25-29 captura el centro pero la incertidumbre del nivel es amplia.",
+  "key_uncertainties": [
+   "Fuentes con metodologías distintas (26 a 45)",
+   "Eventos en el Mar Rojo antes del 31-oct"
+  ],
+  "sources": [
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-suez-canal",
+   "https://mereja.com/index/601943"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554659",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Text Arena del 8-oct: Gemini 4 Argon (Google) #1 con ~1525 vs Claude Opus 5.5 ~1507; ventaja de ~18 puntos con barras solapadas y 2 semanas por delante.",
+  "key_uncertainties": [
+   "Nuevos lanzamientos antes del 31-oct",
+   "Fuentes agregadoras contradictorias",
+   "Reglas de desempate y AutoEval"
+  ],
+  "sources": [
+   "https://thesweat.com/predictions/best-ai-model-of-2026/",
+   "https://llmrun.dev/benchmark/lmarena-text"
+  ],
+  "prompt_version": "v1"
+ }
+]

@@ -9,7 +9,8 @@ const { computeReport, bootstrapByEvent } = require('../src/metrics');
 const server = require('../src/server');
 const { readJsonl, appendJsonl, utcDate } = require('../src/util');
 
-const FDIR = path.join(__dirname, '..', 'forecasts');
+const FDIR = require('fs').mkdtempSync(path.join(require('os').tmpdir(), 'fc-forecasts-'));
+process.env.FORECASTS_DIR = FDIR;
 
 test('flujo completo: seleccion, pronostico, decision, resolucion y endpoints', async () => {
   const dir = setup({ MARKETS_PER_DAY: '3', DOWNLOAD_SECRET: 'sec' });

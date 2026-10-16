@@ -7,7 +7,7 @@ const gamma = require('./gamma');
 const clob = require('./clob');
 const { decide } = require('./decision');
 
-const FORECASTS_DIR = path.join(__dirname, '..', 'forecasts');
+const forecastsDir = () => process.env.FORECASTS_DIR || path.join(__dirname, '..', 'forecasts');
 const HORIZONS = { '24h': 24, '72h': 72, '7d': 168 };
 const fkey = (date, id) => `${date}:${id}`;
 
@@ -66,11 +66,11 @@ function publishedCandidates(date) {
 
 function readForecastFiles() {
   let names = [];
-  try { names = fs.readdirSync(FORECASTS_DIR).filter((n) => /^\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort(); } catch { return []; }
+  try { names = fs.readdirSync(forecastsDir()).filter((n) => /^\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort(); } catch { return []; }
   const out = [];
   for (const n of names) {
     try {
-      const j = JSON.parse(fs.readFileSync(path.join(FORECASTS_DIR, n), 'utf8'));
+      const j = JSON.parse(fs.readFileSync(path.join(forecastsDir(), n), 'utf8'));
       const arr = Array.isArray(j) ? j : j.forecasts || [];
       for (const f of arr) out.push({ date: n.slice(0, 10), ...f });
     } catch (e) { log(`archivo de pronosticos ${n} ilegible: ${e.message}`); }
