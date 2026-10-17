@@ -1,0 +1,232 @@
+[
+ {
+  "market_id": "562803",
+  "p_yes": 0.18,
+  "confidence": "medium",
+  "reasoning": "Los modelos dan a los demócratas ~77-93% en Diputados; republicanos ~18%, coherente con el resto de mercados de balance de poder.",
+  "key_uncertainties": [
+   "Dispersión entre modelos",
+   "Eventos hasta el 3-nov"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.newsweek.com/democrat-chances-of-winning-house-senate-hit-new-high-nate-silver-forecast-12545290"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "562802",
+  "p_yes": 0.82,
+  "confidence": "medium",
+  "reasoning": "Demócratas favoritos en Diputados (modelos 77-93%, centro ~85%); se ajusta a 0.82 por coherencia con los mercados combinados.",
+  "key_uncertainties": [
+   "Dispersión entre modelos",
+   "Eventos hasta el 3-nov"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.newsweek.com/democrat-chances-of-winning-house-senate-hit-new-high-nate-silver-forecast-12545290"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "562831",
+  "p_yes": 0.11,
+  "confidence": "medium",
+  "reasoning": "R Diputados ~0.18 y P(Senado R | Diputados R) ~0.6: ~0.11.",
+  "key_uncertainties": [
+   "Correlación Senado-Diputados"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.newsweek.com/democrat-chances-of-winning-house-senate-hit-new-high-nate-silver-forecast-12545290"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "562793",
+  "p_yes": 0.55,
+  "confidence": "medium",
+  "reasoning": "Senado: modelos entre ~35% y ~75% para demócratas, centro ~55%.",
+  "key_uncertainties": [
+   "Dispersión entre modelos (35-75%)",
+   "Carreras de Maine, Texas, Alaska, Iowa, Ohio y Michigan"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.newsweek.com/democrat-chances-of-winning-house-senate-hit-new-high-nate-silver-forecast-12545290",
+   "https://www.pollsmax.com/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4170754",
+  "p_yes": 0.04,
+  "confidence": "low",
+  "reasoning": "La suba de septiembre ya ocurrió. Falta hike en octubre (poco probable: Warsh no prejuzga, Williams habla de un ajuste 'a fin de año') y otro en diciembre; condicionado a hike en octubre, el de diciembre es menos probable.",
+  "key_uncertainties": [
+   "La búsqueda devolvió cuotas de mercados de predicción; se ignoraron deliberadamente, pero puede haber sesgo de anclaje",
+   "CPI de septiembre +0.6% m/m",
+   "Actas: la mayoría ve una suba más en 2026"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/07/fed-officials-see-another-hike-coming-but-no-sign-as-to-when-minutes-show.html",
+   "https://www.forbes.com/sites/simonmoore/2026/09/29/what-to-expect-from-interest-rates-for-the-rest-of-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4170753",
+  "p_yes": 0.27,
+  "confidence": "low",
+  "reasoning": "Septiembre fue hike. Pausa en octubre ~80% y, dado que los dots piden una suba más este año (16 de 18), una pausa también en diciembre ~35%.",
+  "key_uncertainties": [
+   "La búsqueda devolvió cuotas de mercados de predicción; se ignoraron deliberadamente, pero puede haber sesgo de anclaje",
+   "CPI del 10-nov antes de la reunión de diciembre",
+   "Petróleo en alza puede empujar la inflación"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/07/fed-officials-see-another-hike-coming-but-no-sign-as-to-when-minutes-show.html",
+   "https://www.forbes.com/sites/simonmoore/2026/09/29/what-to-expect-from-interest-rates-for-the-rest-of-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936105",
+  "p_yes": 0.04,
+  "confidence": "medium",
+  "reasoning": "WTI cerró en $101.41 el 16-oct; llegar a $80 (-21%) en ~10 ruedas requiere ~2 desvíos con vol 55% anual: ~3-7%.",
+  "key_uncertainties": [
+   "Alivio brusco de tensiones en Medio Oriente",
+   "No sé cuándo se creó el mercado"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/16/oil-price-today-iran-strait-hormuz-ukraine-russia.html",
+   "https://www.tokenpost.com/news/investing/33503"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5743142",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "WTI cerró en $101.41; tocar $95 (-6.3%) en ~10 ruedas es ~55% por barrera con vol 55% anual. Sube por la chance de que ya se haya tocado antes de crearse el mercado, y baja porque el mercado sigue abierto.",
+  "key_uncertainties": [
+   "Fecha de creación del mercado desconocida",
+   "Retroceso tras 7 subas seguidas",
+   "Escalada en Hormuz"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/16/oil-price-today-iran-strait-hormuz-ukraine-russia.html",
+   "https://www.tokenpost.com/news/investing/33503"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4853905",
+  "p_yes": 0.65,
+  "confidence": "low",
+  "reasoning": "Gemini 3.5 Pro cancelado; el último Pro oficial es 3.1 Pro. Rumores de un 'Gemini 4 Pro' en octubre, pero 'Gemini 4 Argon' (13-oct) no lleva etiqueta Pro. 15 días hasta el 31-oct.",
+  "key_uncertainties": [
+   "Si Argon cuenta como Pro",
+   "Fuentes de rumores poco fiables",
+   "Lanzamientos sorpresa"
+  ],
+  "sources": [
+   "https://aiwiz.uk/blog/gemini-3-5-pro/",
+   "https://geeky-gadgets.com/gemini-4-pro-release-date/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3685385",
+  "p_yes": 0.64,
+  "confidence": "low",
+  "reasoning": "Igual que el mercado del 31-oct con un día más de ventana.",
+  "key_uncertainties": [
+   "Si Argon cuenta como Pro",
+   "Fuentes de rumores poco fiables"
+  ],
+  "sources": [
+   "https://aiwiz.uk/blog/gemini-3-5-pro/",
+   "https://geeky-gadgets.com/gemini-4-pro-release-date/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166964",
+  "p_yes": 0.22,
+  "confidence": "low",
+  "reasoning": "Hasta hoy hay 3 días con lanzamientos calificables (3, 12 y 14 de octubre). Ritmo alto y reactivo; que no haya ninguno más en 2 semanas es posible pero menos probable.",
+  "key_uncertainties": [
+   "Conteo de días de lanzamiento (3-oct y 4-oct pueden ser el mismo evento)",
+   "Tensión con Seúl y posible diálogo con EE.UU."
+  ],
+  "sources": [
+   "https://www.japantimes.co.jp/news/2026/10/03/japan/north-korea-missile-october-3/",
+   "https://news.usni.org/2026/10/15/north-korea-tests-first-submarine-launched-cruise-missile-in-nearly-3-years"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167205",
+  "p_yes": 0.65,
+  "confidence": "low",
+  "reasoning": "Escalada fuerte entre Arabia Saudita y los hutíes (ataques a Riad y Adén, ataques saudíes del 13-oct a Saná). Es probable un ataque saudí directo en una fecha dada de la próxima semana.",
+  "key_uncertainties": [
+   "Posible alto el fuego o mediación",
+   "Atribución a las fuerzas saudíes",
+   "Reportes en conflicto"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/10/15/fighting-in-yemen-intensifies-whats-the-latest-on-the-battlefield",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167212",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "Misma escalada, con más incertidumbre a 2 semanas (alto el fuego, entrada de EE.UU.).",
+  "key_uncertainties": [
+   "Posible alto el fuego o mediación",
+   "Atribución a las fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/10/15/fighting-in-yemen-intensifies-whats-the-latest-on-the-battlefield",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664660",
+  "p_yes": 0.22,
+  "confidence": "low",
+  "reasoning": "Hoy Google lidera el Text Arena (~1525) sobre Claude Opus 5.5 (~1507). En 6 semanas hay riesgo de nuevos lanzamientos (un tracker no fiable sugiere uno de Anthropic cerca del 19-oct).",
+  "key_uncertainties": [
+   "Lanzamientos de aquí a fin de noviembre",
+   "Fuentes agregadoras contradictorias"
+  ],
+  "sources": [
+   "https://thesweat.com/predictions/best-ai-model-of-2026/",
+   "https://llmrun.dev/benchmark/lmarena-text"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664662",
+  "p_yes": 0.52,
+  "confidence": "low",
+  "reasoning": "Google lidera hoy por ~18 puntos con barras solapadas; sobre 6 semanas la incertidumbre por lanzamientos de rivales es alta.",
+  "key_uncertainties": [
+   "Lanzamientos de aquí a fin de noviembre",
+   "Fuentes agregadoras contradictorias"
+  ],
+  "sources": [
+   "https://thesweat.com/predictions/best-ai-model-of-2026/",
+   "https://llmrun.dev/benchmark/lmarena-text"
+  ],
+  "prompt_version": "v1"
+ }
+]
