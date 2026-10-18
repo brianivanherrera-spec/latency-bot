@@ -1,0 +1,229 @@
+[
+ {
+  "market_id": "2589813",
+  "p_yes": 0.17,
+  "confidence": "low",
+  "reasoning": "Septiembre fue hike. Warsh no prejuzga, Williams habla de un ajuste 'a fin de año' y el CPI de septiembre subió 0.6% m/m; octubre es posible pero diciembre es más probable.",
+  "key_uncertainties": [
+   "Ayer una búsqueda sobre la Fed me mostró cuotas de mercados de predicción; las ignoré, pero puede haber sesgo de anclaje",
+   "CPI 0.6% m/m",
+   "Actas: la mayoría ve otra suba en 2026"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/07/fed-officials-see-another-hike-coming-but-no-sign-as-to-when-minutes-show.html",
+   "https://www.forbes.com/sites/simonmoore/2026/09/29/what-to-expect-from-interest-rates-for-the-rest-of-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2589812",
+  "p_yes": 0.81,
+  "confidence": "low",
+  "reasoning": "Sin cambio en octubre más probable (señales de 'fin de año'); recorte casi descartado.",
+  "key_uncertainties": [
+   "Ayer una búsqueda sobre la Fed me mostró cuotas de mercados de predicción; las ignoré, pero puede haber sesgo de anclaje",
+   "CPI hot puede adelantar el hike"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/07/fed-officials-see-another-hike-coming-but-no-sign-as-to-when-minutes-show.html",
+   "https://www.forbes.com/sites/simonmoore/2026/09/29/what-to-expect-from-interest-rates-for-the-rest-of-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3247825",
+  "p_yes": 0.18,
+  "confidence": "medium",
+  "reasoning": "Votación de septiembre 6-3 por mantener (tres pedían subir a 4%), inflación en alza por energía y 54 de 63 economistas esperan una suba en noviembre.",
+  "key_uncertainties": [
+   "Discrepancia entre fuentes de inflación",
+   "Cambios en el petróleo antes del 5-nov"
+  ],
+  "sources": [
+   "https://www.globalbankingandfinance.com/boe-raise-rates-4-november-economists-narrowly-expect-hold/",
+   "https://www.bankofengland.co.uk/monetary-policy/the-interest-rate-bank-rate"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4869280",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Cadencia mensual de versiones (1.1 jul, 1.2 ago, 1.3 sep) y un listado 'muse-spark-1.4' visto en OpenCode sugieren que 1.4 es inminente, pero sin anuncio oficial; el modelo grande 'Watermelon' llegaría más tarde.",
+  "key_uncertainties": [
+   "Un listado no es un lanzamiento",
+   "Meta puede saltar a otra versión"
+  ],
+  "sources": [
+   "https://promptblueprints.tech/leaks/muse-spark-1-4-listing-is-a-signal-not-a-confirmed-launch/",
+   "https://en.wikipedia.org/wiki/Muse_Spark"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167204",
+  "p_yes": 0.68,
+  "confidence": "low",
+  "reasoning": "Guerra Arabia Saudita-hutíes en escalada: ataques saudíes el 13 y 16-oct, Yemen descarta alto el fuego. Un ataque directo saudí en una fecha dada a 5 días es probable.",
+  "key_uncertainties": [
+   "Posible alto el fuego o mediación iraní",
+   "Atribución a fuerzas saudíes",
+   "Reportes en conflicto"
+  ],
+  "sources": [
+   "https://www.cbsnews.com/live-updates/iran-war-trump-us-elections-saudi-arabia-yemen-houthis/",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5180417",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Nvidia lidera con ~$5.3-5.7T frente a ~$4.9-5.0T de Apple; brecha de ~7-13% que Apple debería cerrar en ~10 ruedas.",
+  "key_uncertainties": [
+   "Fuentes con fechas distintas",
+   "Volatilidad de las tecnológicas"
+  ],
+  "sources": [
+   "https://www.stocktitan.net/rankings/companies-market-cap",
+   "https://www.fool.com/research/largest-companies-by-market-cap/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219322",
+  "p_yes": 0.09,
+  "confidence": "low",
+  "reasoning": "Fable 5.5 (cuenta como 5.2+) habría llegado a socios y un leaker espera lanzamiento 'la semana próxima', pero sin fecha; acertar un día exacto es poco probable. No tengo información interna.",
+  "key_uncertainties": [
+   "Filtraciones sin confirmar",
+   "Día exacto del lanzamiento"
+  ],
+  "sources": [
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://aireleasetracker.com/company/anthropic"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166820",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Promedio móvil de 7 días de PortWatch ~28 (rango diario 22-35); el tramo 30-34 queda por encima del centro.",
+  "key_uncertainties": [
+   "Metodologías distintas (26-46)",
+   "Escalada saudí-hutí antes del 31-oct"
+  ],
+  "sources": [
+   "https://www.forbes.com/sites/frankahrens/2026/10/15/tracing-the-houthi-war-on-saudi-oil-3-data-sets-beyond-missile-counts/",
+   "https://mereja.com/index/601943"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4641065",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "El alto el fuego de junio se rompió; hay ataques en Hormuz, bloqueo naval de EE.UU. y negociaciones por Qatar/Omán estancadas. Para resolver No hace falta un ataque aéreo o de misiles de EE.UU. sobre territorio iraní, que hoy parece en pausa.",
+  "key_uncertainties": [
+   "Fechas inconsistentes de las fuentes",
+   "Posible reanudación de ataques",
+   "Acuerdo de Hormuz"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Iran_war_ceasefire",
+   "https://www.cfr.org/global-conflict-tracker/conflict/confrontation-between-united-states-and-iran"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5180413",
+  "p_yes": 0.82,
+  "confidence": "low",
+  "reasoning": "Nvidia lidera por ~7-13% sobre Apple; Alphabet y Microsoft están más lejos.",
+  "key_uncertainties": [
+   "Fuentes con fechas distintas"
+  ],
+  "sources": [
+   "https://www.stocktitan.net/rankings/companies-market-cap",
+   "https://www.fool.com/research/largest-companies-by-market-cap/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219332",
+  "p_yes": 0.38,
+  "confidence": "low",
+  "reasoning": "Fable 5.5 habría llegado a socios con lanzamiento esperado 'la semana próxima' según una filtración y un tracker estima el 28-oct; es probable un lanzamiento antes del 31-oct. No tengo información interna.",
+  "key_uncertainties": [
+   "Filtraciones sin confirmar",
+   "Posibles retrasos"
+  ],
+  "sources": [
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://aireleasetracker.com/company/anthropic"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167212",
+  "p_yes": 0.58,
+  "confidence": "low",
+  "reasoning": "Misma escalada saudí-hutí; más incertidumbre a 13 días (alto el fuego, mediación).",
+  "key_uncertainties": [
+   "Posible alto el fuego o mediación",
+   "Atribución a fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.cbsnews.com/live-updates/iran-war-trump-us-elections-saudi-arabia-yemen-houthis/",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5628381",
+  "p_yes": 0.44,
+  "confidence": "low",
+  "reasoning": "Las reglas están en un PDF que no leí. Con el petróleo en ~$101, 'sin acuerdo de Hormuz o petróleo >= $80' es casi seguro, así que depende de que gane el Senado el Partido Republicano (~0.45).",
+  "key_uncertainties": [
+   "No leí las reglas completas",
+   "Dispersión de los modelos del Senado"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.pollsmax.com/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4951227",
+  "p_yes": 0.68,
+  "confidence": "low",
+  "reasoning": "WTI cerró en $101.41 (Brent ~$110) tras 7 subas seguidas; llegar a $105 (+3.5%) en ~10 ruedas con vol alta es probable por barrera, pero un acuerdo de Hormuz podría hundir el precio.",
+  "key_uncertainties": [
+   "Acuerdo de Hormuz",
+   "Fecha de creación del mercado"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/16/oil-price-today-iran-strait-hormuz-ukraine-russia.html",
+   "https://www.tokenpost.com/news/investing/33503"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664665",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "El mejor modelo de OpenAI está en el puesto ~21 del Text Arena con ~1485, a ~40 puntos del líder.",
+  "key_uncertainties": [
+   "Lanzamientos de aquí a fin de noviembre",
+   "Fuentes agregadoras contradictorias"
+  ],
+  "sources": [
+   "https://llmrun.dev/benchmark/lmarena-text",
+   "https://essentras.com/llm-leaderboard"
+  ],
+  "prompt_version": "v1"
+ }
+]
