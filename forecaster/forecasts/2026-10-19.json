@@ -1,0 +1,232 @@
+[
+ {
+  "market_id": "682705",
+  "p_yes": 0.42,
+  "confidence": "low",
+  "reasoning": "Ningún bloque llega a 61 en las encuestas (Netanyahu ~51-57, oposición ~51-54, los partidos árabes quedan fuera). Netanyahu es el favorito a formar gobierno pero con alta chance de bloqueo o de que otro sea nombrado.",
+  "key_uncertainties": [
+   "Umbrales de partidos pequeños",
+   "Coaliciones post-elección",
+   "Posibles elecciones repetidas"
+  ],
+  "sources": [
+   "https://www.timesofisrael.com/toi-poll-eisenkot-opens-up-big-lead-on-netanyahu-but-both-blocs-short-of-majority/",
+   "https://www.jpost.com/israel-election-2026/article-912004",
+   "https://israel2026.co.il/en/election-polls.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2100984",
+  "p_yes": 0.47,
+  "confidence": "low",
+  "reasoning": "Yashar (Eisenkot) lidera el promedio de encuestas (~21.5 bancas vs ~19 de Likud), pero Likud suele rendir mejor que las encuestas y Channel 14 lo pone primero.",
+  "key_uncertainties": [
+   "Dispersión entre encuestadoras",
+   "30% de indecisos",
+   "Voto en bloque de Likud"
+  ],
+  "sources": [
+   "https://www.timesofisrael.com/toi-poll-eisenkot-opens-up-big-lead-on-netanyahu-but-both-blocs-short-of-majority/",
+   "https://www.jpost.com/israel-election-2026/article-912004",
+   "https://israel2026.co.il/en/election-polls.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630964",
+  "p_yes": 0.48,
+  "confidence": "low",
+  "reasoning": "Talarico lidera a Paxton por ~2.7 puntos en el promedio, pero Texas suele sorprender hacia republicanos en el final. Se compensa a favor del republicano.",
+  "key_uncertainties": [
+   "Sesgo de las encuestas en Texas",
+   "Participación"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/senate/general/2026/texas/talarico-vs-paxton",
+   "https://thehill.com/homenews/campaign/6148528-talarico-paxton-texas-senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630963",
+  "p_yes": 0.52,
+  "confidence": "low",
+  "reasoning": "Talarico +2.7 en el promedio y tres encuestas de octubre a su favor, ajustado a la baja por el historial de sesgo de las encuestas en Texas.",
+  "key_uncertainties": [
+   "Sesgo de las encuestas en Texas",
+   "Paxton débil entre republicanos moderados"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/senate/general/2026/texas/talarico-vs-paxton",
+   "https://thehill.com/homenews/campaign/6148528-talarico-paxton-texas-senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "634974",
+  "p_yes": 0.36,
+  "confidence": "low",
+  "reasoning": "Peltola lidera por ~2.5 puntos en los promedios y la carrera se considera Lean D; con voto preferencial es más pareja. Una búsqueda me mostró una cuota de mercado de predicción (ignorada, pero puede haber anclaje).",
+  "key_uncertainties": [
+   "Voto preferencial",
+   "Encuestas parejas",
+   "Anclaje por una cuota vista"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/senate/general/2026/alaska/peltola-vs-sullivan",
+   "https://www.pollsmax.com/senate/alaska/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936102",
+  "p_yes": 0.22,
+  "confidence": "low",
+  "reasoning": "WTI ~$97-99 el lunes tras la baja por la exención a Rusia; $110 (+12%) en ~9 ruedas con vol 55% anual es ~25% por barrera, ajustado por el alivio de oferta.",
+  "key_uncertainties": [
+   "Hormuz",
+   "Acuerdo de reapertura",
+   "Exención de sanciones a Rusia"
+  ],
+  "sources": [
+   "https://fxstreet.com/news/wti-oil-eases-below-97-amid-hopes-of-higher-supplies-from-russia-202610190823",
+   "https://sundayguardianlive.com/business/brent-crude-oil-price-today-october-19-brent-falls-below-108-wti-slips-under-100-as-trumps-russia-sanctions-waiver-eases-supply-concerns-amid-hormuz-tensions-check-latest-brent-crude-wti-oil-308522/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4951226",
+  "p_yes": 0.18,
+  "confidence": "low",
+  "reasoning": "WTI ~$98; tocar $85 (-13%) en ~9 ruedas es ~20% por barrera con vol alta; el riesgo de un acuerdo de Hormuz es la cola.",
+  "key_uncertainties": [
+   "Plan de reapertura de Hormuz",
+   "Más oferta rusa"
+  ],
+  "sources": [
+   "https://fxstreet.com/news/wti-oil-eases-below-97-amid-hopes-of-higher-supplies-from-russia-202610190823",
+   "https://sundayguardianlive.com/business/brent-crude-oil-price-today-october-19-brent-falls-below-108-wti-slips-under-100-as-trumps-russia-sanctions-waiver-eases-supply-concerns-amid-hormuz-tensions-check-latest-brent-crude-wti-oil-308522/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5789189",
+  "p_yes": 0.27,
+  "confidence": "low",
+  "reasoning": "WTI ~$98 hoy; tocar $90 (-8%) antes del viernes 23 son ~5 ruedas, ~27% por barrera con vol alta.",
+  "key_uncertainties": [
+   "Hormuz",
+   "Exención a Rusia",
+   "Fecha de creación hoy"
+  ],
+  "sources": [
+   "https://fxstreet.com/news/wti-oil-eases-below-97-amid-hopes-of-higher-supplies-from-russia-202610190823",
+   "https://sundayguardianlive.com/business/brent-crude-oil-price-today-october-19-brent-falls-below-108-wti-slips-under-100-as-trumps-russia-sanctions-waiver-eases-supply-concerns-amid-hormuz-tensions-check-latest-brent-crude-wti-oil-308522/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166965",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Hay 3 días con lanzamientos hasta hoy (3, 12 y 14-oct) y ritmo alto; falta al menos uno en los 12 días restantes. Sin reportes de lanzamientos el 17-19.",
+  "key_uncertainties": [
+   "Búsqueda puede no incluir los últimos días",
+   "Diálogo con EE.UU."
+  ],
+  "sources": [
+   "https://www.cbsnews.com/news/north-korea-fires-ballistic-missiles-tests/",
+   "https://news.usni.org/2026/10/15/north-korea-tests-first-submarine-launched-cruise-missile-in-nearly-3-years"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219321",
+  "p_yes": 0.09,
+  "confidence": "low",
+  "reasoning": "Fable 5.5 (cuenta como 5.2+) figura en el catálogo de Azure desde el 13-oct y un leaker habla de la semana del 19; Anthropic no confirmó nada. Acertar el 21-oct exacto es poco probable. No tengo información interna.",
+  "key_uncertainties": [
+   "Filtraciones sin confirmar",
+   "Día exacto"
+  ],
+  "sources": [
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/",
+   "https://cellcog.ai/blog/fable-5-5-release-date/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3685380",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "Google lanzó Gemini 4 Argon (no etiquetado Pro); un 'Gemini 4 Pro' sigue sin confirmación oficial y la ventana es de una semana.",
+  "key_uncertainties": [
+   "Rumores de octubre",
+   "Etiquetado del modelo"
+  ],
+  "sources": [
+   "https://www.orcarouter.ai/blog/gemini-4-pro",
+   "https://nokiapoweruser.com/gemini-4-argon-antigravity-google-ai-pro-rollout-quota-details/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167207",
+  "p_yes": 0.72,
+  "confidence": "low",
+  "reasoning": "Escalada fuerte saudí-hutí (los hutíes reportan 110 ataques en 24 h) y Yemen descarta alto el fuego; un ataque directo en una fecha dada de la próxima semana es probable.",
+  "key_uncertainties": [
+   "Alto el fuego o mediación",
+   "Atribución a fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl",
+   "https://www.cbsnews.com/live-updates/iran-war-us-houthi-saudi-arabia-trump/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167208",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Misma escalada, un día después.",
+  "key_uncertainties": [
+   "Alto el fuego o mediación",
+   "Atribución a fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl",
+   "https://www.cbsnews.com/live-updates/iran-war-us-houthi-saudi-arabia-trump/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4170752",
+  "p_yes": 0.52,
+  "confidence": "low",
+  "reasoning": "Septiembre fue hike. Pausa en octubre ~80% y, con otra suba esperada 'a fin de año', hike en diciembre ~65% condicionado a esa pausa.",
+  "key_uncertainties": [
+   "Ayer vi cuotas de mercados sobre la Fed; las ignoré pero puede haber anclaje",
+   "CPI del 10-nov"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/07/fed-officials-see-another-hike-coming-but-no-sign-as-to-when-minutes-show.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166818",
+  "p_yes": 0.17,
+  "confidence": "low",
+  "reasoning": "Promedio de 7 días de PortWatch ~28 (diario 22-35); el tramo 20-24 queda varios puntos por debajo del centro.",
+  "key_uncertainties": [
+   "Metodologías distintas",
+   "Posible caída por la escalada en Yemen"
+  ],
+  "sources": [
+   "https://www.forbes.com/sites/frankahrens/2026/10/15/tracing-the-houthi-war-on-saudi-oil-3-data-sets-beyond-missile-counts/"
+  ],
+  "prompt_version": "v1"
+ }
+]
