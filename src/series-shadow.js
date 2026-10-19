@@ -10,11 +10,11 @@
  * shadow-ticks.jsonl (el backtest la lee igual: node scripts/backtest.js /data/shadow-ticks-btc15m.jsonl) y deja una
  * línea [SERIE <id>] con el ganador, el libro y qué habría hecho la regla de la cuenta B (anclada, 120-30 s).
  * Al resolver guarda también el priceToBeat que Gamma publica en eventMetadata (valida el strike).
- * Cuenta B15 (paper, solo con paper: true; PAPER_B15=off la apaga): la misma regla de B evaluada en vivo en cada muestra,
+ * Cuenta B15 (paper, solo con paper: true; PAPER_B15=off la apaga en BTC y PAPER_B15_ETH=off en ETH 15 min): la misma regla de B en vivo,
  * una entrada por mercado, orden con el límite justo de B (margen 2, tope $0.72, ~$5) y fill con el libro REST a
  * +PAPER_CHECK_MS (200 ms, lo más parecido a una orden real); se resuelve con el ganador oficial y guarda su estado en
  * DATA_DIR/paper-b15-<id>.json (sigue después de un reinicio). Líneas [PAPER-B15] con cada intento, WIN/LOSS y el balance.
- * SERIES_SHADOW=off apaga la de BTC 15 min; SERIES_SHADOW_ETH=off la de ETH 5 min (id eth5m, precio de Chainlink ETH
+ * SERIES_SHADOW=off apaga la de BTC 15 min; SERIES_SHADOW_ETH=off las de ETH 5 y 15 min (ids eth5m y eth15m, precio de Chainlink ETH
  * por PolyBolt, src/aux-price.js; en su archivo la columna "btc" lleva el precio de ETH).
  */
 'use strict';

@@ -51,6 +51,7 @@ d.observe('info', 'LOOP', 'lag p50=1.1ms p99=12.4ms máx=30ms | bloqueos>200ms=0
 d.observe('info', 'LOOP', 'lag p50=1.1ms p99=60.0ms máx=90ms | bloqueos>200ms=0 (peor 0ms) | CPU 9% | heap 80MB | retraso WS p50=40ms p99=1200ms máx=3500ms (n=500)');
 d.observe('info', 'SERIE', `[SERIE btc15m] ${mkt} | ganó UP | strike $67000.00 | 900 muestras (890 con modelo; REST p50 80 ms`);
 d.observe('info', 'SERIE', `[SERIE eth5m] ${mkt} | ganó DOWN | strike $2500.00 | 300 muestras (0 con modelo; REST p50 80 ms`);
+d.observe('info', 'SERIE', `[SERIE eth15m] ${mkt} | ganó UP | strike $2500.00 | 900 muestras (899 con modelo; REST p50 80 ms`);
 d.observe('info', 'BACKTEST', '[BACKTEST-B-HIPOTESIS] (i) n=16 …');
 d.observe('warn', 'RTDS', 'Alta latencia: 900ms');
 d.observe('warn', 'FOO', 'algo raro 1 pasó');
@@ -60,6 +61,9 @@ d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] ✅ cuenta en paper con l
 d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] UP Oct 16, 1:30PM-1:45PM ET | 100 s restantes | ask $0.50 vs precio justo anclado 64.5% (ventaja 12.7 pts) | orden 8 a $0.60 | ask a +200ms $0.50 → lleno a $0.50 (ventaja al precio pagado 12.7 pts) | Balance B15: +$0.00 (0-0), intentos 1, llenadas 1, sin fill 0, abiertas 1 | desde 2026-10-16T15:00 UTC');
 d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] DOWN Oct 16, 1:45PM-2:00PM ET | 90 s restantes | ask $0.45 vs precio justo anclado 60.0% (ventaja 11.2 pts) | orden 9 a $0.56 | ask a +200ms $0.60 → no llena | Balance B15: +$0.00 (0-0), intentos 2, llenadas 1, sin fill 1, abiertas 1 | desde 2026-10-16T15:00 UTC');
 d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] LOSS UP Oct 16, 1:30PM-1:45PM ET @ $0.50 ×8 → −$4.14 (comisión $0.14) | Balance B15: −$4.14 (0-1), intentos 2, llenadas 1, sin fill 1, abiertas 0 | desde 2026-10-16T15:00 UTC');
+// Cuenta B15 de ETH 15 min: va en su propio ítem y no se mezcla con la de BTC
+d.observe('info', 'SERIE', '[SERIE eth15m] [PAPER-B15] DOWN Oct 16, 1:30PM-1:45PM ET | 80 s restantes | ask $0.60 vs precio justo anclado 72.0% (ventaja 10.3 pts) | orden 8 a $0.65 | ask a +200ms $0.60 → lleno a $0.60 (ventaja al precio pagado 10.3 pts) | Balance B15: +$0.00 (0-0), intentos 1, llenadas 1, sin fill 0, abiertas 1 | desde 2026-10-19T21:00 UTC');
+d.observe('info', 'SERIE', '[SERIE eth15m] [PAPER-B15] WIN DOWN Oct 16, 1:30PM-1:45PM ET @ $0.60 ×8 → +$3.06 (comisión $0.14) | Balance B15: +$3.06 (1-0), intentos 1, llenadas 1, sin fill 0, abiertas 0 | desde 2026-10-19T21:00 UTC');
 d.observe('info', 'RESUMEN', '[RESUMEN] cuentas — no se cuenta a sí mismo: [WATCHDOG] muda:');
 
 const [c1, s1] = d.report(T0 + 3600000);
@@ -78,7 +82,9 @@ has(s1, 'strike 2 (no chainlink 1, espera máx 2.3 s)', 'strike');
 has(s1, 'PTB-CHECK 2 (Δ≠0 1, máx RTDS 1.20, PolyBolt 1.20)', 'PTB');
 has(s1, 'BOOK-CHECK mín 96.7% prom 97.5%, diferencias REALES 1', 'BOOK-CHECK');
 has(s1, 'LOOP 2 min: retraso WS p99 máx 1200 ms, máx 3500 ms; lag p99 máx 60 ms; CPU máx 9%; minutos fuera de umbral 1', 'LOOP sin la línea del corte');
-has(s1, 'SERIE btc15m 1, eth5m 1 (0 con modelo 1), 429 0; corrió backtest sí, ejecución no', 'series y corridas');
+has(c1, 'B15 ETH: intentos 1, llenadas 1, 1-0 +$3.06; total +$3.06 (1-0), intentos 1, llenadas 1, abiertas 0', 'cuenta B15 de ETH aparte');
+ok(c1.indexOf('B15: ') < c1.indexOf('B15 ETH: '), 'B15 de BTC primero');
+has(s1, 'SERIE btc15m 1, eth15m 1 (0 con modelo 0), eth5m 1 (0 con modelo 1), 429 0; corrió backtest sí, ejecución no', 'series y corridas');
 has(s1, 'WARN 10, ERROR 1', 'conteo de WARN/ERROR');
 has(s1, '×2 "[FOO] algo raro 1 pasó"', 'WARN desconocidos agrupados');
 has(s1, 'ERROR ×1 "[MAIN] [ERROR] se rompió algo"', 'ERROR en otros');
@@ -92,6 +98,7 @@ has(c2, 'B: 0-0 +$0.00 (intentos 1, llenadas 0; REST +$0.00 (0-0), REST +200ms +
 has(c2, 'abiertas 1', 'posición abierta');
 has(c2, 'pérdidas B: ninguna');
 has(c2, 'B15: intentos 0, llenadas 0, 0-0 +$0.00; total −$4.14 (0-1)', 'B15 sin movimiento: queda el total');
+has(c2, 'B15 ETH: intentos 0, llenadas 0, 0-0 +$0.00; total +$3.06 (1-0)', 'B15 ETH sigue en el resumen con su total');
 has(s2, 'muda 0, top viejo 0', 'contadores en cero');
 has(s2, 'LOOP 0 min: retraso WS p99 máx n/a', 'sin datos: n/a');
 has(s2, 'BOOK-CHECK n/a');

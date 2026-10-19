@@ -5,7 +5,7 @@
  * ([LOOP] y [WS-DUAL] salen cada minuto), lee estas dos líneas por hora. Mira cada línea
  * que pasa por el Logger, cuenta eventos y guarda máximos; no cambia nada del bot.
  *
- *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B … | B15 (paper de 15 min) …
+ *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B … | B15 (paper de BTC 15 min) … | B15 ETH (paper de ETH 15 min) …
  *   [RESUMEN] salud HH:20-HH:20 UTC | reconexiones … | 1013 … | BOOK-CHECK … | LOOP … | WARN/ERROR …
  *
  * Sale a los :20 UTC de cada hora (el chequeo corre a los :22). LOG_DIGEST=off lo apaga.
@@ -47,6 +47,8 @@ const COUNTS = [
   ['serieBtc15m', /\[SERIE btc15m\] .* muestras/],
   ['serieEth5m', /\[SERIE eth5m\] .* muestras/],
   ['eth0modelo', /\[SERIE eth5m\] .*muestras \(0 con modelo/],
+  ['serieEth15m', /\[SERIE eth15m\] .* muestras/],
+  ['eth15_0modelo', /\[SERIE eth15m\] .*muestras \(0 con modelo/],
   ['serie429', /respondió 429/],
   ['bookReal', /diferencia REAL/],
   ['backtest', /\[BACKTEST-B-HIPOTESIS\]/],
@@ -64,6 +66,8 @@ const KNOWN = [
   /WS2 \(medición\) desconectada/, /\[STRIKE\] /, /\[SKIP\] /,
 ];
 
+const B15_LABEL = { btc15m: 'B15', eth15m: 'B15 ETH' };
+
 class LogDigest {
   constructor(now = Date.now()) {
     this.bootAt = now;
@@ -71,7 +75,7 @@ class LogDigest {
     this.lastB = null;      // último "Balance B" parseado
     this.baseB = null;      // Balance B al cerrar la ventana anterior (para las diferencias)
     this.attempts = new Map(); // "UP mercado" → {secs, edge} del intento de B
-    this.lastB15 = null;    // último "Balance B15" (cuenta en paper de 15 min)
+    this.lastB15 = {};      // id de la serie (btc15m, eth15m) → último "Balance B15" de su cuenta en paper
     this._reset(now);
   }
 
@@ -82,7 +86,7 @@ class LogDigest {
     this.others = new Map(); // clave normalizada → {n, ex, level}
     this.a = { w: 0, l: 0, pnl: 0 };
     this.b = { w: 0, l: 0, pnl: 0, losses: [] };
-    this.b15 = { att: 0, fill: 0, w: 0, l: 0, pnl: 0, losses: [] };
+    this.b15 = {};          // id de la serie → { att, fill, w, l, pnl, losses } de la ventana
     this._aPending = false;
     this.strike = { n: 0, notCl: 0, maxWait: null };
     this.ptb = { n: 0, maxRtds: null, maxPb: null, nonZero: 0 };
@@ -152,9 +156,11 @@ class LogDigest {
     }
   }
 
+  // Una cuenta por serie: el id sale del prefijo [SERIE <id>] (sin prefijo, btc15m)
   _b15(line) {
     let m;
-    const B = this.b15;
+    const id = /\[SERIE (\w+)\]/.exec(line)?.[1] || 'btc15m';
+    const B = this.b15[id] || (this.b15[id] = { att: 0, fill: 0, w: 0, l: 0, pnl: 0, losses: [] });
     if ((m = /\[PAPER-B15\] (WIN|LOSS) (UP|DOWN) (.+?) @ \$([\d.]+) ×\d+ → ([+−-])\$([\d.]+)/.exec(line))) {
       const v = signed(m[5], m[6]);
       B.pnl += v;
@@ -164,7 +170,7 @@ class LogDigest {
       if (/ → lleno a /.test(line)) B.fill++;
     }
     if ((m = /Balance B15: ([+−-])\$([\d.]+) \((\d+)-(\d+)\), intentos (\d+), llenadas (\d+), sin fill (\d+), abiertas (\d+)/.exec(line))) {
-      this.lastB15 = { pnl: signed(m[1], m[2]), w: +m[3], l: +m[4], attempts: +m[5], filled: +m[6], open: +m[8] };
+      this.lastB15[id] = { pnl: signed(m[1], m[2]), w: +m[3], l: +m[4], attempts: +m[5], filled: +m[6], open: +m[8] };
     }
   }
 
@@ -221,7 +227,7 @@ class LogDigest {
       `A: ${this.a.w}-${this.a.l} ${usd(this.a.pnl)}; ${A}`,
       `B: ${this.b.w}-${this.b.l} ${usd(this.b.pnl)}${this._bWindow()}; ${this._bTotal()}`,
       `pérdidas B: ${this.b.losses.length ? this.b.losses.join('; ') : 'ninguna'}`,
-      `B15: intentos ${this.b15.att}, llenadas ${this.b15.fill}, ${this.b15.w}-${this.b15.l} ${usd(this.b15.pnl)}; ${this._b15Total()}${this.b15.losses.length ? `; pérdidas: ${this.b15.losses.join('; ')}` : ''}`];
+      ...this._b15Items()];
     const top = [...this.others.values()].sort((x, y) => y.n - x.n).slice(0, 4)
       .map(o => `${o.level === 'error' ? 'ERROR ' : ''}×${o.n} "${o.ex}"`);
     const f = (v, d = 0) => (v == null ? 'n/a' : v.toFixed(d));
@@ -232,7 +238,7 @@ class LogDigest {
       `strike ${S.n} (no chainlink ${S.notCl}, espera máx ${f(S.maxWait, 1)} s); sin TWAP salteado ${c.skipStrike}; PTB-CHECK ${P.n} (Δ≠0 ${P.nonZero}, máx RTDS ${f(P.maxRtds, 2)}, PolyBolt ${f(P.maxPb, 2)})`,
       `BOOK-CHECK ${K.n ? `mín ${f(K.min, 1)}% prom ${(K.sum / K.n).toFixed(1)}%` : 'n/a'}, diferencias REALES ${c.bookReal}`,
       `LOOP ${L.n} min: retraso WS p99 máx ${f(L.wsP99)} ms, máx ${f(L.wsMax)} ms; lag p99 máx ${f(L.lagP99)} ms; CPU máx ${f(L.cpu)}%; minutos fuera de umbral ${L.bad}`,
-      `SERIE btc15m ${c.serieBtc15m}, eth5m ${c.serieEth5m} (0 con modelo ${c.eth0modelo}), 429 ${c.serie429}; corrió backtest ${c.backtest ? 'sí' : 'no'}, ejecución ${c.ejecucion ? 'sí' : 'no'}`,
+      `SERIE btc15m ${c.serieBtc15m}, eth15m ${c.serieEth15m} (0 con modelo ${c.eth15_0modelo}), eth5m ${c.serieEth5m} (0 con modelo ${c.eth0modelo}), 429 ${c.serie429}; corrió backtest ${c.backtest ? 'sí' : 'no'}, ejecución ${c.ejecucion ? 'sí' : 'no'}`,
       `WARN ${this.warn}, ERROR ${this.error}; otros: ${top.length ? top.join('; ') : 'ninguno'}`];
     this.baseB = this.lastB;
     this._reset(now);
@@ -246,9 +252,15 @@ class LogDigest {
     return ` (intentos ${s.attempts - b.attempts}, llenadas ${s.filled - b.filled}; REST ${d('rest')}, REST +${s.rest2?.ms ?? '?'}ms ${d('rest2')})`;
   }
 
-  _b15Total() {
-    const s = this.lastB15;
-    return s ? `total ${usd(s.pnl)} (${s.w}-${s.l}), intentos ${s.attempts}, llenadas ${s.filled}, abiertas ${s.open}` : 'total sin dato';
+  // "B15: …" (BTC 15 min) siempre; las otras series ("B15 ETH: …") desde que aparece su cuenta
+  _b15Items() {
+    const ids = ['btc15m', ...new Set([...Object.keys(this.lastB15), ...Object.keys(this.b15)].filter(id => id !== 'btc15m'))];
+    return ids.map(id => {
+      const B = this.b15[id] || { att: 0, fill: 0, w: 0, l: 0, pnl: 0, losses: [] }, s = this.lastB15[id];
+      const label = B15_LABEL[id] || `B15 ${id}`;
+      const total = s ? `total ${usd(s.pnl)} (${s.w}-${s.l}), intentos ${s.attempts}, llenadas ${s.filled}, abiertas ${s.open}` : 'total sin dato';
+      return `${label}: intentos ${B.att}, llenadas ${B.fill}, ${B.w}-${B.l} ${usd(B.pnl)}; ${total}${B.losses.length ? `; pérdidas: ${B.losses.join('; ')}` : ''}`;
+    });
   }
 
   _bTotal() {

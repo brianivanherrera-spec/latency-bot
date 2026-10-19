@@ -663,19 +663,23 @@ function runBacktest() {
     { timeout: 10 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
       if (err) logger.warn(`[BACKTEST] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
       else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line);
-      // Después, el mismo backtest sobre la sombra de BTC 15 min: líneas [BACKTEST-15M…] (BACKTEST_15M=off lo apaga)
-      if (process.env.BACKTEST_15M !== 'off') runBacktest15m();
+      // Después, el mismo backtest sobre las sombras de 15 min, una tras otra: BTC con líneas [BACKTEST-15M…] y ETH con
+      // [BACKTEST-ETH15M…] (BACKTEST_15M=off apaga las dos)
+      if (process.env.BACKTEST_15M !== 'off') runBacktest15m([['btc15m', '15M'], ['eth15m', 'ETH15M']]);
     });
 }
-function runBacktest15m() {
+function runBacktest15m(series) {
+  if (!series.length) return;
+  const [[id, tag], ...rest] = series;
   const { execFile } = require('child_process');
   const dir = process.env.DATA_DIR || '/data';
-  const inFile = path.join(dir, 'shadow-ticks-btc15m.jsonl');
-  if (!fs.existsSync(inFile)) return;
-  execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'backtest.js'), inFile, path.join(dir, 'backtest-report-btc15m.json')],
+  const inFile = path.join(dir, `shadow-ticks-${id}.jsonl`);
+  if (!fs.existsSync(inFile)) return runBacktest15m(rest);
+  execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'backtest.js'), inFile, path.join(dir, `backtest-report-${id}.json`)],
     { timeout: 10 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
-      if (err) logger.warn(`[BACKTEST-15M] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
-      else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line.replace(/^\[BACKTEST/, '[BACKTEST-15M'));
+      if (err) logger.warn(`[BACKTEST-${tag}] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
+      else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line.replace(/^\[BACKTEST/, `[BACKTEST-${tag}`));
+      runBacktest15m(rest);
     });
 }
 if (process.env.BACKTEST_ENABLED !== 'false') {
@@ -969,7 +973,7 @@ async function main() {
   // sigue con la otra sin reiniciar ([CHAINLINK-DUAL] cada minuto).
   const CHAINLINK_SOURCE = (process.env.CHAINLINK_SOURCE || 'rtds').toLowerCase();
   let polybolt = null;
-  // Chainlink ETH/USD por la misma conexión de PolyBolt, solo para la sombra de ETH 5 min (SERIES_SHADOW_ETH=off la apaga)
+  // Chainlink ETH/USD por la misma conexión de PolyBolt, solo para las sombras de ETH 5 y 15 min (SERIES_SHADOW_ETH=off apaga las dos)
   let ethPrice = null;
   if (['polybolt', 'both', 'dual'].includes(CHAINLINK_SOURCE)) {
     const { PolyBoltClient } = require('./chainlink-polybolt');
@@ -1727,6 +1731,14 @@ async function main() {
     new SeriesShadow({ id: 'eth5m', slugPrefix: 'eth-updown-5m', periodS: 300,
       fairFn: (K, endMs, nowMs) => ethPrice.fair(K, endMs, nowMs, { volMult: FAIR_VOL_MULT, floor: FAIR_SIGMA_FLOOR }),
       strikeFn: ms => ethPrice.strike(ms), spotFn: () => ethPrice.last('spot')?.value ?? null }).start();
+    // Sombra de ETH 15 min con su cuenta B15 en paper (pedido del 19/10: más muestra para la regla de B en 15 min).
+    // SERIES_SHADOW_ETH15=off apaga la sombra; PAPER_B15_ETH=off solo la cuenta
+    if (process.env.SERIES_SHADOW_ETH15 !== 'off') {
+      new SeriesShadow({ id: 'eth15m', slugPrefix: 'eth-updown-15m', periodS: 900,
+        fairFn: (K, endMs, nowMs) => ethPrice.fair(K, endMs, nowMs, { volMult: FAIR_VOL_MULT, floor: FAIR_SIGMA_FLOOR }),
+        strikeFn: ms => ethPrice.strike(ms), spotFn: () => ethPrice.last('spot')?.value ?? null,
+        paper: process.env.PAPER_B15_ETH !== 'off' }).start();
+    }
   }
 
   // ─── OPEN-SNAP (sombra): ¿el mercado abre mal valuado? ─────────────────────

@@ -265,7 +265,15 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   assert.deepStrictEqual([su.paper.st.unresolved, su.paper.st.pnl, su.paper.st.open.length], [1, 1, 0]);
   // Sin paper (por defecto) no hay cuenta B15
   assert.strictEqual(s.paper, null);
+  // ETH 15 min (pedido del 19/10): su propia cuenta B15, con su archivo de estado y su slug
+  const dirE15 = fs.mkdtempSync(path.join(os.tmpdir(), 'b15e-'));
+  const se15 = new SeriesShadow({ id: 'eth15m', slugPrefix: 'eth-updown-15m', periodS: 900, fetchFn: fetchQ, dataDir: dirE15, now: () => Q0 + 1000,
+    env: {}, paper: true, strikeFn: () => 4000, fairFn: () => null });
+  se15._tick();
+  assert.deepStrictEqual([path.basename(se15.paper.file), se15.cur.slug, se15.paper.st.attempts],
+    ['paper-b15-eth15m.json', `eth-updown-15m-${Q0 / 1000}`, 0], 'cuenta B15 de ETH 15 min aparte de la de BTC');
+  fs.rmSync(dirE15, { recursive: true, force: true });
   for (const d of [dirP, dirR, dirU]) fs.rmSync(d, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('series-shadow: 59 ok');
+  console.log('series-shadow: 60 ok');
 })().catch(e => { console.error(e); process.exit(1); });
