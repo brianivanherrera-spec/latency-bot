@@ -1,0 +1,245 @@
+[
+ {
+  "market_id": "5447182",
+  "p_yes": 0.72,
+  "confidence": "low",
+  "reasoning": "No hay alto el fuego formal, pero Trump se comprometió a no atacar antes de las elecciones del 3-nov y hay una 'calma' que EE.UU. e Israel evalúan romper. Para resolver No hace falta un ataque aéreo o de misiles de EE.UU. sobre territorio iraní; los ataques israelíes no cuentan.",
+  "key_uncertainties": [
+   "La calma está cerca del 'punto de quiebre'",
+   "Hegseth se reunió con Netanyahu",
+   "Ataques de Irán en Hormuz"
+  ],
+  "sources": [
+   "https://gulfnews.com/uae/us-israel-iran-war-lull-nears-breaking-point-us-israel-weighing-new-strikes-what-to-know-oct-20-2026-1.500716736",
+   "https://www.cbsnews.com/live-updates/iran-war-us-trump-strait-of-hormuz-yemen-houthis-saudi-arabia/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5743142",
+  "p_yes": 0.58,
+  "confidence": "low",
+  "reasoning": "WTI ~$98-100 (fuentes en conflicto por el vencimiento del contrato); tocar $95 en ~8 ruedas es ~60% por barrera con vol alta, ajustado por el apoyo de los ataques en Hormuz.",
+  "key_uncertainties": [
+   "Precio actual incierto",
+   "Fecha de creación del mercado",
+   "Exención de sanciones a Rusia"
+  ],
+  "sources": [
+   "https://www.rigzone.com/news/why_is_the_wti_oil_price_rising_more_than_brent_intraday-20-oct-2026-184882-article",
+   "https://investinglive.com/commodities/oil-reverses-course-higher-after-us-and-houthi-attacks",
+   "https://www.schwab.com/learn/story/stock-market-update-open"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664662",
+  "p_yes": 0.52,
+  "confidence": "low",
+  "reasoning": "Google lidera el Text Arena (~1525) sobre Claude Opus 5.5 (~1507); en 6 semanas hay riesgo de lanzamientos rivales.",
+  "key_uncertainties": [
+   "Lanzamientos hasta fin de noviembre",
+   "Fuentes agregadoras contradictorias"
+  ],
+  "sources": [
+   "https://thesweat.com/predictions/best-ai-model-of-2026/",
+   "https://llmrun.dev/benchmark/lmarena-text"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167210",
+  "p_yes": 0.68,
+  "confidence": "low",
+  "reasoning": "Escalada saudí-hutí sin alto el fuego (los hutíes reportan ~110 ataques saudíes en 24 h); a 9 días hay algo más de incertidumbre.",
+  "key_uncertainties": [
+   "Alto el fuego o mediación",
+   "Atribución a fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.cbsnews.com/live-updates/iran-war-us-houthi-saudi-arabia-trump/",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5611043",
+  "p_yes": 0.03,
+  "confidence": "low",
+  "reasoning": "Petróleo por debajo de $80 el 2-nov requiere una caída de ~20% desde ~$98-100 (poco probable, salvo acuerdo de Hormuz) y que los demócratas ganen el Senado (~0.55).",
+  "key_uncertainties": [
+   "Acuerdo de Hormuz",
+   "Correlación petróleo-Senado"
+  ],
+  "sources": [
+   "https://www.rigzone.com/news/why_is_the_wti_oil_price_rising_more_than_brent_intraday-20-oct-2026-184882-article",
+   "https://investinglive.com/commodities/oil-reverses-course-higher-after-us-and-houthi-attacks",
+   "https://www.schwab.com/learn/story/stock-market-update-open",
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.pollsmax.com/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5789186",
+  "p_yes": 0.38,
+  "confidence": "low",
+  "reasoning": "WTI ~$98-100,5; tocar $105 (+5%) antes del viernes 23 son ~4 ruedas, ~40% por barrera con vol alta.",
+  "key_uncertainties": [
+   "Precio actual incierto",
+   "Hormuz",
+   "Exención a Rusia"
+  ],
+  "sources": [
+   "https://www.rigzone.com/news/why_is_the_wti_oil_price_rising_more_than_brent_intraday-20-oct-2026-184882-article",
+   "https://investinglive.com/commodities/oil-reverses-course-higher-after-us-and-houthi-attacks",
+   "https://www.schwab.com/learn/story/stock-market-update-open"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554471",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "Según fuentes secundarias Kimi K3 (Moonshot) lidera los modelos chinos (~1500), seguido de DeepSeek V4 Pro (~1462) y Qwen 3.7 Max (~1455); Alibaba queda detrás.",
+  "key_uncertainties": [
+   "Fuentes secundarias contradictorias",
+   "Lanzamientos antes del 31-oct"
+  ],
+  "sources": [
+   "https://bestllmmodels.com/llm-leaderboard",
+   "https://shattered.io/kimi-k3-coding-leaderboard-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167206",
+  "p_yes": 0.74,
+  "confidence": "low",
+  "reasoning": "Escalada saudí-hutí en curso y Yemen descarta alto el fuego; un ataque directo saudí el 25-oct es probable.",
+  "key_uncertainties": [
+   "Alto el fuego o mediación",
+   "Atribución a fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.cbsnews.com/live-updates/iran-war-us-houthi-saudi-arabia-trump/",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4824602",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Promedio de encuestas: SNS 44.3% vs Lista Estudiantil 41.7%; la encuestadora oficialista da ventaja amplia a SNS y la independiente (junio) a los estudiantes. Una búsqueda mostró cuotas de mercado de predicción; las ignoré, pero puede haber anclaje.",
+  "key_uncertainties": [
+   "Dispersión entre encuestadoras",
+   "Anclaje por cuotas vistas",
+   "Garantías electorales"
+  ],
+  "sources": [
+   "https://politpro.eu/en/serbia/election/parliament/2026",
+   "https://www.bta.bg/en/news/balkans/1208852-poll-vucic-led-list-at-48-6-student-list-at-37-1-ahead-of-serbia-s-parliamen"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4951227",
+  "p_yes": 0.62,
+  "confidence": "low",
+  "reasoning": "WTI ~$98-100; tocar $105 (+5%) en ~8 ruedas es ~60% por barrera, apoyado por los ataques a petroleros en Hormuz.",
+  "key_uncertainties": [
+   "Precio actual incierto",
+   "Acuerdo de Hormuz"
+  ],
+  "sources": [
+   "https://www.rigzone.com/news/why_is_the_wti_oil_price_rising_more_than_brent_intraday-20-oct-2026-184882-article",
+   "https://investinglive.com/commodities/oil-reverses-course-higher-after-us-and-houthi-attacks",
+   "https://www.schwab.com/learn/story/stock-market-update-open"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5238401",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Hay dos portaaviones en la zona (Bush y Washington) y el Roosevelt va en camino, lo que podría dar tres de forma temporal; para el 30-nov la rotación probablemente deje dos, pero con mucha incertidumbre.",
+  "key_uncertainties": [
+   "Decisiones de despliegue",
+   "Rotaciones",
+   "Escalada con Irán"
+  ],
+  "sources": [
+   "https://www.twz.com/sea/where-are-the-aircraft-carriers-october-6-2026",
+   "https://thehill.com/policy/defense/6115812-uss-theodore-roosevelt-middle-east-bound-iran-war/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5611044",
+  "p_yes": 0.43,
+  "confidence": "low",
+  "reasoning": "Petróleo >= $80 el 2-nov es casi seguro (~0.95) y el Senado republicano ~0.45.",
+  "key_uncertainties": [
+   "Dispersión de los modelos del Senado",
+   "Acuerdo de Hormuz"
+  ],
+  "sources": [
+   "https://www.rigzone.com/news/why_is_the_wti_oil_price_rising_more_than_brent_intraday-20-oct-2026-184882-article",
+   "https://investinglive.com/commodities/oil-reverses-course-higher-after-us-and-houthi-attacks",
+   "https://www.schwab.com/learn/story/stock-market-update-open",
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.pollsmax.com/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5789188",
+  "p_yes": 0.42,
+  "confidence": "low",
+  "reasoning": "WTI ~$98-100; tocar $95 (-4/-5%) antes del viernes 23 son ~4 ruedas, ~45% por barrera con vol alta.",
+  "key_uncertainties": [
+   "Precio actual incierto",
+   "Exención a Rusia"
+  ],
+  "sources": [
+   "https://www.rigzone.com/news/why_is_the_wti_oil_price_rising_more_than_brent_intraday-20-oct-2026-184882-article",
+   "https://investinglive.com/commodities/oil-reverses-course-higher-after-us-and-houthi-attacks",
+   "https://www.schwab.com/learn/story/stock-market-update-open"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5237636",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "Ucrania atacó Moscú con drones cada pocos días en octubre (6, 13-14, 16 y 18). La probabilidad en un día dado es cercana a la mitad; 'dirigido a Moscú' puede ser ambiguo.",
+  "key_uncertainties": [
+   "Definición de 'Moscú'",
+   "Lulls entre ataques"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/10/6/ukraine-launches-major-drone-attack-on-russias-moscow-region-killing-two",
+   "https://www.euronews.com/2026/10/16/ukrainian-drones-force-closure-of-all-four-moscow-airports-overnight-cancelling-dozens-of-"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5611880",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "Petróleo por debajo de $85 el 2-nov requiere una caída de ~13-15% (~12%) y que los demócratas ganen el Senado (~0.55).",
+  "key_uncertainties": [
+   "Acuerdo de Hormuz",
+   "Correlación petróleo-Senado"
+  ],
+  "sources": [
+   "https://www.rigzone.com/news/why_is_the_wti_oil_price_rising_more_than_brent_intraday-20-oct-2026-184882-article",
+   "https://investinglive.com/commodities/oil-reverses-course-higher-after-us-and-houthi-attacks",
+   "https://www.schwab.com/learn/story/stock-market-update-open",
+   "https://votes.decisiondeskhq.com/forecast/2026",
+   "https://www.pollsmax.com/senate/"
+  ],
+  "prompt_version": "v1"
+ }
+]
