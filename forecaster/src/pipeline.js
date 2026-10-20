@@ -31,6 +31,12 @@ function loadState() {
   return { candidates, forecasts, decisions, resolutions, snapshots, resolved, lastForecastMid, portfolio: { openUsd, openByEvent } };
 }
 
+// Linea de supervision de una posicion paper (incluye precio de entrada y pago).
+function posicionLine(d) {
+  const gana = d.shares - d.stake_usd - d.fee_usd;
+  return `POSICION ${d.market_id} ${d.side} gastado=$${d.stake_usd.toFixed(2)} precio_medio=${d.avg_price.toFixed(3)} acciones=${d.shares.toFixed(2)} comision=$${d.fee_usd.toFixed(2)} si_gana=+$${gana.toFixed(2)} si_pierde=-$${(d.stake_usd + d.fee_usd).toFixed(2)}`;
+}
+
 async function runSelection(date = utcDate()) {
   const st = loadState();
   const c = config();
@@ -111,7 +117,8 @@ async function ingestForecasts() {
     if (d.action === 'comprar') {
       st.portfolio.openUsd += d.stake_usd;
       st.portfolio.openByEvent.set(market.event_id, (st.portfolio.openByEvent.get(market.event_id) || 0) + 1);
-      log(`PAPER compra ${d.side} ${id} $${d.stake_usd.toFixed(2)} (detalle de precios solo en /data, no en logs)`);
+      log(`PAPER compra ${d.side} ${id} $${d.stake_usd.toFixed(2)}`);
+      log(posicionLine({ ...d, market_id: id }));
     } else log(`PAPER omitido ${id}: ${d.reason}`);
     done.add(key);
     n++;
@@ -162,4 +169,4 @@ async function takeSnapshots(now = Date.now()) {
   return n;
 }
 
-module.exports = { loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
+module.exports = { posicionLine, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };

@@ -47,8 +47,7 @@ function logPosiciones() {
   const st = pipeline.loadState();
   for (const d of st.decisions) {
     if (d.action !== 'comprar' || st.resolved.has(d.market_id)) continue;
-    const gana = d.shares - d.stake_usd - d.fee_usd;
-    log(`POSICION ${d.market_id} ${d.side} gastado=$${d.stake_usd.toFixed(2)} precio_medio=${d.avg_price.toFixed(3)} acciones=${d.shares.toFixed(2)} comision=$${d.fee_usd.toFixed(2)} si_gana=+$${gana.toFixed(2)} si_pierde=-$${(d.stake_usd + d.fee_usd).toFixed(2)}`);
+    log(pipeline.posicionLine(d));
   }
 }
 
