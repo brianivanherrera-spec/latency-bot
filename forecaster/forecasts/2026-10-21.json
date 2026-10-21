@@ -1,0 +1,234 @@
+[
+ {
+  "market_id": "630806",
+  "p_yes": 0.37,
+  "confidence": "low",
+  "reasoning": "El-Sayed (D) lidera en los promedios por ~2.5-3.3 puntos y Marist lo pone 50-48; Cook lo ve como cara o cruz. Se estima ~63% D. Mi cálculo viene de las encuestas.",
+  "key_uncertainties": [
+   "Dispersión entre encuestas",
+   "Una búsqueda mostró cuotas de mercados; las ignoré pero puede haber anclaje"
+  ],
+  "sources": [
+   "https://www.pollsmax.com/senate/michigan/",
+   "https://fiftyplusone.news/polls/senate/general/michigan",
+   "https://www.cbsnews.com/detroit/news/michigan-voter-poll-abdul-el-sayed-mike-rogers/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5180417",
+  "p_yes": 0.14,
+  "confidence": "low",
+  "reasoning": "Nvidia sigue por delante de Apple (~$5.2-5.65T vs ~$4.9-5.0T); Apple necesitaría cerrar una brecha de ~5-12% en 8 ruedas.",
+  "key_uncertainties": [
+   "Fuentes con fechas distintas",
+   "Volatilidad de las tecnológicas"
+  ],
+  "sources": [
+   "https://www.fool.com/research/largest-companies-by-market-cap/",
+   "https://www.investingcube.com/deep-analysis/largest-companies-by-market-cap-in-2026-nvidia-leads-the-global-rankings/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554659",
+  "p_yes": 0.72,
+  "confidence": "low",
+  "reasoning": "Gemini 4 Argon (Google) lidera el Text Arena (~1524-1532), con Meta segundo ~15 puntos atrás y Claude Opus 5.5 tercero; el riesgo es un lanzamiento rival (p. ej. un Fable 5.5) antes del 31-oct.",
+  "key_uncertainties": [
+   "Lanzamientos antes del 31-oct",
+   "Fuentes agregadoras contradictorias"
+  ],
+  "sources": [
+   "https://llmrun.dev/benchmark/lmarena-text",
+   "https://benchlm.ai/llm-leaderboard-history"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167211",
+  "p_yes": 0.65,
+  "confidence": "low",
+  "reasoning": "Escalada saudí-hutí sin alto el fuego (el Reino Unido amplía su apoyo y EE.UU. evalúa unirse); a 9 días queda más incertidumbre por una posible mediación.",
+  "key_uncertainties": [
+   "Alto el fuego o mediación",
+   "Atribución a fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.chinadaily.com.cn/a/202610/21/WS6ad81580e4b06d4aa0563e99.html",
+   "https://www.cbsnews.com/live-updates/iran-war-us-trump-saudi-arabia-houthi/",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "629557",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "Acton (D) lidera en la mayoría de encuestas (Marist +7, CNN +8, NYT +4, BGSU +6) pero ActiVote y co/efficient dan ventaja a Ramaswamy; el promedio es ~+2.6 a +5 para Acton en un estado de inclinación republicana.",
+  "key_uncertainties": [
+   "Dispersión entre encuestas",
+   "Inclinación republicana de Ohio",
+   "La búsqueda devolvió cuotas de mercados de predicción; las ignoré deliberadamente, pero puede haber sesgo de anclaje"
+  ],
+  "sources": [
+   "https://maristpoll.marist.edu/polls/midterm-elections-in-ohio-october-2026/",
+   "https://www.pollsmax.com/governor/ohio/",
+   "https://www.activote.net/polls/2026/oh-governor/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5180413",
+  "p_yes": 0.84,
+  "confidence": "low",
+  "reasoning": "Nvidia lidera por ~5-12% sobre Apple; Alphabet y Microsoft están más lejos.",
+  "key_uncertainties": [
+   "Fuentes con fechas distintas"
+  ],
+  "sources": [
+   "https://www.fool.com/research/largest-companies-by-market-cap/",
+   "https://www.investingcube.com/deep-analysis/largest-companies-by-market-cap-in-2026-nvidia-leads-the-global-rankings/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4418916",
+  "p_yes": 0.92,
+  "confidence": "medium",
+  "reasoning": "En la tabla de edición de imagen de Arena (19-oct) OpenAI ocupa los tres primeros puestos (GPT-Image-2.5 Sunburst ~1514), con el mejor de Google quinto (~1426).",
+  "key_uncertainties": [
+   "Lanzamiento de un nuevo modelo rival antes del 31-oct",
+   "Fuentes agregadoras discrepan"
+  ],
+  "sources": [
+   "https://arena.ai/leaderboard/image-edit",
+   "https://www.swfte.com/ai/leaderboard"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167204",
+  "p_yes": 0.77,
+  "confidence": "low",
+  "reasoning": "Escalada saudí-hutí activa (la coalición confirmó ataques en Saná y el oeste de Yemen el martes); un ataque directo saudí el 23-oct es muy probable.",
+  "key_uncertainties": [
+   "Alto el fuego",
+   "Atribución a fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.chinadaily.com.cn/a/202610/21/WS6ad81580e4b06d4aa0563e99.html",
+   "https://www.cbsnews.com/live-updates/iran-war-us-trump-saudi-arabia-houthi/",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "634893",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Ricketts (R) lidera por ~1 punto en los promedios (FiftyPlusOne 46.7-45.6) y Sabato lo movió a 'Leans R'; Osborn tiene una chance real pero Nebraska es un estado republicano.",
+  "key_uncertainties": [
+   "Encuestas muy parejas",
+   "Gasto republicano creciente"
+  ],
+  "sources": [
+   "https://fiftyplusone.news/polls/senate/general/nebraska",
+   "https://www.pollsmax.com/senate/nebraska/",
+   "https://decisiondeskhq.substack.com/p/nebraska-senate-independent-dan-osborn-pete-ricketts"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5743142",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "WTI ~$99.4 (Brent ~$110) con ataques a petroleros en Hormuz; tocar $95 (-4.4%) en ~7 ruedas es ~60% por barrera, pero el impulso alcista y las minas lo reducen. Un acuerdo de Hormuz es la cola a la baja.",
+  "key_uncertainties": [
+   "Acuerdo de Hormuz",
+   "Fecha de creación desconocida"
+  ],
+  "sources": [
+   "https://www.hngn.com/articles/273562/20261021/brent-tops-110-five-month-high-hormuz-mines-reprice-oil-before-midterms.htm",
+   "https://www.kitco.com/news/article/2026-10-20/gold-pressured-despite-falling-yields-hormuz-diplomacy-sparks-oil-price"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219323",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "Fable 5.5 (cuenta como 5.2+) aparece en el catálogo de Azure y The Information dice que Anthropic lanzará un modelo este mes, pero no hay fecha oficial; acertar el 23-oct es poco probable. No tengo información interna.",
+  "key_uncertainties": [
+   "Filtraciones sin confirmar",
+   "Día exacto",
+   "Podría ser un Opus y no un Fable"
+  ],
+  "sources": [
+   "https://explainx.ai/blog/claude-fable-5-5-partner-access-azure-listing-claimed-vs-verified-2026",
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5645625",
+  "p_yes": 0.28,
+  "confidence": "low",
+  "reasoning": "PortWatch cuenta ~3-4 tránsitos por día en Hormuz (4 el 18-oct, 2 el 11-oct), o sea ~21-28 en la semana; el tramo 25-29 queda en el borde alto.",
+  "key_uncertainties": [
+   "Rezago de publicación",
+   "Solo cuenta barcos con AIS",
+   "Eventos en Hormuz"
+  ],
+  "sources": [
+   "https://straits.live/briefs/2026-10-21",
+   "https://houseofsaud.com/hormuz-mine-blockade-supertankers/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5686982",
+  "p_yes": 0.8,
+  "confidence": "low",
+  "reasoning": "Trump se comprometió a no atacar antes de las elecciones del 3-nov y la calma se mantiene, aunque Hegseth y Netanyahu hablan de reanudar los combates. Para resolver No hace falta un ataque aéreo o de misiles de EE.UU. sobre territorio iraní.",
+  "key_uncertainties": [
+   "La calma está cerca del 'punto de quiebre'",
+   "Ataques de Irán en Hormuz"
+  ],
+  "sources": [
+   "https://gulfnews.com/uae/us-israel-iran-war-lull-nears-breaking-point-us-israel-weighing-new-strikes-what-to-know-oct-20-2026-1.500716736",
+   "https://www.cbsnews.com/live-updates/iran-war-us-trump-talks-russia-strait-of-hormuz/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4951227",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "WTI ~$99.4 con Brent en $110 por las minas en Hormuz; tocar $105 (+5.5%) en ~7 ruedas es ~55% por barrera con vol alta.",
+  "key_uncertainties": [
+   "Acuerdo de Hormuz",
+   "Precio actual incierto"
+  ],
+  "sources": [
+   "https://www.hngn.com/articles/273562/20261021/brent-tops-110-five-month-high-hormuz-mines-reprice-oil-before-midterms.htm",
+   "https://www.kitco.com/news/article/2026-10-20/gold-pressured-despite-falling-yields-hormuz-diplomacy-sparks-oil-price"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219326",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "Mismo caso que el 23-oct: lanzamiento probable este mes pero sin fecha; el lunes 26-oct es un día posible entre varios.",
+  "key_uncertainties": [
+   "Filtraciones sin confirmar",
+   "Día exacto"
+  ],
+  "sources": [
+   "https://explainx.ai/blog/claude-fable-5-5-partner-access-azure-listing-claimed-vs-verified-2026",
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/"
+  ],
+  "prompt_version": "v1"
+ }
+]
