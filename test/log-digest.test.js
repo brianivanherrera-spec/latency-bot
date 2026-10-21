@@ -54,6 +54,10 @@ d.observe('info', 'SERIE', `[SERIE eth5m] ${mkt} | ganó DOWN | strike $2500.00 
 d.observe('info', 'SERIE', `[SERIE eth15m] ${mkt} | ganó UP | strike $2500.00 | 900 muestras (899 con modelo; REST p50 80 ms`);
 d.observe('info', 'BACKTEST', '[BACKTEST-B-HIPOTESIS] (i) n=16 …');
 d.observe('warn', 'RTDS', 'Alta latencia: 900ms');
+d.observe('warn', 'POLY-WS', 'Reconectando en 1000ms...');
+d.observe('warn', 'CHAINLINK-SPOT', '[SPOT] Desconectado (1006). Reconectando...');
+d.observe('warn', 'BINANCE-WS', 'Coinbase desconectado (1006). Reconectando en 1000ms...');
+d.observe('warn', 'MAIN', '[PAPER] ⚠️ Sin fill: ask $0.80 > precio de orden $0.77');
 d.observe('warn', 'FOO', 'algo raro 1 pasó');
 d.observe('warn', 'FOO', 'algo raro 2 pasó');
 d.observe('error', 'MAIN', '[ERROR] se rompió algo');
@@ -85,10 +89,11 @@ has(s1, 'LOOP 2 min: retraso WS p99 máx 1200 ms, máx 3500 ms; lag p99 máx 60 
 has(c1, 'B15 ETH: intentos 1, llenadas 1, 1-0 +$3.06; total +$3.06 (1-0), intentos 1, llenadas 1, abiertas 0', 'cuenta B15 de ETH aparte');
 ok(c1.indexOf('B15: ') < c1.indexOf('B15 ETH: '), 'B15 de BTC primero');
 has(s1, 'SERIE btc15m 1, eth15m 1 (0 con modelo 0), eth5m 1 (0 con modelo 1), 429 0; corrió backtest sí, ejecución no', 'series y corridas');
-has(s1, 'WARN 10, ERROR 1', 'conteo de WARN/ERROR');
+has(s1, 'WARN 14, ERROR 1', 'conteo de WARN/ERROR');
 has(s1, '×2 "[FOO] algo raro 1 pasó"', 'WARN desconocidos agrupados');
 has(s1, 'ERROR ×1 "[MAIN] [ERROR] se rompió algo"', 'ERROR en otros');
 ok(!s1.includes('Alta latencia') && !s1.includes('code=1013'), 'los WARN conocidos no van a otros');
+ok(!/Reconectando en 1000ms|SPOT\] Desconectado|Coinbase desconectado|Sin fill/.test(s1), 'las reconexiones de rutina tampoco');
 
 // Segunda ventana: vacía, la base del B pasa al último Balance B
 d.observe('info', 'PAPER-B', bal('+$21.63', 49, 35, 96, 84, '+$7.10', 45, 34, '+$10.01', 42, 31, 1).slice('[PAPER-B] '.length));

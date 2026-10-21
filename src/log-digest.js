@@ -64,6 +64,10 @@ const KNOWN = [
   /\[WATCHDOG\] (atrasada|muda|top viejo):/, /reconexión por atraso en pausa/, /\[POLYBOLT\] Sin datos/,
   /\[WATCHDOG\] (Binance|Coinbase) .*reconectando/, /\[STALE-GUARD\]/, /distinto hace 3 s/,
   /WS2 \(medición\) desconectada/, /\[STRIKE\] /, /\[SKIP\] /,
+  // Reconexiones de rutina que salían en "otros" todas las horas (21/10): el WS de Polymarket, el RTDS/spot de
+  // Chainlink, PolyBolt, Coinbase, y el "sin fill" de A en paper
+  /\[POLY-WS\] Reconectando en \d+ms/, /\[(RTDS|SPOT)\] Desconectado \((1001|1006)\)\. Reconectando/,
+  /\[POLYBOLT\] Desconectado \((1001|1006)\)/, /Coinbase desconectado \((1001|1006)\)/, /\[PAPER\] ⚠️ Sin fill:/,
 ];
 
 const B15_LABEL = { btc15m: 'B15', eth15m: 'B15 ETH' };
