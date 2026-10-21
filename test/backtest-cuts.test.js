@@ -8,7 +8,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { load, firstFire, fairLimitOf, normInv, blendP, fireRecords, cutStats, makerExec } = require('../scripts/backtest');
+const { load, firstFire, fairLimitOf, normInv, blendP, fireRecords, cutStats, cutStats2, makerExec } = require('../scripts/backtest');
 const { normCdf } = require('../src/fair-value');
 
 const FEE = 0.072, fee = p => FEE * p * (1 - p);
@@ -124,6 +124,13 @@ function oldMarket(start) {
   assert.deepStrictEqual(c.sat.map(x => x.n), [1, 2]);
   assert.deepStrictEqual(c.trend.map(x => x.n), [1, 2, 0, 0], 'el ask bajó 6¢ en una; en las otras quieto');
   near(c.edge[2].pnl, +rs.pnl.toFixed(2), 1e-9);
+  // Variables del 21/10: los tres a 100 s, ask $0.50, UP, 10 UTC, spread 1¢; el anterior de mSat (mTrend) ganó UP
+  // (a favor), el de mOff (mSat) ganó DOWN (en contra) y mTrend no tiene anterior
+  assert.deepStrictEqual([rt.sl, rt.ask, rt.side, rt.hour, rt.spread, rt.prevSame, rs.prevSame, ro.prevSame], [100, 0.5, 'UP', 10, 0.01, null, true, false]);
+  const c2 = cutStats2(recs);
+  assert.deepStrictEqual([c2.secs, c2.ask, c2.side, c2.hour, c2.spread, c2.prev].map(a => a.map(x => x.n)),
+    [[0, 0, 3], [0, 3, 0], [3, 0], [0, 3, 0, 0], [3, 0], [1, 1, 1]]);
+  assert.deepStrictEqual(c2.prev.map(x => x.wr), [0, 1, 1], 'a favor perdió (mSat), en contra ganó (mOff)');
   // Sin llenar no cuenta: un disparo cuyo ask salta 1 s después por encima del límite queda fuera de los cortes
   const jumpRec = { ...rt, filled: false };
   assert.deepStrictEqual([cutStats([jumpRec, rs]).fires, cutStats([jumpRec, rs]).n], [2, 1]);
@@ -151,5 +158,5 @@ function oldMarket(start) {
   assert.strictEqual(firstFire(mRise, bCfg).i, fr.i);
   assert.strictEqual(firstFire(mRise, { ...upCfg, blend: true }).i, fr.i, 'σ sobre el piso: con blend también entra');
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-cuts: 53 ok');
+  console.log('backtest-cuts: 56 ok');
 })().catch(err => { console.error(err); process.exit(1); });

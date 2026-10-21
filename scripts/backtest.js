@@ -321,8 +321,10 @@ function fairLimitExec(markets, cfg, margin, cap) {
 // Disparos de una regla anclada con el fill del límite justo (como B en vivo) y sus rasgos al disparar: ventaja
 // anclada neta de comisión, σ corta del modelo (sin el ×1.4), P del modelo del lado comprado y cuánto se movió el
 // ask de ese lado en los 3 s previos. Sirve para ver de qué disparos sale la ganancia (o la pérdida) de la regla.
+// También (variables del 21/10): segundos restantes, ask, lado, hora UTC de inicio del mercado, spread del lado
+// comprado y si el mercado anterior de la serie (5 o 15 min antes) terminó para el mismo lado.
 function fireRecords(markets, cfg, margin, cap) {
-  const out = [];
+  const out = [], winnerAt = new Map(markets.map(m => [m.start, m.winner]));
   for (const mk of markets) {
     const f = firstFire(mk, cfg);
     if (!f) continue;
@@ -330,9 +332,12 @@ function fireRecords(markets, cfg, margin, cap) {
     const prev = R[f.i - 3], a3 = prev ? (f.side === 'UP' ? prev.ya : prev.na) : null;
     const L = fairLimitOf(f, mk, cfg, margin, cap), a2 = f.ask2 ?? f.ask;
     const price = Math.max(f.ask, a2), win = f.side === mk.winner, ps = (win ? 1 - price : -price) - fee(price);
+    const bid = f.side === 'UP' ? r.yb : r.nb, prevWinner = winnerAt.get(mk.start - 300000) ?? winnerAt.get(mk.start - 900000);
     out.push({ filled: a2 <= L + 1e-9, win, price, ps, pnl: Math.floor(STAKE / L) * ps,
       edge: (f.side === 'UP' ? pj : 1 - pj) - f.ask - fee(f.ask), sigS: r.sigS ?? null,
-      pModel: f.side === 'UP' ? r.p : 1 - r.p, trend: a3 != null ? +(f.ask - a3).toFixed(4) : null });
+      pModel: f.side === 'UP' ? r.p : 1 - r.p, trend: a3 != null ? +(f.ask - a3).toFixed(4) : null,
+      sl: r.sl, ask: f.ask, side: f.side, hour: new Date(mk.start).getUTCHours(),
+      spread: bid != null ? +(f.ask - bid).toFixed(4) : null, prevSame: prevWinner ? prevWinner === f.side : null });
   }
   return out;
 }
@@ -347,6 +352,20 @@ function cutStats(recs, floorE6 = SIGMA_FLOOR_E6) {
     sat: [g(x => x.pModel >= 0.99), g(x => x.pModel < 0.99)],
     trend: [g(x => x.trend != null && x.trend <= -0.02 + 1e-9), g(x => x.trend != null && Math.abs(x.trend) < 0.02 - 1e-9),
       g(x => x.trend != null && x.trend >= 0.02 - 1e-9), g(x => x.trend == null)] };
+}
+// Las mismas llenadas por las variables del 21/10: segundos restantes (30-60, 60-90, 90-120), ask (< $0.45,
+// $0.45-0.55, > $0.55), lado, franja UTC del inicio (00-08 Asia, 08-13 Europa, 13-21 EE.UU., 21-24), spread del lado
+// comprado (1¢ o ≥ 2¢) y mercado anterior a favor / en contra / sin dato
+function cutStats2(recs) {
+  const f = recs.filter(x => x.filled);
+  const g = pred => { const a = f.filter(pred); return { ...groupStat(a), pnl: +a.reduce((s, x) => s + x.pnl, 0).toFixed(2) }; };
+  return { fires: recs.length, n: f.length,
+    secs: [g(x => x.sl < 60), g(x => x.sl >= 60 && x.sl < 90), g(x => x.sl >= 90)],
+    ask: [g(x => x.ask < 0.45 - 1e-9), g(x => x.ask >= 0.45 - 1e-9 && x.ask <= 0.55 + 1e-9), g(x => x.ask > 0.55 + 1e-9)],
+    side: [g(x => x.side === 'UP'), g(x => x.side === 'DOWN')],
+    hour: [g(x => x.hour < 8), g(x => x.hour >= 8 && x.hour < 13), g(x => x.hour >= 13 && x.hour < 21), g(x => x.hour >= 21)],
+    spread: [g(x => x.spread != null && x.spread <= 0.01 + 1e-9), g(x => x.spread != null && x.spread > 0.01 + 1e-9)],
+    prev: [g(x => x.prevSame === true), g(x => x.prevSame === false), g(x => x.prevSame == null)] };
 }
 // Variante maker de una regla anclada: en vez de pagar el ask deja una compra límite y espera. Precio: 'near' = 1¢
 // debajo del ask y como poco el bid (con 1¢ de spread se suma al bid); 'deep' = 3¢ debajo del ask. Llena si en un
@@ -532,7 +551,7 @@ function evGrid(markets) {
 }
 
 module.exports = { load, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
-  normInv, blendP, fireRecords, cutStats, makerExec };
+  normInv, blendP, fireRecords, cutStats, cutStats2, makerExec };
 if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
@@ -671,6 +690,7 @@ if (require.main === module) (async () => {
     const fl = (mks, cfg) => fairLimitExec(mks, cfg, bMargin);
     report.paperBParts = { floorE6: SIGMA_FLOOR_E6,
       cuts: { all: cutStats(fireRecords(markets, bCfg, bMargin)), test: cutStats(fireRecords(test, bCfg, bMargin)) },
+      cuts2: { all: cutStats2(fireRecords(markets, bCfg, bMargin)), test: cutStats2(fireRecords(test, bCfg, bMargin)) },
       blend: { markets: sigSet.size,
         blend: { all: fl(sub(markets), blendCfg), test: fl(sub(test), blendCfg), holdout: fl(sub(bMk), blendCfg) },
         short: { all: fl(sub(markets), bCfg), test: fl(sub(test), bCfg), holdout: fl(sub(bMk), bCfg) },
@@ -688,7 +708,13 @@ if (require.main === module) (async () => {
     // solo con mercados desde HIPOTESIS4_DESDE (el arranque en que se registró) y con la misma vara (z ≥ 2, ≥ 30 llenadas)
     const h4From = Date.parse(process.env.HIPOTESIS4_DESDE || '2026-10-16T03:24:00Z'), h4Mk = markets.filter(m => m.start >= h4From);
     const c15 = { ...bCfg, e: 0.15 };
-    report.paperBHyp4 = { from: new Date(h4From).toISOString(), markets: h4Mk.length, hold: fl(h4Mk, c15), base: fl(h4Mk, bCfg), all: fl(markets, c15) }; }
+    report.paperBHyp4 = { from: new Date(h4From).toISOString(), markets: h4Mk.length, hold: fl(h4Mk, c15), base: fl(h4Mk, bCfg), all: fl(markets, c15) };
+    // Hipótesis (vi), registrada el 21/10 (pedido del usuario: buscar filtros en 5 min): en [BACKTEST-B-CORTES] el único
+    // tramo positivo fue ventaja ≥ 25 pts (todos n=41 +17¢ z 2,23; test 6-1). B solo con ventaja ≥ 25 pts; se juzga con
+    // mercados desde HIPOTESIS6_DESDE y la misma vara (z ≥ 2, ≥ 30 llenadas)
+    const h6From = Date.parse(process.env.HIPOTESIS6_DESDE || '2026-10-21T13:00:00Z'), h6Mk = markets.filter(m => m.start >= h6From);
+    const c25 = { ...bCfg, e: 0.25 };
+    report.paperBHyp6 = { from: new Date(h6From).toISOString(), markets: h6Mk.length, hold: fl(h6Mk, c25), base: fl(h6Mk, bCfg), all: fl(markets, c25) }; }
   fs.writeFileSync(OUT, JSON.stringify(report));
   const b = report.baseline.all, best = top[0];
   const fam = (f) => { const t = f.top[0]; return t ? `mejor train ${JSON.stringify(t.cfg)} n=${t.train.n} EV/acc=${t.train.evPerShare} → test n=${t.test.n} EV/acc=${t.test.evPerShare} z=${t.test.z}` : 'sin reglas con n ≥ 30'; };
@@ -729,6 +755,9 @@ if (require.main === module) (async () => {
     const cut = c => `ventaja 8-15 pts ${sd(c.edge[0])} | 15-25 ${sd(c.edge[1])} | ≥ 25 ${sd(c.edge[2])} || σ corta < piso del modo blend (${f6}e-6) ${sd(c.sigma[0])} | ≥ piso ${sd(c.sigma[1])}${c.sigma[2].n ? ` | sin σ ${c.sigma[2].n}` : ''} || P del modelo ≥ 99 % ${sd(c.sat[0])} | < 99 % ${sd(c.sat[1])} || ask del lado comprado en los 3 s previos: bajó ≥ 2¢ ${sd(c.trend[0])} | estable ${sd(c.trend[1])} | subió ≥ 2¢ ${sd(c.trend[2])}`;
     console.log(`[BACKTEST-B-CORTES] regla de la cuenta B con límite justo (margen ${Math.round(bMargin * 100)}, como en vivo), llenadas: todos (${P.cuts.all.n} de ${P.cuts.all.fires} disparos): ${cut(P.cuts.all)}`);
     console.log(`[BACKTEST-B-CORTES] test (${P.cuts.test.n} de ${P.cuts.test.fires} disparos): ${cut(P.cuts.test)}`);
+    const cut2 = c => `segundos restantes 30-60 ${sd(c.secs[0])} | 60-90 ${sd(c.secs[1])} | 90-120 ${sd(c.secs[2])} || ask < $0.45 ${sd(c.ask[0])} | $0.45-0.55 ${sd(c.ask[1])} | > $0.55 ${sd(c.ask[2])} || UP ${sd(c.side[0])} | DOWN ${sd(c.side[1])} || hora UTC 00-08 ${sd(c.hour[0])} | 08-13 ${sd(c.hour[1])} | 13-21 ${sd(c.hour[2])} | 21-24 ${sd(c.hour[3])} || spread 1¢ ${sd(c.spread[0])} | ≥ 2¢ ${sd(c.spread[1])} || mercado anterior a favor ${sd(c.prev[0])} | en contra ${sd(c.prev[1])}${c.prev[2].n ? ` | sin dato ${c.prev[2].n}` : ''}`;
+    console.log(`[BACKTEST-B-CORTES2] regla de la cuenta B, llenadas por variables nuevas (21/10): todos (${P.cuts2.all.n}): ${cut2(P.cuts2.all)}`);
+    console.log(`[BACKTEST-B-CORTES2] test (${P.cuts2.test.n}): ${cut2(P.cuts2.test)}`);
     const B = P.blend, fb = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl} (disparos ${x.fires})`;
     console.log(`[BACKTEST-B-BLEND] regla de la cuenta B con FAIR_SIGMA_MODE=blend (σ = √(0.25σc² + 0.75σl²), piso ${f6}e-6; recalculada en ${B.markets} mercados con las dos σ grabadas; límite justo margen ${Math.round(bMargin * 100)}): todos ${fb(B.blend.all)} | test ${fb(B.blend.test)} | fuera de muestra desde ${report.paperB.from.slice(0, 10)} ${fb(B.blend.holdout)} || modelo actual en esos mercados: todos ${fb(B.short.all)} | test ${fb(B.short.test)} | fuera de muestra ${fb(B.short.holdout)} || con blend, por ventaja: 8-15 pts ${sd(B.cutsBlend.edge[0])} | 15-25 ${sd(B.cutsBlend.edge[1])} | ≥ 25 ${sd(B.cutsBlend.edge[2])}`);
     const mx = x => `disparos ${x.fires}, llenadas ${x.n} (${x.fires ? Math.round(x.n / x.fires * 100) : 0} %), canceladas ${x.canc}, WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
@@ -736,6 +765,8 @@ if (require.main === module) (async () => {
     console.log(`[BACKTEST-B-HIPOTESIS] fuera de muestra desde ${H.from.slice(0, 16).replace('T', ' ')} UTC (${H.markets} mercados; límite justo margen ${Math.round(bMargin * 100)}; se adopta en paper con z ≥ 2 y ≥ 30 llenadas acá): ${H.variants.map(v => `${v.label}: ${hx(v.hold)}`).join(' | ')} || todos los datos (con los que se eligió, solo referencia): ${H.variants.map(v => `${v.label.split(' ')[0]} ${hx(v.all)}`).join(' | ')}`);
     const H4 = report.paperBHyp4;
     console.log(`[BACKTEST-B-HIPOTESIS] (iv) ventaja ≥ 15 pts, fuera de muestra desde ${H4.from.slice(0, 16).replace('T', ' ')} UTC (${H4.markets} mercados; se adopta en paper con z ≥ 2 y ≥ 30 llenadas acá): ${hx(H4.hold)} | B como está en esos mercados: ${hx(H4.base)} || todos los datos (con los que se eligió, solo referencia): ${hx(H4.all)}`);
+    const H6 = report.paperBHyp6;
+    console.log(`[BACKTEST-B-HIPOTESIS] (vi) ventaja ≥ 25 pts, fuera de muestra desde ${H6.from.slice(0, 16).replace('T', ' ')} UTC (${H6.markets} mercados; se adopta en paper con z ≥ 2 y ≥ 30 llenadas acá): ${hx(H6.hold)} | B como está en esos mercados: ${hx(H6.base)} || todos los datos (con los que se eligió, solo referencia): ${hx(H6.all)}`);
     console.log(`[BACKTEST-B-MAKER] regla de la cuenta B como maker (compra límite sin comisión; se cancela si el precio justo anclado baja de la orden; llena si el ask baja hasta la orden antes de los últimos 10 s): ${P.maker.map(m => `${m.mode === 'near' ? '1¢ debajo del ask (o en el bid)' : '3¢ debajo del ask'}: todos ${mx(m.all)} | test ${mx(m.test)} | fuera de muestra ${mx(m.holdout)}`).join(' || ')}`); }
   { const t = report.trend2h, sd3 = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare}`;
     const ln = (lab, x) => `[BACKTEST-TEND2H] ${lab}: a favor ${sd3(x.fav)} | neutra ${sd3(x.neu)} | en contra ${sd3(x.against)} | a favor − en contra ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}${x.noData ? ` | sin dato de 2 h: ${x.noData}` : ''}`;

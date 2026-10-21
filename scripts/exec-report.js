@@ -64,7 +64,8 @@ function noFillReason(f) {
   return String(f.rejection_reason || f.order_status || 'desconocido').slice(0, 60);
 }
 
-function buildReport({ fills, signals, markets, since = null }) {
+// hypFrom: desde cuándo se juzga la hipótesis (vii) de A (sin perseguir), registrada el 21/10
+function buildReport({ fills, signals, markets, since = null, hypFrom = Date.parse(process.env.HIPOTESIS_A_DESDE || '2026-10-21T13:00:00Z') }) {
   const sigById = new Map(signals.filter(s => s.posId).map(s => [s.posId, s]));
   const winnerOf = winnerFinder(markets);
   const report = { generatedAt: new Date().toISOString(), since, modes: {} };
@@ -140,6 +141,14 @@ function buildReport({ fills, signals, markets, since = null }) {
       const pnlOf = g => r4(g.reduce((a, r) => a + (r.pnl || 0), 0));
       out.competition = { n: mv.length, up: grp(up), same: grp(same), down: grp(down),
         pnlPaper: pnlOf(mv), pnlWithoutUp: pnlOf(mv.filter(r => !up.includes(r))) };
+      // Hipótesis (vii) de A, sin perseguir: no llenar cuando el ask subió en la demora. Se juzga solo con llenadas
+      // desde hypFrom; z del EV por acción de las que se sacarían (negativo = sacarlas ayuda). Se adopta en paper con
+      // ≥ 30 de esas llenadas y z ≤ −2
+      const hv = mv.filter(r => r.t >= hypFrom), hup = hv.filter(r => r.ask400 > r.decisionAsk + 1e-9);
+      const ev = hup.map(evOf), m = ev.length ? mean(ev) : null;
+      const sd = ev.length > 1 ? Math.sqrt(ev.reduce((a, x) => a + (x - m) ** 2, 0) / (ev.length - 1)) : null;
+      out.competition.hyp = { from: hypFrom, n: hv.length, up: grp(hup), z: sd ? r4(m / (sd / Math.sqrt(ev.length))) : null,
+        pnlPaper: pnlOf(hv), pnlWithoutUp: pnlOf(hv.filter(r => !hup.includes(r))) };
     }
     if (mode === 'live') {
       const k = R.filter(r => r.paperWouldFill != null);
@@ -167,6 +176,8 @@ function lines(report) {
     if (M.competition) {
       const k = M.competition, g = x => `${x.wins}-${x.n - x.wins} EV/acc ${c(x.evPerShare)}`;
       L.push(`[EJECUCION] ${tag} con competencia (n=${k.n}): llenadas con el ask subiendo en la demora (compradores adelante) ${g(k.up)} | igual ${g(k.same)} | bajando ${g(k.down)} || si no llenaran las del ask subiendo: P&L $${k.pnlWithoutUp} (paper $${k.pnlPaper})`);
+      const h = k.hyp;
+      if (h) L.push(`[EJECUCION] ${tag} hipótesis (vii) de A sin perseguir (no llenar si el ask subió en la demora), fuera de muestra desde ${new Date(h.from).toISOString().slice(0, 16).replace('T', ' ')} UTC (n=${h.n}; se adopta en paper con ≥ 30 de las que saca y z ≤ −2): las que saca ${g(h.up)} z=${h.z ?? 'n/a'} | P&L paper $${h.pnlPaper} → sin esas $${h.pnlWithoutUp}`);
     }
     if (M.paperVsReal) { const p = M.paperVsReal; L.push(`[EJECUCION] REAL vs lo que habría dicho paper (n=${p.n}): paper llena ${pc(p.paperFillRate)}, real ${pc(p.realFillRate)} | ambos ${p.both}, solo paper ${p.paperOnly}, solo real ${p.realOnly}, ninguno ${p.neither}`); }
   }

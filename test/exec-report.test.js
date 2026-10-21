@@ -77,6 +77,12 @@ assert.strictEqual(P.competition.up.evPerShare, +((1 - 0.62) - FEE * 0.62 * 0.38
 assert.deepStrictEqual([P.competition.pnlPaper, P.competition.pnlWithoutUp], [-2.5, -4.9]);
 assert.ok(lines(rep).some(l => l.startsWith('[EJECUCION] PAPER con competencia (n=2)')), lines(rep).join('\n'));
 assert.strictEqual(L.competition, undefined, 'solo paper');
+// Hipótesis (vii) de A sin perseguir: con la fecha por defecto (21/10) las llenadas de la prueba quedan antes → n=0;
+// desde el principio, las mismas cuentas que la competencia
+assert.deepStrictEqual([P.competition.hyp.n, P.competition.hyp.up.n], [0, 0]);
+const PH = buildReport({ fills, signals, markets, hypFrom: 0 }).modes.paper.competition.hyp;
+assert.deepStrictEqual([PH.n, PH.up.n, PH.up.wins, PH.pnlPaper, PH.pnlWithoutUp, PH.z], [2, 1, 1, -2.5, -4.9, null]);
+assert.ok(lines(rep).some(l => l.startsWith('[EJECUCION] PAPER hipótesis (vii) de A sin perseguir')));
 // Corte por fecha
 assert.strictEqual(buildReport({ fills, signals, markets, since: END + 400_000 }).modes.live.attempts, 1);
-console.log('exec-report: 28 ok');
+console.log('exec-report: 31 ok');
