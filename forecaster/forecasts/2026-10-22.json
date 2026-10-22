@@ -1,0 +1,231 @@
+[
+ {
+  "market_id": "4824600",
+  "p_yes": 0.57,
+  "confidence": "low",
+  "reasoning": "Promedio de encuestas: SNS 45.0% vs Lista Estudiantil 42.5% (120 vs 113 bancas), pero NSPM del 20-oct pone a los estudiantes 44.5-42.7 y CRTA (junio) +9; la oficialista Faktor Plus da ventaja amplia a SNS. Incertidumbre alta; leve ventaja SNS.",
+  "key_uncertainties": [
+   "Dispersión entre encuestadoras",
+   "18% de indecisos",
+   "Garantías electorales"
+  ],
+  "sources": [
+   "https://www.intellinews.com/serbia-s-student-list-leads-ruling-party-in-new-poll-ahead-of-election-477469/",
+   "https://politpro.eu/en/serbia/election/parliament/2026",
+   "https://vreme.com/en/vesti/istrazivanje-nspm-studentska-lista-aleksandar-vucic-izbori/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219279",
+  "p_yes": 0.58,
+  "confidence": "low",
+  "reasoning": "En 2025 la UE tenía ~39 Mt de diésel de emergencia; hubo liberaciones en marzo y se discute otra de ~6.7 Mt, aún sin decidir y condicionada a un compromiso de EE.UU. Sin el dato de 2026, depende de si se libera antes de fin de octubre.",
+  "key_uncertainties": [
+   "No conozco el nivel actual",
+   "Liberación en octubre",
+   "Dato se publica ~3 meses después"
+  ],
+  "sources": [
+   "https://www.euronews.com/2026/10/02/can-releasing-more-of-europes-emergency-reserves-bring-diesel-prices-down",
+   "https://www.bnnbloomberg.ca/markets/oil/2026/10/02/europe-weighs-new-diesel-stocks-release-after-us-pressure-reuters-sources-say/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554950",
+  "p_yes": 0.85,
+  "confidence": "medium",
+  "reasoning": "Claude Fable 5.1 lidera LiveBench general (88.0) frente a Opus 5.5 (86.5) y GPT-6 Astra (86.1); el riesgo es un lanzamiento rival antes del 31-oct.",
+  "key_uncertainties": [
+   "Lanzamientos antes del 31-oct",
+   "Fuentes espejo con cifras distintas"
+  ],
+  "sources": [
+   "https://livebench.ai/",
+   "https://aiproleague.com/benchmarks/livebench/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167211",
+  "p_yes": 0.65,
+  "confidence": "low",
+  "reasoning": "Escalada saudí-hutí sin alto el fuego; a 8 días hay algo más de incertidumbre por una posible mediación.",
+  "key_uncertainties": [
+   "Alto el fuego o mediación",
+   "Atribución a fuerzas saudíes"
+  ],
+  "sources": [
+   "https://www.cbsnews.com/live-updates/iran-war-us-trump-saudi-arabia-houthi/",
+   "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630805",
+  "p_yes": 0.62,
+  "confidence": "low",
+  "reasoning": "El-Sayed (D) lidera los promedios por ~2.5-3.3 puntos y Cook lo ve cara o cruz; se estima ~62% D.",
+  "key_uncertainties": [
+   "Dispersión entre encuestas",
+   "Debates"
+  ],
+  "sources": [
+   "https://www.pollsmax.com/senate/michigan/",
+   "https://fiftyplusone.news/polls/senate/general/michigan"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936079",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "Oro ~$4,082 tras cuatro caídas seguidas por inflación y expectativas de suba de tasas; tocar $4,000 (-2%) en ~7 ruedas es ~60% por barrera.",
+  "key_uncertainties": [
+   "Fecha de creación del mercado",
+   "Cambios en expectativas de tasas"
+  ],
+  "sources": [
+   "https://tradingeconomics.com/commodity/gold",
+   "https://www.fxstreet.com/news/silver-price-today-silver-falls-according-to-fxstreet-data-202610220930"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554548",
+  "p_yes": 0.86,
+  "confidence": "medium",
+  "reasoning": "Claude Opus 5.5 (max) lidera Code Arena WebDev (~1807 vs GPT-6 Astra ~1774) y Anthropic ocupa también el 3.º y 5.º puesto. Una búsqueda mostró cuotas de mercado de predicción; las ignoré, pero puede haber anclaje.",
+  "key_uncertainties": [
+   "Lanzamiento rival antes del 31-oct",
+   "Anclaje por cuotas vistas"
+  ],
+  "sources": [
+   "https://www.benchleader.com/benchmarks/lmarena_webdev",
+   "https://codelifter.com/models/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5645625",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "PortWatch cuenta ~2-4 tránsitos por día en Hormuz (4 el 18-oct), o sea ~21-28 en la semana; el tramo 25-29 queda en el borde alto. Aún no hay datos del 19-21.",
+  "key_uncertainties": [
+   "Rezago de publicación",
+   "Solo AIS",
+   "Eventos en Hormuz"
+  ],
+  "sources": [
+   "https://straits.live/briefs/2026-10-22",
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-strait-of-hormuz"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "634893",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Ricketts (R) lidera por ~1 punto en los promedios y Sabato lo ve 'Leans R'; Osborn tiene chance real pero es un estado republicano.",
+  "key_uncertainties": [
+   "Encuestas muy parejas"
+  ],
+  "sources": [
+   "https://fiftyplusone.news/polls/senate/general/nebraska",
+   "https://www.pollsmax.com/senate/nebraska/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936081",
+  "p_yes": 0.08,
+  "confidence": "low",
+  "reasoning": "Oro ~$4,082; tocar $3,800 (-7%) en ~7 ruedas requiere ~1.7 desvíos, ~8% por barrera.",
+  "key_uncertainties": [
+   "Caída brusca de precios",
+   "Fecha de creación"
+  ],
+  "sources": [
+   "https://tradingeconomics.com/commodity/gold",
+   "https://www.fxstreet.com/news/silver-price-today-silver-falls-according-to-fxstreet-data-202610220930"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219326",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "Fable 5.5 (cuenta como 5.2+) aparece en Azure y The Information dice que Anthropic lanzará un modelo este mes, pero sin fecha oficial; el lunes 26-oct es un día posible entre varios. No tengo información interna.",
+  "key_uncertainties": [
+   "Filtraciones sin confirmar",
+   "Día exacto"
+  ],
+  "sources": [
+   "https://explainx.ai/blog/claude-fable-5-5-partner-access-azure-listing-claimed-vs-verified-2026",
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5238402",
+  "p_yes": 0.25,
+  "confidence": "low",
+  "reasoning": "Hay dos portaaviones en la zona (Bush y Washington) y el Roosevelt va en camino; para el 30-nov la rotación probablemente deje dos, con tres solo si se mantiene el refuerzo.",
+  "key_uncertainties": [
+   "Decisiones de despliegue",
+   "Rotaciones",
+   "Escalada con Irán"
+  ],
+  "sources": [
+   "https://www.twz.com/sea/where-are-the-aircraft-carriers-october-6-2026",
+   "https://thehill.com/policy/defense/6115812-uss-theodore-roosevelt-middle-east-bound-iran-war/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "634892",
+  "p_yes": 0.63,
+  "confidence": "low",
+  "reasoning": "Ricketts lidera por ~1 punto; complemento de la chance de Osborn.",
+  "key_uncertainties": [
+   "Encuestas muy parejas"
+  ],
+  "sources": [
+   "https://fiftyplusone.news/polls/senate/general/nebraska",
+   "https://www.pollsmax.com/senate/nebraska/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936097",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Plata ~$56-58 tras caer ~3.5% hoy; tocar $50 (-11 a -14%) en ~7 ruedas son ~1.5 desvíos, ~12% por barrera.",
+  "key_uncertainties": [
+   "Volatilidad alta de la plata",
+   "Fecha de creación"
+  ],
+  "sources": [
+   "https://tradingeconomics.com/commodity/gold",
+   "https://www.fxstreet.com/news/silver-price-today-silver-falls-according-to-fxstreet-data-202610220930"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166954",
+  "p_yes": 0.17,
+  "confidence": "low",
+  "reasoning": "El promedio de 7 días de PortWatch en Hormuz es ~3 tránsitos por día (4 el 18-oct); llegar a 5-10 el 31-oct requiere una reapertura parcial.",
+  "key_uncertainties": [
+   "Plan de reapertura de Irán",
+   "Solo AIS",
+   "Rezago de datos"
+  ],
+  "sources": [
+   "https://straits.live/briefs/2026-10-22",
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-strait-of-hormuz"
+  ],
+  "prompt_version": "v1"
+ }
+]
