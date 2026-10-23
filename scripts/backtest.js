@@ -530,11 +530,13 @@ function calibration(markets) {
 //    ese lado al ask con comisión (z contra el empate, como evaluate)
 //  - mix: peso w del modelo en logit(q) = (1−w)·logit(mid) + w·logit(p), elegido con el 60 % más viejo de los mercados;
 //    mejora del log-loss contra el precio solo en el 40 % nuevo (promedio por mercado, z). w = 0: el precio ya tiene todo
+// pField 'pAdj': lo mismo con el precio justo anclado de la regla de B (mid + lo que se movió el modelo desde el último
+// cambio del mid): mide si el movimiento que el libro todavía no reflejó informa, aunque el nivel del modelo no lo haga
 const CAL_POINTS = [1800, 900, 600, 300, 180, 120, 90, 60, 30, 10];
 const clampP = x => Math.min(0.999, Math.max(0.001, x));
 const logit = x => Math.log(x / (1 - x));
 const logLoss = (q, y) => -(y ? Math.log(q) : Math.log(1 - q));
-function calSamples(mk, maxSpread) {
+function calSamples(mk, maxSpread, pField = 'p') {
   const best = new Map();
   for (const r of mk.rows) {
     if (!r) continue;
@@ -546,13 +548,13 @@ function calSamples(mk, maxSpread) {
   const out = [];
   for (const c of CAL_POINTS) {
     const r = best.get(c);
-    if (!r || r.ya == null || r.yb == null || r.ya < r.yb || r.ya - r.yb > maxSpread + 1e-9) continue;
-    out.push({ c, r, p: clampP(r.p), mid: clampP((r.ya + r.yb) / 2) });
+    if (!r || r[pField] == null || r.ya == null || r.yb == null || r.ya < r.yb || r.ya - r.yb > maxSpread + 1e-9) continue;
+    out.push({ c, r, p: clampP(r[pField]), mid: clampP((r.ya + r.yb) / 2) });
   }
   return out;
 }
-function modelVsMarket(markets, { gap = 0.10, maxSpread = 0.10, trainFrac = 0.6, minN = 20 } = {}) {
-  const per = markets.map(mk => ({ mk, y: mk.winner === 'UP' ? 1 : 0, s: calSamples(mk, maxSpread) }));
+function modelVsMarket(markets, { gap = 0.10, maxSpread = 0.10, trainFrac = 0.6, minN = 20, pField = 'p' } = {}) {
+  const per = markets.map(mk => ({ mk, y: mk.winner === 'UP' ? 1 : 0, s: calSamples(mk, maxSpread, pField) }));
   const points = [];
   for (const c of CAL_POINTS) {
     let n = 0, bm = 0, bk = 0, sd = 0, sd2 = 0;
@@ -605,7 +607,7 @@ function modelVsMarket(markets, { gap = 0.10, maxSpread = 0.10, trainFrac = 0.6,
     mix[g] = { w: bestW, trainSamples: trainN, testMarkets: tn, gainPct: tn && lk ? +(m / (lk / tn) * 100).toFixed(2) : null,
       z: v > 0 ? +(m / Math.sqrt(v / tn)).toFixed(2) : null };
   }
-  return { markets: markets.length, gap, maxSpread, points, dis, mix };
+  return { markets: markets.length, pField, gap, maxSpread, points, dis, mix };
 }
 
 // EV real por franja de ask (0.05) × tiempo restante: comprar el lado a su ask en ese
@@ -667,6 +669,7 @@ if (require.main === module) (async () => {
     top,
     calibration: calibration(markets),
     modelVsMarket: modelVsMarket(markets),
+    modelVsMarketAnchored: modelVsMarket(markets, { pField: 'pAdj', gap: 0.05 }),
     evGrid: { train: evGrid(train), test: evGrid(test) },
     momentum: selectFamily(train, test, markets, gridMomentum()),
     anchored: selectFamily(train, test, markets, gridAnchored()),
@@ -878,6 +881,9 @@ if (require.main === module) (async () => {
       + `comprando ese lado al ask n=${d.buy.n} EV/acc=${d.buy.evPerShare ?? 'n/a'} z=${d.buy.z ?? 'n/a'} | peso del modelo w=${m.w.toFixed(2)} (elegido con el 60 % viejo; en el 40 % nuevo: ${gain(m)})`;
     console.log(`[BACKTEST-CALIBRACION] modelo contra mercado en ${V.markets} mercados, error cuadrático (Brier, menos es mejor; z > 0: el modelo acierta mejor que el precio): `
       + `${V.points.map(p => `${p.c} s n=${p.n} modelo ${p.model.toFixed(3)} mercado ${p.market.toFixed(3)} z=${p.z ?? 'n/a'}`).join(' | ') || 'sin datos'}`);
-    console.log(`[BACKTEST-CALIBRACION] ${dx('antes de los 120 s', V.dis.early, V.mix.early)} || ${dx('120-10 s', V.dis.final, V.mix.final)}`); }
+    console.log(`[BACKTEST-CALIBRACION] ${dx('antes de los 120 s', V.dis.early, V.mix.early)} || ${dx('120-10 s', V.dis.final, V.mix.final)}`);
+    const A = report.modelVsMarketAnchored, dxA = (label, d, m) => dx(label, d, m).replace(`≥ ${Math.round(V.gap * 100)} pts`, `≥ ${Math.round(A.gap * 100)} pts`);
+    console.log(`[BACKTEST-CALIBRACION] anclado (mid + lo que se movió el modelo desde el último cambio del mid, como la regla de B): Brier z por momento `
+      + `${A.points.map(p => `${p.c} s ${p.z ?? 'n/a'}`).join(', ') || 'sin datos'} || ${dxA('antes de los 120 s', A.dis.early, A.mix.early)} || ${dxA('120-10 s', A.dis.final, A.mix.final)}`); }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });
