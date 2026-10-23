@@ -5,7 +5,7 @@
  * ([LOOP] y [WS-DUAL] salen cada minuto), lee estas dos líneas por hora. Mira cada línea
  * que pasa por el Logger, cuenta eventos y guarda máximos; no cambia nada del bot.
  *
- *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B … | B15 (paper de BTC 15 min) … | B15 ETH (paper de ETH 15 min) …
+ *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B … | B15 (paper de BTC 15 min) … | B15 ETH (paper de ETH 15 min) … | B1H (paper de BTC horario) …
  *   [RESUMEN] salud HH:20-HH:20 UTC | reconexiones … | 1013 … | BOOK-CHECK … | LOOP … | WARN/ERROR …
  *
  * Sale a los :20 UTC de cada hora (el chequeo corre a los :22). LOG_DIGEST=off lo apaga.
@@ -49,6 +49,8 @@ const COUNTS = [
   ['eth0modelo', /\[SERIE eth5m\] .*muestras \(0 con modelo/],
   ['serieEth15m', /\[SERIE eth15m\] .* muestras/],
   ['eth15_0modelo', /\[SERIE eth15m\] .*muestras \(0 con modelo/],
+  ['serieBtc1h', /\[SERIE btc1h\] .* muestras/],
+  ['btc1h_0modelo', /\[SERIE btc1h\] .*muestras \(0 con modelo/],
   ['serie429', /respondió 429/],
   ['bookReal', /diferencia REAL/],
   ['backtest', /\[BACKTEST-B-HIPOTESIS\]/],
@@ -70,7 +72,7 @@ const KNOWN = [
   /\[POLYBOLT\] Desconectado \((1001|1006)\)/, /Coinbase desconectado \((1001|1006)\)/, /\[PAPER\] ⚠️ Sin fill:/,
 ];
 
-const B15_LABEL = { btc15m: 'B15', eth15m: 'B15 ETH' };
+const B15_LABEL = { btc15m: 'B15', eth15m: 'B15 ETH', btc1h: 'B1H' };
 
 class LogDigest {
   constructor(now = Date.now()) {
@@ -103,7 +105,7 @@ class LogDigest {
     const line = `[${prefix}] ${body}`;
     for (const [k, re] of COUNTS) if (re.test(line)) this.c[k]++;
     if (level === 'warn' || level === 'error') this._warnError(level, line);
-    if (line.includes('[PAPER-B15]')) this._b15(line);
+    if (line.includes('[PAPER-B15]') || line.includes('[PAPER-B1H]')) this._b15(line);
     else if (prefix === 'TRACKER') this._a(line);
     else if (prefix === 'PAPER-B') this._b(line);
     else if (prefix === 'LOOP') this._loop(line);
@@ -165,15 +167,15 @@ class LogDigest {
     let m;
     const id = /\[SERIE (\w+)\]/.exec(line)?.[1] || 'btc15m';
     const B = this.b15[id] || (this.b15[id] = { att: 0, fill: 0, w: 0, l: 0, pnl: 0, losses: [] });
-    if ((m = /\[PAPER-B15\] (WIN|LOSS) (UP|DOWN) (.+?) @ \$([\d.]+) ×\d+ → ([+−-])\$([\d.]+)/.exec(line))) {
+    if ((m = /\[PAPER-B(?:15|1H)\] (WIN|LOSS) (UP|DOWN) (.+?) @ \$([\d.]+) ×\d+ → ([+−-])\$([\d.]+)/.exec(line))) {
       const v = signed(m[5], m[6]);
       B.pnl += v;
       if (m[1] === 'WIN') B.w++; else { B.l++; if (B.losses.length < 8) B.losses.push(`${m[2]} ${m[3]} a $${m[4]} ${usd(v)}`); }
-    } else if (/\[PAPER-B15\] (UP|DOWN) .* s restantes/.test(line)) {
+    } else if (/\[PAPER-B(?:15|1H)\] (UP|DOWN) .* s restantes/.test(line)) {
       B.att++;
       if (/ → lleno a /.test(line)) B.fill++;
     }
-    if ((m = /Balance B15: ([+−-])\$([\d.]+) \((\d+)-(\d+)\), intentos (\d+), llenadas (\d+), sin fill (\d+), abiertas (\d+)/.exec(line))) {
+    if ((m = /Balance B(?:15|1H): ([+−-])\$([\d.]+) \((\d+)-(\d+)\), intentos (\d+), llenadas (\d+), sin fill (\d+), abiertas (\d+)/.exec(line))) {
       this.lastB15[id] = { pnl: signed(m[1], m[2]), w: +m[3], l: +m[4], attempts: +m[5], filled: +m[6], open: +m[8] };
     }
   }
@@ -242,7 +244,7 @@ class LogDigest {
       `strike ${S.n} (no chainlink ${S.notCl}, espera máx ${f(S.maxWait, 1)} s); sin TWAP salteado ${c.skipStrike}; PTB-CHECK ${P.n} (Δ≠0 ${P.nonZero}, máx RTDS ${f(P.maxRtds, 2)}, PolyBolt ${f(P.maxPb, 2)})`,
       `BOOK-CHECK ${K.n ? `mín ${f(K.min, 1)}% prom ${(K.sum / K.n).toFixed(1)}%` : 'n/a'}, diferencias REALES ${c.bookReal}`,
       `LOOP ${L.n} min: retraso WS p99 máx ${f(L.wsP99)} ms, máx ${f(L.wsMax)} ms; lag p99 máx ${f(L.lagP99)} ms; CPU máx ${f(L.cpu)}%; minutos fuera de umbral ${L.bad}`,
-      `SERIE btc15m ${c.serieBtc15m}, eth15m ${c.serieEth15m} (0 con modelo ${c.eth15_0modelo}), eth5m ${c.serieEth5m} (0 con modelo ${c.eth0modelo}), 429 ${c.serie429}; corrió backtest ${c.backtest ? 'sí' : 'no'}, ejecución ${c.ejecucion ? 'sí' : 'no'}`,
+      `SERIE btc15m ${c.serieBtc15m}, eth15m ${c.serieEth15m} (0 con modelo ${c.eth15_0modelo}), eth5m ${c.serieEth5m} (0 con modelo ${c.eth0modelo}), btc1h ${c.serieBtc1h} (0 con modelo ${c.btc1h_0modelo}), 429 ${c.serie429}; corrió backtest ${c.backtest ? 'sí' : 'no'}, ejecución ${c.ejecucion ? 'sí' : 'no'}`,
       `WARN ${this.warn}, ERROR ${this.error}; otros: ${top.length ? top.join('; ') : 'ninguno'}`];
     this.baseB = this.lastB;
     this._reset(now);

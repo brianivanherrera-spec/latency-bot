@@ -11,7 +11,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { twapFairUp, normCdf } = require('../src/fair-value');
-const { SeriesShadow, COLS, gammaPriceToBeat } = require('../src/series-shadow');
+const { SeriesShadow, COLS, gammaPriceToBeat, hourlySlugs } = require('../src/series-shadow');
 const { load, firstFire } = require('../scripts/backtest');
 
 const near = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) < tol, `${a} ≠ ${b}`);
@@ -273,7 +273,60 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   assert.deepStrictEqual([path.basename(se15.paper.file), se15.cur.slug, se15.paper.st.attempts],
     ['paper-b15-eth15m.json', `eth-updown-15m-${Q0 / 1000}`, 0], 'cuenta B15 de ETH 15 min aparte de la de BTC');
   fs.rmSync(dirE15, { recursive: true, force: true });
+  // 5) BTC horario (plan del 23/10): nombre del evento con la hora de Nueva York, el segundo candidato si el primero no
+  //    está en Gamma, cuenta B1H aparte y ganador de respaldo con la vela de Binance si Gamma no lo publica
+  assert.deepStrictEqual(hourlySlugs(Date.parse('2026-10-23T14:00:00Z')), ['bitcoin-up-or-down-october-23-10am-et', 'btc-updown-1h-1792764000']);
+  assert.deepStrictEqual(hourlySlugs(Date.parse('2026-10-23T04:00:00Z'))[0], 'bitcoin-up-or-down-october-23-12am-et');
+  assert.deepStrictEqual(hourlySlugs(Date.parse('2026-11-02T17:00:00Z'))[0], 'bitcoin-up-or-down-november-2-12pm-et', 'después del cambio de hora');
+  const H = 3600000, H0 = Date.parse('2026-10-23T14:00:00Z'), dirH = fs.mkdtempSync(path.join(os.tmpdir(), 'b1h-'));
+  const gh = new Map([[`btc-updown-1h-${H0 / 1000}`, { closed: false, prices: '["0.5", "0.5"]' }]]);
+  const asked = [];
+  const fetchH = async (url) => {
+    const u = new URL(url);
+    if (u.pathname === '/events') {
+      asked.push(u.searchParams.get('slug'));
+      const g = gh.get(u.searchParams.get('slug'));
+      return { ok: true, json: async () => (g ? [{ title: 'Bitcoin Up or Down - October 23, 10AM ET',
+        markets: [{ clobTokenIds: '["HU", "HD"]', outcomes: '["Up", "Down"]', closed: g.closed, outcomePrices: g.prices, makerBaseFee: 0 }] }] : []) };
+    }
+    if (u.pathname === '/book') return { ok: true, json: async () => ({ bids: [{ price: '0.49', size: '100' }], asks: [{ price: '0.50', size: '100' }] }) };
+    throw new Error(`url inesperada ${url}`);
+  };
+  let ch = H0 + 1000, fallbackCalls = 0;
+  const sh = new SeriesShadow({ id: 'btc1h', periodS: 3600, slugFn: hourlySlugs, strikeSource: 'binance_1h_open', paperName: 'B1H', paper: true,
+    fetchFn: fetchH, dataDir: dirH, now: () => ch, env: { PAPER_CHECK_MS: '0' }, resolveDelayMs: 0, resolveEveryMs: 0, resolveTries: 2, ptbTries: 0,
+    strikeFn: () => 100000, fairFn: () => ({ p: 0.5, sigma: 70e-6 }), spotFn: () => 100010,
+    winnerFn: async ({ startTs, endTs }) => { fallbackCalls++; assert.deepStrictEqual([startTs, endTs], [H0, H0 + H]); return 'DOWN'; } });
+  sh._tick(); await sh.cur.done;
+  const mh = sh.cur;
+  assert.deepStrictEqual([mh.slug, mh.tokens, asked], [`btc-updown-1h-${H0 / 1000}`, { yes: 'HU', no: 'HD' },
+    ['bitcoin-up-or-down-october-23-10am-et', `btc-updown-1h-${H0 / 1000}`]], 'se queda con el candidato que está en Gamma');
+  assert.deepStrictEqual([path.basename(sh.paper.file), sh.ptag, sh._paperBalance().startsWith('Balance B1H: +$0.00 (0-0)')],
+    ['paper-b1h-btc1h.json', '[PAPER-B1H]', true]);
+  for (let t = 2; t < 6; t++) { ch = H0 + t * 1000; sh._tick(); await sh.cur.done; }
+  // Cierra; Gamma nunca publica el ganador: después de los intentos, el de la vela de Binance
+  ch = H0 + H + 100;
+  sh._tick();
+  for (let i = 0; i < 4; i++) { await tick(); await mh.done; }
+  assert.strictEqual(fallbackCalls, 1);
+  await new Promise(r => setTimeout(r, 30));
+  const recH = JSON.parse(fs.readFileSync(path.join(dirH, 'shadow-ticks-btc1h.jsonl'), 'utf8').trim());
+  assert.deepStrictEqual([recH.series, recH.slug, recH.winner, recH.winner_source, recH.strike_source, recH.end_ts - recH.start_ts, recH.samples],
+    ['btc1h', `btc-updown-1h-${H0 / 1000}`, 'DOWN', 'binance_kline', 'binance_1h_open', H, 4]); // el primer segundo busca el mercado
+  // Posición abierta de B1H al reiniciar, sin ganador en Gamma: también se resuelve con la vela
+  const dirH2 = fs.mkdtempSync(path.join(os.tmpdir(), 'b1hr-'));
+  fs.writeFileSync(path.join(dirH2, 'paper-b1h-btc1h.json'), JSON.stringify({ pnl: 0, w: 0, l: 0, attempts: 1, filled: 1, noFill: 0, unresolved: 0,
+    open: [{ slug: 'bitcoin-up-or-down-october-23-10am-et', label: 'z', side: 'DOWN', paid: 0.45, size: 11, upIdx: 0, start: H0, end: H0 + H }], startedAt: H0 }));
+  const shr = new SeriesShadow({ id: 'btc1h', periodS: 3600, slugFn: hourlySlugs, paperName: 'B1H', paper: true, fetchFn: fetchH, dataDir: dirH2,
+    now: () => H0 + H + 1000, env: {}, resolveDelayMs: 0, resolveEveryMs: 0, resolveTries: 2, strikeFn: () => null, fairFn: () => null,
+    winnerFn: async () => 'DOWN' });
+  const oh = shr.paper.st.open[0];
+  shr._paperResume();
+  for (let i = 0; i < 4; i++) { await tick(); await oh.done; }
+  near(shr.paper.st.pnl, 11 * 0.55 - 0.072 * 0.45 * 0.55 * 11, 1e-4);
+  assert.deepStrictEqual([shr.paper.st.w, shr.paper.st.open.length], [1, 0]);
+  for (const d of [dirH, dirH2]) fs.rmSync(d, { recursive: true, force: true });
   for (const d of [dirP, dirR, dirU]) fs.rmSync(d, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('series-shadow: 60 ok');
+  console.log('series-shadow: 70 ok');
 })().catch(e => { console.error(e); process.exit(1); });

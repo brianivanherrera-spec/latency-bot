@@ -104,6 +104,7 @@ async function load(file) {
       if (btcOpen == null && t != null && t <= 30 && b != null) btcOpen = b;
     }
     markets.push({ start: m.start_ts, winner: m.winner, rows, live: c.pass != null,
+      period: Number.isFinite(m.end_ts) && Number.isFinite(m.start_ts) ? m.end_ts - m.start_ts : null,
       strike: Number.isFinite(m.strike) ? m.strike : null, bnClose60: bn >= 45 ? bs / bn : null, btcOpen });
   }
   return markets.sort((a, b) => a.start - b.start);
@@ -332,7 +333,8 @@ function fireRecords(markets, cfg, margin, cap) {
     const prev = R[f.i - 3], a3 = prev ? (f.side === 'UP' ? prev.ya : prev.na) : null;
     const L = fairLimitOf(f, mk, cfg, margin, cap), a2 = f.ask2 ?? f.ask;
     const price = Math.max(f.ask, a2), win = f.side === mk.winner, ps = (win ? 1 - price : -price) - fee(price);
-    const bid = f.side === 'UP' ? r.yb : r.nb, prevWinner = winnerAt.get(mk.start - 300000) ?? winnerAt.get(mk.start - 900000);
+    const bid = f.side === 'UP' ? r.yb : r.nb;
+    const prevWinner = mk.period ? winnerAt.get(mk.start - mk.period) : winnerAt.get(mk.start - 300000) ?? winnerAt.get(mk.start - 900000);
     out.push({ filled: a2 <= L + 1e-9, win, price, ps, pnl: Math.floor(STAKE / L) * ps,
       edge: (f.side === 'UP' ? pj : 1 - pj) - f.ask - fee(f.ask), sigS: r.sigS ?? null,
       pModel: f.side === 'UP' ? r.p : 1 - r.p, trend: a3 != null ? +(f.ask - a3).toFixed(4) : null,
@@ -518,6 +520,94 @@ function calibration(markets) {
   return Object.entries(bins).sort().map(([k, b]) => ({ k, n: b.n, pred: +(b.sum / b.n).toFixed(3), real: +(b.up / b.n).toFixed(3) }));
 }
 
+// Modelo contra mercado (23/10: sin latencia, ¿dónde sabe el modelo algo que el precio no?). En momentos fijos antes del
+// cierre (CAL_POINTS; la fila más cercana a ±2 s, una por mercado y momento): P(UP) del modelo contra el punto medio del
+// libro de Sí (spread ≤ maxSpread) y el resultado.
+//  - points: error cuadrático (Brier, menos es mejor) de cada uno y la diferencia mercado − modelo, mercado a mercado
+//    (z > 0: el modelo acierta mejor que el precio)
+//  - dis: cuando difieren en ≥ gap, la primera vez por mercado en cada tramo (antes de 120 s / 120-10 s), del lado que
+//    prefiere el modelo: qué daba el mercado, qué el modelo, cuántas pasaron (z contra lo que daba el mercado) y comprar
+//    ese lado al ask con comisión (z contra el empate, como evaluate)
+//  - mix: peso w del modelo en logit(q) = (1−w)·logit(mid) + w·logit(p), elegido con el 60 % más viejo de los mercados;
+//    mejora del log-loss contra el precio solo en el 40 % nuevo (promedio por mercado, z). w = 0: el precio ya tiene todo
+const CAL_POINTS = [1800, 900, 600, 300, 180, 120, 90, 60, 30, 10];
+const clampP = x => Math.min(0.999, Math.max(0.001, x));
+const logit = x => Math.log(x / (1 - x));
+const logLoss = (q, y) => -(y ? Math.log(q) : Math.log(1 - q));
+function calSamples(mk, maxSpread) {
+  const best = new Map();
+  for (const r of mk.rows) {
+    if (!r) continue;
+    for (const c of CAL_POINTS) {
+      const d = Math.abs(r.sl - c), b = best.get(c);
+      if (d <= 2 && (!b || d < Math.abs(b.sl - c))) best.set(c, r);
+    }
+  }
+  const out = [];
+  for (const c of CAL_POINTS) {
+    const r = best.get(c);
+    if (!r || r.ya == null || r.yb == null || r.ya < r.yb || r.ya - r.yb > maxSpread + 1e-9) continue;
+    out.push({ c, r, p: clampP(r.p), mid: clampP((r.ya + r.yb) / 2) });
+  }
+  return out;
+}
+function modelVsMarket(markets, { gap = 0.10, maxSpread = 0.10, trainFrac = 0.6, minN = 20 } = {}) {
+  const per = markets.map(mk => ({ mk, y: mk.winner === 'UP' ? 1 : 0, s: calSamples(mk, maxSpread) }));
+  const points = [];
+  for (const c of CAL_POINTS) {
+    let n = 0, bm = 0, bk = 0, sd = 0, sd2 = 0;
+    for (const { y, s } of per) {
+      const x = s.find(v => v.c === c);
+      if (!x) continue;
+      const em = (x.p - y) ** 2, ek = (x.mid - y) ** 2, d = ek - em;
+      n++; bm += em; bk += ek; sd += d; sd2 += d * d;
+    }
+    if (n < minN) continue;
+    const m = sd / n, v = Math.max(0, sd2 / n - m * m);
+    points.push({ c, n, model: +(bm / n).toFixed(4), market: +(bk / n).toFixed(4), z: v > 0 ? +(m / Math.sqrt(v / n)).toFixed(2) : null });
+  }
+  const groups = { early: c => c > 120, final: c => c <= 120 };
+  const dis = {}, mix = {};
+  for (const [g, inG] of Object.entries(groups)) {
+    let n = 0, sq = 0, sp = 0, w = 0, vq = 0, ne = 0, ev = 0, we = 0, be = 0, vbe = 0;
+    for (const { mk, s } of per) {
+      const x = s.find(v => inG(v.c) && Math.abs(v.p - v.mid) >= gap - 1e-9);
+      if (!x) continue;
+      const up = x.p > x.mid, side = up ? 'UP' : 'DOWN', hit = mk.winner === side ? 1 : 0, q = up ? x.mid : 1 - x.mid;
+      n++; sq += q; sp += up ? x.p : 1 - x.p; w += hit; vq += q * (1 - q);
+      const ask = up ? x.r.ya : x.r.na;
+      if (ask != null && ask > 0.01 && ask < 0.99) {
+        const b = breakEven(ask);
+        ne++; ev += hit - ask - fee(ask); we += hit; be += b; vbe += b * (1 - b);
+      }
+    }
+    dis[g] = { n, market: n ? +(sq / n).toFixed(3) : null, model: n ? +(sp / n).toFixed(3) : null, hit: n ? +(w / n).toFixed(3) : null,
+      z: vq ? +((w - sq) / Math.sqrt(vq)).toFixed(2) : null,
+      buy: { n: ne, evPerShare: ne ? +(ev / ne).toFixed(4) : null, z: vbe ? +((we - be) / Math.sqrt(vbe)).toFixed(2) : null } };
+    // Peso del modelo: elegido en train (todas las muestras del tramo), medido en test por mercado
+    const cut = Math.floor(per.length * trainFrac), mixQ = (x, wt) => 1 / (1 + Math.exp(-((1 - wt) * logit(x.mid) + wt * logit(x.p))));
+    let bestW = 0, bestL = Infinity, trainN = 0;
+    for (let k = 0; k <= 20; k++) {
+      const wt = k / 20;
+      let L = 0, cnt = 0;
+      for (const { y, s } of per.slice(0, cut)) for (const x of s) if (inG(x.c)) { L += logLoss(mixQ(x, wt), y); cnt++; }
+      if (cnt && L < bestL - 1e-12) { bestL = L; bestW = wt; trainN = cnt; }
+    }
+    let tn = 0, sd = 0, sd2 = 0, lk = 0;
+    for (const { y, s } of per.slice(cut)) {
+      const xs = s.filter(x => inG(x.c));
+      if (!xs.length) continue;
+      let d = 0, l = 0;
+      for (const x of xs) { const a = logLoss(x.mid, y); d += a - logLoss(mixQ(x, bestW), y); l += a; }
+      tn++; sd += d / xs.length; sd2 += (d / xs.length) ** 2; lk += l / xs.length;
+    }
+    const m = tn ? sd / tn : 0, v = tn ? Math.max(0, sd2 / tn - m * m) : 0;
+    mix[g] = { w: bestW, trainSamples: trainN, testMarkets: tn, gainPct: tn && lk ? +(m / (lk / tn) * 100).toFixed(2) : null,
+      z: v > 0 ? +(m / Math.sqrt(v / tn)).toFixed(2) : null };
+  }
+  return { markets: markets.length, gap, maxSpread, points, dis, mix };
+}
+
 // EV real por franja de ask (0.05) × tiempo restante: comprar el lado a su ask en ese
 // momento, sin ninguna condición del modelo. Una muestra por mercado y celda. Con el ask
 // del segundo siguiente (1 s de latencia en contra) y comisión.
@@ -551,7 +641,7 @@ function evGrid(markets) {
 }
 
 module.exports = { load, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
-  normInv, blendP, fireRecords, cutStats, cutStats2, makerExec };
+  normInv, blendP, fireRecords, cutStats, cutStats2, makerExec, modelVsMarket };
 if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
@@ -576,6 +666,7 @@ if (require.main === module) (async () => {
     baseline: { cfg: baseline, train: evaluate(train, baseline), test: evaluate(test, baseline), all: evaluate(markets, baseline) },
     top,
     calibration: calibration(markets),
+    modelVsMarket: modelVsMarket(markets),
     evGrid: { train: evGrid(train), test: evGrid(test) },
     momentum: selectFamily(train, test, markets, gridMomentum()),
     anchored: selectFamily(train, test, markets, gridAnchored()),
@@ -779,5 +870,14 @@ if (require.main === module) (async () => {
     console.log(ln(`regla actual de A (${liveMk.length} mercados) según la ventaja anclada de la regla de B al entrar`, d.all));
     console.log(ln(`test (40 % más nuevo: ${d.testMarkets} mercados)`, d.test));
     console.log(ln(`fuera de muestra desde ${d.from.slice(0, 16)}`, d.holdout)); }
+  { const V = report.modelVsMarket, pc = v => (v == null ? 'n/a' : `${(v * 100).toFixed(1)}%`);
+    const verdict = z => (z == null ? '' : z >= 2 ? ' → el modelo suma' : z <= -2 ? ' → el modelo resta' : ' → sin diferencia clara');
+    const gain = m => (m.gainPct == null ? 'sin datos' : m.w === 0 ? 'w=0: el precio ya tiene todo'
+      : `${m.gainPct >= 0 ? 'mejora' : 'empeora'} ${Math.abs(m.gainPct)}% el log-loss contra el precio solo${m.z != null ? ` z=${m.z}` : ''}${verdict(m.z)}`);
+    const dx = (label, d, m) => `${label}: difieren ≥ ${Math.round(V.gap * 100)} pts en ${d.n} mercados (mercado ${pc(d.market)}, modelo ${pc(d.model)}, pasó ${pc(d.hit)}, z contra el mercado ${d.z ?? 'n/a'}); `
+      + `comprando ese lado al ask n=${d.buy.n} EV/acc=${d.buy.evPerShare ?? 'n/a'} z=${d.buy.z ?? 'n/a'} | peso del modelo w=${m.w.toFixed(2)} (elegido con el 60 % viejo; en el 40 % nuevo: ${gain(m)})`;
+    console.log(`[BACKTEST-CALIBRACION] modelo contra mercado en ${V.markets} mercados, error cuadrático (Brier, menos es mejor; z > 0: el modelo acierta mejor que el precio): `
+      + `${V.points.map(p => `${p.c} s n=${p.n} modelo ${p.model.toFixed(3)} mercado ${p.market.toFixed(3)} z=${p.z ?? 'n/a'}`).join(' | ') || 'sin datos'}`);
+    console.log(`[BACKTEST-CALIBRACION] ${dx('antes de los 120 s', V.dis.early, V.mix.early)} || ${dx('120-10 s', V.dis.final, V.mix.final)}`); }
   console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });

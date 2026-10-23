@@ -11,7 +11,7 @@
  * No se tocan signals.jsonl, stats.json, positions.json, shadow-markets.jsonl ni los
  * archivos que se están escribiendo (los crudos sin fecha en el nombre).
  *
- * Archivos de análisis (antes crecían sin límite): shadow-ticks.jsonl, shadow-ticks-btc15m.jsonl, shadow-ticks-eth5m.jsonl, fills.jsonl y
+ * Archivos de análisis (antes crecían sin límite): shadow-ticks.jsonl, shadow-ticks-<serie>.jsonl (btc15m, eth5m, eth15m, btc1h), fills.jsonl y
  * open-snaps.jsonl se rotan al pasar ANALYSIS_ROTATE_MB (a <base>.<fecha>.jsonl; el
  * siguiente append crea el archivo nuevo) y los pedazos rotados, igual que los ticks por
  * posición de ticks/, se borran con más de RETENTION_ANALYSIS_DAYS días (o antes si el
@@ -40,8 +40,8 @@ const MARKET_RE = /^MARKET_.*\.jsonl$/;
 const MIN_AGE_MS = 15 * 60 * 1000; // nunca borrar algo escrito en los últimos 15 min
 const RETENTION_ANALYSIS_DAYS = parseFloat(process.env.RETENTION_ANALYSIS_DAYS || '30');
 const ANALYSIS_ROTATE_MB = parseFloat(process.env.ANALYSIS_ROTATE_MB || '200');
-const ANALYSIS_FILES = ['shadow-ticks', 'shadow-ticks-btc15m', 'shadow-ticks-eth5m', 'fills', 'open-snaps'];
-const ANALYSIS_ROTATED_RE = /^(shadow-ticks|shadow-ticks-btc15m|shadow-ticks-eth5m|fills|open-snaps)\.\d{4}-\d{2}-\d{2}T[\d-]+\.jsonl$/;
+const ANALYSIS_FILES = ['shadow-ticks', 'shadow-ticks-btc15m', 'shadow-ticks-eth5m', 'shadow-ticks-eth15m', 'shadow-ticks-btc1h', 'fills', 'open-snaps'];
+const ANALYSIS_ROTATED_RE = /^(shadow-ticks|shadow-ticks-btc15m|shadow-ticks-eth5m|shadow-ticks-eth15m|shadow-ticks-btc1h|fills|open-snaps)\.\d{4}-\d{2}-\d{2}T[\d-]+\.jsonl$/;
 const TICKS_DIR = path.join(DATA_DIR, 'ticks');
 
 const GB = 1024 ** 3, MB = 1024 ** 2;

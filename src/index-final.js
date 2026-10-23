@@ -9,7 +9,7 @@ const { PolymarketWS } = require('./polymarket-ws');
 const { ChainlinkRTDS } = require('./chainlink-rtds');
 const { ChainlinkSpot } = require('./chainlink-spot');
 const { PriceToBeat } = require('./price-to-beat');
-const { FairValue, twapFairUp } = require('./fair-value');
+const { FairValue, twapFairUp, probUp } = require('./fair-value');
 const { Shadow, MARKETS_FILE: SHADOW_MARKETS_FILE, TICKS_FILE: SHADOW_TICKS_FILE } = require('./shadow');
 const { MarketRecorder } = require('./market-recorder');
 const marketResearch = require('./market-research');
@@ -663,9 +663,9 @@ function runBacktest() {
     { timeout: 10 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
       if (err) logger.warn(`[BACKTEST] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
       else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line);
-      // Después, el mismo backtest sobre las sombras de 15 min, una tras otra: BTC con líneas [BACKTEST-15M…] y ETH con
-      // [BACKTEST-ETH15M…] (BACKTEST_15M=off apaga las dos)
-      if (process.env.BACKTEST_15M !== 'off') runBacktest15m([['btc15m', '15M'], ['eth15m', 'ETH15M']]);
+      // Después, el mismo backtest sobre las otras sombras, una tras otra: BTC 15 min [BACKTEST-15M…], ETH 15 min
+      // [BACKTEST-ETH15M…], BTC horario [BACKTEST-1H…] y ETH 5 min [BACKTEST-ETH5M…] (BACKTEST_15M=off apaga todas)
+      if (process.env.BACKTEST_15M !== 'off') runBacktest15m([['btc15m', '15M'], ['eth15m', 'ETH15M'], ['btc1h', '1H'], ['eth5m', 'ETH5M']]);
     });
 }
 function runBacktest15m(series) {
@@ -924,6 +924,8 @@ async function main() {
   const clRTDS    = new ChainlinkRTDS();   // TWAP 30s + 60s de Chainlink
   // Modo sombra: modelo de valor justo que solo observa y registra (SHADOW_MODE=false lo apaga)
   const fairValue = new FairValue();
+  // Solo los ticks de Binance BTC/USDT (sin Coinbase): modelo de los mercados horarios, que resuelven con la vela de Binance
+  const bnFv = new FairValue();
   const shadow = process.env.SHADOW_MODE === 'false' ? null : new Shadow({ fairValue, polyWs, rtds: clRTDS });
   if (shadow) {
     shadowRef = shadow; shadow.setSignalFn(() => signal.snapshot()); shadow.start();
@@ -1740,6 +1742,26 @@ async function main() {
         paper: process.env.PAPER_B15_ETH !== 'off' }).start();
     }
   }
+  // Mercados horarios de BTC (plan del 23/10: el bot de valor donde la velocidad pesa menos). Resuelven con la vela de 1 h
+  // de Binance BTC/USDT: strike = su apertura (src/binance-kline.js); modelo = último precio de Binance contra el strike con
+  // la σ de 15 min de esos ticks (piso FAIR_SIGMA_FLOOR, × FAIR_VOL_MULT), sin TWAP. Cuenta B1H en paper con la regla de B
+  // (como B15). Gamma puede tardar en publicar el ganador: 30 min de intentos y después la vela de Binance.
+  // SERIES_SHADOW_1H=off apaga la sombra; PAPER_B1H=off solo la cuenta
+  if (process.env.SERIES_SHADOW_1H !== 'off') {
+    const { SeriesShadow, hourlySlugs } = require('./series-shadow');
+    const { BinanceKlines } = require('./binance-kline');
+    const klines = new BinanceKlines();
+    const fair1h = (K, endMs, nowMs) => {
+      const S = bnFv.lastPrice, sL = bnFv.sigma(nowMs), T = (endMs - nowMs) / 1000;
+      if (!(S > 0) || !sL || K == null || T <= 0 || nowMs - bnFv.lastTs > 10000) return null;
+      const sigma = Math.max(sL, FAIR_SIGMA_FLOOR) * FAIR_VOL_MULT;
+      return { p: probUp(S, K, T, sigma), sigma, sigmaShort: null, sigmaLong: sL };
+    };
+    new SeriesShadow({ id: 'btc1h', periodS: 3600, slugFn: hourlySlugs, strikeSource: 'binance_1h_open', paperName: 'B1H',
+      fairFn: fair1h, strikeFn: ms => klines.open(ms), spotFn: () => bnFv.lastPrice,
+      winnerFn: ({ startTs }) => klines.winner(startTs), resolveTries: 90, ptbTries: 0,
+      paper: process.env.PAPER_B1H !== 'off' }).start();
+  }
 
   // ─── OPEN-SNAP (sombra): ¿el mercado abre mal valuado? ─────────────────────
   // El strike es el TWAP 60 s del minuto previo a la apertura, así que desde el segundo 0
@@ -2051,6 +2073,7 @@ async function main() {
 
     // Cinta de ticks crudos (antes del throttle), solo Binance
     if (btcPriceNow > 0 && priceData.source !== 'coinbase') {
+      bnFv.onTick(btcPriceNow, t1_ms);
       bnTape.push({ ts: t1_ms, price: btcPriceNow });
       while (bnTape.length && t1_ms - bnTape[0].ts > 90000) bnTape.shift();
     }

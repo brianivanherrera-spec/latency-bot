@@ -68,6 +68,10 @@ d.observe('info', 'SERIE', '[SERIE btc15m] [PAPER-B15] LOSS UP Oct 16, 1:30PM-1:
 // Cuenta B15 de ETH 15 min: va en su propio ítem y no se mezcla con la de BTC
 d.observe('info', 'SERIE', '[SERIE eth15m] [PAPER-B15] DOWN Oct 16, 1:30PM-1:45PM ET | 80 s restantes | ask $0.60 vs precio justo anclado 72.0% (ventaja 10.3 pts) | orden 8 a $0.65 | ask a +200ms $0.60 → lleno a $0.60 (ventaja al precio pagado 10.3 pts) | Balance B15: +$0.00 (0-0), intentos 1, llenadas 1, sin fill 0, abiertas 1 | desde 2026-10-19T21:00 UTC');
 d.observe('info', 'SERIE', '[SERIE eth15m] [PAPER-B15] WIN DOWN Oct 16, 1:30PM-1:45PM ET @ $0.60 ×8 → +$3.06 (comisión $0.14) | Balance B15: +$3.06 (1-0), intentos 1, llenadas 1, sin fill 0, abiertas 0 | desde 2026-10-19T21:00 UTC');
+// Cuenta B1H (BTC horario, 23/10): su propio ítem, con su etiqueta
+d.observe('info', 'SERIE', '[SERIE btc1h] [PAPER-B1H] UP Oct 16, 9AM ET | 60 s restantes | ask $0.55 vs precio justo anclado 66.0% (ventaja 9.2 pts) | orden 9 a $0.62 | ask a +200ms $0.55 → lleno a $0.55 (ventaja al precio pagado 9.2 pts) | Balance B1H: +$0.00 (0-0), intentos 1, llenadas 1, sin fill 0, abiertas 1 | desde 2026-10-23T16:00 UTC');
+d.observe('info', 'SERIE', '[SERIE btc1h] [PAPER-B1H] LOSS UP Oct 16, 9AM ET @ $0.55 ×9 → −$5.11 (comisión $0.16) | Balance B1H: −$5.11 (0-1), intentos 1, llenadas 1, sin fill 0, abiertas 0 | desde 2026-10-23T16:00 UTC');
+d.observe('info', 'SERIE', '[SERIE btc1h] Oct 16, 9AM ET | ganó DOWN | strike $100000.00 | 3599 muestras (0 con modelo; REST p50 80 ms');
 d.observe('info', 'RESUMEN', '[RESUMEN] cuentas — no se cuenta a sí mismo: [WATCHDOG] muda:');
 
 const [c1, s1] = d.report(T0 + 3600000);
@@ -88,7 +92,9 @@ has(s1, 'BOOK-CHECK mín 96.7% prom 97.5%, diferencias REALES 1', 'BOOK-CHECK');
 has(s1, 'LOOP 2 min: retraso WS p99 máx 1200 ms, máx 3500 ms; lag p99 máx 60 ms; CPU máx 9%; minutos fuera de umbral 1', 'LOOP sin la línea del corte');
 has(c1, 'B15 ETH: intentos 1, llenadas 1, 1-0 +$3.06; total +$3.06 (1-0), intentos 1, llenadas 1, abiertas 0', 'cuenta B15 de ETH aparte');
 ok(c1.indexOf('B15: ') < c1.indexOf('B15 ETH: '), 'B15 de BTC primero');
-has(s1, 'SERIE btc15m 1, eth15m 1 (0 con modelo 0), eth5m 1 (0 con modelo 1), 429 0; corrió backtest sí, ejecución no', 'series y corridas');
+has(s1, 'SERIE btc15m 1, eth15m 1 (0 con modelo 0), eth5m 1 (0 con modelo 1), btc1h 1 (0 con modelo 1), 429 0; corrió backtest sí, ejecución no', 'series y corridas');
+has(c1, 'B1H: intentos 1, llenadas 1, 0-1 −$5.11; total −$5.11 (0-1), intentos 1, llenadas 1, abiertas 0; pérdidas: UP Oct 16, 9AM ET a $0.55 −$5.11', 'cuenta B1H aparte');
+ok(c1.indexOf('B15 ETH: ') < c1.indexOf('B1H: '), 'B1H después de las de 15 min');
 has(s1, 'WARN 14, ERROR 1', 'conteo de WARN/ERROR');
 has(s1, '×2 "[FOO] algo raro 1 pasó"', 'WARN desconocidos agrupados');
 has(s1, 'ERROR ×1 "[MAIN] [ERROR] se rompió algo"', 'ERROR en otros');
