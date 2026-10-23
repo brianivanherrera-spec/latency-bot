@@ -82,7 +82,7 @@ class SeriesShadow {
     if (this.timer) return this;
     this.timer = setInterval(() => { try { this._tick(); } catch (e) { logger.warn(`[SERIE ${this.id}] ${e.message}`); } }, this.sampleMs);
     this.timer.unref?.();
-    logger.info(`[SERIE ${this.id}] ✅ Sombra de ${this.slugPrefix} (${this.periodMs / 60000} min): libro REST cada ${this.sampleMs} ms y modelo TWAP de Chainlink → ${this.file} (solo registro)`);
+    logger.info(`[SERIE ${this.id}] ✅ Sombra de ${this.slugPrefix} (${this.periodMs / 60000} min): libro REST cada ${this.sampleMs} ms y modelo ${this.strikeSource === 'binance_1h_open' ? 'de Binance contra la apertura de la vela de 1 h' : 'TWAP de Chainlink'} → ${this.file} (solo registro)`);
     if (this.paper) {
       const c = this.paper.cfg;
       logger.info(`[SERIE ${this.id}] ${this.ptag} ✅ cuenta en paper con la regla de B en vivo: límite justo margen ${Math.round(c.margin * 100)} pts, tope $${c.cap.toFixed(2)}, $${c.stake} por operación, fill con el libro REST a +${c.checkMs} ms | ${this._paperBalance()}`);

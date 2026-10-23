@@ -1757,7 +1757,7 @@ async function main() {
       const sigma = Math.max(sL, FAIR_SIGMA_FLOOR) * FAIR_VOL_MULT;
       return { p: probUp(S, K, T, sigma), sigma, sigmaShort: null, sigmaLong: sL };
     };
-    new SeriesShadow({ id: 'btc1h', periodS: 3600, slugFn: hourlySlugs, strikeSource: 'binance_1h_open', paperName: 'B1H',
+    new SeriesShadow({ id: 'btc1h', slugPrefix: 'bitcoin-up-or-down', periodS: 3600, slugFn: hourlySlugs, strikeSource: 'binance_1h_open', paperName: 'B1H',
       fairFn: fair1h, strikeFn: ms => klines.open(ms), spotFn: () => bnFv.lastPrice,
       winnerFn: ({ startTs }) => klines.winner(startTs), resolveTries: 90, ptbTries: 0,
       paper: process.env.PAPER_B1H !== 'off' }).start();
