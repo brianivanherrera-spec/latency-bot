@@ -1,0 +1,232 @@
+[
+ {
+  "market_id": "5611879",
+  "p_yes": 0.04,
+  "confidence": "medium",
+  "reasoning": "Requiere WTI <85 el 2/11 (hoy ~99, minimo de octubre 86.86 el 6/10) y control republicano del Senado (forecasters inclinan a D). Caida de ~14% en 10 dias es improbable; la correlacion con un acuerdo de paz con Iran suma algo.",
+  "key_uncertainties": [
+   "acuerdo con Iran",
+   "control del Senado"
+  ],
+  "sources": [
+   "https://www.oilpriceapi.com/oil-prices-today",
+   "https://en.wikipedia.org/wiki/2026%E2%80%932028_world_oil_market_chronology",
+   "https://www.newsweek.com/republicans-dealt-triple-senate-polling-blow-by-leading-election-forecaster-12602006"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5180417",
+  "p_yes": 0.37,
+  "confidence": "low",
+  "reasoning": "Segun financecharts del 22/10 Nvidia ~5.11T vs Apple ~5.07T; otra fuente da 5.24T vs 5.00T. Brecha chica, ligera ventaja de Nvidia, 8 dias de volatilidad.",
+  "key_uncertainties": [
+   "resultados de balances",
+   "rotacion tech"
+  ],
+  "sources": [
+   "https://www.financecharts.com/screener/biggest",
+   "https://www.stocktitan.net/rankings/companies-market-cap"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554657",
+  "p_yes": 0.22,
+  "confidence": "medium",
+  "reasoning": "Gemini 4 Argon lidera Arena texto con ~1524 vs ~1508 de Claude Opus 5.5 (15 puntos, rango +-9, voto limitado). Anthropic necesitaria un lanzamiento (Fable 5.5) antes del 31/10 que supere a Google.",
+  "key_uncertainties": [
+   "lanzamiento Fable 5.5",
+   "desempate/rank compartido"
+  ],
+  "sources": [
+   "https://www.therevenueaireport.com/blog/ai-model-performance-october-2026",
+   "https://suprmind.ai/hub/ai-models-index/",
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166820",
+  "p_yes": 0.2,
+  "confidence": "low",
+  "reasoning": "Promedio 7 dias reportado: ~28 (5-11/10) y ~26 (hasta 18/10); 30-34 requiere recuperacion del trafico, poco probable con la ofensiva en Yemen.",
+  "key_uncertainties": [
+   "datos PortWatch con rezago",
+   "escalada en Yemen"
+  ],
+  "sources": [
+   "https://redanalysis.org/2026/10/08/houthis-bab-el-mandeb-maritime-transport/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "634893",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Osborn (independiente) empata o queda ~1-3 puntos abajo en promedios (DDHQ 47-45 Ricketts); Sabato paso a Leans R el 14/10.",
+  "key_uncertainties": [
+   "participacion",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://politicalwire.com/2026/10/12/ricketts-leads-osborn-in-nebraska-senate-race/",
+   "https://decisiondeskhq.substack.com/p/nebraska-senate-independent-dan-osborn-pete-ricketts",
+   "https://www.poliwave.com/us/ne/sen-fed"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219279",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Eurostat dio ~38 Mt de reservas de emergencia de la UE (junio 2026); la liberacion G7 de 100M barriles (~13 Mt entre todos, diesel frontal) bajaria stock UE pero probablemente queda >=30 Mt. Incierto el dato exacto y su publicacion.",
+  "key_uncertainties": [
+   "porcentaje que libera la UE",
+   "cuando publica Eurostat"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/10/2/trump-says-europe-agrees-to-release-massive-amount-diesel-stockpile",
+   "https://www.eureporter.co/energy/2026/10/02/eu-weighs-diesel-reserve-release-as-us-piles-on-the-pressure/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554659",
+  "p_yes": 0.62,
+  "confidence": "medium",
+  "reasoning": "Gemini 4 Argon #1 en Arena con ~15 puntos de ventaja (1524 vs 1509 Meta, 1508 Anthropic); puntaje preliminar y pocos votos.",
+  "key_uncertainties": [
+   "lanzamiento rival antes del 31/10",
+   "puntaje preliminar"
+  ],
+  "sources": [
+   "https://www.therevenueaireport.com/blog/ai-model-performance-october-2026",
+   "https://suprmind.ai/hub/ai-models-index/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166819",
+  "p_yes": 0.43,
+  "confidence": "low",
+  "reasoning": "Promedio 7 dias reciente ~26-28, centro de la franja 25-29; dispersion de +-4 y riesgo de caida por la guerra en Yemen.",
+  "key_uncertainties": [
+   "datos PortWatch con rezago",
+   "escalada en Yemen"
+  ],
+  "sources": [
+   "https://redanalysis.org/2026/10/08/houthis-bab-el-mandeb-maritime-transport/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4824600",
+  "p_yes": 0.58,
+  "confidence": "low",
+  "reasoning": "Agregado PolitPro SNS 45% vs lista estudiantil 42.5%; una encuesta independiente del 20/10 pone a los estudiantes arriba. Ventaja del oficialismo en aparato y bancas, pero muy parejo.",
+  "key_uncertainties": [
+   "fraude/participacion",
+   "encuestas muy divergentes"
+  ],
+  "sources": [
+   "https://politpro.eu/en/serbia/election/parliament/2026",
+   "https://www.intellinews.com/serbia-s-student-list-leads-ruling-party-in-new-poll-ahead-of-election-477469/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5612213",
+  "p_yes": 0.12,
+  "confidence": "medium",
+  "reasoning": "WTI en ~99; sesiones desde el 19/10 con minimo ~95. Hace falta bajar a 90 (-9%) en una semana; volatilidad alta por Iran pero tendencia reciente alcista.",
+  "key_uncertainties": [
+   "noticias Iran/paz",
+   "fecha de creacion del mercado"
+  ],
+  "sources": [
+   "https://www.oilpriceapi.com/oil-prices-today",
+   "https://en.wikipedia.org/wiki/2026%E2%80%932028_world_oil_market_chronology"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664660",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Google lidera hoy; un lanzamiento de Anthropic en noviembre (Fable 5.5 rumoreado) podria darle el puesto, pero Google y otros tambien lanzan. Horizonte largo, mucha incertidumbre.",
+  "key_uncertainties": [
+   "lanzamientos de Google/Meta/OpenAI",
+   "Fable 5.5"
+  ],
+  "sources": [
+   "https://www.therevenueaireport.com/blog/ai-model-performance-october-2026",
+   "https://suprmind.ai/hub/ai-models-index/",
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167211",
+  "p_yes": 0.65,
+  "confidence": "low",
+  "reasoning": "Ofensiva saudi-apoyada desde el 5/10 con ~100 aviones y ataques continuos hasta al menos el 18/10; exige ataque directo de fuerzas saudies ese dia (30/10).",
+  "key_uncertainties": [
+   "tregua",
+   "atribucion del ataque a Arabia Saudita"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Yemen_offensives",
+   "https://www.washingtontimes.com/news/2026/oct/18/airstrike-kills-least-9-rebel-held-yemen-mideast-news/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "634892",
+  "p_yes": 0.57,
+  "confidence": "low",
+  "reasoning": "Ricketts lidera por poco en promedios (47-45/47-46); Sabato 'Leans R'. Complementario del independiente.",
+  "key_uncertainties": [
+   "participacion",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://politicalwire.com/2026/10/12/ricketts-leads-osborn-in-nebraska-senate-race/",
+   "https://decisiondeskhq.substack.com/p/nebraska-senate-independent-dan-osborn-pete-ricketts",
+   "https://www.poliwave.com/us/ne/sen-fed"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2941850",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Tasa 2.25%. Economistas divididos: BMO, RBC DS y Desjardins pasaron a suba; TD y otros mantienen. Empleo -68k y desempleo 6.5% frenan, inflacion 3.1% con nafta +27.8% empuja.",
+  "key_uncertainties": [
+   "posible suba de 25 pb",
+   "sesgo del comunicado"
+  ],
+  "sources": [
+   "https://www.moneysense.ca/news/bank-of-canada-interest-rate-forecast-october-2026/",
+   "https://www.mpamag.com/ca/mortgage-industry/industry-trends/bank-of-canadas-next-move-what-top-economists-are-saying/594101"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219327",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Sin anuncio oficial; filtraciones dicen que Fable 5.5 llego a socios con lanzamiento 'proxima semana' sin confirmar. Un dia especifico (27/10) tiene probabilidad baja.",
+  "key_uncertainties": [
+   "fecha de lanzamiento",
+   "nombre/version del modelo"
+  ],
+  "sources": [
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/"
+  ],
+  "prompt_version": "v1"
+ }
+]
