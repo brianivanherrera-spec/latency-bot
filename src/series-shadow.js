@@ -31,6 +31,7 @@ const { marketLabel } = require('./market-label');
 
 const logger = new Logger('SERIE');
 const GAMMA = 'https://gamma-api.polymarket.com';
+const CLOB = process.env.CLOB_API_BASE || 'https://clob.polymarket.com';
 // Las columnas de shadow-ticks.jsonl hasta sigma_long_e6 (sin las de la señal de Binance del bot)
 const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src', 'sigma_short_e6', 'sigma_long_e6'];
 const I = Object.fromEntries(COLS.map((k, i) => [k, i]));
@@ -123,12 +124,26 @@ class SeriesShadow {
     m.discovering = true;
     m.lastTry = this.now();
     try {
-      // Nombres candidatos en orden: el primero que esté en Gamma pasa a ser el slug del mercado
-      let r = null, found = null;
-      for (const sl of m.slugs) { r = await this._gammaMarket(sl); if (r) { found = sl; break; } }
+      // Nombres candidatos en orden: el primero que esté en Gamma con libro de órdenes pasa a ser el slug del mercado (si
+      // ninguno lo tiene, el primero que esté). El 23/10 el horario bitcoin-up-or-down-…-et dio 404 en todo el libro REST:
+      // la primera vez de cada arranque, una línea con lo que dice Gamma de cada candidato
+      const seen = [];
+      let pick = null;
+      for (const sl of m.slugs) {
+        const g = await this._gammaMarket(sl);
+        seen.push([sl, g]);
+        if (g && g.mk.enableOrderBook !== false) { pick = [sl, g]; break; }
+      }
+      pick = pick || seen.find(([, g]) => g) || null;
+      if (!this.candLogged && m.slugs.length > 1) {
+        this.candLogged = true;
+        logger.info(`[SERIE ${this.id}] candidatos en Gamma: ${seen.map(([sl, g]) => `${sl} → ${g ? `libro ${g.mk.enableOrderBook}, acepta órdenes ${g.mk.acceptingOrders}, activo ${g.mk.active}, cerrado ${g.mk.closed}, volumen ${g.mk.volume ?? 'n/a'}` : 'no está'}`).join(' | ')}`);
+      }
+      const r = pick?.[1];
       const ids = parseArr(r?.mk.clobTokenIds), outs = parseArr(r?.mk.outcomes);
       if (!ids || ids.length < 2) { m.discoverErr = r ? 'sin tokens' : 'no está en Gamma'; return; }
-      m.slug = found;
+      m.slug = pick[0];
+      m.conditionId = r.mk.conditionId || null;
       m.upIdx = outs && /^(down|no)$/i.test(String(outs[0])) ? 1 : 0; // Sí = Up: el primero salvo que diga lo contrario
       m.tokens = { yes: ids[m.upIdx], no: ids[1 - m.upIdx] };
       m.question = r.ev.title || r.mk.question || m.slug;
@@ -159,6 +174,7 @@ class SeriesShadow {
         const code = /HTTP (\d{3})/.exec(e?.message || '')?.[1] || 'sin respuesta';
         m.restCodes[code] = (m.restCodes[code] || 0) + 1;
         if (code === '429' && !m.warned429) { m.warned429 = true; logger.warn(`[SERIE ${this.id}] la API REST respondió 429 (demasiados pedidos) en ${m.slug}`); }
+        if (code === '404' && !this.clobDiagDone) m.diag = this._clobDiag(m);
         return null;
       };
       m.restReq += 2;
@@ -178,6 +194,22 @@ class SeriesShadow {
         e6(F?.sigmaShort), e6(F?.sigmaLong)]);
       if (this.paper) { try { this._paperStep(m, m.rows[m.rows.length - 1], now); } catch (e) { logger.warn(`[SERIE ${this.id}] ${this.ptag} ${e.message}`); } }
     } finally { m.inFlight = false; }
+  }
+
+  // Una vez por arranque y serie, cuando el libro REST da 404: qué dice el CLOB de ese mercado (si tiene libro, si acepta
+  // órdenes y si sus tokens son los que dio Gamma)
+  async _clobDiag(m) {
+    if (this.clobDiagDone) return;
+    this.clobDiagDone = true;
+    const head = `[SERIE ${this.id}] el libro REST da 404 en ${m.slug}: CLOB /markets`;
+    if (!m.conditionId) { logger.warn(`${head} sin conditionId en Gamma`); return; }
+    try {
+      const res = await this.fetch(`${CLOB}/markets/${m.conditionId}`, { signal: AbortSignal.timeout(5000) });
+      const j = res.ok ? await res.json() : null;
+      const ours = [m.tokens?.yes, m.tokens?.no].map(String);
+      const toks = (j?.tokens || []).map(t => `${t.outcome} ${String(t.token_id).slice(0, 10)}… ${ours.includes(String(t.token_id)) ? '(= Gamma)' : '(≠ Gamma)'}`);
+      logger.warn(`${head} → HTTP ${res.status}${j ? `, libro ${j.enable_order_book}, acepta órdenes ${j.accepting_orders}, activo ${j.active}, cerrado ${j.closed}, tokens: ${toks.join(', ') || 'ninguno'}` : ''}`);
+    } catch (e) { logger.warn(`${head} falló (${e.message})`); }
   }
 
   _close(m) {

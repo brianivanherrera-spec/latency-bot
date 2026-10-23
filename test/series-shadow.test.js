@@ -279,7 +279,9 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   assert.deepStrictEqual(hourlySlugs(Date.parse('2026-10-23T04:00:00Z'))[0], 'bitcoin-up-or-down-october-23-12am-et');
   assert.deepStrictEqual(hourlySlugs(Date.parse('2026-11-02T17:00:00Z'))[0], 'bitcoin-up-or-down-november-2-12pm-et', 'después del cambio de hora');
   const H = 3600000, H0 = Date.parse('2026-10-23T14:00:00Z'), dirH = fs.mkdtempSync(path.join(os.tmpdir(), 'b1h-'));
-  const gh = new Map([[`btc-updown-1h-${H0 / 1000}`, { closed: false, prices: '["0.5", "0.5"]' }]]);
+  // El primer candidato está en Gamma pero sin libro de órdenes: se queda con el segundo
+  const gh = new Map([[`btc-updown-1h-${H0 / 1000}`, { closed: false, prices: '["0.5", "0.5"]' }],
+    ['bitcoin-up-or-down-october-23-10am-et', { closed: false, prices: '["0.5", "0.5"]', book: false }]]);
   const asked = [];
   const fetchH = async (url) => {
     const u = new URL(url);
@@ -287,8 +289,10 @@ const tick = () => new Promise(r => setTimeout(r, 0));
       asked.push(u.searchParams.get('slug'));
       const g = gh.get(u.searchParams.get('slug'));
       return { ok: true, json: async () => (g ? [{ title: 'Bitcoin Up or Down - October 23, 10AM ET',
-        markets: [{ clobTokenIds: '["HU", "HD"]', outcomes: '["Up", "Down"]', closed: g.closed, outcomePrices: g.prices, feesEnabled: false }] }] : []) };
+        markets: [{ clobTokenIds: g.book === false ? '["OU", "OD"]' : '["HU", "HD"]', outcomes: '["Up", "Down"]', closed: g.closed, outcomePrices: g.prices,
+          feesEnabled: false, enableOrderBook: g.book !== false, conditionId: '0xc1' }] }] : []) };
     }
+    if (u.pathname === '/markets/0xc1') return { ok: true, json: async () => ({ enable_order_book: true, tokens: [{ outcome: 'Up', token_id: 'HU' }, { outcome: 'Down', token_id: 'ZZ' }] }) };
     if (u.pathname === '/book') return { ok: true, json: async () => ({ bids: [{ price: '0.49', size: '100' }], asks: [{ price: '0.50', size: '100' }] }) };
     throw new Error(`url inesperada ${url}`);
   };
@@ -300,7 +304,10 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   sh._tick(); await sh.cur.done;
   const mh = sh.cur;
   assert.deepStrictEqual([mh.slug, mh.tokens, asked], [`btc-updown-1h-${H0 / 1000}`, { yes: 'HU', no: 'HD' },
-    ['bitcoin-up-or-down-october-23-10am-et', `btc-updown-1h-${H0 / 1000}`]], 'se queda con el candidato que está en Gamma');
+    ['bitcoin-up-or-down-october-23-10am-et', `btc-updown-1h-${H0 / 1000}`]], 'se queda con el candidato que tiene libro');
+  assert.strictEqual(mh.conditionId, '0xc1');
+  await sh._clobDiag(mh);
+  assert.ok(sh.clobDiagDone, 'diagnóstico del CLOB una vez por arranque');
   assert.deepStrictEqual([path.basename(sh.paper.file), sh.ptag, sh._paperBalance().startsWith('Balance B1H: +$0.00 (0-0)')],
     ['paper-b1h-btc1h.json', '[PAPER-B1H]', true]);
   assert.deepStrictEqual([sh.rule.fee, sq.rule.fee], [0, 0.072], 'feesEnabled=false en Gamma: sin comisión; los de 15 min siguen igual');
@@ -329,5 +336,5 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   for (const d of [dirH, dirH2]) fs.rmSync(d, { recursive: true, force: true });
   for (const d of [dirP, dirR, dirU]) fs.rmSync(d, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('series-shadow: 71 ok');
+  console.log('series-shadow: 73 ok');
 })().catch(e => { console.error(e); process.exit(1); });
