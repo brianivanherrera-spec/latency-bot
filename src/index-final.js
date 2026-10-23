@@ -665,18 +665,19 @@ function runBacktest() {
       else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line);
       // Después, el mismo backtest sobre las otras sombras, una tras otra: BTC 15 min [BACKTEST-15M…], ETH 15 min
       // [BACKTEST-ETH15M…], BTC horario [BACKTEST-1H…] y ETH 5 min [BACKTEST-ETH5M…] (BACKTEST_15M=off apaga todas)
-      if (process.env.BACKTEST_15M !== 'off') runBacktest15m([['btc15m', '15M'], ['eth15m', 'ETH15M'], ['btc1h', '1H'], ['eth5m', 'ETH5M']]);
+      // (los horarios no cobran comisión: su backtest corre con TAKER_FEE_RATE=0)
+      if (process.env.BACKTEST_15M !== 'off') runBacktest15m([['btc15m', '15M'], ['eth15m', 'ETH15M'], ['btc1h', '1H', { TAKER_FEE_RATE: '0' }], ['eth5m', 'ETH5M']]);
     });
 }
 function runBacktest15m(series) {
   if (!series.length) return;
-  const [[id, tag], ...rest] = series;
+  const [[id, tag, env], ...rest] = series;
   const { execFile } = require('child_process');
   const dir = process.env.DATA_DIR || '/data';
   const inFile = path.join(dir, `shadow-ticks-${id}.jsonl`);
   if (!fs.existsSync(inFile)) return runBacktest15m(rest);
   execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'backtest.js'), inFile, path.join(dir, `backtest-report-${id}.json`)],
-    { timeout: 10 * 60000, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
+    { timeout: 10 * 60000, maxBuffer: 1 << 20, env: { ...process.env, ...env } }, (err, stdout, stderr) => {
       if (err) logger.warn(`[BACKTEST-${tag}] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);
       else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line.replace(/^\[BACKTEST/, `[BACKTEST-${tag}`));
       runBacktest15m(rest);

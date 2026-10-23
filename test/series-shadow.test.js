@@ -287,7 +287,7 @@ const tick = () => new Promise(r => setTimeout(r, 0));
       asked.push(u.searchParams.get('slug'));
       const g = gh.get(u.searchParams.get('slug'));
       return { ok: true, json: async () => (g ? [{ title: 'Bitcoin Up or Down - October 23, 10AM ET',
-        markets: [{ clobTokenIds: '["HU", "HD"]', outcomes: '["Up", "Down"]', closed: g.closed, outcomePrices: g.prices, makerBaseFee: 0 }] }] : []) };
+        markets: [{ clobTokenIds: '["HU", "HD"]', outcomes: '["Up", "Down"]', closed: g.closed, outcomePrices: g.prices, feesEnabled: false }] }] : []) };
     }
     if (u.pathname === '/book') return { ok: true, json: async () => ({ bids: [{ price: '0.49', size: '100' }], asks: [{ price: '0.50', size: '100' }] }) };
     throw new Error(`url inesperada ${url}`);
@@ -303,6 +303,7 @@ const tick = () => new Promise(r => setTimeout(r, 0));
     ['bitcoin-up-or-down-october-23-10am-et', `btc-updown-1h-${H0 / 1000}`]], 'se queda con el candidato que está en Gamma');
   assert.deepStrictEqual([path.basename(sh.paper.file), sh.ptag, sh._paperBalance().startsWith('Balance B1H: +$0.00 (0-0)')],
     ['paper-b1h-btc1h.json', '[PAPER-B1H]', true]);
+  assert.deepStrictEqual([sh.rule.fee, sq.rule.fee], [0, 0.072], 'feesEnabled=false en Gamma: sin comisión; los de 15 min siguen igual');
   for (let t = 2; t < 6; t++) { ch = H0 + t * 1000; sh._tick(); await sh.cur.done; }
   // Cierra; Gamma nunca publica el ganador: después de los intentos, el de la vela de Binance
   ch = H0 + H + 100;
@@ -328,5 +329,5 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   for (const d of [dirH, dirH2]) fs.rmSync(d, { recursive: true, force: true });
   for (const d of [dirP, dirR, dirU]) fs.rmSync(d, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('series-shadow: 70 ok');
+  console.log('series-shadow: 71 ok');
 })().catch(e => { console.error(e); process.exit(1); });

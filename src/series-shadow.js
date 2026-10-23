@@ -69,8 +69,9 @@ class SeriesShadow {
     this.fetch = fetchFn;
     this.file = path.join(dataDir, `shadow-ticks-${id}.jsonl`);
     // Regla de la cuenta B (src/paper-b.js), para el resumen de cada mercado
+    this.envFee = num(env.TAKER_FEE_RATE, 0.072);
     this.rule = { edge: num(env.PAPER_B_EDGE, 0.08), lo: num(env.PAPER_B_MIN_ASK, 0.30), hi: num(env.PAPER_B_MAX_ASK, 0.70),
-      tMax: num(env.PAPER_B_TMAX, 120), tMin: num(env.PAPER_B_TMIN, 30), fee: num(env.TAKER_FEE_RATE, 0.072) };
+      tMax: num(env.PAPER_B_TMAX, 120), tMin: num(env.PAPER_B_TMIN, 30), fee: this.envFee };
     this.cur = null;
     this.pending = new Set();
     this.timer = null;
@@ -131,7 +132,14 @@ class SeriesShadow {
       m.upIdx = outs && /^(down|no)$/i.test(String(outs[0])) ? 1 : 0; // Sí = Up: el primero salvo que diga lo contrario
       m.tokens = { yes: ids[m.upIdx], no: ids[1 - m.upIdx] };
       m.question = r.ev.title || r.mk.question || m.slug;
-      // Una vez por arranque: qué dice Gamma de comisiones en esta serie (la regla de B asume la de los de 15 min)
+      // Comisión de la serie: los mercados con feesEnabled=false en Gamma (los horarios, 23/10) no cobran → 0 en la regla y
+      // en la cuenta; los demás siguen con TAKER_FEE_RATE (las reglas de B y B15 no cambian)
+      const fee = r.mk.feesEnabled === false ? 0 : this.envFee;
+      if (fee !== this.rule.fee) {
+        this.rule.fee = fee;
+        logger.info(`[SERIE ${this.id}] ${m.slug}: ${fee ? `comisión ${fee}·p·(1−p)` : 'sin comisión (feesEnabled=false)'} en la regla de B y la cuenta`);
+      }
+      // Una vez por arranque: qué dice Gamma de comisiones en esta serie
       if (!this.feesLogged) {
         this.feesLogged = true;
         const f = Object.entries(r.mk).filter(([k]) => /fee|rebate/i.test(k)).map(([k, v]) => `${k}=${JSON.stringify(v)}`.slice(0, 80));
@@ -315,7 +323,8 @@ class SeriesShadow {
     if (att.filled) {
       att.paid = Math.round(cost / att.size * 1e4) / 1e4;
       st.filled++;
-      st.open.push({ slug: m.slug, label, side: att.side, paid: att.paid, size: att.size, upIdx: m.upIdx, start: m.startTs, end: m.endTs });
+      st.open.push({ slug: m.slug, label, side: att.side, paid: att.paid, size: att.size, upIdx: m.upIdx, start: m.startTs, end: m.endTs,
+        feeRate: this.rule.fee });
     } else st.noFill++;
     const px = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
     logger.info(`[SERIE ${this.id}] ${this.ptag} ${att.side} ${label} | ${att.sl} s restantes | ask ${px(att.ask)} vs precio justo anclado ${(att.pa * 100).toFixed(1)}% (ventaja ${(att.edge * 100).toFixed(1)} pts) | orden ${att.size} a ${px(att.limit)} | ask a +${P.cfg.checkMs}ms ${px(att.ask200)} → `
@@ -333,7 +342,7 @@ class SeriesShadow {
       logger.warn(`[SERIE ${this.id}] ${this.ptag} ${o.side} ${o.label}: sin ganador oficial en Gamma, queda afuera del balance | ${this._paperBalance()}`);
       return this._paperSave();
     }
-    const win = o.side === winner, fee = this.rule.fee * o.paid * (1 - o.paid) * o.size;
+    const win = o.side === winner, fee = (o.feeRate ?? this.rule.fee) * o.paid * (1 - o.paid) * o.size;
     const pnl = (win ? o.size * (1 - o.paid) : -o.size * o.paid) - fee;
     st.pnl = Math.round((st.pnl + pnl) * 1e4) / 1e4;
     if (win) st.w++; else st.l++;
