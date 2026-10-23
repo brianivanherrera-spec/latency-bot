@@ -120,4 +120,16 @@ ok(msToNextEmit(Date.UTC(2026, 9, 16, 13, 19, 0)) === 60000, 'falta 1 min');
 ok(msToNextEmit(Date.UTC(2026, 9, 16, 13, 20, 0)) === 3600000, 'justo a los :20 → la próxima hora');
 ok(msToNextEmit(Date.UTC(2026, 9, 16, 23, 50, 0)) === 30 * 60000, 'pasa de día');
 
+// SOL 15 min (SERIES_SHADOW_SOL=on): su cuenta va con su etiqueta y la serie se cuenta solo si aparece
+{
+  const e = new LogDigest(T0);
+  e.observe('info', 'SERIE', `[SERIE sol15m] ${mkt} | ganó UP | strike $180.00 | 900 muestras (900 con modelo; REST p50 80 ms`);
+  e.observe('info', 'SERIE', '[SERIE sol15m] [PAPER-B15] WIN UP Oct 16, 1:30PM-1:45PM ET @ $0.55 ×9 → +$3.90 (comisión $0.16) | Balance B15: +$3.90 (1-0), intentos 1, llenadas 1, sin fill 0, abiertas 0 | desde 2026-10-23T20:00 UTC');
+  const [c3, s3] = e.report(T0 + 3600000);
+  has(c3, 'B15 SOL: ', 'cuenta B15 de SOL con su etiqueta');
+  has(s3, 'sol15m 1 (0 con modelo 0)', 'serie de SOL contada');
+  const [, s4] = new LogDigest(T0).report(T0 + 3600000);
+  ok(!s4.includes('sol15m'), 'sin SOL no aparece en el resumen');
+}
+
 console.log(`log-digest: ${n} ok`);

@@ -665,8 +665,9 @@ function runBacktest() {
       else for (const line of stdout.trim().split('\n')) if (line.trim()) logger.info(line);
       // Después, el mismo backtest sobre las otras sombras, una tras otra: BTC 15 min [BACKTEST-15M…], ETH 15 min
       // [BACKTEST-ETH15M…], BTC horario [BACKTEST-1H…] y ETH 5 min [BACKTEST-ETH5M…] (BACKTEST_15M=off apaga todas)
+      // y SOL 15 min [BACKTEST-SOL15M…] solo si existe su grabación (SERIES_SHADOW_SOL=on)
       // (los horarios no cobran comisión: su backtest corre con TAKER_FEE_RATE=0)
-      if (process.env.BACKTEST_15M !== 'off') runBacktest15m([['btc15m', '15M'], ['eth15m', 'ETH15M'], ['btc1h', '1H', { TAKER_FEE_RATE: '0' }], ['eth5m', 'ETH5M']]);
+      if (process.env.BACKTEST_15M !== 'off') runBacktest15m([['btc15m', '15M'], ['eth15m', 'ETH15M'], ['btc1h', '1H', { TAKER_FEE_RATE: '0' }], ['eth5m', 'ETH5M'], ['sol15m', 'SOL15M']]);
     });
 }
 function runBacktest15m(series) {
@@ -978,14 +979,23 @@ async function main() {
   let polybolt = null;
   // Chainlink ETH/USD por la misma conexión de PolyBolt, solo para las sombras de ETH 5 y 15 min (SERIES_SHADOW_ETH=off apaga las dos)
   let ethPrice = null;
+  // Chainlink SOL/USD, solo para la sombra de SOL 15 min con su cuenta B15 en paper (pedido del 23/10: medir si la
+  // regla de B tiene ventaja en otra cripto). Apagada por defecto: SERIES_SHADOW_SOL=on la prende
+  let solPrice = null;
   if (['polybolt', 'both', 'dual'].includes(CHAINLINK_SOURCE)) {
     const { PolyBoltClient } = require('./chainlink-polybolt');
     const ethShadow = process.env.SERIES_SHADOW_ETH !== 'off';
-    polybolt = new PolyBoltClient({ getCreds: () => poly.getApiCreds(), extraSymbols: ethShadow ? ['ethusd'] : [] });
-    if (ethShadow) {
+    const solShadow = process.env.SERIES_SHADOW_SOL === 'on';
+    const extraSymbols = [...(ethShadow ? ['ethusd'] : []), ...(solShadow ? ['solusd'] : [])];
+    polybolt = new PolyBoltClient({ getCreds: () => poly.getApiCreds(), extraSymbols });
+    if (ethShadow || solShadow) {
       const { AuxPrice } = require('./aux-price');
-      ethPrice = new AuxPrice({ symbol: 'ethusd' });
-      polybolt.onExtra((sym, kind, pt) => { if (sym === 'ethusd') ethPrice.onPoint(kind, pt); });
+      if (ethShadow) ethPrice = new AuxPrice({ symbol: 'ethusd' });
+      if (solShadow) solPrice = new AuxPrice({ symbol: 'solusd' });
+      polybolt.onExtra((sym, kind, pt) => {
+        if (sym === 'ethusd' && ethPrice) ethPrice.onPoint(kind, pt);
+        else if (sym === 'solusd' && solPrice) solPrice.onPoint(kind, pt);
+      });
     }
     if (CHAINLINK_SOURCE === 'polybolt' || CHAINLINK_SOURCE === 'dual') {
       // Mismo formato que RTDS para que el resto del bot no cambie
@@ -1762,6 +1772,15 @@ async function main() {
       fairFn: fair1h, strikeFn: ms => klines.open(ms), spotFn: () => bnFv.lastPrice,
       winnerFn: ({ startTs }) => klines.winner(startTs), resolveTries: 90, ptbTries: 0,
       paper: process.env.PAPER_B1H !== 'off' }).start();
+  }
+  // Sombra de SOL 15 min con su cuenta B15 en paper (pedido del 23/10). Solo con SERIES_SHADOW_SOL=on (y PolyBolt);
+  // PAPER_B15_SOL=off deja la sombra sin la cuenta
+  if (solPrice) {
+    const { SeriesShadow } = require('./series-shadow');
+    new SeriesShadow({ id: 'sol15m', slugPrefix: 'sol-updown-15m', periodS: 900,
+      fairFn: (K, endMs, nowMs) => solPrice.fair(K, endMs, nowMs, { volMult: FAIR_VOL_MULT, floor: FAIR_SIGMA_FLOOR }),
+      strikeFn: ms => solPrice.strike(ms), spotFn: () => solPrice.last('spot')?.value ?? null,
+      paper: process.env.PAPER_B15_SOL !== 'off' }).start();
   }
 
   // ─── OPEN-SNAP (sombra): ¿el mercado abre mal valuado? ─────────────────────
