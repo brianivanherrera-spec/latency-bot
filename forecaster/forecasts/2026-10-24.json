@@ -1,0 +1,230 @@
+[
+ {
+  "market_id": "943823",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "Los modelos proyectan entre 47 y 49 escaños republicanos (rango 44-52); exactamente 51 queda en la cola alta de la distribución.",
+  "key_uncertainties": [
+   "resultado de carreras reñidas",
+   "independientes"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936102",
+  "p_yes": 0.17,
+  "confidence": "low",
+  "reasoning": "WTI cerró en $103.27 el 23/10 tras subir $3.80 por ataques hutíes; tocar $110 exige +6.5% en 5 sesiones. Volatilidad alta por Medio Oriente.",
+  "key_uncertainties": [
+   "escalada con Irán/Houthis",
+   "noticias de paz"
+  ],
+  "sources": [
+   "https://www.riotimesonline.com/oil-markets-latam-friday-october-23-2026",
+   "https://www.nationthailand.com/news/world/40072667"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5154301",
+  "p_yes": 0.17,
+  "confidence": "low",
+  "reasoning": "Los incidentes críticos de octubre encontrados duraron 19 min, 1h07 y 4h30; el de 7h54 del 12/10 figura como menor. Falta que ocurra uno de 6-12h en lo que queda del mes o que alguno cuente distinto en el status oficial.",
+  "key_uncertainties": [
+   "clasificación oficial de GitHub",
+   "nuevo incidente largo"
+  ],
+  "sources": [
+   "https://pulsetic.com/status/github/",
+   "https://isdown.app/status/github/incidents/672233-incident-with-actions-and-pages"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167209",
+  "p_yes": 0.72,
+  "confidence": "low",
+  "reasoning": "Ofensiva saudí con ~100 aviones desde el 5/10 y ataques continuos; los hutíes golpearon aeropuertos saudíes el 23/10. Exige ataque de fuerzas saudíes ese día.",
+  "key_uncertainties": [
+   "tregua",
+   "atribución a Arabia Saudita"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Yemen_offensives",
+   "https://www.washingtontimes.com/news/2026/oct/18/airstrike-kills-least-9-rebel-held-yemen-mideast-news/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2100981",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Las tres encuestas finales de TV ponen a Yashar (Eisenkot) en 22-23 escaños y al Likud en 19-21; solo Canal 14 da al Likud 30 como valor atípico.",
+  "key_uncertainties": [
+   "error de encuestas",
+   "fusiones de listas"
+  ],
+  "sources": [
+   "https://www.ynetnews.com/article/s1wppltnme",
+   "https://www.timesofisrael.com/liveblog_entry/final-polls-before-election-show-both-blocs-short-of-majority-small-parties-out-of-knesset/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219280",
+  "p_yes": 0.62,
+  "confidence": "low",
+  "reasoning": "Eurostat dio ~38 Mt de reservas de emergencia de la UE en junio; la liberación G7 de 100M barriles (parte diésel adelantada) las baja. Umbral de 31 Mt más exigente que el de 30.",
+  "key_uncertainties": [
+   "parte que libera la UE",
+   "datos de Eurostat con meses de demora"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/10/2/trump-says-europe-agrees-to-release-massive-amount-diesel-stockpile",
+   "https://www.eureporter.co/energy/2026/10/02/eu-weighs-diesel-reserve-release-as-us-piles-on-the-pressure/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219329",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "Sin anuncio oficial; filtraciones sin fecha firme de Fable 5.5. Un día puntual tiene baja probabilidad.",
+  "key_uncertainties": [
+   "fecha de lanzamiento",
+   "nombre del modelo"
+  ],
+  "sources": [
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6065256",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Promedio reciente ~26-28 tránsitos/día (semana 5-11/10: 28; hasta 18/10: 26); 170-189 equivale a 24.3-27/día, justo en el centro de lo esperado.",
+  "key_uncertainties": [
+   "datos PortWatch con rezago",
+   "escalada en Yemen/Mar Rojo"
+  ],
+  "sources": [
+   "https://redanalysis.org/2026/10/08/houthis-bab-el-mandeb-maritime-transport/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "682708",
+  "p_yes": 0.33,
+  "confidence": "low",
+  "reasoning": "Eisenkot lidera las encuestas finales pero su bloque queda en 52-56 escaños, lejos de 61; la formación de coalición depende de partidos árabes y hay riesgo de bloqueo o nueva elección.",
+  "key_uncertainties": [
+   "coalición",
+   "bloqueo político"
+  ],
+  "sources": [
+   "https://www.ynetnews.com/article/s1wppltnme",
+   "https://www.timesofisrael.com/liveblog_entry/final-polls-before-election-show-both-blocs-short-of-majority-small-parties-out-of-knesset/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6085634",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "WTI cerró en $103.27; bajar a $100 requiere -3% en 5 sesiones y el 22/10 cerró cerca de $99.5. Incierto si ya tocó $100 después de crearse el mercado.",
+  "key_uncertainties": [
+   "fecha de creación del mercado",
+   "noticias de Irán/Houthis"
+  ],
+  "sources": [
+   "https://www.riotimesonline.com/oil-markets-latam-friday-october-23-2026",
+   "https://www.nationthailand.com/news/world/40072667"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219328",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "Sin anuncio oficial; filtraciones sin fecha firme de Fable 5.5. Un día puntual tiene baja probabilidad.",
+  "key_uncertainties": [
+   "fecha de lanzamiento",
+   "nombre del modelo"
+  ],
+  "sources": [
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://madrobot.blog/2026/10/16/claude-fable-5-5-release-date-is-it-out/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5238403",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "Hay 1 portaaviones en CENTCOM (George Washington) y el Theodore Roosevelt en camino; el máximo reciente fue 3 en abril. Cuatro o más el 30/11 sería inédito.",
+  "key_uncertainties": [
+   "escalada con Irán",
+   "despliegues"
+  ],
+  "sources": [
+   "https://www.twz.com/sea/where-are-the-aircraft-carriers-october-6-2026",
+   "https://www.jpost.com/middle-east/article-912321"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5611881",
+  "p_yes": 0.33,
+  "confidence": "low",
+  "reasoning": "Petróleo ≥$85 es casi seguro con WTI en ~$103 (~92%); el resto depende de que los republicanos conserven el Senado (modelos entre 17% y 43%).",
+  "key_uncertainties": [
+   "control del Senado",
+   "caída del petróleo por acuerdo con Irán"
+  ],
+  "sources": [
+   "https://www.riotimesonline.com/oil-markets-latam-friday-october-23-2026",
+   "https://www.nationthailand.com/news/world/40072667",
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219289",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Con stocks de ~38 Mt en junio y liberaciones comprometidas por el G7, llegar a fin de octubre con 37 Mt o más es improbable.",
+  "key_uncertainties": [
+   "parte que libera la UE",
+   "dato de Eurostat"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/10/2/trump-says-europe-agrees-to-release-massive-amount-diesel-stockpile",
+   "https://www.eureporter.co/energy/2026/10/02/eu-weighs-diesel-reserve-release-as-us-piles-on-the-pressure/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554763",
+  "p_yes": 0.1,
+  "confidence": "medium",
+  "reasoning": "Meta (Muse Wonder Max) es #2 en Arena texto con ~1509-1513 contra ~1524 de Google; la brecha es chica pero Google lidera.",
+  "key_uncertainties": [
+   "nuevo modelo de Meta o Google",
+   "puntaje preliminar de Google"
+  ],
+  "sources": [
+   "https://x.com/arena/status/2110120205464846828",
+   "https://www.therevenueaireport.com/blog/ai-model-performance-october-2026"
+  ],
+  "prompt_version": "v1"
+ }
+]
