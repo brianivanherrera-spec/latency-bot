@@ -1,0 +1,233 @@
+[
+ {
+  "market_id": "943822",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Los modelos proyectan 47-49 escaños republicanos (rango 44-52); exactamente 50 está cerca de la mediana alta pero con distribución dispersa.",
+  "key_uncertainties": [
+   "carreras reñidas",
+   "independientes"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4951227",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "WTI cerró en $103.27 el 23/10; tocar $105 exige solo +1.7% en 5 sesiones con volatilidad alta por Houthis e Irán.",
+  "key_uncertainties": [
+   "escalada o distensión en Medio Oriente",
+   "fecha de creación"
+  ],
+  "sources": [
+   "https://www.riotimesonline.com/oil-markets-latam-friday-october-23-2026",
+   "https://www.nationthailand.com/news/world/40072667"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219332",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "Sin anuncio oficial de Fable 5.2+. Las filtraciones hablan de lanzamiento cercano pero fallaron fechas previas (rumor falso del 20/10); estimo ~40% de que salga antes del 31/10.",
+  "key_uncertainties": [
+   "lanzamiento sorpresa",
+   "definición de público general"
+  ],
+  "sources": [
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://emergent.sh/news/claude-fable-5-5-release-date"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166953",
+  "p_yes": 0.8,
+  "confidence": "medium",
+  "reasoning": "PortWatch: 4 tránsitos el 18/10 y promedio de 28 días de 3.4/día por el bloqueo de minas; el promedio de 7 días al 31/10 probablemente quede entre 0 y 5.",
+  "key_uncertainties": [
+   "levantamiento del bloqueo",
+   "rezago de datos"
+  ],
+  "sources": [
+   "https://straits.live/briefs/2026-10-23",
+   "https://worldfreightmonitor.com/chokepoints/strait-of-hormuz/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5611882",
+  "p_yes": 0.57,
+  "confidence": "low",
+  "reasoning": "Petróleo ≥$85 es casi seguro con WTI ~$103 (~92%); control demócrata del Senado entre ~54% y 83% según modelos, estimo ~62%.",
+  "key_uncertainties": [
+   "control del Senado",
+   "caída del petróleo"
+  ],
+  "sources": [
+   "https://www.riotimesonline.com/oil-markets-latam-friday-october-23-2026",
+   "https://www.nationthailand.com/news/world/40072667",
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5743142",
+  "p_yes": 0.1,
+  "confidence": "medium",
+  "reasoning": "WTI en ~$103; los mínimos de la semana pasada fueron ~$95.25 sin tocar $95. Bajar a $95 exige -8% en 5 sesiones.",
+  "key_uncertainties": [
+   "acuerdo con Irán",
+   "fecha de creación del mercado"
+  ],
+  "sources": [
+   "https://www.riotimesonline.com/oil-markets-latam-friday-october-23-2026",
+   "https://www.nationthailand.com/news/world/40072667"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6065172",
+  "p_yes": 0.28,
+  "confidence": "low",
+  "reasoning": "Tránsitos de Ormuz de ~3.4-4/día implican 24-28 en la semana; 25-29 cubre la parte alta de ese rango.",
+  "key_uncertainties": [
+   "bloqueo de minas",
+   "rezago PortWatch"
+  ],
+  "sources": [
+   "https://straits.live/briefs/2026-10-23",
+   "https://worldfreightmonitor.com/chokepoints/strait-of-hormuz/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "943824",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "Proyecciones de 47-49 escaños republicanos; llegar a exactamente 52 requiere ganar casi todas las carreras reñidas.",
+  "key_uncertainties": [
+   "carreras reñidas"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3247826",
+  "p_yes": 0.85,
+  "confidence": "medium",
+  "reasoning": "Encuesta Reuters del 15/10: 54 de 63 economistas esperan suba de 25 pb el 5/11; la inflación subió a 3.5% y 3 miembros ya votaron suba en septiembre.",
+  "key_uncertainties": [
+   "datos de inflación",
+   "sesgo del comité"
+  ],
+  "sources": [
+   "https://tradersunion.com/news/financial-news/show/3822839-bank-of-england-rate-hike-november/",
+   "https://hoa.org.uk/news/interest-rate-predictions-2/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167210",
+  "p_yes": 0.72,
+  "confidence": "low",
+  "reasoning": "Ofensiva saudí en curso y ataques hutíes sobre territorio saudí el 23/10; exige ataque de fuerzas saudíes ese día.",
+  "key_uncertainties": [
+   "tregua",
+   "atribución"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Yemen_offensives",
+   "https://www.washingtontimes.com/news/2026/oct/18/airstrike-kills-least-9-rebel-held-yemen-mideast-news/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5611045",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "Petróleo ≥$80 casi seguro (~96%) con WTI ~$103; control demócrata del Senado estimado ~62%.",
+  "key_uncertainties": [
+   "control del Senado",
+   "caída del petróleo"
+  ],
+  "sources": [
+   "https://www.riotimesonline.com/oil-markets-latam-friday-october-23-2026",
+   "https://www.nationthailand.com/news/world/40072667",
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936082",
+  "p_yes": 0.08,
+  "confidence": "low",
+  "reasoning": "Oro cerró en ~$3,996-4,008 el 23/10 tras caer 4.1% en la semana; tocar $3,700 requiere -7.5% en 5 sesiones.",
+  "key_uncertainties": [
+   "liquidación de posiciones",
+   "dólar y tasas"
+  ],
+  "sources": [
+   "https://roboforex.com/beginners/analytics/forex-forecast/gold/xau-usd-gold-weekly-forecast-2026-10-23/",
+   "https://www.xauusdglobal.com/gold-forecast/2026-10-26/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167212",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Ofensiva saudí en curso con ataques frecuentes; el 31/10 cae sábado y exige ataque directo de fuerzas saudíes.",
+  "key_uncertainties": [
+   "tregua",
+   "atribución"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Yemen_offensives",
+   "https://www.washingtontimes.com/news/2026/oct/18/airstrike-kills-least-9-rebel-held-yemen-mideast-news/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "631058",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Brown (D) lidera por ~3 puntos en promedios (Marist +4, Fox +5); Rasmussen y ActiVote dan a Husted ligera ventaja.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://maristpoll.marist.edu/polls/midterm-elections-in-ohio-october-2026/",
+   "https://www.pollsmax.com/senate/ohio/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4935944",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "COIN cerró en $164.45 el 23/10; llegar a $230 exige +40% en una semana, incluso con balance el 29/10.",
+  "key_uncertainties": [
+   "reacción al balance"
+  ],
+  "sources": [
+   "https://finance.yahoo.com/quote/COIN/",
+   "https://primexbt.com/for-traders/coinbase-earnings-date/"
+  ],
+  "prompt_version": "v1"
+ }
+]
