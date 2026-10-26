@@ -1,0 +1,225 @@
+[
+ {
+  "market_id": "943820",
+  "p_yes": 0.17,
+  "confidence": "low",
+  "reasoning": "Los modelos proyectan 47-49 escaños republicanos (rango 44-52); exactamente 48 queda cerca del centro de la distribución pero con mucha dispersión.",
+  "key_uncertainties": [
+   "carreras reñidas",
+   "independientes"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936102",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "WTI en ~$101.6 el 26/10 tras bajar por esperanzas de distensión; llegar a $110 exige +8% en 5 sesiones.",
+  "key_uncertainties": [
+   "escalada con Houthis/Irán"
+  ],
+  "sources": [
+   "https://arbiterz.com/oil-prices-today-brent-retreats-to-115-3-per-barrel-as-traders-weigh-middle-east-conflict-de-escalation-hopes",
+   "https://www.goodreturns.in/news/crude-oil-prices-today-brent-crude-falls-below-115-why-oil-prices-are-falling-despite-middle-east-1543357.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664660",
+  "p_yes": 0.33,
+  "confidence": "low",
+  "reasoning": "Google lidera hoy Arena texto; un lanzamiento de Anthropic en noviembre (Fable 5.5 rumoreado) podría darle el primer puesto, pero Google y Meta también lanzan. Mide la tabla sin control de estilo.",
+  "key_uncertainties": [
+   "lanzamientos de rivales",
+   "Fable 5.5"
+  ],
+  "sources": [
+   "https://www.therevenueaireport.com/blog/ai-model-performance-october-2026",
+   "https://suprmind.ai/hub/ai-models-index/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166817",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "Promedio de 7 días reciente ~26-28 tránsitos/día; menos de 20 exige una caída fuerte en una semana.",
+  "key_uncertainties": [
+   "escalada en Mar Rojo",
+   "rezago PortWatch"
+  ],
+  "sources": [
+   "https://redanalysis.org/2026/10/08/houthis-bab-el-mandeb-maritime-transport/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "943825",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "Las proyecciones dan 47-49 republicanos; 53 implica que no pierdan ningún escaño.",
+  "key_uncertainties": [
+   "carreras reñidas"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5180417",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "El 23/10 Nvidia cerró con ~$5.094T y Apple ~$5.074T; Apple superó brevemente a Nvidia en la sesión y viene ganando terreno.",
+  "key_uncertainties": [
+   "balances de la semana",
+   "rotación tech"
+  ],
+  "sources": [
+   "https://tech-insider.org/apple-nvidia-most-valuable-company-iphone-duo-5-1-trillion-2026/",
+   "https://www.financecharts.com/screener/biggest"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167211",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Ofensiva saudí en curso con ataques frecuentes; exige ataque directo de fuerzas saudíes el 30/10.",
+  "key_uncertainties": [
+   "tregua",
+   "atribución"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Yemen_offensives",
+   "https://www.washingtontimes.com/news/2026/oct/18/airstrike-kills-least-9-rebel-held-yemen-mideast-news/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "628940",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Emerson (17-19/10): Becerra 60% vs Hilton 33%, ventaja creciente (18 puntos en agosto, 27 ahora).",
+  "key_uncertainties": [
+   "error de encuesta"
+  ],
+  "sources": [
+   "https://emersoncollegepolling.com/california-2026-poll-xavier-becerra-holds-27-point-lead-over-steve-hilton/",
+   "https://www.courthousenews.com/poll-gives-becerra-27-point-lead-over-hilton-in-california-governor-race/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4951227",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "WTI ~$101.6 el 26/10 tras cerrar $103.27 el viernes; tocar $105 exige +3.3% en 5 sesiones con alta volatilidad.",
+  "key_uncertainties": [
+   "escalada con Houthis/Irán",
+   "distensión"
+  ],
+  "sources": [
+   "https://arbiterz.com/oil-prices-today-brent-retreats-to-115-3-per-barrel-as-traders-weigh-middle-east-conflict-de-escalation-hopes",
+   "https://www.goodreturns.in/news/crude-oil-prices-today-brent-crude-falls-below-115-why-oil-prices-are-falling-despite-middle-east-1543357.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5167209",
+  "p_yes": 0.72,
+  "confidence": "low",
+  "reasoning": "Ofensiva saudí en curso y ataques hutíes en territorio saudí; exige ataque directo de fuerzas saudíes ese día.",
+  "key_uncertainties": [
+   "tregua",
+   "atribución"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Yemen_offensives",
+   "https://www.washingtontimes.com/news/2026/oct/18/airstrike-kills-least-9-rebel-held-yemen-mideast-news/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630746",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Carrera muy pareja: RCP Marshall 46.0 vs Hamilton 45.7; Poliwave Hamilton 46.7 vs 45.9. Cook la calificó 'Likely R'.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/senate/general/2026/kansas/marshall-vs-hamilton",
+   "https://www.poliwave.com/us/ks/sen-fed",
+   "https://emersoncollegepolling.com/kansas-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5180413",
+  "p_yes": 0.53,
+  "confidence": "low",
+  "reasoning": "Nvidia cerró el 23/10 con ~$5.094T vs Apple ~$5.074T; ventaja mínima y Apple viene ganando terreno.",
+  "key_uncertainties": [
+   "balances de la semana",
+   "rotación tech"
+  ],
+  "sources": [
+   "https://tech-insider.org/apple-nvidia-most-valuable-company-iphone-duo-5-1-trillion-2026/",
+   "https://www.financecharts.com/screener/biggest"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5162929",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Irán atacó a EAU en marzo-mayo y contra bases en EAU y Jordania tras ataques de EE.UU. a fines del verano; en octubre no encontré ataques, pero hay reportes de que EE.UU. e Israel podrían reanudar ataques a Irán. Ventana de 5 semanas.",
+  "key_uncertainties": [
+   "reanudación de ataques a Irán",
+   "atribución de ataques"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/5/5/uae-intercepts-missiles-and-drones-for-second-day",
+   "https://www.cbsnews.com/live-updates/iran-war-us-strikes-strait-of-hormuz-larak-island/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630924",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Graham (R) lidera por ~2.7 en el promedio RCP (Trafalgar 49-46, Rasmussen 49-45); carrera cercana.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://www.wspa.com/news/politics/elections/sc-senate-race-toss-up/",
+   "https://www.realclearpolling.com/polls/senate/general/2026/south-carolina/graham-vs-andrews"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6172748",
+  "p_yes": 0.04,
+  "confidence": "low",
+  "reasoning": "WTI ~$101.6; llegar a $140 en noviembre exige +38%. Solo un cierre prolongado de Ormuz con escalada mayor lo haría plausible.",
+  "key_uncertainties": [
+   "escalada mayor con Irán"
+  ],
+  "sources": [
+   "https://arbiterz.com/oil-prices-today-brent-retreats-to-115-3-per-barrel-as-traders-weigh-middle-east-conflict-de-escalation-hopes",
+   "https://www.goodreturns.in/news/crude-oil-prices-today-brent-crude-falls-below-115-why-oil-prices-are-falling-despite-middle-east-1543357.html"
+  ],
+  "prompt_version": "v1"
+ }
+]
