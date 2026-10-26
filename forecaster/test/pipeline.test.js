@@ -117,3 +117,18 @@ test('metricas: Brier, bootstrap por evento y conclusion con >= 50', () => {
   const bs = bootstrapByEvent([{ event: 'a', d: 1 }, { event: 'a', d: 1 }, { event: 'b', d: -1 }]);
   assert.strictEqual(bs.events, 2);
 });
+
+test('resolucionLines: resultado y pago de cada posicion', () => {
+  const { resolucionLines } = require('../src/pipeline');
+  const decs = [
+    { action: 'comprar', market_id: 'a', side: 'NO', stake_usd: 10, shares: 20, fee_usd: 0.25 },
+    { action: 'comprar', market_id: 'a', side: 'SI', stake_usd: 10, shares: 40, fee_usd: 0 },
+    { action: 'omitir', market_id: 'a' },
+    { action: 'comprar', market_id: 'b', side: 'SI', stake_usd: 10, shares: 40, fee_usd: 0 },
+  ];
+  const l = resolucionLines('a', 'Pregunta?', 0, decs);
+  assert.equal(l.length, 3);
+  assert.match(l[0], /resultado=NO Pregunta\?/);
+  assert.match(l[1], /NO GANO gastado=\$10.00 pnl=\+\$9.75/);
+  assert.match(l[2], /SI PERDIO gastado=\$10.00 pnl=-\$10.00/);
+});

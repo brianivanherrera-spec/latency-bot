@@ -37,6 +37,18 @@ function posicionLine(d) {
   return `POSICION ${d.market_id} ${d.side} gastado=$${d.stake_usd.toFixed(2)} precio_medio=${d.avg_price.toFixed(3)} acciones=${d.shares.toFixed(2)} comision=$${d.fee_usd.toFixed(2)} si_gana=+$${gana.toFixed(2)} si_pierde=-$${(d.stake_usd + d.fee_usd).toFixed(2)}`;
 }
 
+// Lineas de supervision al resolver un mercado: resultado y pago de cada posicion paper.
+function resolucionLines(id, question, outcomeYes, decisions) {
+  const lines = [`RESOLUCION ${id} resultado=${outcomeYes ? 'SI' : 'NO'} ${question || ''}`.trim()];
+  for (const d of decisions) {
+    if (d.action !== 'comprar' || d.market_id !== id) continue;
+    const gano = (d.side === 'SI') === Boolean(outcomeYes);
+    const pnl = gano ? d.shares - d.stake_usd - d.fee_usd : -(d.stake_usd + d.fee_usd);
+    lines.push(`RESOLUCION ${id} ${d.side} ${gano ? 'GANO' : 'PERDIO'} gastado=$${d.stake_usd.toFixed(2)} pnl=${pnl >= 0 ? '+' : '-'}$${Math.abs(pnl).toFixed(2)}`);
+  }
+  return lines;
+}
+
 async function runSelection(date = utcDate()) {
   const st = loadState();
   const c = config();
@@ -141,7 +153,9 @@ async function checkResolutions() {
     const py = Number(prices[iy]);
     const disputed = /dispute/i.test(String(m.umaResolutionStatus || ''));
     if (disputed || !(py >= 0.99 || py <= 0.01)) { log(`resolucion ${id}: anulado/disputado/sin resultado claro, queda afuera`); continue; }
-    appendJsonl('resolutions.jsonl', { ts: new Date().toISOString(), market_id: id, outcome_yes: py >= 0.99 ? 1 : 0 });
+    const outcome_yes = py >= 0.99 ? 1 : 0;
+    appendJsonl('resolutions.jsonl', { ts: new Date().toISOString(), market_id: id, outcome_yes });
+    for (const l of resolucionLines(id, m.question, outcome_yes, st.decisions)) log(l);
     n++;
   }
   return n;
@@ -169,4 +183,4 @@ async function takeSnapshots(now = Date.now()) {
   return n;
 }
 
-module.exports = { posicionLine, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
+module.exports = { posicionLine, resolucionLines, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
