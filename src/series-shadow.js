@@ -28,6 +28,7 @@ const path = require('path');
 const { Logger } = require('./logger');
 const { fetchRestBook } = require('./book-check');
 const { marketLabel } = require('./market-label');
+const { outcomeTokenIds } = require('./token-ids');
 
 const logger = new Logger('SERIE');
 const GAMMA = 'https://gamma-api.polymarket.com';
@@ -140,7 +141,7 @@ class SeriesShadow {
         logger.info(`[SERIE ${this.id}] candidatos en Gamma: ${seen.map(([sl, g]) => `${sl} → ${g ? `libro ${g.mk.enableOrderBook}, acepta órdenes ${g.mk.acceptingOrders}, activo ${g.mk.active}, cerrado ${g.mk.closed}, volumen ${g.mk.volume ?? 'n/a'}` : 'no está'}`).join(' | ')}`);
       }
       const r = pick?.[1];
-      const ids = parseArr(r?.mk.clobTokenIds), outs = parseArr(r?.mk.outcomes);
+      const ids = outcomeTokenIds(r?.mk), outs = parseArr(r?.mk.outcomes);
       if (!ids || ids.length < 2) { m.discoverErr = r ? 'sin tokens' : 'no está en Gamma'; return; }
       m.slug = pick[0];
       m.conditionId = r.mk.conditionId || null;

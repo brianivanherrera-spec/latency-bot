@@ -10,6 +10,7 @@
 
 const { Logger } = require('./logger');
 const config = require('./config');
+const { outcomeTokenIds } = require('./token-ids');
 const logger = new Logger('POLYMARKET');
 
 const DEPOSIT_WALLET_FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
@@ -261,10 +262,7 @@ class PolymarketClient {
 
   _formatMarket(m) {
     let tokens = m.tokens || [];
-    if (!tokens.length && m.clobTokenIds) {
-      try { tokens = typeof m.clobTokenIds === 'string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds; }
-      catch(e) { tokens = []; }
-    }
+    if (!tokens.length) tokens = outcomeTokenIds(m) || [];
 
     let yesTokenId = tokens[0] || null;
     let noTokenId = tokens[1] || null;
