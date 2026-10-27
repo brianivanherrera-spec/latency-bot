@@ -1,0 +1,225 @@
+[
+ {
+  "market_id": "629506",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "Carrera empatada: promedio FiftyPlusOne del 26/10 Lombardo 44.1 vs Ford 44.0; Noble Predictive (6/10) Lombardo +2 y Emerson (septiembre) Ford +2.",
+  "key_uncertainties": [
+   "participación",
+   "candidata independiente"
+  ],
+  "sources": [
+   "https://fiftyplusone.news/polls/governor/general/nevada",
+   "https://www.noblepredictiveinsights.com/post/lombardo-tries-to-escape-trump-s-orbit-up-2-over-ford"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6172749",
+  "p_yes": 0.03,
+  "confidence": "low",
+  "reasoning": "WTI ~$101 el 27/10; llegar a $130 en noviembre exige +29%. Solo un cierre prolongado de Ormuz con escalada mayor lo haría plausible.",
+  "key_uncertainties": [
+   "escalada mayor con Irán"
+  ],
+  "sources": [
+   "https://www.voiceofemirates.com/en/business/2026/10/27/oil-prices-today-brent-crude-reaches-115-while-u-s-west-texas-intermediate-wti-stands-at-101/",
+   "https://arbiterz.com/oil-prices-today-brent-slips-below-115-wti-nears-101"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554472",
+  "p_yes": 0.2,
+  "confidence": "low",
+  "reasoning": "Xiaomi MiMo-V2.6-Pro aparece como el mejor chino en el texto de Arena (~1479-1491); no encontré rango de Kimi/Moonshot en octubre, aunque Kimi K3 salió en julio.",
+  "key_uncertainties": [
+   "rango real de Kimi K3",
+   "empates con GLM/Qwen"
+  ],
+  "sources": [
+   "https://benchlm.ai/llm-leaderboard-history",
+   "https://dev.to/max_quimby/the-hype-picks-moonshot-the-money-picks-xiaomi-5e86"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5775586",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "El Roosevelt salió de San Diego el 27/9; funcionarios de EE.UU. dijeron al WSJ que llegaría a la región a fines de noviembre. Llegar antes del 12/11 exige un tránsito rápido.",
+  "key_uncertainties": [
+   "velocidad de tránsito",
+   "escalada con Irán"
+  ],
+  "sources": [
+   "https://www.twz.com/sea/where-are-the-aircraft-carriers-september-30-2026",
+   "https://www.dawn.com/news/2034013/uss-theodore-roosevelt-aircraft-carrier-strike-group-heading-to-middle-east-us-official"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3215007",
+  "p_yes": 0.15,
+  "confidence": "medium",
+  "reasoning": "Las encuestas de CNBC (76%) y Reuters (100 economistas) esperan una suba en diciembre; Waller habló de 85% de al menos una suba. Sin cambio es el escenario minoritario.",
+  "key_uncertainties": [
+   "datos de inflación",
+   "tono de la reunión de octubre"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/27/federal-reserve-rate-hike-timing-expectations.html",
+   "https://www.federalreserve.gov/newsevents/speech/waller20261008a.htm"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6207381",
+  "p_yes": 0.05,
+  "confidence": "low",
+  "reasoning": "WTI ~$101; llegar a $125 en noviembre exige +24%. Solo escalada mayor con Irán lo haría plausible.",
+  "key_uncertainties": [
+   "escalada con Irán",
+   "cierre de Ormuz"
+  ],
+  "sources": [
+   "https://www.voiceofemirates.com/en/business/2026/10/27/oil-prices-today-brent-crude-reaches-115-while-u-s-west-texas-intermediate-wti-stands-at-101/",
+   "https://arbiterz.com/oil-prices-today-brent-slips-below-115-wti-nears-101"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554475",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "Xiaomi MiMo-V2.6-Pro es el modelo chino mejor rankeado en las capturas de octubre (1479-1491), con GLM-5.2-max muy cerca (1476).",
+  "key_uncertainties": [
+   "nuevos modelos chinos",
+   "empates por puntaje"
+  ],
+  "sources": [
+   "https://benchlm.ai/llm-leaderboard-history",
+   "https://dev.to/max_quimby/the-hype-picks-moonshot-the-money-picks-xiaomi-5e86"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6065257",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Promedio reciente ~26-28 tránsitos/día; 190-209 equivale a 27.1-29.9/día, en la parte alta de lo esperado.",
+  "key_uncertainties": [
+   "datos PortWatch con rezago",
+   "escalada en Yemen/Mar Rojo"
+  ],
+  "sources": [
+   "https://redanalysis.org/2026/10/08/houthis-bab-el-mandeb-maritime-transport/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630734",
+  "p_yes": 0.47,
+  "confidence": "low",
+  "reasoning": "Carrera de moneda al aire: Marist (8-11/10) Turek +3, Fox Turek +2, Emerson Hinson +2; promedio de Poliwave empatado en 45.9.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://maristpoll.marist.edu/polls/2026-midterm-elections-in-iowa-october-2026/",
+   "https://www.poliwave.com/us/senate/iowa",
+   "https://www.foxnews.com/politics/fox-news-poll-turek-hinson-close-iowa-senate-race"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4951227",
+  "p_yes": 0.22,
+  "confidence": "low",
+  "reasoning": "WTI ~$101 el 27/10 (cerró $101.76 el lunes); tocar $105 exige +4% en 4 sesiones con volatilidad alta pero tendencia a la baja por esperanzas de distensión.",
+  "key_uncertainties": [
+   "Houthis e Irán",
+   "distensión"
+  ],
+  "sources": [
+   "https://www.voiceofemirates.com/en/business/2026/10/27/oil-prices-today-brent-crude-reaches-115-while-u-s-west-texas-intermediate-wti-stands-at-101/",
+   "https://arbiterz.com/oil-prices-today-brent-slips-below-115-wti-nears-101"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5401165",
+  "p_yes": 0.85,
+  "confidence": "medium",
+  "reasoning": "Pakistán lanzó ataques aéreos en Afganistán el 1/10 y nuevos ataques en la tercera semana de octubre; choques fronterizos el 17/10 y sin señales de tregua.",
+  "key_uncertainties": [
+   "tregua",
+   "definición de ataque calificado"
+  ],
+  "sources": [
+   "https://www.longwarjournal.org/archives/2026/10/pakistan-launches-new-strikes-as-conflict-with-taliban-persist-into-third-week.php",
+   "https://www.aljazeera.com/news/2026/10/1/afghanistan-says-nine-killed-in-pakistani-air-raids-on-kunar-helmand"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630733",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "Carrera de moneda al aire: Marist Turek +3, Fox Turek +2, Emerson Hinson +2; modelos dan ligera ventaja a Turek.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://maristpoll.marist.edu/polls/2026-midterm-elections-in-iowa-october-2026/",
+   "https://www.poliwave.com/us/senate/iowa",
+   "https://www.foxnews.com/politics/fox-news-poll-turek-hinson-close-iowa-senate-race"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6097440",
+  "p_yes": 0.04,
+  "confidence": "low",
+  "reasoning": "WTI ~$101; tocar $110 en la semana del 26/10 exige +9% en 4 sesiones.",
+  "key_uncertainties": [
+   "escalada con Houthis/Irán"
+  ],
+  "sources": [
+   "https://www.voiceofemirates.com/en/business/2026/10/27/oil-prices-today-brent-crude-reaches-115-while-u-s-west-texas-intermediate-wti-stands-at-101/",
+   "https://arbiterz.com/oil-prices-today-brent-slips-below-115-wti-nears-101"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4424725",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Irán atacó Jordania en febrero-septiembre tras ataques de EE.UU.; en octubre solo hay alertas de la embajada y ningún ataque confirmado. Ventana de 4 días.",
+  "key_uncertainties": [
+   "reanudación de ataques de EE.UU. a Irán"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Iranian_strikes_on_Jordan",
+   "https://www.aljazeera.com/news/2026/9/1/us-military-says-launching-new-attacks-on-iran"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630747",
+  "p_yes": 0.57,
+  "confidence": "low",
+  "reasoning": "Carrera muy pareja pero Cook la califica 'Likely R'; RCP Marshall 46.0 vs Hamilton 45.7. Complementario de Demócratas.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/senate/general/2026/kansas/marshall-vs-hamilton",
+   "https://emersoncollegepolling.com/kansas-2026/"
+  ],
+  "prompt_version": "v1"
+ }
+]
