@@ -13,7 +13,8 @@
  * Cuenta B15 (paper, solo con paper: true; PAPER_B15=off la apaga en BTC y PAPER_B15_ETH=off en ETH 15 min): la misma regla de B en vivo,
  * una entrada por mercado, orden con el límite justo de B (margen 2, tope $0.72, ~$5) y fill con el libro REST a
  * +PAPER_CHECK_MS (200 ms, lo más parecido a una orden real); se resuelve con el ganador oficial y guarda su estado en
- * DATA_DIR/paper-b15-<id>.json (sigue después de un reinicio). Líneas [PAPER-B15] con cada intento, WIN/LOSS y el balance.
+ * DATA_DIR/paper-b15-<id>.json (sigue después de un reinicio). Líneas [PAPER-B15] con cada intento, WIN/LOSS y el balance;
+ * cada intento también va a DATA_DIR/paper-b15-attempts-<id>.jsonl (el backtest llena con ese ask a +200 ms).
  * SERIES_SHADOW=off apaga la de BTC 15 min; SERIES_SHADOW_ETH=off las de ETH 5 y 15 min (ids eth5m y eth15m, precio de Chainlink ETH
  * por PolyBolt, src/aux-price.js; en su archivo la columna "btc" lleva el precio de ETH).
  * Mercados horarios de BTC (id btc1h, plan del 23/10; SERIES_SHADOW_1H=off la apaga, PAPER_B1H=off solo la cuenta): resuelven
@@ -311,7 +312,8 @@ class SeriesShadow {
     try { st = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) {}
     if (!st || typeof st !== 'object') st = { pnl: 0, w: 0, l: 0, attempts: 0, filled: 0, noFill: 0, unresolved: 0, open: [], startedAt: this.now() };
     if (!Array.isArray(st.open)) st.open = [];
-    return { file, cfg, st, chain: Promise.resolve() };
+    const attFile = path.join(this.dataDir, `paper-${this.paperName.toLowerCase()}-attempts-${this.id}.jsonl`);
+    return { file, attFile, cfg, st, chain: Promise.resolve() };
   }
 
   _paperBalance() {
@@ -359,6 +361,11 @@ class SeriesShadow {
       st.open.push({ slug: m.slug, label, side: att.side, paid: att.paid, size: att.size, upIdx: m.upIdx, start: m.startTs, end: m.endTs,
         feeRate: this.rule.fee });
     } else st.noFill++;
+    // Cada intento queda registrado para el backtest (usa este ask a +checkMs en vez del de 1 s después)
+    const rec = JSON.stringify({ start: m.startTs, side: att.side, sl: att.sl, ask: att.ask, ask200: att.ask200, limit: att.limit,
+      filled: att.filled, paid: att.paid ?? null, t: att.t });
+    P.chain = P.chain.then(() => fs.promises.appendFile(P.attFile, rec + '\n'))
+      .catch(e => logger.warn(`[SERIE ${this.id}] ${this.ptag} no se pudo registrar el intento: ${e.message}`));
     const px = v => (v == null ? 'n/a' : `$${v.toFixed(2)}`);
     logger.info(`[SERIE ${this.id}] ${this.ptag} ${att.side} ${label} | ${att.sl} s restantes | ask ${px(att.ask)} vs precio justo anclado ${(att.pa * 100).toFixed(1)}% (ventaja ${(att.edge * 100).toFixed(1)} pts) | orden ${att.size} a ${px(att.limit)} | ask a +${P.cfg.checkMs}ms ${px(att.ask200)} → `
       + `${att.filled ? `lleno a ${px(att.paid)} (ventaja al precio pagado ${((att.pa - att.paid - fee(att.paid)) * 100).toFixed(1)} pts)` : 'no llena'} | ${this._paperBalance()}`);

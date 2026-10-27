@@ -8,7 +8,9 @@
  *   - precio: ask del lado en [lo, hi]
  *   - probabilidad ajustada pa = λ·p_modelo + (1−λ)·mid_mercado  (λ=1: modelo puro)
  *   - ventaja neta pa − precio − comisión(precio) ≥ eMin
- * Fill conservador: max(ask en t, ask en t+1) — un segundo de latencia en contra.
+ * Fill conservador: max(ask en t, ask en t+1) — un segundo de latencia en contra. En los mercados donde B15 intentó en
+ * vivo (mismo lado, ±3 s), el ask de t+1 se reemplaza por el ask del libro REST a +200 ms que registró el vivo
+ * (DATA_DIR/paper-b15-attempts-<id>.jsonl y la semilla scripts/b15-seed/paper-b15-attempts-seed-<id>.jsonl, sacada de los logs).
  * Comisión taker TAKER_FEE_RATE (0.072)·p·(1−p) por acción. $5 por trade (floor(5/precio) acciones).
  *
  * Familias extra (cada una con su propia selección en train y prueba en test):
@@ -152,8 +154,36 @@ function fires(R, i, side, cfg, ask, bid) {
   return pa - ask - fee(ask) >= cfg.e;
 }
 
-// Primer disparo de una regla en un mercado → { side, i, ask, ask2 (1 s después), price, escaped } o null.
+// Intentos de B15 en vivo por inicio de mercado: { side, sl, ask200 } (el primero que aparece en los archivos)
+function loadLiveAttempts(files) {
+  const byStart = new Map();
+  for (const f of files) {
+    let txt; try { txt = fs.readFileSync(f, 'utf8'); } catch { continue; }
+    for (const line of txt.split('\n')) {
+      let a; try { a = JSON.parse(line); } catch { continue; }
+      if (!a || !Number.isFinite(a.start) || !Number.isFinite(a.ask200) || !Number.isFinite(a.sl) || !a.side) continue;
+      if (!byStart.has(a.start)) byStart.set(a.start, { side: a.side, sl: a.sl, ask200: a.ask200 });
+    }
+  }
+  return byStart;
+}
+function attachLive(markets, byStart) {
+  let n = 0;
+  for (const mk of markets) { const a = byStart.get(mk.start); if (a) { mk.liveAtt = a; n++; } }
+  return n;
+}
+// Archivos de intentos de la serie de IN (shadow-ticks-<id>.jsonl); el de 5 min (shadow-ticks.jsonl) no tiene B15
+function liveAttemptFiles(inFile) {
+  const m = /^shadow-ticks-(.+)\.jsonl$/.exec(path.basename(inFile));
+  if (!m) return [];
+  return [path.join(path.dirname(inFile), `paper-b15-attempts-${m[1]}.jsonl`),
+    path.join(__dirname, 'b15-seed', `paper-b15-attempts-seed-${m[1]}.jsonl`)];
+}
+const LIVE_SL_TOL = 3;
+
+// Primer disparo de una regla en un mercado → { side, i, ask, ask2 (1 s después), price, escaped, live } o null.
 // escaped: el precio se escapó en ese segundo (fill conservador por encima del tope): no hay entrada.
+// live: B15 intentó en vivo en ese mercado, mismo lado y ±LIVE_SL_TOL s: ask2 es el ask del REST a +200 ms del vivo.
 function firstFire(mk, cfg) {
   const R = mk.rows;
   for (let i = 0; i < R.length - 1; i++) {
@@ -163,10 +193,11 @@ function firstFire(mk, cfg) {
       const ask = side === 'UP' ? r.ya : r.na, bid = side === 'UP' ? r.yb : r.nb;
       if (ask == null || ask < cfg.lo || ask > cfg.hi) continue;
       if (!fires(R, i, side, cfg, ask, bid)) continue;
-      const nx = R[i + 1];
-      const ask2 = nx ? (side === 'UP' ? nx.ya : nx.na) : null;
+      const nx = R[i + 1], la = mk.liveAtt;
+      const live = !!la && la.side === side && Math.abs(la.sl - r.sl) <= LIVE_SL_TOL;
+      const ask2 = live ? la.ask200 : nx ? (side === 'UP' ? nx.ya : nx.na) : null;
       const price = Math.max(ask, ask2 ?? ask);
-      return { side, i, ask, ask2, price, escaped: price > cfg.hi + 0.02 || price >= 0.99 };
+      return { side, i, ask, ask2, price, escaped: price > cfg.hi + 0.02 || price >= 0.99, live };
     }
   }
   return null;
@@ -642,11 +673,12 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-module.exports = { load, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
+module.exports = { load, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
   normInv, blendP, fireRecords, cutStats, cutStats2, makerExec, modelVsMarket };
 if (require.main === module) (async () => {
   const t0 = Date.now();
   const markets = await load(IN);
+  const liveMatched = attachLive(markets, loadLiveAttempts(liveAttemptFiles(IN)));
   const cut = Math.floor(markets.length * 0.6);
   const train = markets.slice(0, cut), test = markets.slice(cut);
   const results = [];
@@ -758,8 +790,8 @@ if (require.main === module) (async () => {
     entries: bMk.map(mk => ({ mk, f: firstFire(mk, bCfg) })).filter(x => x.f).map(({ mk, f }) => {
       const L = fairLimitOf(f, mk, bCfg, bMargin);
       return { start: new Date(mk.start).toISOString(), side: f.side, ask: f.ask, ask2: f.ask2, price: f.price,
-        secsLeft: mk.rows[f.i].sl, escaped: f.escaped, win: f.side === mk.winner, fairLimit: L, fairFill: (f.ask2 ?? f.ask) <= L + 1e-9 };
-    }) };
+        secsLeft: mk.rows[f.i].sl, escaped: f.escaped, win: f.side === mk.winner, fairLimit: L, fairFill: (f.ask2 ?? f.ask) <= L + 1e-9, live: f.live };
+    }), liveMatched };
   // Doble filtro (regla actual de A según el gate anclado al entrar): todos, la parte de test (el 40 % más
   // nuevo de los mercados de la regla actual: todos caen dentro del test general) y fuera de muestra desde
   // que se planteó la hipótesis (DOBLE_DESDE)
@@ -840,10 +872,10 @@ if (require.main === module) (async () => {
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B con límite por precio justo (paga hasta donde quedan M pts de ventaja, tope $${(bCfg.hi + 0.02).toFixed(2)}; llena si el ask 1 s después sigue ≤ límite): ${pb.fair.map(f => `margen ${Math.round(f.margin * 100)}: todos ${fx(f.all)} | test ${fx(f.test)}`).join(' || ')}`);
     console.log(`[BACKTEST-ANCLA] regla de la cuenta B con límite justo (margen ${Math.round(bMargin * 100)}) y tope más alto: ${pb.fairCap.map(f => `tope $${f.cap.toFixed(2)}: todos ${fx(f.all)} | test ${fx(f.test)}`).join(' || ')}`);
     const h = pb.holdout, hm = t => t.slice(11, 16);
-    const one = x => `${hm(x.start)} UTC ${x.side} ${Math.round(x.secsLeft)} s ask $${x.ask.toFixed(2)}${x.escaped ? ` → $${x.ask2 == null ? 'n/a' : x.ask2.toFixed(2)} 1 s después: se escapó` : ` → paga $${x.price.toFixed(2)} ${x.win ? 'G' : 'P'}`} (límite justo $${x.fairLimit.toFixed(2)}: ${x.fairFill ? 'llena' : 'no llena'})`;
-    const esc = pb.entries.filter(x => x.escaped).length;
+    const one = x => `${hm(x.start)} UTC ${x.side} ${Math.round(x.secsLeft)} s ask $${x.ask.toFixed(2)}${x.escaped ? ` → $${x.ask2 == null ? 'n/a' : x.ask2.toFixed(2)} ${x.live ? 'a +200 ms (vivo)' : '1 s después'}: se escapó` : ` → paga $${x.price.toFixed(2)} ${x.win ? 'G' : 'P'}${x.live ? ' V' : ''}`} (límite justo $${x.fairLimit.toFixed(2)}: ${x.fairFill ? 'llena' : 'no llena'})`;
+    const esc = pb.entries.filter(x => x.escaped).length, nLive = pb.entries.filter(x => x.live).length;
     const list = `${pb.entries.length > 12 ? `últimos 12 de ${pb.entries.length}: ` : ''}${pb.entries.slice(-12).map(one).join(', ')}`;
-    console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | disparos (inicio del mercado; ${esc} con el precio escapado en 1 s, sin entrada): ${list}` : ''}`); }
+    console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | disparos (inicio del mercado; ${esc} con el precio escapado, sin entrada; ${nLive} con el ask a +200 ms de B15 en vivo, marcados V o "(vivo)", el resto con el de 1 s después): ${list}` : ''}`); }
   { const P = report.paperBParts, f6 = Math.round(P.floorE6);
     const sd = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
     const cut = c => `ventaja 8-15 pts ${sd(c.edge[0])} | 15-25 ${sd(c.edge[1])} | ≥ 25 ${sd(c.edge[2])} || σ corta < piso del modo blend (${f6}e-6) ${sd(c.sigma[0])} | ≥ piso ${sd(c.sigma[1])}${c.sigma[2].n ? ` | sin σ ${c.sigma[2].n}` : ''} || P del modelo ≥ 99 % ${sd(c.sat[0])} | < 99 % ${sd(c.sat[1])} || ask del lado comprado en los 3 s previos: bajó ≥ 2¢ ${sd(c.trend[0])} | estable ${sd(c.trend[1])} | subió ≥ 2¢ ${sd(c.trend[2])}`;

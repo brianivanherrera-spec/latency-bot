@@ -8,7 +8,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { load, firstFire, fairLimitOf, normInv, blendP, fireRecords, cutStats, cutStats2, makerExec } = require('../scripts/backtest');
+const { load, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, fairLimitOf, normInv, blendP, fireRecords, cutStats, cutStats2, makerExec } = require('../scripts/backtest');
 const { normCdf } = require('../src/fair-value');
 
 const FEE = 0.072, fee = p => FEE * p * (1 - p);
@@ -157,6 +157,30 @@ function oldMarket(start) {
   assert.deepStrictEqual([fr.side, fr.ask, mRise.rows[fr.i].sl], ['UP', 0.50, 100], 'el ask subió 5¢: entra igual que sin filtro');
   assert.strictEqual(firstFire(mRise, bCfg).i, fr.i);
   assert.strictEqual(firstFire(mRise, { ...upCfg, blend: true }).i, fr.i, 'σ sobre el piso: con blend también entra');
+  // Intentos de B15 en vivo: en ese mercado (mismo lado, ±3 s) el backtest llena con el ask a +200 ms del vivo
+  const f1 = firstFire(mRise, bCfg);
+  const withLive = a => ({ ...mRise, liveAtt: a });
+  const fv = firstFire(withLive({ side: 'UP', sl: 101, ask200: 0.47 }), bCfg);
+  assert.deepStrictEqual([fv.i, fv.live, fv.ask2, fv.price, fv.escaped], [f1.i, true, 0.47, 0.50, false], 'ask a +200 ms más bajo: paga el ask del disparo');
+  const fe = firstFire(withLive({ side: 'UP', sl: 100, ask200: 0.80 }), bCfg);
+  assert.deepStrictEqual([fe.live, fe.price, fe.escaped], [true, 0.80, true], 'a +200 ms ya se había ido: sin entrada');
+  assert.strictEqual(firstFire(withLive({ side: 'DOWN', sl: 100, ask200: 0.47 }), bCfg).live, false, 'otro lado: 1 s después');
+  assert.strictEqual(firstFire(withLive({ side: 'UP', sl: 96, ask200: 0.47 }), bCfg).ask2, f1.ask2, 'otro momento: 1 s después');
+  assert.strictEqual(f1.live, false);
+  const dl = fs.mkdtempSync(path.join(os.tmpdir(), 'btlive-'));
+  const lf = path.join(dl, 'paper-b15-attempts-btc15m.jsonl'), sf = path.join(dl, 'seed.jsonl');
+  fs.writeFileSync(lf, `${JSON.stringify({ start: 1, side: 'UP', sl: 80, ask200: 0.4 })}\nroto\n${JSON.stringify({ start: 2, side: 'DOWN', sl: 70, ask200: null })}\n`);
+  fs.writeFileSync(sf, `${JSON.stringify({ start: 1, side: 'DOWN', sl: 90, ask200: 0.5 })}\n${JSON.stringify({ start: 3, side: 'DOWN', sl: 60, ask200: 0.55 })}\n`);
+  const byStart = loadLiveAttempts([lf, path.join(dl, 'no-existe.jsonl'), sf]);
+  assert.deepStrictEqual([...byStart.entries()], [[1, { side: 'UP', sl: 80, ask200: 0.4 }], [3, { side: 'DOWN', sl: 60, ask200: 0.55 }]],
+    'el primero por mercado; sin ask200 o línea rota: afuera');
+  const lmk = [{ start: 1 }, { start: 2 }, { start: 3 }];
+  assert.strictEqual(attachLive(lmk, byStart), 2);
+  assert.deepStrictEqual([lmk[0].liveAtt.side, lmk[1].liveAtt, lmk[2].liveAtt.sl], ['UP', undefined, 60]);
+  const lfs = liveAttemptFiles('/data/shadow-ticks-eth15m.jsonl');
+  assert.deepStrictEqual([lfs[0], path.basename(lfs[1])], ['/data/paper-b15-attempts-eth15m.jsonl', 'paper-b15-attempts-seed-eth15m.jsonl']);
+  assert.deepStrictEqual(liveAttemptFiles('/data/shadow-ticks.jsonl'), [], 'el de 5 min no tiene B15');
+  fs.rmSync(dl, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-cuts: 56 ok');
+  console.log('backtest-cuts: 66 ok');
 })().catch(err => { console.error(err); process.exit(1); });

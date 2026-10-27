@@ -246,6 +246,11 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   const q2 = await runQ(Q0 + P, () => { bq.QU = [0.64, 0.65]; });
   bq.QU = [0.49, 0.50];
   assert.deepStrictEqual([q2.b15.filled, q2.b15.ask200, sq.paper.st.attempts, sq.paper.st.noFill, sq.paper.st.open.length], [false, 0.65, 2, 1, 0]);
+  // Cada intento queda en paper-b15-attempts-btc15m.jsonl (lo lee el backtest)
+  await sq.paper.chain;
+  const atts = fs.readFileSync(path.join(dirP, 'paper-b15-attempts-btc15m.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
+  assert.deepStrictEqual(atts.map(a => [a.start, a.side, a.sl, a.ask, a.ask200, a.limit, a.filled, a.paid]),
+    [[Q0, 'UP', 100, 0.50, 0.50, 0.60, true, 0.5], [Q0 + P, 'UP', 100, 0.50, 0.65, 0.60, false, null]]);
   // Reinicio con una posición abierta (DOWN a $0.40 × 12 en el primer mercado, que ganó Up): se resuelve sola → LOSS
   const dirR = fs.mkdtempSync(path.join(os.tmpdir(), 'b15r-'));
   fs.writeFileSync(path.join(dirR, 'paper-b15-btc15m.json'), JSON.stringify({ pnl: 0, w: 0, l: 0, attempts: 1, filled: 1, noFill: 0, unresolved: 0,
