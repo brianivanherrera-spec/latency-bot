@@ -1,0 +1,286 @@
+{
+ "actualizado": "2026-10-28",
+ "nota": "posiciones paper abiertas; el indice se completa cada dia con las compras nuevas y se quitan las resueltas",
+ "posiciones": [
+  {
+   "market_id": "2941850",
+   "side": "SI",
+   "nombre": "Banco de Canadá sin cambio en la tasa (anuncio oct)",
+   "resuelve": "2026-10-28",
+   "compras": 1
+  },
+  {
+   "market_id": "682708",
+   "side": "NO",
+   "nombre": "Eisenkot próximo primer ministro de Israel",
+   "resuelve": "2026-10-28",
+   "compras": 1
+  },
+  {
+   "market_id": "3554657",
+   "side": "NO",
+   "nombre": "Anthropic mejor modelo de IA fin de octubre (Arena texto)",
+   "resuelve": "2026-10-31",
+   "compras": 1
+  },
+  {
+   "market_id": "4853905",
+   "side": "NO",
+   "nombre": "No sale nuevo Google Gemini Pro antes del 31/10",
+   "resuelve": "2026-10-31",
+   "compras": 1
+  },
+  {
+   "market_id": "4869280",
+   "side": "NO",
+   "nombre": "No sale nuevo Meta Muse Spark antes del 31/10",
+   "resuelve": "2026-10-31",
+   "compras": 1
+  },
+  {
+   "market_id": "3554659",
+   "side": "NO",
+   "nombre": "Google mejor modelo de IA fin de octubre (Arena texto)",
+   "resuelve": "2026-10-31",
+   "compras": 1
+  },
+  {
+   "market_id": "3554472",
+   "side": "SI",
+   "nombre": "Moonshot mejor modelo chino fin de octubre (Arena)",
+   "resuelve": "2026-10-31",
+   "compras": 1
+  },
+  {
+   "market_id": "3554475",
+   "side": "NO",
+   "nombre": "Xiaomi mejor modelo chino fin de octubre (Arena)",
+   "resuelve": "2026-10-31",
+   "compras": 1
+  },
+  {
+   "market_id": "3554762",
+   "side": "SI",
+   "nombre": "Anthropic #1 modelo de IA fin de octubre (Arena, control de estilo)",
+   "resuelve": "2026-10-31",
+   "compras": 1
+  },
+  {
+   "market_id": "3554692",
+   "side": "SI",
+   "nombre": "Google segundo mejor laboratorio de IA fin de octubre (Arena)",
+   "resuelve": "2026-10-31",
+   "compras": 1
+  },
+  {
+   "market_id": "5166819",
+   "side": "NO",
+   "nombre": "Bab el-Mandeb entre 25 y 29 tránsitos diarios promedio 7d el 31/10",
+   "resuelve": "2026-11-01",
+   "compras": 2
+  },
+  {
+   "market_id": "3685385",
+   "side": "NO",
+   "nombre": "No sale nuevo Google Gemini Pro antes del 1/11",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "5166964",
+   "side": "NO",
+   "nombre": "Corea del Norte exactamente 3 pruebas de misiles en octubre",
+   "resuelve": "2026-11-01",
+   "compras": 2
+  },
+  {
+   "market_id": "5743142",
+   "side": "SI",
+   "nombre": "WTI toca mínimo $95 en octubre",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "4936102",
+   "side": "NO",
+   "nombre": "WTI toca máximo $110 en octubre",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "5180417",
+   "side": "NO",
+   "nombre": "Apple mayor empresa del mundo por capitalización el 31/10",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "5180413",
+   "side": "SI",
+   "nombre": "Nvidia mayor empresa del mundo por capitalización el 31/10",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "5219279",
+   "side": "NO",
+   "nombre": "Stock de emergencia de diésel UE >=30M toneladas fin de octubre (Eurostat)",
+   "resuelve": "2026-11-01",
+   "compras": 2
+  },
+  {
+   "market_id": "5166954",
+   "side": "SI",
+   "nombre": "Entre 5 y 10 tránsitos diarios promedio del estrecho el 31/10",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "5166953",
+   "side": "NO",
+   "nombre": "Ormuz promedio 7d 0-5 tránsitos el 31/10",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "5167212",
+   "side": "NO",
+   "nombre": "Arabia Saudita ataca Yemen el 31/10",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "6065115",
+   "side": "NO",
+   "nombre": "UKMTO publica 4-7 avisos entre 26/10 y 1/11",
+   "resuelve": "2026-11-02",
+   "compras": 1
+  },
+  {
+   "market_id": "943821",
+   "side": "SI",
+   "nombre": "Republicanos exactamente 49 escaños en el Senado",
+   "resuelve": "2026-11-03",
+   "compras": 1
+  },
+  {
+   "market_id": "562828",
+   "side": "NO",
+   "nombre": "Balance of Power: D Senado y D Diputados",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "562793",
+   "side": "NO",
+   "nombre": "Demócratas controlan el Senado",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "5611044",
+   "side": "SI",
+   "nombre": "Petróleo >=80 el 2/11 y Republicanos ganan el Senado",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "630806",
+   "side": "SI",
+   "nombre": "Republicanos ganan Senado de Michigan",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "630805",
+   "side": "NO",
+   "nombre": "Demócratas ganan Senado de Michigan",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "629557",
+   "side": "NO",
+   "nombre": "Demócratas ganan gobernación de Ohio",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "634893",
+   "side": "SI",
+   "nombre": "Independiente gana Senado de Nebraska",
+   "resuelve": "2026-11-04",
+   "compras": 2
+  },
+  {
+   "market_id": "630924",
+   "side": "SI",
+   "nombre": "Demócratas ganan Senado de Carolina del Sur",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "629506",
+   "side": "SI",
+   "nombre": "Republicanos ganan gobernación de Nevada",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "630734",
+   "side": "NO",
+   "nombre": "Republicanos ganan Senado de Iowa",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "630733",
+   "side": "SI",
+   "nombre": "Demócratas ganan Senado de Iowa",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "3247825",
+   "side": "SI",
+   "nombre": "Banco de Inglaterra sin cambio tras reunión de noviembre",
+   "resuelve": "2026-11-05",
+   "compras": 1
+  },
+  {
+   "market_id": "3247826",
+   "side": "NO",
+   "nombre": "Banco de Inglaterra sube 25 pb en noviembre",
+   "resuelve": "2026-11-05",
+   "compras": 1
+  },
+  {
+   "market_id": "5775586",
+   "side": "NO",
+   "nombre": "USS Theodore Roosevelt llega a CENTCOM antes del 12/11",
+   "resuelve": "2026-11-13",
+   "compras": 1
+  },
+  {
+   "market_id": "5401165",
+   "side": "SI",
+   "nombre": "Pakistán ataca Afganistán antes del 15/11",
+   "resuelve": "2026-11-16",
+   "compras": 1
+  },
+  {
+   "market_id": "4664660",
+   "side": "NO",
+   "nombre": "Anthropic mejor modelo de IA fin de noviembre (Arena)",
+   "resuelve": "2026-12-01",
+   "compras": 2
+  },
+  {
+   "market_id": "5238401",
+   "side": "NO",
+   "nombre": "2 portaaviones de EE.UU. en CENTCOM el 30/11",
+   "resuelve": "2026-12-01",
+   "compras": 1
+  }
+ ]
+}
