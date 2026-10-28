@@ -1,0 +1,151 @@
+[
+ {
+  "market_id": "2941850",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.45,
+  "p_yes_revisada": 0.01,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida casi segura",
+  "novedades": "28/10: el Banco de Canadá subió la tasa 25 pb a 2.5%.",
+  "razonamiento": "La pregunta es si no hay cambio; la suba ya fue anunciada, falta solo la resolución oficial del mercado.",
+  "fuentes": [
+   "https://www.cbc.ca/news/business/livestory/bank-of-canada-interest-rate-announcement-oct-28-9.7398140",
+   "https://www.theglobeandmail.com/business/article-bank-of-canada-interest-rate-decision-oct-28-live-updates/"
+  ]
+ },
+ {
+  "market_id": "682708",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.33,
+  "p_yes_revisada": 0.12,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "sigue abierta (depende de formar gobierno)",
+  "novedades": "27-28/10: con ~86% escrutado, bloque de Netanyahu 53, de Eisenkot 48, árabes 19; ninguno llega a 61; Likud es la primera lista (26 vs 21).",
+  "razonamiento": "Eisenkot no tiene mayoría ni primer puesto; para ser PM necesita sumar a partidos árabes o romper el bloque rival.",
+  "fuentes": [
+   "https://www.ynetnews.com/article/hjnatbkaml",
+   "https://www.jpost.com/israel-election-2026/article-912743"
+  ]
+ },
+ {
+  "market_id": "3554657",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.22,
+  "p_yes_revisada": 0.04,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "28/10: en Arena texto, Gemini 4 Carbon 1528 y Argon 1520 lideran; Claude Opus 5.5 es 3ro con 1509.",
+  "razonamiento": "Anthropic está a ~19 puntos del primer puesto y no hay Fable 5.5 confirmado antes del 31/10.",
+  "fuentes": [
+   "https://cryptobriefing.com/gemini-4-carbon-tops-text-arena",
+   "https://officechai.com/ai/gemini-4-carbon-tops-text-arena-places-2nd-on-agent-arena/"
+  ]
+ },
+ {
+  "market_id": "3554659",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.93,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable",
+  "novedades": "28/10: Google tiene los dos primeros puestos en Arena (Carbon 1528, Argon 1520).",
+  "razonamiento": "Google lidera con dos modelos y ventaja de ~19 puntos sobre Anthropic.",
+  "fuentes": [
+   "https://cryptobriefing.com/gemini-4-carbon-tops-text-arena",
+   "https://benchlm.ai/llm-leaderboard-history"
+  ]
+ },
+ {
+  "market_id": "3554762",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.03,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida casi segura",
+  "novedades": "28/10: Google lidera Arena con dos modelos; Claude Opus 5.5 es 3ro (1509).",
+  "razonamiento": "Anthropic necesitaría remontar ~19 puntos en 3 días.",
+  "fuentes": [
+   "https://cryptobriefing.com/gemini-4-carbon-tops-text-arena"
+  ]
+ },
+ {
+  "market_id": "3554692",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.03,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida casi segura",
+  "novedades": "28/10: Google ocupa el 1er y 2do puesto de modelos; en ranking de laboratorios es 1ro.",
+  "razonamiento": "Google segundo laboratorio exigiría que otro laboratorio pase a Google, lo cual no se ve en la tabla.",
+  "fuentes": [
+   "https://cryptobriefing.com/gemini-4-carbon-tops-text-arena",
+   "https://arena.ai/leaderboard/chat/text?rankBy=labs"
+  ]
+ },
+ {
+  "market_id": "3554472",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.45,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierta",
+  "novedades": "28/10: las fuentes se contradicen: una pone a Kimi K3 primer modelo abierto en Arena (1488), otra a MiMo-V2.6-Pro (1491).",
+  "razonamiento": "Kimi K3 y MiMo están en la misma banda de error; Qwen3.8-Max (1484) y GLM también compiten.",
+  "fuentes": [
+   "https://www.secondtalent.com/resources/mimo-vs-kimi-vs-qwen/",
+   "https://benchlm.ai/best/chinese-models"
+  ]
+ },
+ {
+  "market_id": "3554475",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.5,
+  "p_yes_revisada": 0.4,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierta",
+  "novedades": "28/10: mismas fuentes contradictorias; MiMo lidera en índices compuestos pero no claramente en Arena.",
+  "razonamiento": "Xiaomi tiene chances de ser el mejor chino pero no es seguro.",
+  "fuentes": [
+   "https://benchlm.ai/best/chinese-models",
+   "https://www.secondtalent.com/resources/mimo-vs-kimi-vs-qwen/"
+  ]
+ },
+ {
+  "market_id": "4853905",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.65,
+  "p_yes_revisada": 0.75,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable",
+  "novedades": "28/10: sin lanzamiento público de Gemini Pro; Argon anunciado el 30/9 solo para probadores de confianza.",
+  "razonamiento": "Los rumores de octubre no tienen fecha oficial y quedan 3 días.",
+  "fuentes": [
+   "https://evolink.ai/blog/gemini-4-release-date",
+   "https://www.cometapi.com/gemini-4-pro-is-coming/"
+  ]
+ },
+ {
+  "market_id": "4869280",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.88,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "perdida probable",
+  "novedades": "28/10: Meta lanzó Muse Wonder (12/10) y Muse Spark Open (15/10); nada anunciado para esta semana.",
+  "razonamiento": "No hay señales de un nuevo modelo Muse Spark antes del 31/10.",
+  "fuentes": [
+   "https://techcrunch.com/2026/10/15/meta-launches-an-open-weight-model-that-runs-on-macs/",
+   "https://fortune.com/2026/10/13/metas-muse-models-reach-the-ai-frontier-and-kill-any-hopes-to-pace-it/"
+  ]
+ }
+]
