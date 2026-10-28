@@ -1,0 +1,222 @@
+[
+ {
+  "market_id": "3215008",
+  "p_yes": 0.78,
+  "confidence": "medium",
+  "reasoning": "Encuestas de CNBC (76%) y Reuters (100 economistas) esperan una suba de 25 pb en diciembre; Waller habló de 85% de al menos una suba. Riesgo de que sea 50 pb o que no suban.",
+  "key_uncertainties": [
+   "datos de inflación",
+   "decisión de octubre"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/27/federal-reserve-rate-hike-timing-expectations.html",
+   "https://www.federalreserve.gov/newsevents/speech/waller20261008a.htm"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4936102",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "WTI en ~$101.5 el 28/10; quedan 2 sesiones y llegar a $110 exige +8.4%.",
+  "key_uncertainties": [
+   "escalada con Irán"
+  ],
+  "sources": [
+   "https://www.thenationalnews.com/business/energy/2026/10/28/oil-prices-up-due-to-houthi-strikes-and-us-threat-to-renew-iran-war/",
+   "https://finance.yahoo.com/energy/articles/oil-prices-rise-houthi-attack-103009399.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219331",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "El 31/10 es sábado, sin anuncio oficial de Fable 5.2+ y filtraciones sin fecha firme; muy improbable un lanzamiento en un sábado.",
+  "key_uncertainties": [
+   "lanzamiento sorpresa"
+  ],
+  "sources": [
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://emergent.sh/news/claude-fable-5-5-release-date"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5237644",
+  "p_yes": 0.75,
+  "confidence": "medium",
+  "reasoning": "Los ataques con drones ucranianos a Moscú y el cierre de sus aeropuertos fueron casi diarios en octubre (22 y 23/10, 101 horas de cierre en los primeros 14 días).",
+  "key_uncertainties": [
+   "definición de ataque calificado",
+   "cambios de táctica"
+  ],
+  "sources": [
+   "https://www.euronews.com/2026/10/16/ukrainian-drones-force-closure-of-all-four-moscow-airports-overnight-cancelling-dozens-of-",
+   "https://www.aerotime.aero/articles/moscow-airports-shut-down-drone-attacks-october-23"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630773",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Jackson (D) lidera por ~2 puntos en promedios (Marist +2, Fox/Beacon empate, Trafalgar empate); Suffolk da a Collins +2. Carrera pareja con voto por orden de preferencia.",
+  "key_uncertainties": [
+   "voto ordenado",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://fiftyplusone.news/polls/senate/general/maine",
+   "https://www.pollsmax.com/senate/maine/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5180417",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Nvidia mantiene la delantera: ~$5.26T vs Apple ~$5.07T el 27/10 (brecha ~4%); el 23/10 Apple superó a Nvidia solo durante la sesión.",
+  "key_uncertainties": [
+   "balances",
+   "rotación tech"
+  ],
+  "sources": [
+   "https://247wallst.com/investing/2026/10/23/apple-is-just-42-billion-away-from-passing-nvidia-as-the-worlds-most-valuable-company/",
+   "https://companiesmarketcap.com/apple/marketcap/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554762",
+  "p_yes": 0.17,
+  "confidence": "medium",
+  "reasoning": "Google lidera Arena con ~1525 vs ~1507 de Claude Opus 5.5; sin lanzamiento de Anthropic confirmado antes del 31/10.",
+  "key_uncertainties": [
+   "lanzamiento Fable 5.5",
+   "puntaje preliminar de Google"
+  ],
+  "sources": [
+   "https://benchlm.ai/llm-leaderboard-history",
+   "https://arena.ai/leaderboard/chat/text?rankBy=labs"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166782",
+  "p_yes": 0.65,
+  "confidence": "low",
+  "reasoning": "Los hutíes atacaron Saudi casi a diario (25, 26 y 27/10, incluida Riyadh); el mercado cuenta solo impactos directos, no los interceptados.",
+  "key_uncertainties": [
+   "interceptación",
+   "tregua"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/10/27/saudi-led-coalition-destroys-four-houthi-drones",
+   "https://www.cnbc.com/2026/10/25/saudi-arabia-houthi-missile-drone-interceptions.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "943821",
+  "p_yes": 0.2,
+  "confidence": "low",
+  "reasoning": "Los modelos proyectan 47-49 escaños republicanos; 49 está en el extremo alto del centro de la distribución.",
+  "key_uncertainties": [
+   "carreras reñidas"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5743142",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "WTI en ~$101.5; bajar a $95 exige -6.4% en 2 sesiones.",
+  "key_uncertainties": [
+   "acuerdo con Irán"
+  ],
+  "sources": [
+   "https://www.thenationalnews.com/business/energy/2026/10/28/oil-prices-up-due-to-houthi-strikes-and-us-threat-to-renew-iran-war/",
+   "https://finance.yahoo.com/energy/articles/oil-prices-rise-houthi-attack-103009399.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3554692",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Google lidera hoy; segundo sería solo si Anthropic u otro lo supera, lo que estimo en ~15-17%.",
+  "key_uncertainties": [
+   "lanzamientos de rivales"
+  ],
+  "sources": [
+   "https://benchlm.ai/llm-leaderboard-history",
+   "https://arena.ai/leaderboard/chat/text?rankBy=labs"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166964",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "Hubo lanzamientos el 3, 12 y 14/10 (tres días, aunque el conteo exacto depende de la fuente); Corea del Norte lanza con frecuencia y quedan 4 días.",
+  "key_uncertainties": [
+   "nuevos lanzamientos hasta el 31/10",
+   "conteo exacto"
+  ],
+  "sources": [
+   "https://www.usnews.com/news/world/2026-10-11/north-korea-fires-unidentified-projectile-toward-sea-off-its-east-coast-seoul-says",
+   "https://news.usni.org/2026/10/15/north-korea-tests-first-submarine-launched-cruise-missile-in-nearly-3-years"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3501951",
+  "p_yes": 0.05,
+  "confidence": "low",
+  "reasoning": "PortWatch registra 3-4 tránsitos/día en Ormuz frente a un umbral de 60; Omán dice que hay un esquema para restablecer la navegación, pero sin acuerdo y con amenaza de EE.UU. de reanudar ataques.",
+  "key_uncertainties": [
+   "acuerdo con Irán",
+   "desminado"
+  ],
+  "sources": [
+   "https://worldfreightmonitor.com/chokepoints/strait-of-hormuz/",
+   "https://www.thenationalnews.com/business/energy/2026/10/28/oil-prices-up-due-to-houthi-strikes-and-us-threat-to-renew-iran-war/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6172750",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "WTI ~$101.5; llegar a $120 en noviembre exige +18%; UBS espera Brent estable cerca de $110.",
+  "key_uncertainties": [
+   "escalada con Irán",
+   "cierre de Ormuz"
+  ],
+  "sources": [
+   "https://www.thenationalnews.com/business/energy/2026/10/28/oil-prices-up-due-to-houthi-strikes-and-us-threat-to-renew-iran-war/",
+   "https://finance.yahoo.com/energy/articles/oil-prices-rise-houthi-attack-103009399.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6065115",
+  "p_yes": 0.25,
+  "confidence": "low",
+  "reasoning": "Hubo 12 ataques a buques en la semana del 5-11/10 y avisos de UKMTO el 23 y 26/10; lo más probable es que la semana pase de 7 avisos, pero no sé el ritmo exacto de fines de octubre.",
+  "key_uncertainties": [
+   "ritmo de avisos",
+   "avisos tardíos"
+  ],
+  "sources": [
+   "https://www.seatrade-maritime.com/security/ukmto-issues-four-hormuz-attack-warnings-in-four-hours",
+   "https://www.iranintl.com/en/202610139592"
+  ],
+  "prompt_version": "v1"
+ }
+]
