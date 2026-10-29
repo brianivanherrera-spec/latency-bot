@@ -1,0 +1,184 @@
+[
+ {
+  "market_id": "682708",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.33,
+  "p_yes_revision_manana": 0.1,
+  "p_yes_revisada": 0.1,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable (resuelve tarde)",
+  "novedades": "29/10: Israel en estancamiento; Netanyahu 53 escaños y Eisenkot 48 con 97% escrutado; Herzog consultará tras los resultados finales de la semana próxima.",
+  "razonamiento": "Eisenkot rechaza servir bajo Netanyahu y no tiene mayoría; el mandato se decide la semana que viene y hay 42 días para formar gobierno.",
+  "fuentes": [
+   {
+    "url": "https://www.axios.com/2026/10/28/israel-elections-netanyahu-eisenkot-results-deadlock",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.abc.net.au/news/2026-10-29/herzog-netanyahu-israel-election/107321418",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554657",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.22,
+  "p_yes_revision_manana": 0.04,
+  "p_yes_revisada": 0.04,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Sin cambios en Arena: Carbon 1528, Argon 1520, Claude Opus 5.5 3ro con 1509.",
+  "razonamiento": "Anthropic a ~19 puntos del primer puesto.",
+  "fuentes": [
+   {
+    "url": "https://x.com/arena/status/2115495002998751262",
+    "tipo": "red_social_oficial"
+   },
+   {
+    "url": "https://cryptobriefing.com/gemini-4-carbon-tops-text-arena",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554659",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revision_manana": 0.95,
+  "p_yes_revisada": 0.95,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable",
+  "novedades": "Sin cambios en Arena: Google tiene el 1ro y el 2do puesto.",
+  "razonamiento": "Ventaja de ~19 puntos sobre Anthropic.",
+  "fuentes": [
+   {
+    "url": "https://x.com/arena/status/2115495002998751262",
+    "tipo": "red_social_oficial"
+   }
+  ]
+ },
+ {
+  "market_id": "3554762",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revision_manana": 0.03,
+  "p_yes_revisada": 0.03,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida casi segura",
+  "novedades": "Sin cambios en Arena.",
+  "razonamiento": "Anthropic necesitaría remontar ~19 puntos en 2 días.",
+  "fuentes": [
+   {
+    "url": "https://x.com/arena/status/2115495002998751262",
+    "tipo": "red_social_oficial"
+   }
+  ]
+ },
+ {
+  "market_id": "3554692",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.15,
+  "p_yes_revision_manana": 0.03,
+  "p_yes_revisada": 0.03,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida casi segura",
+  "novedades": "Sin cambios en Arena: Google es 1er laboratorio.",
+  "razonamiento": "Para que Google quede 2º, otro laboratorio tendría que pasarlo.",
+  "fuentes": [
+   {
+    "url": "https://arena.ai/leaderboard/chat/text?rankBy=labs",
+    "tipo": "oficial"
+   }
+  ]
+ },
+ {
+  "market_id": "3554472",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.2,
+  "p_yes_revision_manana": 0.45,
+  "p_yes_revisada": 0.25,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierta",
+  "novedades": "29/10: Arena publicó Qwen3.8-Max 5º en texto con 1496 al lanzar, por encima de Kimi K3 (~1486-1488) y MiMo (~1480-1491); otra fuente lo pone en 1484.",
+  "razonamiento": "Alibaba aparece como candidato fuerte, restando probabilidad a Moonshot; las fuentes siguen contradictorias.",
+  "fuentes": [
+   {
+    "url": "https://x.com/arena/status/2084108703729615026",
+    "tipo": "red_social_oficial"
+   },
+   {
+    "url": "https://benchlm.ai/llm-leaderboard-history",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554475",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.5,
+  "p_yes_revision_manana": 0.4,
+  "p_yes_revisada": 0.25,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia posible",
+  "novedades": "29/10: mismos datos; Qwen3.8-Max (1496 según Arena) y Kimi K3 compiten con MiMo.",
+  "razonamiento": "Xiaomi deja de ser favorito claro.",
+  "fuentes": [
+   {
+    "url": "https://x.com/arena/status/2084108703729615026",
+    "tipo": "red_social_oficial"
+   },
+   {
+    "url": "https://www.secondtalent.com/resources/mimo-vs-kimi-vs-qwen/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "4853905",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.65,
+  "p_yes_revision_manana": 0.75,
+  "p_yes_revisada": 0.75,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable (depende de la definición)",
+  "novedades": "29/10: Gemini 4 Carbon sigue limitado a defensores de ciberseguridad; sin fecha ni modelo para la API pública. Argon ya estaba disponible globalmente desde el 13/10.",
+  "razonamiento": "La definición de 'próximo Gemini Pro' y si Carbon cuenta antes de ser público sigue sin verificar.",
+  "fuentes": [
+   {
+    "url": "https://nerdschalk.com/gemini-4-carbon-public-release-date-what-google-has-announced/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://smartscope.blog/en/blog/gemini-4-carbon-availability-release-date-differences-argon-2026/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "4869280",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revision_manana": 0.88,
+  "p_yes_revisada": 0.88,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "perdida probable",
+  "novedades": "29/10: sin nuevos lanzamientos de Meta desde Spark Open (15/10).",
+  "razonamiento": "Sin señales de un nuevo Muse Spark antes del 31/10.",
+  "fuentes": [
+   {
+    "url": "https://research.meta.ai/blog/muse-spark-open",
+    "tipo": "oficial"
+   }
+  ]
+ }
+]

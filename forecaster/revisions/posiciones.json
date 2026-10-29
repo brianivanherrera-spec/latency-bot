@@ -80,13 +80,6 @@
    "compras": 1
   },
   {
-   "market_id": "5166964",
-   "side": "NO",
-   "nombre": "Corea del Norte exactamente 3 pruebas de misiles en octubre",
-   "resuelve": "2026-11-01",
-   "compras": 2
-  },
-  {
    "market_id": "5743142",
    "side": "SI",
    "nombre": "WTI toca mínimo $95 en octubre",
@@ -272,6 +265,55 @@
    "market_id": "5238401",
    "side": "NO",
    "nombre": "2 portaaviones de EE.UU. en CENTCOM el 30/11",
+   "resuelve": "2026-12-01",
+   "compras": 1
+  },
+  {
+   "market_id": "6364486",
+   "side": "NO",
+   "nombre": "UKMTO publica 4-7 avisos entre 2/11 y 8/11",
+   "resuelve": "2026-11-09",
+   "compras": 1
+  },
+  {
+   "market_id": "630772",
+   "side": "NO",
+   "nombre": "Demócratas ganan Senado de Maine",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "5166967",
+   "side": "NO",
+   "nombre": "Microsoft tercera empresa por capitalización el 31/10",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "630925",
+   "side": "NO",
+   "nombre": "Republicanos ganan Senado de Carolina del Sur",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "629558",
+   "side": "SI",
+   "nombre": "Republicanos ganan gobernación de Ohio",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "5166969",
+   "side": "SI",
+   "nombre": "Alphabet tercera empresa por capitalización el 31/10",
+   "resuelve": "2026-11-01",
+   "compras": 1
+  },
+  {
+   "market_id": "6172751",
+   "side": "NO",
+   "nombre": "WTI toca máximo $110 en noviembre",
    "resuelve": "2026-12-01",
    "compras": 1
   }
