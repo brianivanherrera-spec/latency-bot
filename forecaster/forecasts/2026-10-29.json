@@ -1,0 +1,231 @@
+[
+ {
+  "market_id": "630772",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "Jackson (D) lidera por ~2 puntos en promedios (Marist +2, empates en Fox/Beacon y Trafalgar); Suffolk da a Collins +2.",
+  "key_uncertainties": [
+   "voto ordenado",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://fiftyplusone.news/polls/senate/general/maine",
+   "https://www.pollsmax.com/senate/maine/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5166967",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Microsoft y Alphabet empatados cerca de $3.9T; las fuentes discrepan sobre cuál es tercera (Statista y Fool ponen a Alphabet; StockAnalysis y NGN a Microsoft).",
+  "key_uncertainties": [
+   "cierre del 31/10",
+   "fuente de datos"
+  ],
+  "sources": [
+   "https://www.statista.com/statistics/1350976/leading-tech-companies-worldwide-by-market-cap/",
+   "https://stockanalysis.com/stocks/msft/market-cap/",
+   "https://companiesmarketcap.com/alphabet-google/marketcap/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664662",
+  "p_yes": 0.65,
+  "confidence": "low",
+  "reasoning": "Google lidera Arena con Gemini 4 Carbon (1528) y Argon (1520); Anthropic es 3ra con 1509. Un Fable 5.5 o un modelo de Meta podrían cambiarlo en noviembre.",
+  "key_uncertainties": [
+   "lanzamiento Fable 5.5",
+   "modelos rivales"
+  ],
+  "sources": [
+   "https://cryptobriefing.com/gemini-4-carbon-tops-text-arena",
+   "https://officechai.com/ai/gemini-4-carbon-tops-text-arena-places-2nd-on-agent-arena/"
+  ],
+  "prompt_version": "v1",
+  "nota": "Pronostico escrito despues de ver, a pedido del usuario, el precio actual de mercados relacionados o del mismo mercado (29/10)."
+ },
+ {
+  "market_id": "5166820",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Promedio reciente ~26/día (185 tránsitos en la semana 12-18/10); 30-34 requiere una recuperación del tráfico que no se ve.",
+  "key_uncertainties": [
+   "datos PortWatch con rezago",
+   "Yemen/Mar Rojo"
+  ],
+  "sources": [
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-bab-el-mandeb-strait"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630925",
+  "p_yes": 0.63,
+  "confidence": "low",
+  "reasoning": "Graham (R) lidera por ~2.7 en promedios (Trafalgar 49-46, Rasmussen 49-45); carrera cercana.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://www.wspa.com/news/politics/elections/sc-senate-race-toss-up/",
+   "https://www.realclearpolling.com/polls/senate/general/2026/south-carolina/graham-vs-andrews"
+  ],
+  "prompt_version": "v1",
+  "nota": "Pronostico escrito despues de ver, a pedido del usuario, el precio actual de mercados relacionados o del mismo mercado (29/10)."
+ },
+ {
+  "market_id": "4951227",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "WTI ~$101.3 hoy y cerró $102.78 el 28/10; quedan 2 sesiones y llegar a $105 exige +3.6%.",
+  "key_uncertainties": [
+   "Houthis e Irán",
+   "distensión"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/28/oil-price-today-wti-brent-hormuz.html",
+   "https://www.thenationalnews.com/business/energy/2026/10/29/oil-prices-decline-after-diplomatic-push-in-iran-war/"
+  ],
+  "prompt_version": "v1",
+  "nota": "Pronostico escrito despues de ver, a pedido del usuario, el precio actual de mercados relacionados o del mismo mercado (29/10)."
+ },
+ {
+  "market_id": "4664660",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Google lidera Arena y Anthropic es 3ra a ~19 puntos; Anthropic necesitaría que Fable 5.5 salga y supere a los modelos de Google en noviembre.",
+  "key_uncertainties": [
+   "lanzamiento Fable 5.5",
+   "modelos rivales"
+  ],
+  "sources": [
+   "https://cryptobriefing.com/gemini-4-carbon-tops-text-arena",
+   "https://officechai.com/ai/gemini-4-carbon-tops-text-arena-places-2nd-on-agent-arena/"
+  ],
+  "prompt_version": "v1",
+  "nota": "Pronostico escrito despues de ver, a pedido del usuario, el precio actual de mercados relacionados o del mismo mercado (29/10)."
+ },
+ {
+  "market_id": "6364486",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Los avisos de UKMTO vienen a ritmo alto (12 ataques en la semana del 5-11/10; numeración 182 a 185 entre el 26 y 29/10, ~6/semana); 4-7 es el centro del rango pero hay riesgo de más.",
+  "key_uncertainties": [
+   "ritmo de incidentes en Ormuz",
+   "avisos tardíos"
+  ],
+  "sources": [
+   "https://www.seatrade-maritime.com/security/ukmto-issues-four-hormuz-attack-warnings-in-four-hours",
+   "https://www.iranintl.com/en/202610139592"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "629558",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Acton (D) lidera por 2-4 puntos en promedios (RCP +4.3, Pollsmax +2.3; Marist +7, Suffolk +4), con Echelon y ActiVote a favor de Ramaswamy.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/governor/general/2026/ohio/ramaswamy-vs-acton",
+   "https://maristpoll.marist.edu/polls/midterm-elections-in-ohio-october-2026/"
+  ],
+  "prompt_version": "v1",
+  "nota": "Pronostico escrito despues de ver, a pedido del usuario, el precio actual de mercados relacionados o del mismo mercado (29/10)."
+ },
+ {
+  "market_id": "5166969",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "Alphabet y Microsoft empatados cerca de $3.9T; Alphabet figura tercera en Statista y Fool, Microsoft en StockAnalysis.",
+  "key_uncertainties": [
+   "cierre del 31/10",
+   "fuente de datos"
+  ],
+  "sources": [
+   "https://www.statista.com/statistics/1350976/leading-tech-companies-worldwide-by-market-cap/",
+   "https://stockanalysis.com/stocks/msft/market-cap/",
+   "https://companiesmarketcap.com/alphabet-google/marketcap/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219332",
+  "p_yes": 0.92,
+  "confidence": "medium",
+  "reasoning": "Sin anuncio oficial de un Fable 5.2+; el 31/10 es sábado y las filtraciones no tienen fecha firme.",
+  "key_uncertainties": [
+   "lanzamiento sorpresa"
+  ],
+  "sources": [
+   "https://www.testingcatalog.com/anthropic-several-models-coming-fable-5-5-reaches-partners/",
+   "https://emergent.sh/news/claude-fable-5-5-release-date"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6364516",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Promedio reciente ~26/día implica ~182 en 7 días, dentro del rango 170-189.",
+  "key_uncertainties": [
+   "datos PortWatch con rezago",
+   "Yemen/Mar Rojo"
+  ],
+  "sources": [
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-bab-el-mandeb-strait"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "629690",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Abbott (R) lidera por ~3 puntos en promedios (Fox 52-47, Emerson 49-45, CBS 52-48); UT Texas Politics da a Hinojosa +1.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/polls/general-ballot-test/2026-tx-governor/texas",
+   "https://texaspolitics.utexas.edu/blog/texas-2026-gubernatorial-poll-tracker"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6172751",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "WTI ~$101.3; llegar a $110 en noviembre exige +8.6% con alta volatilidad por Irán y los Houthis.",
+  "key_uncertainties": [
+   "escalada o distensión con Irán"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/28/oil-price-today-wti-brent-hormuz.html",
+   "https://www.thenationalnews.com/business/energy/2026/10/29/oil-prices-decline-after-diplomatic-push-in-iran-war/"
+  ],
+  "prompt_version": "v1",
+  "nota": "Pronostico escrito despues de ver, a pedido del usuario, el precio actual de mercados relacionados o del mismo mercado (29/10)."
+ },
+ {
+  "market_id": "5166926",
+  "p_yes": 0.25,
+  "confidence": "low",
+  "reasoning": "Hubo incidentes en claude.ai el 7, 22, 25 y 27/10, y otros trackers cuentan más; el recuento por días del estado oficial puede quedar sobre 10, pero no pude verificar la página.",
+  "key_uncertainties": [
+   "definición de día con falla",
+   "incidentes pendientes hasta el 31/10"
+  ],
+  "sources": [
+   "https://www.host-tracker.com/en/is-claude-down/incidents/2026-10-25-0614",
+   "https://deployflow.co/blog/claude-anthropic-outage-protect-claude-infrastructure/"
+  ],
+  "prompt_version": "v1"
+ }
+]
