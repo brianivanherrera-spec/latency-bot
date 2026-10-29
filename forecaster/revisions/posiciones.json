@@ -1,14 +1,7 @@
 {
- "actualizado": "2026-10-28",
+ "actualizado": "2026-10-29",
  "nota": "posiciones paper abiertas; el indice se completa cada dia con las compras nuevas y se quitan las resueltas",
  "posiciones": [
-  {
-   "market_id": "2941850",
-   "side": "SI",
-   "nombre": "Banco de Canadá sin cambio en la tasa (anuncio oct)",
-   "resuelve": "2026-10-28",
-   "compras": 1
-  },
   {
    "market_id": "682708",
    "side": "NO",

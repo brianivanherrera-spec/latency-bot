@@ -1,0 +1,311 @@
+[
+ {
+  "market_id": "682708",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.33,
+  "p_yes_revisada": 0.1,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable (resuelve tarde)",
+  "novedades": "28/10: con ~90% escrutado, Netanyahu 53, Eisenkot 48, árabes 19; Eisenkot rechaza servir bajo Netanyahu y los bloques no llegan a 61.",
+  "razonamiento": "Eisenkot no tiene mayoría ni vía clara a la coalición; el resultado oficial tardará semanas.",
+  "fuentes": [
+   "https://www.jpost.com/israel-election-2026/article-913122",
+   "https://www.aljazeera.com/news/2026/10/28/five-key-takeaways-from-israels-parliamentary-elections"
+  ]
+ },
+ {
+  "market_id": "3554657",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.22,
+  "p_yes_revisada": 0.04,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "28-29/10: Gemini 4 Carbon (1528) y Argon (1520) lideran Arena; Claude Opus 5.5 es 3º con 1509.",
+  "razonamiento": "Anthropic está a ~19 puntos del primer puesto.",
+  "fuentes": [
+   "https://officechai.com/ai/gemini-4-carbon-tops-text-arena-places-2nd-on-agent-arena/",
+   "https://x.com/arena/status/2115495002998751262"
+  ]
+ },
+ {
+  "market_id": "3554659",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.95,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable",
+  "novedades": "28-29/10: Gemini 4 Carbon debutó 1º en Arena; Google ocupa el 1º y 2º puesto.",
+  "razonamiento": "Ventaja de ~19 puntos sobre Anthropic con dos modelos de Google arriba.",
+  "fuentes": [
+   "https://x.com/arena/status/2115495002998751262",
+   "https://the-decoder.com/google-deepmind-releases-gemini-4-carbon-just-two-weeks-after-argon-with-gains-across-the-board/"
+  ]
+ },
+ {
+  "market_id": "3554762",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.03,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida casi segura",
+  "novedades": "28-29/10: Carbon 1528 y Argon 1520 por encima de Claude Opus 5.5 (1509).",
+  "razonamiento": "Anthropic necesita remontar ~19 puntos en 2 días.",
+  "fuentes": [
+   "https://x.com/arena/status/2115495002998751262"
+  ]
+ },
+ {
+  "market_id": "3554692",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.03,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida casi segura",
+  "novedades": "28-29/10: Google es 1º laboratorio y tiene 1º y 2º modelo.",
+  "razonamiento": "Para que Google quede segundo, otro laboratorio tendría que pasarlo.",
+  "fuentes": [
+   "https://x.com/arena/status/2115495002998751262",
+   "https://arena.ai/leaderboard/chat/text?rankBy=labs"
+  ]
+ },
+ {
+  "market_id": "3554472",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.45,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierta",
+  "novedades": "28/10: fuentes contradictorias sobre Kimi K3 (1488) vs MiMo-V2.6-Pro (1491) en Arena.",
+  "razonamiento": "Misma banda de error; sin dato nuevo hoy.",
+  "fuentes": [
+   "https://www.secondtalent.com/resources/mimo-vs-kimi-vs-qwen/",
+   "https://benchlm.ai/best/chinese-models"
+  ]
+ },
+ {
+  "market_id": "3554475",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.5,
+  "p_yes_revisada": 0.4,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierta",
+  "novedades": "28/10: mismas fuentes contradictorias.",
+  "razonamiento": "Sin dato nuevo hoy.",
+  "fuentes": [
+   "https://benchlm.ai/best/chinese-models",
+   "https://www.secondtalent.com/resources/mimo-vs-kimi-vs-qwen/"
+  ]
+ },
+ {
+  "market_id": "4853905",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.65,
+  "p_yes_revisada": 0.75,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable (depende de la definición)",
+  "novedades": "28/10: Gemini 4 Carbon lanzó solo para defensores de ciberseguridad; sin lanzamiento público confirmado.",
+  "razonamiento": "Falta leer las reglas exactas del mercado sobre qué cuenta como lanzamiento; Carbon y Argon son acceso restringido.",
+  "fuentes": [
+   "https://latent.space/p/ainews-gemini-4-carbon/",
+   "https://www.techtimes.com/articles/329651/20261029/google-debuts-gemini-4-carbon-improved-coding-agentic-task-capabilities.htm"
+  ]
+ },
+ {
+  "market_id": "3685385",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.64,
+  "p_yes_revisada": 0.73,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable (depende de la definición)",
+  "novedades": "28/10: igual que arriba; un día más de ventana.",
+  "razonamiento": "Mismo tema que 4853905.",
+  "fuentes": [
+   "https://latent.space/p/ainews-gemini-4-carbon/",
+   "https://www.anews.com.tr/tech/2026/10/28/us-tech-giant-google-unveils-gemini-4-carbon-ai-model"
+  ]
+ },
+ {
+  "market_id": "4869280",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.88,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "perdida probable",
+  "novedades": "Sin novedad: nada anunciado de un nuevo Muse Spark desde Wonder (12/10) y Spark Open (15/10).",
+  "razonamiento": "Sin señales de un nuevo modelo antes del 31/10.",
+  "fuentes": [
+   "https://techcrunch.com/2026/10/15/meta-launches-an-open-weight-model-that-runs-on-macs/"
+  ]
+ },
+ {
+  "market_id": "5166819",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.43,
+  "p_yes_revisada": 0.45,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierta",
+  "novedades": "Último dato PortWatch: 185 tránsitos en la semana 12-18/10 (~26/día); sin dato nuevo.",
+  "razonamiento": "Centro del rango 25-29 con dispersión de ±4.",
+  "fuentes": [
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-bab-el-mandeb-strait"
+  ]
+ },
+ {
+  "market_id": "5166964",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.12,
+  "direccion": "refuerza",
+  "cambia_de_lado": true,
+  "resultado_probable": "ganancia probable",
+  "novedades": "29/10: Corea del Norte disparó ~10 misiles balísticos de corto alcance desde Wonsan, el 17º lanzamiento del año.",
+  "razonamiento": "Con los lanzamientos del 3, 12, 14 y 29/10 ya serían al menos 4 días de lanzamiento en octubre.",
+  "fuentes": [
+   "https://www.aljazeera.com/news/2026/10/29/north-korea-fires-missiles-as-row-over-landmine-blast-intensifies",
+   "https://www.usnews.com/news/world/articles/2026-10-28/north-korea-fires-projectile-toward-sea-off-east-coast-south-korea-military-says"
+  ]
+ },
+ {
+  "market_id": "5743142",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.03,
+  "p_yes_revisada": 0.04,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida casi segura",
+  "novedades": "29/10: WTI ~$101.3 (cerró $102.78 el 28/10); quedan 2 sesiones.",
+  "razonamiento": "Bajar a $95 exige -6% en 2 sesiones.",
+  "fuentes": [
+   "https://www.cnbc.com/2026/10/28/oil-price-today-wti-brent-hormuz.html",
+   "https://www.thenationalnews.com/business/energy/2026/10/29/oil-prices-decline-after-diplomatic-push-in-iran-war/"
+  ]
+ },
+ {
+  "market_id": "4936102",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.03,
+  "p_yes_revisada": 0.03,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia casi segura",
+  "novedades": "29/10: WTI ~$101.3; quedan 2 sesiones.",
+  "razonamiento": "Llegar a $110 exige +8.6%.",
+  "fuentes": [
+   "https://www.cnbc.com/2026/10/28/oil-price-today-wti-brent-hormuz.html"
+  ]
+ },
+ {
+  "market_id": "5180417",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.3,
+  "p_yes_revisada": 0.25,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "28/10: Nvidia ~$5.26T vs Apple ~$5.07T (brecha ~3.7%).",
+  "razonamiento": "Apple necesita remontar en 2 sesiones.",
+  "fuentes": [
+   "https://www.statista.com/statistics/1350976/leading-tech-companies-worldwide-by-market-cap/",
+   "https://www.fool.com/research/largest-companies-by-market-cap/"
+  ]
+ },
+ {
+  "market_id": "5180413",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.53,
+  "p_yes_revisada": 0.72,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "28/10: igual que arriba.",
+  "razonamiento": "Nvidia lidera con ventaja pequeña.",
+  "fuentes": [
+   "https://www.statista.com/statistics/1350976/leading-tech-companies-worldwide-by-market-cap/"
+  ]
+ },
+ {
+  "market_id": "5219279",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.7,
+  "p_yes_revisada": 0.85,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable (resuelve cuando Eurostat publique)",
+  "novedades": "Sin novedad: stock ~38-39 Mt en junio; la liberación del G7 se discute sin cifra firme; dato de octubre sale en 3 meses.",
+  "razonamiento": "El stock probablemente siga arriba de 30 Mt.",
+  "fuentes": [
+   "https://www.aljazeera.com/news/2026/10/2/trump-says-europe-agrees-to-release-massive-amount-diesel-stockpile",
+   "https://www.euronews.com/2026/10/05/who-holds-the-keys-to-europes-emergency-oil-reserves"
+  ]
+ },
+ {
+  "market_id": "5166954",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.1,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable",
+  "novedades": "PortWatch: 2 tránsitos el 25/10 y 23 en la semana del 19/10 (~3/día).",
+  "razonamiento": "Un promedio de 5 a 10 por día exigiría una reapertura parcial.",
+  "fuentes": [
+   "https://straits.live/briefs/2026-10-29",
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-strait-of-hormuz"
+  ]
+ },
+ {
+  "market_id": "5166953",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.8,
+  "p_yes_revisada": 0.92,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable",
+  "novedades": "PortWatch: 2 tránsitos el 25/10 y ~3/día en la semana del 19/10.",
+  "razonamiento": "El promedio de 7 días probablemente quede en 0-5.",
+  "fuentes": [
+   "https://straits.live/briefs/2026-10-29"
+  ]
+ },
+ {
+  "market_id": "5167212",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.7,
+  "p_yes_revisada": 0.78,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "perdida probable",
+  "novedades": "28/10: ataques saudíes en Yemen (14 muertos en un mercado según los hutíes) y ataques hutíes a Saudi sin tregua.",
+  "razonamiento": "Exige ataque directo de fuerzas saudíes el 31/10 (sábado).",
+  "fuentes": [
+   "https://www.washingtonpost.com/national/2026/10/28/mideast-iran-saudi-yemen-israel-palestinians-october-282026/e7631f28-d2c0-11f1-9931-2a41b76fc976_story.html",
+   "https://www.aljazeera.com/news/2026/10/27/saudi-led-coalition-destroys-four-houthi-drones"
+  ]
+ },
+ {
+  "market_id": "6065115",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.25,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierta (gana solo con 8+ avisos)",
+  "novedades": "29/10: UKMTO ya numeró los avisos 182 (26/10) a 185 (29/10), es decir, al menos 4 en lo que va de la semana.",
+  "razonamiento": "4-7 queda casi seguro como mínimo; la posición gana solo si hay 8 o más.",
+  "fuentes": [
+   "https://www.ukmto.org/-/media/ukmto/products/20261029-ukmto_warning-185-26.pdf",
+   "https://www.iranintl.com/en/202610139592"
+  ]
+ }
+]
