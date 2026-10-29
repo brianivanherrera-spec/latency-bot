@@ -40,6 +40,11 @@ const fee = p => FEE * p * (1 - p);
 // esto (hasta el 16/10 lo comparaban con p, sin la comisión, y salían ~0,2-0,3 más altas con n = 30-60)
 const breakEven = p => p + fee(p);
 const STAKE = 5;
+// Tope de lo que se lee entre el archivo actual y los pedazos rotados (retention.js los rota a 200 MB)
+const MAX_MB = parseFloat(process.env.BACKTEST_MAX_MB || '450');
+// De los pedazos rotados solo entran los mercados de los últimos BACKTEST_DAYS días: así el de 5 min sigue con ~1 mes
+// (~8700 mercados, ~170 s y ~1 GB en Railway, como antes de rotar). El archivo actual entra entero.
+const DAYS = parseFloat(process.env.BACKTEST_DAYS || '30');
 
 // Φ⁻¹(p) — inversa de la normal estándar (Acklam, error relativo < 1.2e-9)
 function normInv(p) {
@@ -63,13 +68,50 @@ function blendP(p, sS, sL, floorE6 = SIGMA_FLOOR_E6) {
   return normCdf(normInv(Math.min(0.9999, Math.max(0.0001, p))) * sS / sB);
 }
 
+// Archivo actual más los pedazos rotados de la misma sombra (<base>.<fecha>.jsonl, ver src/retention.js), del más
+// nuevo al más viejo mientras el total no pase maxMB (el actual entra siempre) y el pedazo tenga algo de los últimos
+// `days` días (la fecha del nombre es la de la rotación, su dato más nuevo). Hasta el 29/10 se leía solo el actual y,
+// al rotar, el backtest volvía a empezar casi de cero.
+function inputFiles(file, maxMB = MAX_MB, days = DAYS, now = Date.now()) {
+  const dir = path.dirname(file), ext = path.extname(file), base = path.basename(file, ext);
+  const size = f => { try { return fs.statSync(f).size; } catch { return null; } };
+  const out = [];
+  let total = 0;
+  const cur = size(file);
+  if (cur != null) { out.push(file); total += cur; }
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { /* sin directorio */ }
+  const re = /^\.(\d{4}-\d{2}-\d{2}T[\d-]+)$/;
+  const pieces = names.filter(n => n.startsWith(base) && n.endsWith(ext) && re.test(n.slice(base.length, n.length - ext.length)))
+    .sort().reverse();
+  const since = now - days * 86400000;
+  for (const n of pieces) {
+    const ts = re.exec(n.slice(base.length, n.length - ext.length))[1].replace(/T(\d\d)-(\d\d)-(\d\d)$/, 'T$1:$2:$3Z');
+    if (Date.parse(ts) < since) break;
+    const f = path.join(dir, n), sz = size(f);
+    if (sz == null) continue;
+    if (out.length && (total + sz) / 1048576 > maxMB) break;
+    out.push(f); total += sz;
+  }
+  return { files: out, rotated: out.filter(f => f !== file).length, mb: Math.round(total / 1048576), current: file, since };
+}
+
+// file: un archivo, una lista o lo que devuelve inputFiles (de los rotados, solo los mercados desde `since`)
 async function load(file) {
-  const markets = [];
+  const byStart = new Map();
+  if (file && file.files) {
+    for (const f of file.files) await loadInto(f, byStart, f === file.current ? -Infinity : file.since);
+  } else for (const f of Array.isArray(file) ? file : [file]) await loadInto(f, byStart, -Infinity);
+  return [...byStart.values()].sort((a, b) => a.start - b.start);
+}
+
+async function loadInto(file, byStart, since) {
   const rl = readline.createInterface({ input: fs.createReadStream(file), crlfDelay: Infinity });
   for await (const line of rl) {
     if (!line) continue;
     let m; try { m = JSON.parse(line); } catch { continue; }
     if (m.winner !== 'UP' && m.winner !== 'DOWN') continue;
+    if (m.start_ts < since || byStart.has(m.start_ts)) continue;
     const c = Object.fromEntries((m.cols || []).map((k, i) => [k, i]));
     const rows = [];
     for (const r of m.rows || []) {
@@ -106,11 +148,11 @@ async function load(file) {
       if (t != null && t >= 240 && t <= 300 && b != null) { bs += b; bn++; }
       if (btcOpen == null && t != null && t <= 30 && b != null) btcOpen = b;
     }
-    markets.push({ start: m.start_ts, winner: m.winner, rows, live: c.pass != null,
+    // un mercado repetido entre pedazos se queda con el primero leído (el archivo más nuevo)
+    byStart.set(m.start_ts, { start: m.start_ts, winner: m.winner, rows, live: c.pass != null,
       period: Number.isFinite(m.end_ts) && Number.isFinite(m.start_ts) ? m.end_ts - m.start_ts : null,
       strike: Number.isFinite(m.strike) ? m.strike : null, bnClose60: bn >= 45 ? bs / bn : null, btcOpen });
   }
-  return markets.sort((a, b) => a.start - b.start);
 }
 
 // ¿La fila i dispara la regla para este lado? (según la familia)
@@ -695,11 +737,12 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-module.exports = { load, depthSplit, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
+module.exports = { load, inputFiles, depthSplit, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
   normInv, blendP, fireRecords, cutStats, cutStats2, makerExec, modelVsMarket };
 if (require.main === module) (async () => {
   const t0 = Date.now();
-  const markets = await load(IN);
+  const inputs = inputFiles(IN);
+  const markets = await load(inputs);
   const liveMatched = attachLive(markets, loadLiveAttempts(liveAttemptFiles(IN)));
   const cut = Math.floor(markets.length * 0.6);
   const train = markets.slice(0, cut), test = markets.slice(cut);
@@ -715,7 +758,7 @@ if (require.main === module) (async () => {
   const baseline = { lam: 1, e: 0.08, lo: 0.59, hi: 0.79, tMax: 270, tMin: 10 };
   const report = {
     generatedAt: new Date().toISOString(), secs: (Date.now() - t0) / 1000,
-    markets: markets.length, train: train.length, test: test.length,
+    markets: markets.length, train: train.length, test: test.length, files: { ...inputs, since: new Date(inputs.since).toISOString() },
     from: markets[0] && new Date(markets[0].start).toISOString(),
     to: markets.length && new Date(markets[markets.length - 1].start).toISOString(),
     configsEvaluated: results.length,
@@ -950,5 +993,5 @@ if (require.main === module) (async () => {
     const A = report.modelVsMarketAnchored, dxA = (label, d, m) => dx(label, d, m).replace(`≥ ${Math.round(V.gap * 100)} pts`, `≥ ${Math.round(A.gap * 100)} pts`);
     console.log(`[BACKTEST-CALIBRACION] anclado (mid + lo que se movió el modelo desde el último cambio del mid, como la regla de B): Brier z por momento `
       + `${A.points.map(p => `${p.c} s ${p.z ?? 'n/a'}`).join(', ') || 'sin datos'} || ${dxA('antes de los 120 s', A.dis.early, A.mix.early)} || ${dxA('120-10 s', A.dis.final, A.mix.final)}`); }
-  console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
+  console.log(`[BACKTEST] ${markets.length} mercados (${report.from} → ${report.to}) en ${report.secs}s (archivo actual${inputs.rotated ? ` + ${inputs.rotated} rotado${inputs.rotated > 1 ? 's' : ''} desde ${new Date(inputs.since).toISOString().slice(0, 10)}` : ''}, ${inputs.mb} MB) | base: n=${b.n} WR=${b.wr} EV/acc=${b.evPerShare} | mejor train ${JSON.stringify(best?.cfg)} → test n=${best?.test.n} EV/acc=${best?.test.evPerShare} | ${OUT}`);
 })().catch(e => { console.error(`[BACKTEST] error: ${e.stack || e.message}`); process.exit(1); });

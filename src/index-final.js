@@ -675,7 +675,10 @@ function runBacktest15m(series) {
   const { execFile } = require('child_process');
   const dir = process.env.DATA_DIR || '/data';
   const inFile = path.join(dir, `shadow-ticks-${id}.jsonl`);
-  if (!fs.existsSync(inFile)) return runBacktest15m(rest);
+  // recién rotado (retention.js) el actual todavía no existe: alcanza con un pedazo <base>.<fecha>.jsonl
+  let has = fs.existsSync(inFile);
+  if (!has) try { has = fs.readdirSync(dir).some(n => n.startsWith(`shadow-ticks-${id}.`)); } catch (_) {}
+  if (!has) return runBacktest15m(rest);
   execFile(process.execPath, [path.join(__dirname, '..', 'scripts', 'backtest.js'), inFile, path.join(dir, `backtest-report-${id}.json`)],
     { timeout: 10 * 60000, maxBuffer: 1 << 20, env: { ...process.env, ...env } }, (err, stdout, stderr) => {
       if (err) logger.warn(`[BACKTEST-${tag}] falló: ${err.message} ${String(stderr || '').slice(0, 300)}`);

@@ -8,7 +8,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { load, depthSplit, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, fairLimitOf, normInv, blendP, fireRecords, cutStats, cutStats2, makerExec } = require('../scripts/backtest');
+const { load, inputFiles, depthSplit, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, fairLimitOf, normInv, blendP, fireRecords, cutStats, cutStats2, makerExec } = require('../scripts/backtest');
 const { normCdf } = require('../src/fair-value');
 
 const FEE = 0.072, fee = p => FEE * p * (1 - p);
@@ -199,6 +199,35 @@ function oldMarket(start) {
   const ds5 = depthSplit(DM, bCfg, 'dimb5');
   assert.deepStrictEqual([ds5.fav.n, ds5.neu.n, ds5.against.n, ds5.noData], [0, 1, 1, 3], '≤ 5¢: +0.10 neutro, −0.40 en contra');
   fs.rmSync(dd, { recursive: true, force: true });
+
+  // Pedazos rotados (retention.js): el actual + los rotados del más nuevo al más viejo, hasta el tope en MB
+  const rd = fs.mkdtempSync(path.join(os.tmpdir(), 'rot-'));
+  const cur = path.join(rd, 'shadow-ticks.jsonl');
+  const rotA = path.join(rd, 'shadow-ticks.2026-10-20T10-00-00.jsonl'), rotB = path.join(rd, 'shadow-ticks.2026-10-29T17-00-00.jsonl');
+  const line = m => JSON.stringify(m) + '\n';
+  fs.writeFileSync(rotA, line(trendMarket(S0, 'UP')) + line(riseMarket(S0 + 5 * MIN, 'UP')));
+  fs.writeFileSync(rotB, line(riseMarket(S0 + 5 * MIN, 'DOWN')) + line(satMarket(S0 + 10 * MIN, 'DOWN', 0.999, 10, 10)));
+  fs.writeFileSync(cur, line(oldMarket(S0 + 15 * MIN)));
+  fs.writeFileSync(path.join(rd, 'shadow-ticks-btc15m.2026-10-25T00-00-00.jsonl'), line(oldMarket(S0 + 20 * MIN)));
+  fs.writeFileSync(path.join(rd, 'shadow-ticks-btc15m.jsonl'), line(oldMarket(S0 + 25 * MIN)));
+  const NOW = Date.UTC(2026, 9, 30);
+  const inp = inputFiles(cur, 1000, 30, NOW);
+  assert.deepStrictEqual(inp.files, [cur, rotB, rotA], 'actual, rotado nuevo, rotado viejo; no los de btc15m');
+  assert.strictEqual(inp.rotated, 2);
+  const RM = await load(inp);
+  assert.deepStrictEqual(RM.map(m => (m.start - S0) / MIN), [0, 5, 10, 15], 'ordenados y sin repetir');
+  assert.strictEqual(RM[1].winner, 'DOWN', 'el repetido se queda con el pedazo más nuevo');
+  const tope = (fs.statSync(cur).size + fs.statSync(rotB).size) / 1048576;
+  assert.deepStrictEqual(inputFiles(cur, tope * 1.01, 30, NOW).files, [cur, rotB], 'el tope corta el más viejo');
+  assert.deepStrictEqual(inputFiles(cur, 0, 30, NOW).files, [cur], 'el actual entra siempre');
+  assert.deepStrictEqual(inputFiles(cur, 1000, 5, NOW).files, [cur, rotB], 'rotado el 20/10: fuera de los últimos 5 días');
+  const i15 = inputFiles(cur, 1000, 15, NOW);
+  assert.strictEqual(i15.rotated, 2, 'los dos pedazos rotaron después del 15/10');
+  assert.deepStrictEqual((await load(i15)).map(m => (m.start - S0) / MIN), [15], 'de los pedazos, solo mercados desde el 15/10; el actual entero');
+  fs.unlinkSync(cur);
+  assert.deepStrictEqual(inputFiles(cur, 0, 30, NOW).files, [rotB], 'recién rotado: sin actual, el último pedazo');
+  assert.deepStrictEqual(inputFiles(path.join(rd, 'shadow-ticks-btc15m.jsonl'), 1000, 30, NOW).rotated, 1);
+  fs.rmSync(rd, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-cuts: 72 ok');
+  console.log('backtest-cuts: 84 ok');
 })().catch(err => { console.error(err); process.exit(1); });
