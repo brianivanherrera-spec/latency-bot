@@ -13,3 +13,7 @@ Pasos:
 6. Informar en una linea: posiciones revisadas, cuantas cambian de lado, busquedas usadas.
 
 Calendario de pasadas (desde el 29/10): lun a vie 2 por dia (manana junto al pronostico: AAAA-MM-DD.json; tarde ~19:47 UTC: AAAA-MM-DD-tarde.json); sabado y domingo solo la de la manana; lunes una pasada extra al mediodia (~15:47 UTC: AAAA-MM-DD-mediodia.json). Todas con el mismo alcance (resuelven en <= 3 dias) y sin cambiar pronosticos ni compras.
+
+Ajuste (29/10): la pasada de la manana revisa lo que resuelve en <= 3 dias; la de la tarde (y la del mediodia del lunes, que usa el alcance de la manana) es la mirada final y revisa solo lo que resuelve en las proximas 36 horas. Los mercados con end_date a las 04:59 UTC del dia siguiente cuentan como del dia anterior.
+
+Fuentes: noticias y fuentes oficiales. Una publicacion de redes sociales solo cuenta si es de una cuenta oficial o primaria (el propio organismo, empresa o vocero) o esta confirmada por dos fuentes independientes; nunca rumores. En cada fuente indicar el tipo (noticia, oficial, red_social_oficial).
