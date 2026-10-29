@@ -8,7 +8,7 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { load, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, fairLimitOf, normInv, blendP, fireRecords, cutStats, cutStats2, makerExec } = require('../scripts/backtest');
+const { load, depthSplit, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, fairLimitOf, normInv, blendP, fireRecords, cutStats, cutStats2, makerExec } = require('../scripts/backtest');
 const { normCdf } = require('../src/fair-value');
 
 const FEE = 0.072, fee = p => FEE * p * (1 - p);
@@ -181,6 +181,24 @@ function oldMarket(start) {
   assert.deepStrictEqual([lfs[0], path.basename(lfs[1])], ['/data/paper-b15-attempts-eth15m.jsonl', 'paper-b15-attempts-seed-eth15m.jsonl']);
   assert.deepStrictEqual(liveAttemptFiles('/data/shadow-ticks.jsonl'), [], 'el de 5 min no tiene B15');
   fs.rmSync(dl, { recursive: true, force: true });
+  // Filtro del book de agosto: las entradas de B separadas por la profundidad de compra al entrar (orientada al lado comprado)
+  const depthMarket = (start, winner, imb, imb5) => {
+    const m = riseMarket(start, winner);
+    return { ...m, cols: [...cols, 'book_imb', 'book_imb5'], rows: m.rows.map(r => [...r, imb, imb5]) };
+  };
+  const dd = fs.mkdtempSync(path.join(os.tmpdir(), 'btdep-'));
+  const df = path.join(dd, 'shadow-ticks.jsonl');
+  fs.writeFileSync(df, [depthMarket(S0, 'UP', 0.5, 0.1), depthMarket(S0 + 5 * MIN, 'DOWN', -0.5, -0.4), depthMarket(S0 + 10 * MIN, 'UP', 0.1, null),
+    depthMarket(S0 + 15 * MIN, 'DOWN', null, null), riseMarket(S0 + 20 * MIN, 'UP')].map(m => JSON.stringify(m)).join('\n') + '\n');
+  const DM = await load(df);
+  assert.deepStrictEqual([DM[0].rows[200].dimb, DM[0].rows[200].dimb5, DM[4].rows[200].dimb], [0.5, 0.1, null], 'columnas nuevas; sin ellas, null');
+  const ds = depthSplit(DM, bCfg, 'dimb');
+  assert.deepStrictEqual([ds.fav.n, ds.fav.wr, ds.neu.n, ds.against.n, ds.against.wr, ds.noData], [1, 1, 1, 1, 0, 2],
+    'UP con +0.50 a favor gana; UP con −0.50 (bloquearía) pierde; 0.10 neutro; dos sin dato');
+  near(ds.against.evPerShare, -0.5 - fee(0.5), 1e-4);
+  const ds5 = depthSplit(DM, bCfg, 'dimb5');
+  assert.deepStrictEqual([ds5.fav.n, ds5.neu.n, ds5.against.n, ds5.noData], [0, 1, 1, 3], '≤ 5¢: +0.10 neutro, −0.40 en contra');
+  fs.rmSync(dd, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('backtest-cuts: 66 ok');
+  console.log('backtest-cuts: 72 ok');
 })().catch(err => { console.error(err); process.exit(1); });

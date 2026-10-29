@@ -2705,10 +2705,14 @@ async function main() {
       const movThr = parseFloat(process.env.BOOK_FILTER_MIN_MOVEMENT || '0.10');
       const against = (v, thr) => v == null ? null
         : (sig.direction === 'UP' ? v < -thr : v > thr);
+      // Filtro original del 10/08 (commit 4af8d6c2): profundidad de compra YES contra NO, bloquea con ±0.30 en contra
+      const dep = polyWs.getDepthImbalance?.() ?? null;
       return {
         imb, mov10s, mov30s,
         imbBlock: against(imb, imbThr),
         movBlock: against(movWin, movThr),
+        depImb: dep?.imb ?? null, depImb5: dep?.imb5 ?? null, depYes: dep?.yes ?? null, depNo: dep?.no ?? null,
+        depBlock: against(dep?.imb ?? null, imbThr),
       };
     })();
 
@@ -2917,7 +2921,7 @@ async function main() {
       // Book al momento de la señal (calculado arriba); se loguea solo si se entra
       const f = v => v == null ? 'n/a' : (v >= 0 ? '+' : '') + v.toFixed(3);
       const verdict = b => b == null ? 'sin dato' : (b ? 'BLOQUEARÍA' : 'deja pasar');
-      logger.info(`[BOOK-SHADOW] ${sig.direction} imb=${f(bookShadow.imb)} (filtro viejo: ${verdict(bookShadow.imbBlock)}) | mov10s=${f(bookShadow.mov10s)} mov30s=${f(bookShadow.mov30s)} (filtro movimiento: ${verdict(bookShadow.movBlock)})`);
+      logger.info(`[BOOK-SHADOW] ${sig.direction} imb=${f(bookShadow.imb)} (filtro viejo: ${verdict(bookShadow.imbBlock)}) | mov10s=${f(bookShadow.mov10s)} mov30s=${f(bookShadow.mov30s)} (filtro movimiento: ${verdict(bookShadow.movBlock)}) | profundidad YES ${bookShadow.depYes ?? 'n/a'} / NO ${bookShadow.depNo ?? 'n/a'} imb=${f(bookShadow.depImb)} imb5=${f(bookShadow.depImb5)} (filtro de agosto: ${verdict(bookShadow.depBlock)})`);
     }
     shadow?.recordBotTrade({ direction: sig.direction, price, zScore: sig.zScore, posId });
     logger.info(`  Exposure: $${finalExposure} | Size: ${size} | Token: ${tokenId}`);

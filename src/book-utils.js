@@ -39,4 +39,23 @@ function bestOfBook(book) {
   return { bestBid: bid.price, bestBidSize: bid.size, bestAsk: ask.price, bestAskSize: ask.size, crossed };
 }
 
-module.exports = { bestLevel, sortedLevels, bestOfBook, parseSize };
+// Profundidad de compra de un lado a partir de pares [precio, tamaño]: todo el libro y los niveles a ≤ 5¢ del mejor bid
+function bidDepth(pairs) {
+  if (!Array.isArray(pairs)) return null;
+  let best = null, all = 0, near = 0;
+  for (const [p, z] of pairs) if (z > 0 && (best == null || p > best)) best = p;
+  for (const [p, z] of pairs) { if (!(z > 0)) continue; all += z; if (p >= best - 0.05 - 1e-9) near += z; }
+  return { all, near };
+}
+
+// Desbalance de profundidad YES contra NO ({ all, near } de cada lado): imb = (YES − NO) / (YES + NO) con todo el
+// libro, imb5 con los niveles cercanos al mejor bid. +1 = toda la compra en YES. null si falta un lado o los dos están vacíos.
+function depthImbalance(y, n) {
+  if (!y || !n) return null;
+  const r = (a, b) => (a + b > 0 ? Math.round((a - b) / (a + b) * 1000) / 1000 : null);
+  const imb = r(y.all, n.all);
+  if (imb == null) return null;
+  return { yes: Math.round(y.all), no: Math.round(n.all), imb, imb5: r(y.near, n.near) };
+}
+
+module.exports = { bestLevel, sortedLevels, bestOfBook, parseSize, bidDepth, depthImbalance };

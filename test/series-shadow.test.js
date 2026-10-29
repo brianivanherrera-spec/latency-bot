@@ -79,6 +79,7 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   const r0 = m.rows[0], r1 = m.rows[1];
   assert.deepStrictEqual([r0[0], r0[1], r0[2], r0[3], r0[10]], [2, 898, 100090, null, null], 'sin strike todavía: sin modelo');
   assert.deepStrictEqual([r1[0], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[10], r1[11], r1[12]], [3, 0.5, 0.49, 0.50, 0.50, 0.51, 70, 1, 50, 50]);
+  assert.deepStrictEqual([r1[9], r1[13]], [0, 0], 'profundidad de compra pareja en Sí y No (100 y 100)');
   // Siguiente mercado: el anterior queda esperando a Gamma; cuando cierra con Up en 1 se escribe
   gamma.set(slug(S0 + P), { outcomes: '["Down", "Up"]', ids: '["D2", "U2"]', closed: false, prices: '["0.5", "0.5"]' });
   clock = S0 + P + 500;
@@ -341,5 +342,5 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   for (const d of [dirH, dirH2]) fs.rmSync(d, { recursive: true, force: true });
   for (const d of [dirP, dirR, dirU]) fs.rmSync(d, { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('series-shadow: 73 ok');
+  console.log('series-shadow: 74 ok');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -30,12 +30,15 @@ const { Logger } = require('./logger');
 const { fetchRestBook } = require('./book-check');
 const { marketLabel } = require('./market-label');
 const { outcomeTokenIds } = require('./token-ids');
+const { bidDepth, depthImbalance } = require('./book-utils');
 
 const logger = new Logger('SERIE');
 const GAMMA = 'https://gamma-api.polymarket.com';
 const CLOB = process.env.CLOB_API_BASE || 'https://clob.polymarket.com';
 // Las columnas de shadow-ticks.jsonl hasta sigma_long_e6 (sin las de la señal de Binance del bot)
-const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src', 'sigma_short_e6', 'sigma_long_e6'];
+// book_imb / book_imb5: desbalance de profundidad de compra YES contra NO en el libro REST (todo / ≤ 5¢ del mejor bid), desde el 29/10
+const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src', 'sigma_short_e6', 'sigma_long_e6',
+  'book_imb5'];
 const I = Object.fromEntries(COLS.map((k, i) => [k, i]));
 const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const rnd = (v, d) => (v == null || !Number.isFinite(v)) ? null : Math.round(v * 10 ** d) / 10 ** d;
@@ -191,9 +194,10 @@ class SeriesShadow {
       let btc = null;
       try { btc = this.spotFn(); } catch (_) {}
       const e6 = v => rnd(v == null ? null : v * 1e6, 3);
+      const dep = Y && N ? depthImbalance(bidDepth(Y.bids), bidDepth(N.bids)) : null;
       m.rows.push([Math.round((now - m.startTs) / 1000), rnd((m.endTs - now) / 1000, 1), rnd(btc, 2), rnd(F?.p, 4),
-        Y?.bid ?? null, Y?.ask ?? null, N?.bid ?? null, N?.ask ?? null, e6(F?.sigma), null, F?.p != null ? 1 : null,
-        e6(F?.sigmaShort), e6(F?.sigmaLong)]);
+        Y?.bid ?? null, Y?.ask ?? null, N?.bid ?? null, N?.ask ?? null, e6(F?.sigma), dep?.imb ?? null, F?.p != null ? 1 : null,
+        e6(F?.sigmaShort), e6(F?.sigmaLong), dep?.imb5 ?? null]);
       if (this.paper) { try { this._paperStep(m, m.rows[m.rows.length - 1], now); } catch (e) { logger.warn(`[SERIE ${this.id}] ${this.ptag} ${e.message}`); } }
     } finally { m.inFlight = false; }
   }

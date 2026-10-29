@@ -53,8 +53,10 @@ const WINDOW_EDGE = parseFloat(process.env.SHADOW_WINDOW_EDGE || '0.05');
 // z / move_pct: estado de la señal de Binance del bot en ese segundo (SignalEngine.snapshot);
 // sig: el bot generó una señal en ese segundo (+1 UP, −1 DOWN, 0 no); pass: intentó comprar ([OPEN]).
 // Con eso el backtest evalúa la regla que opera el bot, no solo las reglas del modelo.
+// book_imb / book_imb5: desbalance de profundidad de compra YES contra NO (todo el libro / niveles a ≤ 5¢ del mejor
+// bid; PolymarketWS.getDepthImbalance). Hasta el 29/10 book_imb quedaba siempre vacío (el método no existía).
 const COLS = ['t', 'secs_left', 'btc', 'p_up', 'yes_bid', 'yes_ask', 'no_bid', 'no_ask', 'sigma_e6', 'book_imb', 'src', 'sigma_short_e6', 'sigma_long_e6',
-  'z', 'move_pct', 'sig', 'pass'];
+  'z', 'move_pct', 'sig', 'pass', 'book_imb5'];
 // Filtro FAIR "anclado" (solo sombra, no decide): precio justo = último mid de Polymarket + cuánto
 // se movió el modelo desde que ese mid cambió por última vez. El nivel lo pone el mercado (que
 // predice mejor que el modelo: Brier 0.162 vs 0.184 a 120 s, 528 mercados 03-05/10) y el modelo
@@ -255,7 +257,8 @@ class Shadow {
     const N = same ? this._top(m.noTokenId, now) : null;
     const yesAsk = Y?.ask ?? null, yesBid = Y?.bid ?? null;
     const noAsk = N?.ask ?? null, noBid = N?.bid ?? null;
-    const imb = same ? (this.poly.getDepthImbalance?.()?.imb ?? null) : null;
+    const dep = same ? (this.poly.getDepthImbalance?.() ?? null) : null;
+    const imb = dep?.imb ?? null;
 
     const t = Math.round((now - m.startTs) / 1000);
     if (yesBid != null && yesAsk != null && p != null && F?.src === 1) {
@@ -269,7 +272,7 @@ class Shadow {
     try { snap = this.signalFn ? this.signalFn() : null; } catch (_) {}
     m.rows.push([t, rnd(T, 1), rnd(S, 2), rnd(p, 4), yesBid, yesAsk, noBid, noAsk, rnd(sigma == null ? null : sigma * 1e6, 3), imb, F ? F.src : null,
       rnd(F?.sigmaShort == null ? null : F.sigmaShort * 1e6, 3), rnd(F?.sigmaLong == null ? null : F.sigmaLong * 1e6, 3),
-      rnd(snap?.z, 2), rnd(snap?.movePct, 4), m.secSig, m.secPass]);
+      rnd(snap?.z, 2), rnd(snap?.movePct, 4), m.secSig, m.secPass, dep?.imb5 ?? null]);
     m.secSig = 0; m.secPass = 0;
     if (F?.sigmaShort) { m.sigmaShortSum += F.sigmaShort; m.sigmaShortN++; }
     if (F?.sigmaLong) { m.sigmaLongSum += F.sigmaLong; m.sigmaLongN++; }

@@ -51,5 +51,22 @@ assert.strictEqual(w2._topOfBook.get(T).bestAsk, 0.61, 'manda el top del server'
 const lt = loopMonitor.snapshot().text;
 assert.ok(/book_override=1\b/.test(lt) && /book_phantom=1\b/.test(lt), lt);
 assert.strictEqual(w2.getAskSizeUpTo(T, 0.61), 4, 'la profundidad arranca en el top del server: el nivel fantasma no cuenta');
-console.log('book-depth: 17 ok');
+
+// Desbalance de profundidad YES contra NO (filtro del book de agosto): todo el libro y niveles a ≤ 5¢ del mejor bid
+const { bidDepth, depthImbalance } = require('../src/book-utils');
+assert.deepStrictEqual(bidDepth([[0.60, 10], [0.58, 20], [0.40, 70]]), { all: 100, near: 30 }, '0.40 queda fuera de los 5¢');
+assert.strictEqual(bidDepth(null), null);
+assert.deepStrictEqual(depthImbalance({ all: 300, near: 30 }, { all: 100, near: 90 }), { yes: 300, no: 100, imb: 0.5, imb5: -0.5 });
+assert.strictEqual(depthImbalance({ all: 0, near: 0 }, { all: 0, near: 0 }), null, 'libros vacíos');
+assert.strictEqual(depthImbalance(null, { all: 5, near: 5 }), null, 'falta un lado');
+const w3 = new PolymarketWS();
+w3._yesTokenId = 'Y'; w3._noTokenId = 'N';
+assert.strictEqual(w3.getDepthImbalance(), null, 'sin libros');
+w3._onBook({ asset_id: 'Y', bids: [{ price: '0.60', size: '30' }, { price: '0.50', size: '270' }], asks: [{ price: '0.61', size: '5' }] });
+assert.strictEqual(w3.getDepthImbalance(), null, 'falta el libro de NO');
+w3._onBook({ asset_id: 'N', bids: [{ price: '0.39', size: '100' }], asks: [{ price: '0.40', size: '5' }] });
+assert.deepStrictEqual(w3.getDepthImbalance(), { yes: 300, no: 100, imb: 0.5, imb5: -0.538 });
+w3._bookByToken.get('N').updatedAt -= 6000;
+assert.strictEqual(w3.getDepthImbalance(), null, 'libro de NO con más de 5 s');
+console.log('book-depth: 27 ok');
 process.exit(0);

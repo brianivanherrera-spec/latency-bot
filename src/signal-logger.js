@@ -190,6 +190,10 @@ async function logSignalOpen({ posId, direction, price, size, market, sig, utcHo
     book_mov_30s:       bookShadow?.mov30s ?? null,
     book_imb_would_block: bookShadow?.imbBlock ?? null,
     book_mov_would_block: bookShadow?.movBlock ?? null,
+    // Profundidad de compra YES contra NO (filtro original del 10/08), desde el 29/10
+    book_depth_imb:     bookShadow?.depImb ?? null,
+    book_depth_imb5:    bookShadow?.depImb5 ?? null,
+    book_depth_would_block: bookShadow?.depBlock ?? null,
     // Último trade ejecutado en Polymarket al momento de la señal
     poly_last_trade_token:     tradeSnap?.latest_token      ?? null,
     poly_last_trade_side:      tradeSnap?.latest_trade_side ?? null,

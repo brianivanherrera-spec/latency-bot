@@ -15,7 +15,7 @@
 
 const WebSocket = require('ws');
 const fs   = require('fs');
-const { parseSize: _parseSize } = require('./book-utils');
+const { parseSize: _parseSize, bidDepth, depthImbalance } = require('./book-utils');
 const path = require('path');
 const { Logger } = require('./logger');
 const loopMonitor = require('./loop-monitor');
@@ -582,6 +582,21 @@ class PolymarketWS {
     const total = calcYesBid + calcNoBid;
     if (total <= 0) return null;
     return parseFloat(((calcYesBid - calcNoBid) / total).toFixed(3));
+  }
+
+  // Desbalance de PROFUNDIDAD del libro (el filtro original del 10/08, commit 4af8d6c2): acciones ofrecidas
+  // para comprar YES contra las ofrecidas para comprar NO. imb = todo el libro; imb5 = solo los niveles a
+  // ≤ 5¢ del mejor bid de cada lado. +1 = toda la compra en YES. null si falta el libro de un token o tiene
+  // más de maxAgeMs (sin muestras viejas del mercado anterior). Solo registro: no decide nada.
+  getDepthImbalance(maxAgeMs = 5000) {
+    const now = Date.now();
+    const side = tok => {
+      const lv = this._levels?.get(tok), meta = this._bookByToken.get(tok);
+      if (!lv || !meta || now - (meta.updatedAt || 0) > maxAgeMs) return null;
+      return bidDepth([...lv.bids]);
+    };
+    const y = side(this._yesTokenId), n = side(this._noTokenId);
+    return depthImbalance(y, n);
   }
 
   // Muestrea el imbalance cada segundo; las muestras llevan el par de tokens

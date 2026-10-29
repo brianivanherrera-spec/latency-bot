@@ -78,7 +78,8 @@ async function load(file) {
       rows.push({ sl, p, yb: r[c.yes_bid], ya: r[c.yes_ask], nb: r[c.no_bid], na: r[c.no_ask], sig: r[c.sigma_e6],
         sigS: c.sigma_short_e6 != null ? r[c.sigma_short_e6] : null, sigL: c.sigma_long_e6 != null ? r[c.sigma_long_e6] : null,
         btc: r[c.btc] ?? null, bsig: c.sig != null ? r[c.sig] : null, pass: c.pass != null ? r[c.pass] : null,
-        z: c.z != null ? r[c.z] : null, mv: c.move_pct != null ? r[c.move_pct] : null });
+        z: c.z != null ? r[c.z] : null, mv: c.move_pct != null ? r[c.move_pct] : null,
+        dimb: c.book_imb != null ? r[c.book_imb] ?? null : null, dimb5: c.book_imb5 != null ? r[c.book_imb5] ?? null : null });
     }
     // Ancla de cada fila: p del modelo en el segundo en que el mid de YES tomó su valor actual
     let aMid = null, aP = null;
@@ -291,6 +292,27 @@ function anchorSplit(population, cfg, cuts = [0.03, 0.08]) {
   const agree = [...g.mid, ...g.hi], pnl = a => +a.reduce((s, x) => s + x.pnl, 0).toFixed(2);
   return { cuts, lo: groupStat(g.lo), mid: groupStat(g.mid), hi: groupStat(g.hi), noData,
     agree: { ...groupStat(agree), pnl: pnl(agree) }, disagree: { ...groupStat(g.lo), pnl: pnl(g.lo) }, ...diffOf(agree, g.lo) };
+}
+
+// Filtro del book de agosto (commit 4af8d6c2, 10/08): desbalance de profundidad de compra YES contra NO en el segundo
+// de la entrada (o hasta 3 s antes), orientado al lado comprado (+ = la compra del libro va para el mismo lado). Separa
+// las entradas de una regla en a favor (≥ thr), neutro y en contra (≤ −thr, las que el filtro bloqueaba). field: 'dimb'
+// (todo el libro) o 'dimb5' (niveles a ≤ 5¢ del mejor bid). Solo los mercados grabados desde el 29/10 tienen el dato.
+function depthSplit(population, cfg, field = 'dimb', thr = 0.30) {
+  const g = { fav: [], neu: [], against: [] };
+  let noData = 0;
+  for (const mk of population) {
+    const e = entry(mk, cfg);
+    if (!e) continue;
+    let v = null;
+    for (let k = e.i; k >= Math.max(0, e.i - 3) && v == null; k--) v = mk.rows[k]?.[field] ?? null;
+    if (v == null) { noData++; continue; }
+    const o = e.side === 'UP' ? v : -v, win = e.side === mk.winner, ps = (win ? 1 - e.price : -e.price) - fee(e.price);
+    (o >= thr - 1e-9 ? g.fav : o <= -thr + 1e-9 ? g.against : g.neu).push({ win, price: e.price, ps, pnl: Math.floor(STAKE / e.price) * ps });
+  }
+  const pnl = a => +a.reduce((s, x) => s + x.pnl, 0).toFixed(2);
+  const st = a => ({ ...groupStat(a), pnl: pnl(a) });
+  return { thr, field, fav: st(g.fav), neu: st(g.neu), against: st(g.against), noData, ...diffOf([...g.fav, ...g.neu], g.against) };
 }
 
 // Regla con límite de precio (como B en vivo: límite = ask al decidir + buffer): llena solo si el ask
@@ -673,7 +695,7 @@ function evGrid(markets) {
   }).sort((x, y) => x.k < y.k ? -1 : 1);
 }
 
-module.exports = { load, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
+module.exports = { load, depthSplit, loadLiveAttempts, attachLive, liveAttemptFiles, firstFire, entry, evaluate, limitExec, fairLimitOf, fairLimitExec, btcSeries, priceAt, trendSplit, anchorSplit, byDay,
   normInv, blendP, fireRecords, cutStats, cutStats2, makerExec, modelVsMarket };
 if (require.main === module) (async () => {
   const t0 = Date.now();
@@ -807,6 +829,11 @@ if (require.main === module) (async () => {
     anchoredB: trendSplit(markets, bCfg, series),
     fairBase: trendSplit(markets, base240, series),
   };
+  // Filtro del book de agosto (profundidad YES contra NO, ±0.30): intentos de A en vivo y regla de B, todo el libro y ≤ 5¢
+  const liveCfg = { kind: 'live', field: 'pass', lo: 0, hi: 1, tMax: 300, tMin: 0 }; // los intentos de A (como report.live.attempts)
+  report.bookDepth = { markets: markets.filter(m => m.rows.some(r => r && r.dimb != null)).length,
+    a: liveMk.length ? { all: depthSplit(liveMk, liveCfg, 'dimb'), near: depthSplit(liveMk, liveCfg, 'dimb5') } : null,
+    b: { all: depthSplit(markets, bCfg, 'dimb'), near: depthSplit(markets, bCfg, 'dimb5') } };
   // Regla de B por partes (de qué disparos sale el resultado), con el modelo en modo blend (σ con piso) y como
   // maker. Lo de blend se recalcula sobre lo grabado: solo los mercados con las dos σ, comparado con el modelo actual
   // en esos mismos mercados.
@@ -905,6 +932,12 @@ if (require.main === module) (async () => {
     console.log(ln(`regla actual de A (${liveMk.length} mercados) según la ventaja anclada de la regla de B al entrar`, d.all));
     console.log(ln(`test (40 % más nuevo: ${d.testMarkets} mercados)`, d.test));
     console.log(ln(`fuera de muestra desde ${d.from.slice(0, 16)}`, d.holdout)); }
+  { const D = report.bookDepth, sx = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} P&L=$${x.pnl}`;
+    const one = (lab, x) => `${lab} (±${x.thr}): a favor ${sx(x.fav)} | neutro ${sx(x.neu)} | en contra (bloquearía) ${sx(x.against)}${x.noData ? ` | sin dato ${x.noData}` : ''} | diferencia ${x.diff == null ? 'n/a' : `${(x.diff * 100).toFixed(1)}¢/acc z=${x.zDiff}`}`;
+    const parts = [];
+    if (D.a) parts.push(one('regla de A (intentos en vivo), todo el libro', D.a.all), one('A, ≤ 5¢ del mejor bid', D.a.near));
+    parts.push(one('regla de B, todo el libro', D.b.all), one('B, ≤ 5¢ del mejor bid', D.b.near));
+    console.log(`[BACKTEST-PROFUNDIDAD] filtro del book de agosto (profundidad de compra YES contra NO al entrar; datos desde el 29/10, ${D.markets} mercados con dato): ${parts.join(' || ')}`); }
   { const V = report.modelVsMarket, pc = v => (v == null ? 'n/a' : `${(v * 100).toFixed(1)}%`);
     const verdict = z => (z == null ? '' : z >= 2 ? ' → el modelo suma' : z <= -2 ? ' → el modelo resta' : ' → sin diferencia clara');
     const gain = m => (m.gainPct == null ? 'sin datos' : m.w === 0 ? 'w=0: el precio ya tiene todo'
