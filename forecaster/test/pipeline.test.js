@@ -132,3 +132,27 @@ test('resolucionLines: resultado y pago de cada posicion', () => {
   assert.match(l[1], /NO GANO gastado=\$10.00 pnl=\+\$9.75/);
   assert.match(l[2], /SI PERDIO gastado=\$10.00 pnl=-\$10.00/);
 });
+
+test('valorCartera: valor actual, P&L no realizado y total', async () => {
+  const st = {
+    decisions: [
+      { action: 'comprar', market_id: 'a', side: 'NO', token: 'tn', stake_usd: 10, shares: 20, avg_price: 0.5, fee_usd: 0 },
+      { action: 'comprar', market_id: 'b', side: 'SI', token: 'ty', stake_usd: 10, shares: 40, avg_price: 0.25, fee_usd: 0.5 },
+      { action: 'comprar', market_id: 'c', side: 'SI', token: 'tz', stake_usd: 10, shares: 50, avg_price: 0.2, fee_usd: 0 },
+      { action: 'comprar', market_id: 'd', side: 'NO', token: 'tw', stake_usd: 10, shares: 25, avg_price: 0.4, fee_usd: 0 },
+    ],
+    resolutions: [{ market_id: 'c', outcome_yes: 1 }, { market_id: 'd', outcome_yes: 1 }],
+    resolved: new Set(['c', 'd']),
+  };
+  const books = { tn: { mid: 0.6, bid: 0.55 }, ty: { mid: 0.1, bid: 0.08 } };
+  const v = await pipeline.valorCartera(st, async (t) => books[t]);
+  assert.equal(v.abiertas, 2);
+  assert.equal(v.invertido, 20.5);
+  assert.ok(Math.abs(v.noReal - ((20 * 0.6 + 40 * 0.1) - 20.5)) < 1e-9);
+  assert.ok(Math.abs(v.realizado - (50 - 10 + -10)) < 1e-9);
+  assert.match(v.resumen, /abiertas=2 invertido=\$20.50 valor_actual=\$16.00 pnl_no_realizado=-\$4.50/);
+  assert.match(v.lines[0], /VALOR a NO entrada=0.500 actual=0.600 bid=0.550 valor=\$12.00 pnl=\+\$2.00/);
+  const sin = await pipeline.valorCartera(st, async () => null);
+  assert.equal(sin.sinPrecio, 2);
+  assert.equal(sin.noReal, 0);
+});

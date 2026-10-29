@@ -161,6 +161,46 @@ async function checkResolutions() {
   return n;
 }
 
+// Valor actual de las posiciones abiertas (mark-to-market) con P&L realizado y total.
+// "actual" = precio medio del libro del lado comprado; "bid" = lo que se obtendria vendiendo ya.
+const usd = (x) => `${x >= 0 ? '+' : '-'}$${Math.abs(x).toFixed(2)}`;
+
+function valorLine(d, b) {
+  const costo = d.stake_usd + (d.fee_usd || 0);
+  if (!b || b.mid === null) return `VALOR ${d.market_id} ${d.side} entrada=${d.avg_price.toFixed(3)} actual=sin_precio costo=$${costo.toFixed(2)}`;
+  const vMid = d.shares * b.mid;
+  const bid = b.bid ?? 0;
+  return `VALOR ${d.market_id} ${d.side} entrada=${d.avg_price.toFixed(3)} actual=${b.mid.toFixed(3)} bid=${bid.toFixed(3)} valor=$${vMid.toFixed(2)} pnl=${usd(vMid - costo)} pnl_al_bid=${usd(d.shares * bid - costo)}`;
+}
+
+async function valorCartera(st = loadState(), fetchBook = clob.fetchBook) {
+  const open = st.decisions.filter((d) => d.action === 'comprar' && !st.resolved.has(d.market_id));
+  const outcome = new Map(st.resolutions.map((r) => [r.market_id, r.outcome_yes]));
+  let realizado = 0;
+  for (const d of st.decisions) {
+    if (d.action !== 'comprar' || !st.resolved.has(d.market_id)) continue;
+    const gano = (d.side === 'SI') === Boolean(outcome.get(d.market_id));
+    realizado += (gano ? d.shares : 0) - d.stake_usd - (d.fee_usd || 0);
+  }
+  const rows = [];
+  for (let i = 0; i < open.length; i += 8) {
+    const chunk = open.slice(i, i + 8);
+    const books = await Promise.all(chunk.map((d) => fetchBook(d.token).catch(() => null)));
+    chunk.forEach((d, j) => rows.push({ d, b: books[j] }));
+  }
+  let invertido = 0, vMid = 0, vBid = 0, sinPrecio = 0;
+  for (const { d, b } of rows) {
+    const costo = d.stake_usd + (d.fee_usd || 0);
+    invertido += costo;
+    if (!b || b.mid === null) { sinPrecio++; vMid += costo; vBid += costo; continue; }
+    vMid += d.shares * b.mid;
+    vBid += d.shares * (b.bid ?? 0);
+  }
+  const noReal = vMid - invertido, noRealBid = vBid - invertido;
+  const resumen = `CARTERA abiertas=${open.length} invertido=$${invertido.toFixed(2)} valor_actual=$${vMid.toFixed(2)} pnl_no_realizado=${usd(noReal)} (al bid ${usd(noRealBid)}) pnl_realizado=${usd(realizado)} pnl_total=${usd(realizado + noReal)} (al bid ${usd(realizado + noRealBid)}) sin_precio=${sinPrecio}`;
+  return { lines: rows.map(({ d, b }) => valorLine(d, b)), resumen, realizado, noReal, noRealBid, invertido, abiertas: open.length, sinPrecio };
+}
+
 async function takeSnapshots(now = Date.now()) {
   const st = loadState();
   const have = new Set(st.snapshots.map((s) => `${s.key}|${s.horizon}`));
@@ -183,4 +223,4 @@ async function takeSnapshots(now = Date.now()) {
   return n;
 }
 
-module.exports = { posicionLine, resolucionLines, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
+module.exports = { posicionLine, resolucionLines, valorLine, valorCartera, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
