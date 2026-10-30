@@ -162,7 +162,7 @@ test('reportePorTramo: agrupa por precio, edge, divergencia y confianza', () => 
     decisions: [
       { action: 'comprar', key: 'k1', market_id: 'a', side: 'NO', category: 'politica', stake_usd: 10, shares: 200, avg_price: 0.05, fee_usd: 0, edge: 0.1 },
       { action: 'comprar', key: 'k2', market_id: 'b', side: 'SI', category: 'economia', stake_usd: 10, shares: 20, avg_price: 0.5, fee_usd: 0, edge: 0.25 },
-      { action: 'comprar', key: 'k3', market_id: 'c', side: 'SI', category: 'economia', stake_usd: 10, shares: 40, avg_price: 0.25, fee_usd: 0, edge: 0.15 },
+      { action: 'comprar', key: 'k3', ts: 't3', market_id: 'c', side: 'SI', category: 'economia', stake_usd: 10, shares: 40, avg_price: 0.25, fee_usd: 0, edge: 0.15 },
     ],
     resolutions: [{ market_id: 'a', outcome_yes: 1 }, { market_id: 'b', outcome_yes: 1 }],
     resolved: new Set(['a', 'b']),
@@ -172,7 +172,7 @@ test('reportePorTramo: agrupa por precio, edge, divergencia y confianza', () => 
       { key: 'k3', p_yes: 0.5, mid_yes: 0.25, confidence: 'low', end_date: new Date(Date.now() + 40 * 864e5).toISOString(), ts: new Date().toISOString() },
     ],
   };
-  const rows = [{ d: st.decisions[2], b: { mid: 0.3, bid: 0.28 } }];
+  const rows = [{ d: { ...st.decisions[2] }, b: { mid: 0.3, bid: 0.28 } }]; // copia: se une por clave, no por identidad
   const out = pipeline.reportePorTramo(st, rows);
   const t = (s) => out.find((l) => l.startsWith(`TRAMO ${s} `));
   assert.match(t('precio<0.10'), /n=1 invertido=\$10.00 cerradas=1 ganadas=0 pnl_real=-\$10.00/);

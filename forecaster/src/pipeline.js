@@ -226,7 +226,8 @@ function reportePorTramo(st, rows = []) {
   const outcome = new Map(st.resolutions.map((r) => [r.market_id, r.outcome_yes]));
   const fByKey = new Map(st.forecasts.map((f) => [f.key, f]));
   const mtm = new Map();
-  for (const { d, b } of rows) mtm.set(d, b);
+  const dk = (d) => `${d.key}|${d.ts}|${d.side}|${d.stake_usd}`;
+  for (const { d, b } of rows) mtm.set(dk(d), b);
   const g = new Map();
   for (const d of st.decisions) {
     if (d.action !== 'comprar') continue;
@@ -234,7 +235,7 @@ function reportePorTramo(st, rows = []) {
     const cerrada = st.resolved.has(d.market_id);
     let pnl = null, gano = false;
     if (cerrada) { gano = (d.side === 'SI') === Boolean(outcome.get(d.market_id)); pnl = (gano ? d.shares : 0) - costo; }
-    else { const b = mtm.get(d); if (b && b.mid !== null) pnl = d.shares * b.mid - costo; }
+    else { const b = mtm.get(dk(d)); if (b && b.mid !== null) pnl = d.shares * b.mid - costo; }
     for (const t of tramoDe(d, fByKey.get(d.key))) {
       const r = g.get(t) || { n: 0, cerradas: 0, ganadas: 0, real: 0, abiertas: 0, noReal: 0, invertido: 0 };
       r.n++; r.invertido += costo;
