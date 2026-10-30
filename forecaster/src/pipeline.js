@@ -198,7 +198,7 @@ async function valorCartera(st = loadState(), fetchBook = clob.fetchBook) {
   }
   const noReal = vMid - invertido, noRealBid = vBid - invertido;
   const resumen = `CARTERA abiertas=${open.length} invertido=$${invertido.toFixed(2)} valor_actual=$${vMid.toFixed(2)} pnl_no_realizado=${usd(noReal)} (al bid ${usd(noRealBid)}) pnl_realizado=${usd(realizado)} pnl_total=${usd(realizado + noReal)} (al bid ${usd(realizado + noRealBid)}) sin_precio=${sinPrecio}`;
-  return { rows, lines: rows.map(({ d, b }) => valorLine(d, b)), resumen, realizado, noReal, noRealBid, invertido, abiertas: open.length, sinPrecio };
+  return { st, rows, lines: rows.map(({ d, b }) => valorLine(d, b)), resumen, realizado, noReal, noRealBid, invertido, abiertas: open.length, sinPrecio };
 }
 
 // Rendimiento por tramo (precio de entrada, edge, divergencia con el mercado, confianza, categoria, horizonte).
@@ -248,6 +248,51 @@ function reportePorTramo(st, rows = []) {
     `TRAMO ${t} n=${r.n} invertido=$${r.invertido.toFixed(2)} cerradas=${r.cerradas} ganadas=${r.ganadas} pnl_real=${usd(r.real)} abiertas=${r.abiertas} pnl_no_realizado=${usd(r.noReal)} total=${usd(r.real + r.noReal)}`);
 }
 
+// Estrategia B (solo paper, sombra de la A): subconjunto de las compras de A que cumplen reglas mas estrictas.
+// Reglas: precio de entrada >= 0.30; |p_yes - mid al pronosticar| <= 0.15; una posicion por mercado;
+// una posicion abierta por evento. No cambia ninguna compra real de A; se mide en paralelo.
+const dkey = (d) => `${d.key}|${d.ts}|${d.side}|${d.stake_usd}`;
+
+function estrategiaB(st) {
+  const fBy = new Map(st.forecasts.map((f) => [f.key, f]));
+  const ordenadas = st.decisions.filter((d) => d.action === 'comprar').sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
+  const mercados = new Set(), eventosAbiertos = new Set(), out = [];
+  for (const d of ordenadas) {
+    const f = fBy.get(d.key);
+    if (!f || f.mid_yes === null || f.mid_yes === undefined) continue;
+    if (d.avg_price < 0.3) continue;
+    if (Math.abs(f.p_yes - f.mid_yes) > 0.15) continue;
+    if (mercados.has(d.market_id)) continue;
+    if (eventosAbiertos.has(d.event_id)) continue;
+    mercados.add(d.market_id);
+    if (!st.resolved.has(d.market_id)) eventosAbiertos.add(d.event_id);
+    out.push(d);
+  }
+  return out;
+}
+
+function carteraB(st, rows = []) {
+  const b = estrategiaB(st);
+  const claves = new Set(b.map(dkey));
+  const outcome = new Map(st.resolutions.map((r) => [r.market_id, r.outcome_yes]));
+  let realizado = 0, invertido = 0, vMid = 0, vBid = 0, abiertas = 0;
+  for (const d of b) {
+    if (!st.resolved.has(d.market_id)) continue;
+    const gano = (d.side === 'SI') === Boolean(outcome.get(d.market_id));
+    realizado += (gano ? d.shares : 0) - d.stake_usd - (d.fee_usd || 0);
+  }
+  for (const { d, b: libro } of rows) {
+    if (!claves.has(dkey(d))) continue;
+    const costo = d.stake_usd + (d.fee_usd || 0);
+    abiertas++; invertido += costo;
+    if (!libro || libro.mid === null) { vMid += costo; vBid += costo; continue; }
+    vMid += d.shares * libro.mid; vBid += d.shares * (libro.bid ?? 0);
+  }
+  const noReal = vMid - invertido, noRealBid = vBid - invertido;
+  const resumen = `CARTERA_B abiertas=${abiertas} invertido=$${invertido.toFixed(2)} valor_actual=$${vMid.toFixed(2)} pnl_no_realizado=${usd(noReal)} (al bid ${usd(noRealBid)}) pnl_realizado=${usd(realizado)} pnl_total=${usd(realizado + noReal)} (al bid ${usd(realizado + noRealBid)}) compras_b=${b.length}`;
+  return { resumen, b, realizado, noReal, noRealBid, invertido, abiertas, total: realizado + noReal };
+}
+
 async function takeSnapshots(now = Date.now()) {
   const st = loadState();
   const have = new Set(st.snapshots.map((s) => `${s.key}|${s.horizon}`));
@@ -270,4 +315,4 @@ async function takeSnapshots(now = Date.now()) {
   return n;
 }
 
-module.exports = { posicionLine, resolucionLines, valorLine, valorCartera, reportePorTramo, tramoDe, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
+module.exports = { posicionLine, resolucionLines, valorLine, valorCartera, reportePorTramo, tramoDe, estrategiaB, carteraB, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };

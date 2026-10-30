@@ -183,3 +183,28 @@ test('reportePorTramo: agrupa por precio, edge, divergencia y confianza', () => 
   assert.match(t('diverg>=0.30'), /n=1 /);
   assert.match(t('diverg 0.15-0.30'), /n=2 /);
 });
+
+test('estrategiaB: filtra por precio, divergencia, mercado repetido y evento', () => {
+  const mk = (key, id, ev, price, ts) => ({ action: 'comprar', key, ts, market_id: id, event_id: ev, side: 'SI', stake_usd: 10, shares: 10 / price, avg_price: price, fee_usd: 0 });
+  const st = {
+    decisions: [
+      mk('k1', 'a', 'e1', 0.5, '2026-10-20T00:00:00Z'), // entra
+      mk('k2', 'b', 'e2', 0.1, '2026-10-20T01:00:00Z'), // precio bajo
+      mk('k3', 'c', 'e3', 0.4, '2026-10-20T02:00:00Z'), // divergencia alta
+      mk('k4', 'a', 'e1', 0.5, '2026-10-21T00:00:00Z'), // mercado repetido
+      mk('k5', 'd', 'e1', 0.5, '2026-10-21T01:00:00Z'), // evento ya abierto
+      mk('k6', 'e', 'e4', 0.6, '2026-10-21T02:00:00Z'), // entra
+    ],
+    forecasts: [
+      { key: 'k1', p_yes: 0.6, mid_yes: 0.5 }, { key: 'k2', p_yes: 0.3, mid_yes: 0.1 }, { key: 'k3', p_yes: 0.8, mid_yes: 0.4 },
+      { key: 'k4', p_yes: 0.6, mid_yes: 0.5 }, { key: 'k5', p_yes: 0.6, mid_yes: 0.5 }, { key: 'k6', p_yes: 0.7, mid_yes: 0.6 },
+    ],
+    resolutions: [], resolved: new Set(),
+  };
+  assert.deepEqual(pipeline.estrategiaB(st).map((d) => d.key), ['k1', 'k6']);
+  const rows = st.decisions.map((d) => ({ d: { ...d }, b: { mid: 0.55, bid: 0.5 } }));
+  const c = pipeline.carteraB(st, rows);
+  assert.equal(c.abiertas, 2);
+  assert.equal(c.invertido, 20);
+  assert.match(c.resumen, /^CARTERA_B abiertas=2 invertido=\$20.00 /);
+});
