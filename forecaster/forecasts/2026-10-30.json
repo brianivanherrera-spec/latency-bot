@@ -1,0 +1,220 @@
+[
+ {
+  "market_id": "943819",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Los modelos proyectan 47-49 escaños republicanos (Vote-Scope 47 con rango 44-52, Cornell 48, Poliwave 49); 47 o menos es plausible pero no el centro.",
+  "key_uncertainties": [
+   "carreras reñidas"
+  ],
+  "sources": [
+   "https://votes.decisiondeskhq.com/forecast/2026/senate",
+   "https://www.poliwave.com/us/fed/projection",
+   "https://vote-scope.com/en/us/senate/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6172747",
+  "p_yes": 0.01,
+  "confidence": "medium",
+  "reasoning": "WTI ~$102-103; llegar a $150 en noviembre exige +46%, algo sin precedentes aun con el bloqueo de Ormuz.",
+  "key_uncertainties": [
+   "escalada total con Irán"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/29/oil-price-today-wti-brent.html",
+   "https://fxstreet.com/news/wti-oil-holds-above-10300-near-five-month-highs-amid-new-attacks-in-the-strait-of-hormuz-202610301219"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6065257",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Promedio reciente ~26/día (185 en la semana 12-18/10); 190-209 requiere ≥27.1/día, en la parte alta de lo esperado.",
+  "key_uncertainties": [
+   "datos PortWatch con rezago",
+   "Yemen/Mar Rojo"
+  ],
+  "sources": [
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-bab-el-mandeb-strait"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630746",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Carrera muy pareja (RCP Marshall 46.0 vs Hamilton 45.7); Cook la califica 'Likely R'.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/senate/general/2026/kansas/marshall-vs-hamilton",
+   "https://emersoncollegepolling.com/kansas-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6172755",
+  "p_yes": 0.03,
+  "confidence": "low",
+  "reasoning": "WTI ~$102-103; bajar a $70 en noviembre exige -31%, solo con un acuerdo total con Irán y reapertura plena de Ormuz.",
+  "key_uncertainties": [
+   "acuerdo con Irán"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/29/oil-price-today-wti-brent.html",
+   "https://fxstreet.com/news/wti-oil-holds-above-10300-near-five-month-highs-amid-new-attacks-in-the-strait-of-hormuz-202610301219"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6065171",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "PortWatch: 2 tránsitos el 25/10, 4 el 18/10 y 23 en la semana del 19/10 (~3/día); 20-24 en 7 días está en el centro de lo esperado.",
+  "key_uncertainties": [
+   "datos PortWatch con rezago",
+   "reapertura parcial"
+  ],
+  "sources": [
+   "https://straits.live/briefs/2026-10-30",
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-strait-of-hormuz"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "634976",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "Peltola (D) lidera por ~1-2 puntos en promedios (RCP +1.2, Poliwave +1.8) pero Rasmussen da a Sullivan +1; voto por orden de preferencia.",
+  "key_uncertainties": [
+   "voto ordenado",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/senate/general/2026/alaska/peltola-vs-sullivan",
+   "https://www.poliwave.com/us/ak/sen-fed"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6172730",
+  "p_yes": 0.03,
+  "confidence": "low",
+  "reasoning": "Plata ~$51-53 (cerró $52.92 el 29/10 tras caer 2%); llegar a $64 exige +22% en noviembre.",
+  "key_uncertainties": [
+   "rebote de metales"
+  ],
+  "sources": [
+   "https://www.fxstreet.com/news/silver-price-forecast-55-rejection-puts-50-back-in-focus-202610281735",
+   "https://www.investing.com/currencies/xag-usd-historical-data"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6065116",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "UKMTO ya numeró avisos del 182 (26/10) al 187 (30/10), al menos 6 en la semana; con el fin de semana por delante, 8-11 es el rango más probable.",
+  "key_uncertainties": [
+   "ritmo de avisos del fin de semana",
+   "avisos tardíos"
+  ],
+  "sources": [
+   "https://www.middleeasteye.net/live-blog/live-blog-update/ukmto-says-threat-hormuz-shipping-severe-further-attacks-highly-likely",
+   "https://gulfnews.com/world/mena/middle-east-war-saudi-intercepts-houthi-missile-as-iran-warns-israel-against-strikes-1.500727751"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "630747",
+  "p_yes": 0.57,
+  "confidence": "low",
+  "reasoning": "Carrera muy pareja pero 'Likely R' para Cook; RCP Marshall +0.3. Complementario de Demócratas.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://www.realclearpolling.com/polls/senate/general/2026/kansas/marshall-vs-hamilton"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5219297",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "Stock UE de ~38-39 Mt en junio; con la liberación del G7 en curso, llegar a fin de noviembre con ≥37 Mt es improbable.",
+  "key_uncertainties": [
+   "parte que libera la UE"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/10/2/trump-says-europe-agrees-to-release-massive-amount-diesel-stockpile",
+   "https://www.euronews.com/2026/10/05/who-holds-the-keys-to-europes-emergency-oil-reserves"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5238398",
+  "p_yes": 0.65,
+  "confidence": "low",
+  "reasoning": "El Roosevelt estaba en la 7ª Flota (Japón) el 27/10 y relevaría al George Washington; funcionarios de EE.UU. dijeron al WSJ que llegaría a fines de noviembre.",
+  "key_uncertainties": [
+   "velocidad de tránsito",
+   "escalada con Irán"
+  ],
+  "sources": [
+   "https://www.washingtontimes.com/news/2026/oct/2/navy-sending-uss-theodore-roosevelt-carrier-strike-group-middle-east/",
+   "https://www.yahoo.com/news/us/articles/where-aircraft-carriers-october-27-234317096.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "631057",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "Brown (D) lidera por ~3 puntos en promedios (Marist +4, Fox +5); Rasmussen y ActiVote dan a Husted ventaja mínima.",
+  "key_uncertainties": [
+   "participación",
+   "encuestas divergentes"
+  ],
+  "sources": [
+   "https://maristpoll.marist.edu/polls/midterm-elections-in-ohio-october-2026/",
+   "https://www.pollsmax.com/senate/ohio/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4393420",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "Tras subir a 2.5% el 28/10, el Banco dijo que podrían hacer falta más subas pero con cautela; RBC espera otra en diciembre o enero y Desjardins esperaba mantener hasta 2027.",
+  "key_uncertainties": [
+   "inflación hasta diciembre",
+   "datos de empleo"
+  ],
+  "sources": [
+   "https://money.ca/news/economy/bank-of-canada-rate-hike-october-2026",
+   "https://ca.finance.yahoo.com/news/bank-canada-expected-hike-key-080005989.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5238399",
+  "p_yes": 0.08,
+  "confidence": "medium",
+  "reasoning": "Hay al menos un portaaviones (George Washington) en CENTCOM y el Roosevelt en camino; dejar cero el 30/11 exigiría una retirada total.",
+  "key_uncertainties": [
+   "acuerdo con Irán",
+   "relevos"
+  ],
+  "sources": [
+   "https://www.yahoo.com/news/us/articles/where-aircraft-carriers-october-27-234317096.html"
+  ],
+  "prompt_version": "v1"
+ }
+]
