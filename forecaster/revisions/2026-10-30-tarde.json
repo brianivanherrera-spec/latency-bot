@@ -1,0 +1,438 @@
+[
+ {
+  "market_id": "3554657",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.22,
+  "p_yes_revisada": 0.03,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Gemini 4 Carbon debutó #1 en Arena el 28/10 (1528); Opus 5.5 tercero.",
+  "razonamiento": "Anthropic no lidera el ranking general.",
+  "fuentes": [
+   {
+    "url": "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "4853905",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.65,
+  "p_yes_revisada": 0.88,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Gemini 4 Carbon anunciado el 28/10 (Argon GA el 13/10); falta confirmar que las reglas cuenten Carbon como Pro.",
+  "razonamiento": "Hubo lanzamiento nuevo antes del 31/10 según el tracker y la página de DeepMind.",
+  "fuentes": [
+   {
+    "url": "https://releasebot.io/updates/google/gemini-api",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://deepmind.google/models/",
+    "tipo": "oficial"
+   }
+  ]
+ },
+ {
+  "market_id": "3685385",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.64,
+  "p_yes_revisada": 0.88,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Igual que 4853905: Carbon el 28/10, dentro de la ventana.",
+  "razonamiento": "Lanzamiento dentro del plazo.",
+  "fuentes": [
+   {
+    "url": "https://releasebot.io/updates/google/gemini-api",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://deepmind.google/models/",
+    "tipo": "oficial"
+   }
+  ]
+ },
+ {
+  "market_id": "4869280",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.12,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Último lanzamiento Meta: Muse Spark Open el 15/10; nada anunciado para 31/10.",
+  "razonamiento": "Sin señales de lanzamiento en 2 días.",
+  "fuentes": [
+   {
+    "url": "https://9to5mac.com/2026/10/15/meta-launches-new-muse-spark-open-model-optimized-to-run-on-mac-studio/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554659",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.96,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Carbon #1 (1528), Argon #2 (1520): Google lidera.",
+  "razonamiento": "Google primero en la tabla general.",
+  "fuentes": [
+   {
+    "url": "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554472",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.4,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Fuentes se contradicen: Kimi K3 Max 16º vs Qwen3.8-Max 22º, o al revés (8º vs 12º). Datos del 19/10.",
+  "razonamiento": "Kimi y Qwen empatados; Moonshot tiene chance real.",
+  "fuentes": [
+   {
+    "url": "https://www.spke.com/en/ai/article/3791",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554475",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.5,
+  "p_yes_revisada": 0.05,
+  "direccion": "refuerza",
+  "cambia_de_lado": true,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Xiaomi MiMo no aparece entre los mejores chinos en Arena; lideran Kimi/Qwen.",
+  "razonamiento": "Xiaomi lejos de ser el mejor chino en Arena.",
+  "fuentes": [
+   {
+    "url": "https://www.spke.com/en/ai/article/3791",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554762",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.08,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Carbon y Argon lideran; control de estilo no verificado (Argon 1524 con estilo el 20/10).",
+  "razonamiento": "Anthropic #1 con estilo requiere superar a Carbon.",
+  "fuentes": [
+   {
+    "url": "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554692",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.04,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Google tiene #1 y #2; sería el mejor laboratorio, no el segundo.",
+  "razonamiento": "Google es primero entre laboratorios.",
+  "fuentes": [
+   {
+    "url": "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166819",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.43,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 26/día (sem. al 18/10), Redsea Meridian 28/día, Windward 39/día; el rango 25-29 es plausible.",
+  "razonamiento": "Dos de tres fuentes caen dentro del rango.",
+  "fuentes": [
+   {
+    "url": "https://redseameridian.com/corridor-watch",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/bab-el-mandeb",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5743142",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.03,
+  "p_yes_revisada": 0.03,
+  "direccion": "sin_cambio",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "WTI ~$102-104 al 30/10; no verifiqué si tocó $95 antes en octubre.",
+  "razonamiento": "Caer a $95 en el último día es muy improbable.",
+  "fuentes": [
+   {
+    "url": "https://www.oilpriceapi.com/oil-prices-today",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "4936102",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.03,
+  "p_yes_revisada": 0.07,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable (riesgo)",
+  "novedades": "WTI ~$104 intradía, +2% en el día por ataques hutíes; $110 exige +5%.",
+  "razonamiento": "Una sesión restante, pero con volatilidad alta.",
+  "fuentes": [
+   {
+    "url": "https://www.oilpriceapi.com/oil-prices-today",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5180417",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.3,
+  "p_yes_revisada": 0.07,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Nvidia ~$5.26-5.53T vs Apple ~$4.9-5.07T.",
+  "razonamiento": "Brecha de 4-10% difícil de cerrar en un día.",
+  "fuentes": [
+   {
+    "url": "https://www.fool.com/research/largest-companies-by-market-cap/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5180413",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.53,
+  "p_yes_revisada": 0.92,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Nvidia sigue primera por capitalización.",
+  "razonamiento": "Lidera con holgura.",
+  "fuentes": [
+   {
+    "url": "https://www.fool.com/research/largest-companies-by-market-cap/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166967",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.45,
+  "p_yes_revisada": 0.04,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Alphabet ~$4.0-4.17T vs Microsoft ~$3.8-3.9T.",
+  "razonamiento": "Microsoft es cuarta.",
+  "fuentes": [
+   {
+    "url": "https://www.fool.com/research/largest-companies-by-market-cap/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166969",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.93,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Alphabet tercera por capitalización.",
+  "razonamiento": "Detrás de Nvidia y Apple, delante de Microsoft.",
+  "fuentes": [
+   {
+    "url": "https://www.fool.com/research/largest-companies-by-market-cap/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5219279",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.7,
+  "p_yes_revisada": 0.85,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Eurostat (jun/26): ~38M t de reservas de emergencia; liberación de 42M barriles en 3 meses, la mitad diésel (~2,9M t).",
+  "razonamiento": "Con ~38M t y una liberación chica, queda sobre 30M.",
+  "fuentes": [
+   {
+    "url": "https://www.aljazeera.com/news/2026/10/2/trump-vs-europe-as-us-presses-for-release-of-emergency-diesel-stocks",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166954",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.25,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "hormuz.now 7d ~5,9/día; PortWatch 2/día el 25/10.",
+  "razonamiento": "Depende de la fuente de conteo.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166953",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.8,
+  "p_yes_revisada": 0.72,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 2/día; hormuz.now 5,9/día, justo sobre 5.",
+  "razonamiento": "Sobre el borde del rango 0-5.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5167212",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.7,
+  "p_yes_revisada": 0.95,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Ataques saudíes en Yemen casi a diario; hubo ataques el 29/10.",
+  "razonamiento": "Muy probable que haya acción saudí el 31/10.",
+  "fuentes": [
+   {
+    "url": "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065115",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.25,
+  "p_yes_revisada": 0.15,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Varios avisos UKMTO el 29/10 (proyectil, dhow, explosivos limpet).",
+  "razonamiento": "Semana con muchos avisos: 4-7 queda bajo.",
+  "fuentes": [
+   {
+    "url": "https://gulfnews.com/world/mena/middle-east-war-iran-claims-tankers-hit-mines-in-strait-of-hormuz-ukmto-confirms-strike-off-oman-fired-us-general-reportedly-admitted-iran-leaks-1.500729137",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065116",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "No pude contar los avisos de la semana.",
+  "razonamiento": "Sin conteo; muchos incidentes pero no verificados.",
+  "fuentes": [
+   {
+    "url": "https://gulfnews.com/world/mena/middle-east-war-iran-claims-tankers-hit-mines-in-strait-of-hormuz-ukmto-confirms-strike-off-oman-fired-us-general-reportedly-admitted-iran-leaks-1.500729137",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065257",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.3,
+  "p_yes_revisada": 0.35,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 26/día → ~182 en la semana; Redsea Meridian 28/día → ~196.",
+  "razonamiento": "El rango 190-209 está justo sobre el nivel PortWatch.",
+  "fuentes": [
+   {
+    "url": "https://redseameridian.com/corridor-watch",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/bab-el-mandeb",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065171",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.3,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 2/día el 25/10 (~14 en la semana); hormuz.now 5,9/día.",
+  "razonamiento": "Rango 20-24 exige ~3/día, sobre lo medido.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ }
+]

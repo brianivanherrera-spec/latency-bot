@@ -316,6 +316,76 @@
    "nombre": "WTI toca máximo $110 en noviembre",
    "resuelve": "2026-12-01",
    "compras": 1
+  },
+  {
+   "market_id": "943819",
+   "side": "NO",
+   "nombre": "Republicanos 47 o menos escaños en el Senado",
+   "resuelve": "2026-11-03",
+   "compras": 1
+  },
+  {
+   "market_id": "6065257",
+   "side": "NO",
+   "nombre": "Bab el-Mandeb 190-209 tránsitos 26/10-1/11 (PortWatch)",
+   "resuelve": "2026-11-02",
+   "compras": 1
+  },
+  {
+   "market_id": "630746",
+   "side": "NO",
+   "nombre": "Demócratas ganan Senado de Kansas",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "6065171",
+   "side": "NO",
+   "nombre": "Ormuz 20-24 tránsitos 26/10-1/11 (PortWatch)",
+   "resuelve": "2026-11-02",
+   "compras": 1
+  },
+  {
+   "market_id": "634976",
+   "side": "NO",
+   "nombre": "Peltola gana Senado de Alaska",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "6065116",
+   "side": "SI",
+   "nombre": "UKMTO publica 8-11 avisos entre 26/10 y 1/11",
+   "resuelve": "2026-11-02",
+   "compras": 1
+  },
+  {
+   "market_id": "630747",
+   "side": "SI",
+   "nombre": "Republicanos ganan Senado de Kansas",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "5238398",
+   "side": "NO",
+   "nombre": "USS Theodore Roosevelt llega a CENTCOM antes del 30/11",
+   "resuelve": "2026-12-01",
+   "compras": 1
+  },
+  {
+   "market_id": "631057",
+   "side": "NO",
+   "nombre": "Demócratas ganan Senado de Ohio",
+   "resuelve": "2026-11-04",
+   "compras": 1
+  },
+  {
+   "market_id": "4393420",
+   "side": "NO",
+   "nombre": "Banco de Canadá sin cambio en diciembre",
+   "resuelve": "2026-12-09",
+   "compras": 1
   }
  ]
 }
