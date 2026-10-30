@@ -198,7 +198,53 @@ async function valorCartera(st = loadState(), fetchBook = clob.fetchBook) {
   }
   const noReal = vMid - invertido, noRealBid = vBid - invertido;
   const resumen = `CARTERA abiertas=${open.length} invertido=$${invertido.toFixed(2)} valor_actual=$${vMid.toFixed(2)} pnl_no_realizado=${usd(noReal)} (al bid ${usd(noRealBid)}) pnl_realizado=${usd(realizado)} pnl_total=${usd(realizado + noReal)} (al bid ${usd(realizado + noRealBid)}) sin_precio=${sinPrecio}`;
-  return { lines: rows.map(({ d, b }) => valorLine(d, b)), resumen, realizado, noReal, noRealBid, invertido, abiertas: open.length, sinPrecio };
+  return { rows, lines: rows.map(({ d, b }) => valorLine(d, b)), resumen, realizado, noReal, noRealBid, invertido, abiertas: open.length, sinPrecio };
+}
+
+// Rendimiento por tramo (precio de entrada, edge, divergencia con el mercado, confianza, categoria, horizonte).
+// Cerradas: P&L real y aciertos. Abiertas: P&L a precio actual (si hay libro). No cambia ninguna decision.
+function tramoDe(d, f) {
+  const precio = d.avg_price < 0.1 ? 'precio<0.10' : d.avg_price < 0.3 ? 'precio 0.10-0.30' : d.avg_price <= 0.7 ? 'precio 0.30-0.70' : 'precio>0.70';
+  const e = d.edge ?? 0;
+  const edge = e < 0.12 ? 'edge 0.08-0.12' : e < 0.2 ? 'edge 0.12-0.20' : 'edge>=0.20';
+  let div = 'diverg sin_dato';
+  if (f && f.mid_yes !== null && f.mid_yes !== undefined) {
+    const x = Math.abs(f.p_yes - f.mid_yes);
+    div = x < 0.15 ? 'diverg<0.15' : x < 0.3 ? 'diverg 0.15-0.30' : 'diverg>=0.30';
+  }
+  const conf = `confianza ${f?.confidence || 'sin_dato'}`;
+  const cat = `categoria ${d.category || 'sin_dato'}`;
+  let hor = 'horizonte sin_dato';
+  if (f && f.end_date) {
+    const dias = (Date.parse(f.end_date) - Date.parse(f.ts)) / 864e5;
+    hor = dias <= 3 ? 'horizonte<=3d' : dias <= 10 ? 'horizonte 4-10d' : dias <= 30 ? 'horizonte 11-30d' : 'horizonte>30d';
+  }
+  return [precio, edge, div, conf, cat, hor];
+}
+
+function reportePorTramo(st, rows = []) {
+  const outcome = new Map(st.resolutions.map((r) => [r.market_id, r.outcome_yes]));
+  const fByKey = new Map(st.forecasts.map((f) => [f.key, f]));
+  const mtm = new Map();
+  for (const { d, b } of rows) mtm.set(d, b);
+  const g = new Map();
+  for (const d of st.decisions) {
+    if (d.action !== 'comprar') continue;
+    const costo = d.stake_usd + (d.fee_usd || 0);
+    const cerrada = st.resolved.has(d.market_id);
+    let pnl = null, gano = false;
+    if (cerrada) { gano = (d.side === 'SI') === Boolean(outcome.get(d.market_id)); pnl = (gano ? d.shares : 0) - costo; }
+    else { const b = mtm.get(d); if (b && b.mid !== null) pnl = d.shares * b.mid - costo; }
+    for (const t of tramoDe(d, fByKey.get(d.key))) {
+      const r = g.get(t) || { n: 0, cerradas: 0, ganadas: 0, real: 0, abiertas: 0, noReal: 0, invertido: 0 };
+      r.n++; r.invertido += costo;
+      if (cerrada) { r.cerradas++; if (gano) r.ganadas++; r.real += pnl; }
+      else { r.abiertas++; if (pnl !== null) r.noReal += pnl; }
+      g.set(t, r);
+    }
+  }
+  return [...g.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([t, r]) =>
+    `TRAMO ${t} n=${r.n} invertido=$${r.invertido.toFixed(2)} cerradas=${r.cerradas} ganadas=${r.ganadas} pnl_real=${usd(r.real)} abiertas=${r.abiertas} pnl_no_realizado=${usd(r.noReal)} total=${usd(r.real + r.noReal)}`);
 }
 
 async function takeSnapshots(now = Date.now()) {
@@ -223,4 +269,4 @@ async function takeSnapshots(now = Date.now()) {
   return n;
 }
 
-module.exports = { posicionLine, resolucionLines, valorLine, valorCartera, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
+module.exports = { posicionLine, resolucionLines, valorLine, valorCartera, reportePorTramo, tramoDe, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };

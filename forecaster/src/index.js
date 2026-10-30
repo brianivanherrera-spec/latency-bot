@@ -38,7 +38,7 @@ async function tick() {
     if (summaryDate !== today && now.getUTCHours() >= config().SELECT_HOUR_UTC) {
       const st = pipeline.loadState();
       log(summaryLine(st, computeReport(st)));
-      await safe('valor posiciones', async () => { for (const l of (await pipeline.valorCartera(st)).lines) log(l); });
+      await safe('valor posiciones', async () => { const v = await pipeline.valorCartera(st); for (const l of v.lines) log(l); for (const l of pipeline.reportePorTramo(st, v.rows)) log(l); });
       summaryDate = today;
     }
   } finally { busy = false; }
@@ -58,7 +58,7 @@ function main() {
   log(`iniciando (solo paper, sin ordenes reales). DATA_DIR=${c.DATA_DIR} MARKETS_PER_DAY=${c.MARKETS_PER_DAY}`);
   server.start();
   try { logPosiciones(); } catch (e) { log(`posiciones: ${e.message}`); }
-  pipeline.valorCartera().then((v) => { v.lines.forEach((l) => log(l)); log(v.resumen); }).catch((e) => log(`valor cartera: ${e.message}`));
+  pipeline.valorCartera().then((v) => { v.lines.forEach((l) => log(l)); log(v.resumen); pipeline.reportePorTramo(pipeline.loadState(), v.rows).forEach((l) => log(l)); }).catch((e) => log(`valor cartera: ${e.message}`));
   setInterval(() => tick().catch((e) => log(`tick: ${e.message}`)), 60000);
   tick().catch((e) => log(`tick: ${e.message}`));
 }

@@ -156,3 +156,30 @@ test('valorCartera: valor actual, P&L no realizado y total', async () => {
   assert.equal(sin.sinPrecio, 2);
   assert.equal(sin.noReal, 0);
 });
+
+test('reportePorTramo: agrupa por precio, edge, divergencia y confianza', () => {
+  const st = {
+    decisions: [
+      { action: 'comprar', key: 'k1', market_id: 'a', side: 'NO', category: 'politica', stake_usd: 10, shares: 200, avg_price: 0.05, fee_usd: 0, edge: 0.1 },
+      { action: 'comprar', key: 'k2', market_id: 'b', side: 'SI', category: 'economia', stake_usd: 10, shares: 20, avg_price: 0.5, fee_usd: 0, edge: 0.25 },
+      { action: 'comprar', key: 'k3', market_id: 'c', side: 'SI', category: 'economia', stake_usd: 10, shares: 40, avg_price: 0.25, fee_usd: 0, edge: 0.15 },
+    ],
+    resolutions: [{ market_id: 'a', outcome_yes: 1 }, { market_id: 'b', outcome_yes: 1 }],
+    resolved: new Set(['a', 'b']),
+    forecasts: [
+      { key: 'k1', p_yes: 0.7, mid_yes: 0.95, confidence: 'low', end_date: new Date(Date.now() + 5 * 864e5).toISOString(), ts: new Date().toISOString() },
+      { key: 'k2', p_yes: 0.8, mid_yes: 0.5, confidence: 'medium', end_date: new Date(Date.now() + 2 * 864e5).toISOString(), ts: new Date().toISOString() },
+      { key: 'k3', p_yes: 0.5, mid_yes: 0.25, confidence: 'low', end_date: new Date(Date.now() + 40 * 864e5).toISOString(), ts: new Date().toISOString() },
+    ],
+  };
+  const rows = [{ d: st.decisions[2], b: { mid: 0.3, bid: 0.28 } }];
+  const out = pipeline.reportePorTramo(st, rows);
+  const t = (s) => out.find((l) => l.startsWith(`TRAMO ${s} `));
+  assert.match(t('precio<0.10'), /n=1 invertido=\$10.00 cerradas=1 ganadas=0 pnl_real=-\$10.00/);
+  assert.match(t('precio 0.30-0.70'), /cerradas=1 ganadas=1 pnl_real=\+\$10.00/);
+  assert.match(t('precio 0.10-0.30'), /abiertas=1 pnl_no_realizado=\+\$2.00/);
+  assert.match(t('confianza low'), /n=2 /);
+  assert.match(t('horizonte>30d'), /n=1 /);
+  assert.match(t('diverg>=0.30'), /n=1 /);
+  assert.match(t('diverg 0.15-0.30'), /n=2 /);
+});
