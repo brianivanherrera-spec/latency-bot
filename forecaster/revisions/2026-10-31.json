@@ -1,0 +1,675 @@
+[
+ {
+  "market_id": "630806",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.37,
+  "p_yes_revisada": 0.25,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "CNN: El-Sayed 49-42 sobre Rogers en Michigan.",
+  "razonamiento": "El demócrata lidera con holgura en Michigan.",
+  "fuentes": [
+   {
+    "url": "https://www.cnn.com/2026/10/29/politics/cnn-polls-michigan-maine-texas-kansas-senate-races-midterms-vis",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630805",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.25,
+  "direccion": "refuerza",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "Misma encuesta CNN.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://www.cnn.com/2026/10/29/politics/cnn-polls-michigan-maine-texas-kansas-senate-races-midterms-vis",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630772",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.35,
+  "direccion": "refuerza",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "CNN y Marist: Jackson (D) +4 y +2 sobre Collins.",
+  "razonamiento": "Maine inclinado al demócrata pero cerrado.",
+  "fuentes": [
+   {
+    "url": "https://www.cnn.com/2026/10/29/politics/cnn-polls-michigan-maine-texas-kansas-senate-races-midterms-vis",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629557",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.65,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Marist: Acton +7, promedio +4; Cook y Sabato pasaron la carrera a Lean D.",
+  "razonamiento": "El demócrata es favorito.",
+  "fuentes": [
+   {
+    "url": "https://thehill.com/homenews/campaign/6099939-ohio-polls-democrats-lead/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629558",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.35,
+  "p_yes_revisada": 0.35,
+  "direccion": "sin_cambio",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Idem.",
+  "razonamiento": "El republicano es menos probable.",
+  "fuentes": [
+   {
+    "url": "https://thehill.com/homenews/campaign/6099939-ohio-polls-democrats-lead/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "631057",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.68,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Marist: Brown 48-44 sobre Husted; Fox pasó la carrera a Lean D.",
+  "razonamiento": "Brown lidera por poco.",
+  "fuentes": [
+   {
+    "url": "https://www.foxnews.com/politics/fox-news-power-rankings-iran-looms-large-can-gop-keep-faithful",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630733",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.5,
+  "p_yes_revisada": 0.47,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "Iowa: las últimas cinco encuestas no muestran líder claro.",
+  "razonamiento": "Pelea pareja.",
+  "fuentes": [
+   {
+    "url": "https://www.nbcnews.com/politics/2026-elections/senate-battleground-polls",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630734",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.47,
+  "p_yes_revisada": 0.5,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "Idem.",
+  "razonamiento": "Pelea pareja.",
+  "fuentes": [
+   {
+    "url": "https://www.nbcnews.com/politics/2026-elections/senate-battleground-polls",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "634893",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.42,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Echelon: Ricketts +1 sobre Osborn.",
+  "razonamiento": "Nebraska parejo, leve ventaja republicana.",
+  "fuentes": [
+   {
+    "url": "https://www.nbcnews.com/politics/2026-elections/senate-battleground-polls",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630924",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.35,
+  "p_yes_revisada": 0.47,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Times/Siena: empate 48-48; Citadel: Graham +4.",
+  "razonamiento": "Pelea pareja.",
+  "fuentes": [
+   {
+    "url": "https://www.nbcnews.com/politics/2026-elections/senate-battleground-polls",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630925",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.63,
+  "p_yes_revisada": 0.52,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Idem.",
+  "razonamiento": "Pelea pareja.",
+  "fuentes": [
+   {
+    "url": "https://www.nbcnews.com/politics/2026-elections/senate-battleground-polls",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630746",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.58,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "pérdida probable",
+  "novedades": "CNN y Emerson: Hamilton (D) +4; solo una encuesta del último mes da a Marshall ventaja.",
+  "razonamiento": "El demócrata es favorito leve en Kansas.",
+  "fuentes": [
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/10/30/latest-polls-in-2026-midterms-democrat-adam-hamilton-ahead-in-kansas-senate-race-in-2-polls/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630747",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.57,
+  "p_yes_revisada": 0.42,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Idem.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/10/30/latest-polls-in-2026-midterms-democrat-adam-hamilton-ahead-in-kansas-senate-race-in-2-polls/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "634976",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.6,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Promedios: Peltola +1,2 a +3,7; NYT/Siena +7.",
+  "razonamiento": "La demócrata es favorita leve.",
+  "fuentes": [
+   {
+    "url": "https://onpointpolitics.us/polls/ak/senate",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.ms.now/polling-alaska-senate",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629506",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.5,
+  "p_yes_revisada": 0.6,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "No encontré encuesta confiable de Nevada.",
+  "razonamiento": "Lombardo (R) es el titular; sin datos nuevos.",
+  "fuentes": []
+ },
+ {
+  "market_id": "562793",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.58,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Los demócratas llevan ventaja en los modelos (Poliwave 53-47); Washington Post lo describe como mucho más cerrado que la Cámara.",
+  "razonamiento": "Demócratas son favoritos leves a controlar el Senado.",
+  "fuentes": [
+   {
+    "url": "https://www.washingtonpost.com/politics/2026/10/28/these-seven-races-will-determine-which-party-controls-senate/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "562828",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.48,
+  "p_yes_revisada": 0.52,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Cámara claramente demócrata; Senado es lo incierto.",
+  "razonamiento": "Es el producto de ambas probabilidades.",
+  "fuentes": [
+   {
+    "url": "https://www.washingtonpost.com/politics/2026/10/28/these-seven-races-will-determine-which-party-controls-senate/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5611044",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.43,
+  "p_yes_revisada": 0.42,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "El petróleo ≥$80 el 2/11 es casi seguro; queda la mitad del Senado.",
+  "razonamiento": "Equivale a que los republicanos conserven el Senado.",
+  "fuentes": [
+   {
+    "url": "https://www.washingtonpost.com/politics/2026/10/28/these-seven-races-will-determine-which-party-controls-senate/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "943821",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.17,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Fox proyecta 48 demócratas y 47 republicanos con 5 reñidos; el resultado exacto de 49 es una cola angosta.",
+  "razonamiento": "Distribución de escaños muy abierta.",
+  "fuentes": [
+   {
+    "url": "https://www.foxnews.com/politics/fox-news-power-rankings-iran-looms-large-can-gop-keep-faithful",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "943819",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.35,
+  "p_yes_revisada": 0.2,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Los republicanos con 47 o menos requieren una ola demócrata.",
+  "razonamiento": "Cola baja del modelo.",
+  "fuentes": [
+   {
+    "url": "https://www.foxnews.com/politics/fox-news-power-rankings-iran-looms-large-can-gop-keep-faithful",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554657",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.22,
+  "p_yes_revisada": 0.03,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Gemini 4 Carbon debutó #1 en Arena el 28/10 (1528); Opus 5.5 tercero.",
+  "razonamiento": "Anthropic no lidera el ranking general.",
+  "fuentes": [
+   {
+    "url": "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "4853905",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.65,
+  "p_yes_revisada": 0.88,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Gemini 4 Carbon anunciado el 28/10 (Argon GA el 13/10); falta confirmar que las reglas cuenten Carbon como Pro.",
+  "razonamiento": "Hubo lanzamiento nuevo antes del 31/10 según el tracker y la página de DeepMind.",
+  "fuentes": [
+   {
+    "url": "https://releasebot.io/updates/google/gemini-api",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://deepmind.google/models/",
+    "tipo": "oficial"
+   }
+  ]
+ },
+ {
+  "market_id": "3685385",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.64,
+  "p_yes_revisada": 0.88,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Igual que 4853905: Carbon el 28/10, dentro de la ventana.",
+  "razonamiento": "Lanzamiento dentro del plazo.",
+  "fuentes": [
+   {
+    "url": "https://releasebot.io/updates/google/gemini-api",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://deepmind.google/models/",
+    "tipo": "oficial"
+   }
+  ]
+ },
+ {
+  "market_id": "4869280",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.12,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Último lanzamiento Meta: Muse Spark Open el 15/10; nada anunciado para 31/10.",
+  "razonamiento": "Sin señales de lanzamiento en 2 días.",
+  "fuentes": [
+   {
+    "url": "https://9to5mac.com/2026/10/15/meta-launches-new-muse-spark-open-model-optimized-to-run-on-mac-studio/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554659",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.96,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Carbon #1 (1528), Argon #2 (1520): Google lidera.",
+  "razonamiento": "Google primero en la tabla general.",
+  "fuentes": [
+   {
+    "url": "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554472",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.4,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Fuentes se contradicen: Kimi K3 Max 16º vs Qwen3.8-Max 22º, o al revés (8º vs 12º). Datos del 19/10.",
+  "razonamiento": "Kimi y Qwen empatados; Moonshot tiene chance real.",
+  "fuentes": [
+   {
+    "url": "https://www.spke.com/en/ai/article/3791",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554475",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.5,
+  "p_yes_revisada": 0.05,
+  "direccion": "refuerza",
+  "cambia_de_lado": true,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Xiaomi MiMo no aparece entre los mejores chinos en Arena; lideran Kimi/Qwen.",
+  "razonamiento": "Xiaomi lejos de ser el mejor chino en Arena.",
+  "fuentes": [
+   {
+    "url": "https://www.spke.com/en/ai/article/3791",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554762",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.08,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Carbon y Argon lideran; control de estilo no verificado (Argon 1524 con estilo el 20/10).",
+  "razonamiento": "Anthropic #1 con estilo requiere superar a Carbon.",
+  "fuentes": [
+   {
+    "url": "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3554692",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.04,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Google tiene #1 y #2; sería el mejor laboratorio, no el segundo.",
+  "razonamiento": "Google es primero entre laboratorios.",
+  "fuentes": [
+   {
+    "url": "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166819",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.43,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 26/día (sem. al 18/10), Redsea Meridian 28/día, Windward 39/día; el rango 25-29 es plausible.",
+  "razonamiento": "Dos de tres fuentes caen dentro del rango.",
+  "fuentes": [
+   {
+    "url": "https://redseameridian.com/corridor-watch",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/bab-el-mandeb",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5219279",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.7,
+  "p_yes_revisada": 0.85,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Eurostat (jun/26): ~38M t de reservas de emergencia; liberación de 42M barriles en 3 meses, la mitad diésel (~2,9M t).",
+  "razonamiento": "Con ~38M t y una liberación chica, queda sobre 30M.",
+  "fuentes": [
+   {
+    "url": "https://www.aljazeera.com/news/2026/10/2/trump-vs-europe-as-us-presses-for-release-of-emergency-diesel-stocks",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166954",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.25,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "hormuz.now 7d ~5,9/día; PortWatch 2/día el 25/10.",
+  "razonamiento": "Depende de la fuente de conteo.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166953",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.8,
+  "p_yes_revisada": 0.72,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 2/día; hormuz.now 5,9/día, justo sobre 5.",
+  "razonamiento": "Sobre el borde del rango 0-5.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5167212",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.7,
+  "p_yes_revisada": 0.95,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Ataques saudíes en Yemen casi a diario; hubo ataques el 29/10.",
+  "razonamiento": "Muy probable que haya acción saudí el 31/10.",
+  "fuentes": [
+   {
+    "url": "https://www.cnn.com/2026/10/13/middleeast/saudi-strikes-houthi-fuel-depot-latam-intl",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065115",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.25,
+  "p_yes_revisada": 0.15,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Varios avisos UKMTO el 29/10 (proyectil, dhow, explosivos limpet).",
+  "razonamiento": "Semana con muchos avisos: 4-7 queda bajo.",
+  "fuentes": [
+   {
+    "url": "https://gulfnews.com/world/mena/middle-east-war-iran-claims-tankers-hit-mines-in-strait-of-hormuz-ukmto-confirms-strike-off-oman-fired-us-general-reportedly-admitted-iran-leaks-1.500729137",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065116",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "No pude contar los avisos de la semana.",
+  "razonamiento": "Sin conteo; muchos incidentes pero no verificados.",
+  "fuentes": [
+   {
+    "url": "https://gulfnews.com/world/mena/middle-east-war-iran-claims-tankers-hit-mines-in-strait-of-hormuz-ukmto-confirms-strike-off-oman-fired-us-general-reportedly-admitted-iran-leaks-1.500729137",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065257",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.3,
+  "p_yes_revisada": 0.35,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 26/día → ~182 en la semana; Redsea Meridian 28/día → ~196.",
+  "razonamiento": "El rango 190-209 está justo sobre el nivel PortWatch.",
+  "fuentes": [
+   {
+    "url": "https://redseameridian.com/corridor-watch",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/bab-el-mandeb",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065171",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.3,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 2/día el 25/10 (~14 en la semana); hormuz.now 5,9/día.",
+  "razonamiento": "Rango 20-24 exige ~3/día, sobre lo medido.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ }
+]

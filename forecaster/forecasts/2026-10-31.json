@@ -1,0 +1,224 @@
+[
+ {
+  "market_id": "6274257",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "Los demócratas lideran por poco en MI (+7), ME (+4), OH (+4), TX (+2 a +8), KS (+1 a +5) y AK (+1 a +7); Iowa está parejo. Ganar los siete exige que casi todo salga a su favor, aunque los errores de encuesta están correlacionados.",
+  "key_uncertainties": [
+   "Iowa sin líder claro",
+   "Error de encuesta correlacionado entre estados",
+   "Voto ranked-choice en Alaska"
+  ],
+  "sources": [
+   "https://www.forbes.com/sites/saradorn/2026/10/30/latest-polls-in-2026-midterms-democrat-adam-hamilton-ahead-in-kansas-senate-race-in-2-polls/",
+   "https://onpointpolitics.us/polls/ak/senate",
+   "https://www.cnn.com/2026/10/29/politics/cnn-polls-michigan-maine-texas-kansas-senate-races-midterms-vis"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6207377",
+  "p_yes": 0.93,
+  "confidence": "medium",
+  "reasoning": "WTI cerró en $104,12 el 30/10, apenas 0,9% bajo $105, con ataques hutíes y tanqueros golpeados. Con todo noviembre por delante, tocar $105 es muy probable.",
+  "key_uncertainties": [
+   "Un desplome por acuerdo o liberación de reservas",
+   "Contrato activo de Pyth puede diferir del spot"
+  ],
+  "sources": [
+   "https://energynow.com/2026/10/october-oil-gains-exceed-13-oil-climbs-more-than-2-friday-as-middle-east-attacks-intensify-wti-and-brent-finish-week-higher-october-gains-exceed-13/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664662",
+  "p_yes": 0.8,
+  "confidence": "medium",
+  "reasoning": "Gemini 4 Carbon debutó #1 en Arena el 28/10 (1528) y Argon es segundo (1520); Opus 5.5 es tercero (1509). Google ocupa los dos primeros lugares con ventaja de 8 a 19 puntos.",
+  "key_uncertainties": [
+   "Lanzamientos de Anthropic u OpenAI en noviembre",
+   "La tabla sin control de estilo puede diferir"
+  ],
+  "sources": [
+   "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+   "https://aitoolsrecap.com/Blog/ai-releases-november-2026"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6403111",
+  "p_yes": 0.2,
+  "confidence": "low",
+  "reasoning": "Corea del Norte hizo 17 eventos balísticos en 2026 (3 en octubre) y 7 pruebas de crucero hasta el 14/10: unos 2,5 a 3 días con lanzamientos por mes, con rachas. Exactamente 2 es posible pero no lo más probable.",
+  "key_uncertainties": [
+   "Los lanzamientos de MLRS no cuentan",
+   "Racha de actividad a fin de octubre"
+  ],
+  "sources": [
+   "https://www.latintimes.com/north-korea-fires-missiles-sea-japan-600679"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6274191",
+  "p_yes": 0.04,
+  "confidence": "low",
+  "reasoning": "Exige que los republicanos ganen Kansas y pierdan los otros seis, incluido Iowa. Kansas tiene a Hamilton (D) arriba por 1 a 5, y perder seis estados vuelve improbable ganar justo el más difícil para ellos.",
+  "key_uncertainties": [
+   "Correlación entre estados",
+   "Encuestas de Kansas escasas"
+  ],
+  "sources": [
+   "https://www.forbes.com/sites/saradorn/2026/10/30/latest-polls-in-2026-midterms-democrat-adam-hamilton-ahead-in-kansas-senate-race-in-2-polls/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6207379",
+  "p_yes": 0.33,
+  "confidence": "low",
+  "reasoning": "WTI cerró en $104,12 y necesita +10,5% para $115. El máximo de 52 semanas ronda $113-118 según la fuente. La volatilidad es alta por la guerra, con riesgo de escalada tras las elecciones y riesgo de baja por liberación de reservas.",
+  "key_uncertainties": [
+   "Posible ataque a Irán después del 3/11",
+   "Liberación coordinada de reservas"
+  ],
+  "sources": [
+   "https://energynow.com/2026/10/october-oil-gains-exceed-13-oil-climbs-more-than-2-friday-as-middle-east-attacks-intensify-wti-and-brent-finish-week-higher-october-gains-exceed-13/",
+   "https://www.jpost.com/israel-news/defense-news/article-913105"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6279754",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "Carbon lidera Arena desde el 28/10. Si el mercado se creó antes y Carbon no figura como opción, 'Otro' ya gana; si figura, es poco probable. No pude ver la lista de opciones.",
+  "key_uncertainties": [
+   "Si Carbon está listado como opción",
+   "La tabla sin control de estilo",
+   "Lanzamientos antes del 9/11"
+  ],
+  "sources": [
+   "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5238400",
+  "p_yes": 0.2,
+  "confidence": "low",
+  "reasoning": "Hoy hay dos portaaviones en CENTCOM y el Roosevelt llega hacia fines de noviembre; puede relevar a uno o sumarse (tres). Exactamente uno el 30/11 requiere que uno se vaya antes de que llegue el Roosevelt.",
+  "key_uncertainties": [
+   "Si el Roosevelt releva o se suma",
+   "Fecha de llegada a CENTCOM"
+  ],
+  "sources": [
+   "https://www.theweek.in/news/middle-east/2026/10/21/war-prep-in-full-swing-uss-theodore-roosevelt-to-arrive-in-middle-east-by-november-end.html",
+   "https://www.twz.com/sea/where-are-the-aircraft-carriers-october-27-2026"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "629324",
+  "p_yes": 0.22,
+  "confidence": "medium",
+  "reasoning": "Donalds (R) lidera por 4 a 5 en los promedios; las encuestas recientes son más cerradas (UNF +2, St. Pete +2). Florida es republicano y Jolly necesita un error de encuesta.",
+  "key_uncertainties": [
+   "Votantes independientes (Jolly +17 en UNF)"
+  ],
+  "sources": [
+   "https://onpointpolitics.us/polls/fl/governor",
+   "https://www.nbcmiami.com/elections/donalds-leads-jolly-in-2026-florida-governors-race-new-poll-finds/3869116/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6172731",
+  "p_yes": 0.06,
+  "confidence": "medium",
+  "reasoning": "La plata cayó 6% el 30/10 a ~$49-51; $62 exige +22-27% en un mes. Es una volatilidad enorme pero con viento en contra (apuestas de suba de tasas de la Fed).",
+  "key_uncertainties": [
+   "Reversión violenta",
+   "Fuentes con precios intradía distintos"
+  ],
+  "sources": [
+   "https://www.usagold.com/daily-precious-metals-market-report-october-30-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5238397",
+  "p_yes": 0.07,
+  "confidence": "medium",
+  "reasoning": "El Roosevelt terminó Keen Sword el 29/10 en el Pacífico y los reportes apuntan a una llegada hacia fines de noviembre. Llegar antes del 15/11 exigiría una travesía muy rápida.",
+  "key_uncertainties": [
+   "Fecha exacta de salida del Pacífico occidental"
+  ],
+  "sources": [
+   "https://www.theweek.in/news/middle-east/2026/10/21/war-prep-in-full-swing-uss-theodore-roosevelt-to-arrive-in-middle-east-by-november-end.html",
+   "https://www.armyrecognition.com/news/navy-news/2026/u-s-aircraft-carrier-uss-theodore-roosevelt-heads-to-middle-east-as-navy-sustains-iran-operations"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "629184",
+  "p_yes": 0.13,
+  "confidence": "medium",
+  "reasoning": "Hobbs (D) lidera todas las encuestas recientes: +6 (Noble, 26-28/10), +5 (RedBox), +13 (HighGround). Biggs es el nominado republicano.",
+  "key_uncertainties": [
+   "Hobbs faltó al debate",
+   "Participación"
+  ],
+  "sources": [
+   "https://www.noblepredictiveinsights.com/post/az-poll-of-record-hobbs-6-yee-bucks-the-trend",
+   "https://www.azfamily.com/2026/10/14/new-arizona-poll-shows-democrats-leading-several-key-races/"
+  ],
+  "prompt_version": "v1",
+  "nota": "Resultado de busqueda que mostraba cuotas de mercados de prediccion; se ignoro y el pronostico se basa en encuestas."
+ },
+ {
+  "market_id": "6172692",
+  "p_yes": 0.07,
+  "confidence": "medium",
+  "reasoning": "El oro cayó 3% el 30/10 a ~$3.900-4.000. Llegar a $3.400 exige -12 a -15% en un mes; con volatilidad de 3% diario no es imposible.",
+  "key_uncertainties": [
+   "Apuestas de suba de tasas de la Fed",
+   "Fuentes con precios intradía distintos"
+  ],
+  "sources": [
+   "https://www.usagold.com/daily-precious-metals-market-report-october-30-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6403113",
+  "p_yes": 0.33,
+  "confidence": "low",
+  "reasoning": "Con 3 eventos balísticos en octubre y 7 pruebas de crucero hasta el 14/10, la tasa reciente sugiere 3 o más días con lanzamientos al mes, con rachas. Cuatro o más tiene una probabilidad real.",
+  "key_uncertainties": [
+   "Los lanzamientos de MLRS no cuentan",
+   "Posibles pausas por política exterior"
+  ],
+  "sources": [
+   "https://www.latintimes.com/north-korea-fires-missiles-sea-japan-600679",
+   "https://www.koreatimes.co.kr/southkorea/defense/20261024/north-koreas-diversifying-missile-arsenal-complicates-souths-defense"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "629721",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Crowley (D) lidera por 7 en la última encuesta de Marquette (51-44 votantes probables) y por ~5 en el promedio, pero Tiffany tiene ventaja de dinero y de entusiasmo.",
+  "key_uncertainties": [
+   "Brecha de entusiasmo",
+   "Encuestas con margen de 4,7"
+  ],
+  "sources": [
+   "https://www.wpr.org/news/marquette-poll-crowley-tiffany-october-28-2026",
+   "https://today.marquette.edu/2026/10/marquette-law-school-poll-finds-crowley-at-51-tiffany-44-among-likely-voters-in-final-survey-before-nov-3-election/"
+  ],
+  "prompt_version": "v1",
+  "nota": "Resultado de busqueda que mostraba cuotas de mercados de prediccion; se ignoro y el pronostico se basa en encuestas."
+ }
+]
