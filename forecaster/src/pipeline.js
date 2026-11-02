@@ -271,26 +271,72 @@ function estrategiaB(st) {
   return out;
 }
 
-function carteraB(st, rows = []) {
-  const b = estrategiaB(st);
-  const claves = new Set(b.map(dkey));
+// Cartera de una estrategia sombra: compras = decisiones de A (con d.factor opcional que escala el monto).
+function carteraEstrategia(etiqueta, compras, st, rows = [], extra = '') {
+  const factor = (d) => (d.factor === undefined ? 1 : d.factor);
+  const claves = new Set(compras.map(dkey));
   const outcome = new Map(st.resolutions.map((r) => [r.market_id, r.outcome_yes]));
   let realizado = 0, invertido = 0, vMid = 0, vBid = 0, abiertas = 0;
-  for (const d of b) {
+  for (const d of compras) {
     if (!st.resolved.has(d.market_id)) continue;
     const gano = (d.side === 'SI') === Boolean(outcome.get(d.market_id));
-    realizado += (gano ? d.shares : 0) - d.stake_usd - (d.fee_usd || 0);
+    realizado += factor(d) * ((gano ? d.shares : 0) - d.stake_usd - (d.fee_usd || 0));
   }
   for (const { d, b: libro } of rows) {
     if (!claves.has(dkey(d))) continue;
-    const costo = d.stake_usd + (d.fee_usd || 0);
+    const comprada = compras.find((x) => dkey(x) === dkey(d));
+    const f = factor(comprada);
+    const costo = f * (d.stake_usd + (d.fee_usd || 0));
     abiertas++; invertido += costo;
     if (!libro || libro.mid === null) { vMid += costo; vBid += costo; continue; }
-    vMid += d.shares * libro.mid; vBid += d.shares * (libro.bid ?? 0);
+    vMid += f * d.shares * libro.mid; vBid += f * d.shares * (libro.bid ?? 0);
   }
   const noReal = vMid - invertido, noRealBid = vBid - invertido;
-  const resumen = `CARTERA_B abiertas=${abiertas} invertido=$${invertido.toFixed(2)} valor_actual=$${vMid.toFixed(2)} pnl_no_realizado=${usd(noReal)} (al bid ${usd(noRealBid)}) pnl_realizado=${usd(realizado)} pnl_total=${usd(realizado + noReal)} (al bid ${usd(realizado + noRealBid)}) compras_b=${b.length}`;
-  return { resumen, b, realizado, noReal, noRealBid, invertido, abiertas, total: realizado + noReal };
+  const resumen = `CARTERA_${etiqueta} abiertas=${abiertas} invertido=$${invertido.toFixed(2)} valor_actual=$${vMid.toFixed(2)} pnl_no_realizado=${usd(noReal)} (al bid ${usd(noRealBid)}) pnl_realizado=${usd(realizado)} pnl_total=${usd(realizado + noReal)} (al bid ${usd(realizado + noRealBid)}) compras_${etiqueta.toLowerCase()}=${compras.length}${extra}`;
+  return { resumen, realizado, noReal, noRealBid, invertido, abiertas, total: realizado + noReal };
+}
+
+function carteraB(st, rows = []) {
+  const b = estrategiaB(st);
+  return { b, ...carteraEstrategia('B', b, st, rows) };
+}
+
+// Estrategia C (solo paper): compras de A que la segunda capa (con precios a la vista) confirmo o redujo.
+// Las confirmaciones viven en confirmaciones/AAAA-MM-DD.json y aplican a las compras del mismo dia UTC.
+const confirmDir = () => process.env.CONFIRMACIONES_DIR || path.join(__dirname, '..', 'confirmaciones');
+
+function readConfirmaciones() {
+  const out = new Map();
+  let names = [];
+  try { names = fs.readdirSync(confirmDir()).filter((n) => /^\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort(); } catch { return out; }
+  for (const n of names) {
+    try {
+      const j = JSON.parse(fs.readFileSync(path.join(confirmDir(), n), 'utf8'));
+      for (const c of Array.isArray(j) ? j : []) {
+        if (c && c.market_id && (c.side === 'SI' || c.side === 'NO') && ['confirmar', 'reducir', 'descartar'].includes(c.accion)) out.set(`${n.slice(0, 10)}|${c.market_id}|${c.side}`, c);
+      }
+    } catch (e) { log(`confirmaciones ${n}: ${e.message}`); }
+  }
+  return out;
+}
+
+function estrategiaC(st, conf = readConfirmaciones()) {
+  const compras = st.decisions.filter((d) => d.action === 'comprar');
+  const out = [];
+  let descartadas = 0, sinRevisar = 0;
+  for (const d of compras) {
+    const c = conf.get(`${String(d.ts).slice(0, 10)}|${d.market_id}|${d.side}`);
+    if (!c) { sinRevisar++; continue; }
+    if (c.accion === 'descartar') { descartadas++; continue; }
+    const factor = c.accion === 'reducir' ? (c.factor > 0 && c.factor < 1 ? c.factor : 0.5) : 1;
+    out.push({ ...d, factor });
+  }
+  return { compras: out, descartadas, sinRevisar };
+}
+
+function carteraC(st, rows = [], conf) {
+  const c = estrategiaC(st, conf);
+  return { ...c, ...carteraEstrategia('C', c.compras, st, rows, ` descartadas=${c.descartadas} sin_revisar=${c.sinRevisar}`) };
 }
 
 async function takeSnapshots(now = Date.now()) {
@@ -315,4 +361,4 @@ async function takeSnapshots(now = Date.now()) {
   return n;
 }
 
-module.exports = { posicionLine, resolucionLines, valorLine, valorCartera, reportePorTramo, tramoDe, estrategiaB, carteraB, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
+module.exports = { posicionLine, resolucionLines, valorLine, valorCartera, reportePorTramo, tramoDe, estrategiaB, carteraB, estrategiaC, carteraC, readConfirmaciones, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };

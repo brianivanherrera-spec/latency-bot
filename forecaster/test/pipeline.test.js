@@ -208,3 +208,26 @@ test('estrategiaB: filtra por precio, divergencia, mercado repetido y evento', (
   assert.equal(c.invertido, 20);
   assert.match(c.resumen, /^CARTERA_B abiertas=2 invertido=\$20.00 /);
 });
+
+test('estrategiaC: solo compras confirmadas o reducidas el mismo dia; reducir escala el monto', () => {
+  const mk = (key, id, price, ts) => ({ action: 'comprar', key, ts, market_id: id, event_id: 'e' + id, side: 'SI', stake_usd: 10, shares: 10 / price, avg_price: price, fee_usd: 0 });
+  const st = {
+    decisions: [mk('k1', 'a', 0.5, '2026-11-02T12:30:00Z'), mk('k2', 'b', 0.5, '2026-11-02T12:31:00Z'), mk('k3', 'c', 0.5, '2026-11-02T12:32:00Z'), mk('k4', 'd', 0.5, '2026-11-03T12:30:00Z')],
+    forecasts: [], resolutions: [{ market_id: 'a', outcome_yes: true }], resolved: new Set(['a']),
+  };
+  const conf = new Map([
+    ['2026-11-02|a|SI', { accion: 'confirmar' }],
+    ['2026-11-02|b|SI', { accion: 'descartar' }],
+    ['2026-11-02|c|SI', { accion: 'reducir', factor: 0.5 }],
+    ['2026-11-02|d|SI', { accion: 'confirmar' }], // otro dia: no aplica a k4
+  ]);
+  const e = pipeline.estrategiaC(st, conf);
+  assert.deepEqual(e.compras.map((d) => [d.key, d.factor]), [['k1', 1], ['k3', 0.5]]);
+  assert.equal(e.descartadas, 1);
+  assert.equal(e.sinRevisar, 1);
+  const rows = [{ d: { ...st.decisions[2] }, b: { mid: 0.6, bid: 0.55 } }];
+  const c = pipeline.carteraC(st, rows, conf);
+  assert.equal(c.invertido, 5);
+  assert.equal(Math.round(c.realizado * 100) / 100, 10); // a gana: 20 - 10
+  assert.match(c.resumen, /^CARTERA_C abiertas=1 invertido=\$5.00 /);
+});
