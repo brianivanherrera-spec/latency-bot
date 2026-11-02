@@ -1,0 +1,6 @@
+[
+ {"market_id":"2431413","side":"NO","accion":"reducir","factor":0.5,"precio_visto":0.62,"motivo":"Divergencia de 0,21 (mi p 0,17 contra ~0,38 del mercado) a dos meses; el mercado puede estar anticipando un lanzamiento de Anthropic que no veo. Misma apuesta de fondo que la de Google, así que se reduce."},
+ {"market_id":"2126461","side":"NO","accion":"confirmar","precio_visto":0.84,"motivo":"WTI a $104 necesita +41% para $147; mi p 0,05 contra ~0,16. Pago chico (+$1,9) contra riesgo de $10, pero la cola extrema por Ormuz explica el precio y el edge sigue siendo positivo."},
+ {"market_id":"2431412","side":"SI","accion":"confirmar","precio_visto":0.53,"motivo":"Google tiene #1 y #2 de Arena con 19 puntos de ventaja; precio medio (0,53), sin cola extrema. La divergencia (0,22) es la mayor del día pero hay evidencia concreta."},
+ {"market_id":"5676703","side":"NO","accion":"reducir","factor":0.5,"precio_visto":0.71,"motivo":"Los fiscales ya mencionan comunicaciones frecuentes con un miembro de la familia real saudí; un cargo nuevo que atribuya el acto a un ente estatal es posible. Mi p 0,12 puede ser baja, así que se reduce."}
+]
