@@ -14,13 +14,6 @@
   "compras": 2
  },
  {
-  "market_id": "3685385",
-  "side": "NO",
-  "nombre": "No sale nuevo Google Gemini Pro antes del 1/11",
-  "resuelve": "2026-11-01",
-  "compras": 1
- },
- {
   "market_id": "5219279",
   "side": "NO",
   "nombre": "Stock de emergencia de diésel UE >=30M toneladas fin de octubre (Eurostat)",
@@ -39,20 +32,6 @@
   "side": "NO",
   "nombre": "Ormuz promedio 7d 0-5 tránsitos el 31/10",
   "resuelve": "2026-11-01",
-  "compras": 1
- },
- {
-  "market_id": "5167212",
-  "side": "NO",
-  "nombre": "Arabia Saudita ataca Yemen el 31/10",
-  "resuelve": "2026-11-01",
-  "compras": 1
- },
- {
-  "market_id": "6065115",
-  "side": "NO",
-  "nombre": "UKMTO publica 4-7 avisos entre 26/10 y 1/11",
-  "resuelve": "2026-11-02",
   "compras": 1
  },
  {
@@ -252,13 +231,6 @@
   "compras": 1
  },
  {
-  "market_id": "6065116",
-  "side": "SI",
-  "nombre": "UKMTO publica 8-11 avisos entre 26/10 y 1/11",
-  "resuelve": "2026-11-02",
-  "compras": 1
- },
- {
   "market_id": "630747",
   "side": "SI",
   "nombre": "Republicanos ganan Senado de Kansas",
@@ -339,6 +311,20 @@
   "market_id": "629721",
   "side": "SI",
   "nombre": "Republicanos ganan gobernación de Wisconsin",
+  "resuelve": "2026-11-04",
+  "compras": 1
+ },
+ {
+  "market_id": "629505",
+  "side": "NO",
+  "nombre": "Demócratas ganan gobernación de Nevada",
+  "resuelve": "2026-11-04",
+  "compras": 1
+ },
+ {
+  "market_id": "629325",
+  "side": "SI",
+  "nombre": "Republicanos ganan gobernación de Florida",
   "resuelve": "2026-11-04",
   "compras": 1
  }

@@ -1,0 +1,218 @@
+[
+ {
+  "market_id": "663583",
+  "p_yes": 0.02,
+  "confidence": "medium",
+  "reasoning": "El régimen sobrevivió a la guerra y a las protestas; las fuerzas de seguridad no muestran deserciones y Mojtaba Khamenei ya sucedió a su padre. Caer en dos meses exige una ruptura brusca.",
+  "key_uncertainties": [
+   "Colapso por guerra o crisis económica",
+   "Deserciones en el IRGC"
+  ],
+  "sources": [
+   "https://commonslibrary.parliament.uk/research-briefings/cbp-10462/",
+   "https://carnegieendowment.org/research/2026/10/the-political-economy-of-protests-in-iran"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "608368",
+  "p_yes": 0.93,
+  "confidence": "medium",
+  "reasoning": "OpenAI presentó un S-1 confidencial en mayo-junio, pero reportes dicen que se inclina por salir a bolsa en 2027 y su CFO habló de 2027 o antes. No hay S-1 público ni fecha.",
+  "key_uncertainties": [
+   "Cotización sorpresa en noviembre-diciembre"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/05/20/openai-ipo-filing.html",
+   "https://aitoolsrecap.com/Blog/openai-ipo-2026-valuation-timeline-what-investors-need-to-know"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2431413",
+  "p_yes": 0.17,
+  "confidence": "medium",
+  "reasoning": "Gemini 4 Carbon lidera Arena (1528), Argon es segundo (1520) y Opus 5.5 tercero (1509). Anthropic necesitaría un modelo nuevo que supere a Google antes del 31/12.",
+  "key_uncertainties": [
+   "Lanzamiento de Anthropic en noviembre-diciembre",
+   "La tabla sin control de estilo puede diferir"
+  ],
+  "sources": [
+   "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o",
+   "https://aitoolsrecap.com/Blog/ai-releases-november-2026"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2696747",
+  "p_yes": 0.07,
+  "confidence": "medium",
+  "reasoning": "La ventana de 60 días del memorándum venció sin acuerdo; Trump dijo que no hay conversaciones y Irán propone un plan de dos días condicionado a exigencias. Firmar un acuerdo nuclear con límites medibles antes de fin de año es improbable.",
+  "key_uncertainties": [
+   "Mediación china u omaní",
+   "Presión por el cierre de Ormuz"
+  ],
+  "sources": [
+   "https://www.cbsnews.com/live-updates/us-iran-war-deal-expired-strait-of-hormuz/",
+   "https://krmg.com/2026/11/02/iran-has-a-2-day-plan-to-reopen-strait-resume-nuclear-talks-with-us-and-other-mideast-news/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "665374",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "El Pentágono preparó planes para tomar islas y operar en tierra, y hay reportes de una campaña corta tras las elecciones, pero hasta ahora nada se ejecutó y una campaña aérea no cuenta; hace falta una ofensiva para controlar territorio.",
+  "key_uncertainties": [
+   "Ofensiva terrestre limitada a islas",
+   "Reportes de una campaña tras el 3/11"
+  ],
+  "sources": [
+   "https://www.jpost.com/israel-news/defense-news/article-913105",
+   "https://quincyinst.org/research/limited-us-ground-operations-in-iran-will-not-shift-the-wars-balance/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2126461",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "WTI cerró en $104,12 y Brent en $117,64; superar $147,27 en el contrato activo de CME exige +41% en dos meses. Solo una escalada extrema lo lograría.",
+  "key_uncertainties": [
+   "Cierre total de Ormuz con ataques a infraestructura saudí"
+  ],
+  "sources": [
+   "https://energynow.com/2026/10/october-oil-gains-exceed-13-oil-climbs-more-than-2-friday-as-middle-east-attacks-intensify-wti-and-brent-finish-week-higher-october-gains-exceed-13/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2431412",
+  "p_yes": 0.75,
+  "confidence": "medium",
+  "reasoning": "Google ocupa el primero y segundo lugar de Arena (Carbon 1528, Argon 1520) con 19 puntos sobre Anthropic. Un cambio exige un lanzamiento rival que supere a ambos.",
+  "key_uncertainties": [
+   "Lanzamientos de OpenAI o Anthropic",
+   "La tabla sin control de estilo puede diferir"
+  ],
+  "sources": [
+   "https://www.willamettenews.com/post/market-pulse-google-jumps-to-favorite-in-year-end-ai-race-after-gemini-4-carbon-tops-leaderboard-o"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3215073",
+  "p_yes": 0.06,
+  "confidence": "medium",
+  "reasoning": "EE.UU. estudió ocupar Kharg pero nada se ejecutó; el fondo minado y el riesgo de misiles hacen costosa la operación, y debe establecerse control efectivo, no un desembarco temporal.",
+  "key_uncertainties": [
+   "Campaña tras elecciones",
+   "Acuerdo de paz con transferencia"
+  ],
+  "sources": [
+   "https://www.pbs.org/newshour/world/what-experts-say-about-the-risks-of-u-s-seizing-irans-kharg-island"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "666861",
+  "p_yes": 0.015,
+  "confidence": "high",
+  "reasoning": "Una salida de Trump antes de 2027 exige renuncia, destitución o incapacidad sostenida; no hay indicios de ninguna.",
+  "key_uncertainties": [
+   "Evento de salud"
+  ],
+  "sources": [
+   "https://www.cnn.com/2026/10/29/politics/senate-midterms-democrats-republicans"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "676741",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Apple cerró en $5,03 billones y Nvidia en $4,93 billones el 30/10, una brecha de 2%; Apple pasó a Nvidia tras una caída de 7% en semiconductores. Los dos intercambiaron el primer lugar el 23/10 y ahora.",
+  "key_uncertainties": [
+   "Rebote de Nvidia en resultados",
+   "Dudas sobre el gasto en IA"
+  ],
+  "sources": [
+   "https://www.technology.org/2026/11/02/apple-passes-nvidia-most-valuable-company-5-03-trillion/",
+   "https://www.notebookcheck.net/Nvidia-loses-its-5-trillion-crown-as-Apple-takes-the-top-spot.1438760.0.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5676703",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Alfozan fue acusado de interceptar comunicaciones; los fiscales mencionan WhatsApp frecuentes con un miembro de la familia real saudí pero no alegaron que actuara por orden de un gobierno. La atribución debe ser definitiva para contar.",
+  "key_uncertainties": [
+   "Nuevo cargo de espionaje",
+   "Declaraciones de OpenAI"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/19/openai-bugging-suspect-alfozan-saudi-royal-family.html",
+   "https://winbuzzer.com/2026/10/28/former-openai-engineer-indicted-in-office-bugging-case-xcxwbn"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "1394086",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Pahlavi prometió volver pero sin fecha y el régimen mantiene el control; entrar a Irán requeriría un colapso del régimen o una operación clandestina muy improbable.",
+  "key_uncertainties": [
+   "Colapso del régimen"
+  ],
+  "sources": [
+   "https://www.iranintl.com/en/202603140455",
+   "https://www.middleeastmonitor.com/20260119-reza-pahlavi-pledges-to-return-to-iran-after-claiming-calls-from-the-people-to-lead/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2176270",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "El tráfico por Ormuz está en un dígito diario y el promedio de 7 días debe llegar a 60 (unos 70% del normal). Irán propone un plan de reapertura condicionado, sin acuerdo, y Trump dice que no hay conversaciones.",
+  "key_uncertainties": [
+   "Acuerdo repentino",
+   "Meses de recuperación aun con acuerdo"
+  ],
+  "sources": [
+   "https://www.cbsnews.com/live-updates/us-iran-war-deal-expired-strait-of-hormuz/",
+   "https://krmg.com/2026/11/02/iran-has-a-2-day-plan-to-reopen-strait-resume-nuclear-talks-with-us-and-other-mideast-news/",
+   "https://hormuz.now/traffic"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2657589",
+  "p_yes": 0.2,
+  "confidence": "medium",
+  "reasoning": "La Fed ya subió una vez (septiembre) y mantuvo en octubre con 10-2 (dos votos por subir); el mercado da 80% a una suba en diciembre, que la dejaría en dos. Exactamente una requiere que no suba en diciembre.",
+  "key_uncertainties": [
+   "Datos de inflación",
+   "Debilidad bursátil"
+  ],
+  "sources": [
+   "https://www.cnn.com/2026/10/28/business/live-news/federal-reserve-interest-rate-october",
+   "https://www.cnbc.com/2026/10/28/fed-rate-decision-warsh-takeaways.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "1820798",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Los mejores modelos chinos en Arena están lejos del primer lugar (Kimi y Qwen entre 8º y 22º); superar a Carbon y Argon en dos meses es muy improbable.",
+  "key_uncertainties": [
+   "Lanzamiento chino sorpresivo"
+  ],
+  "sources": [
+   "https://www.spke.com/en/ai/article/3791"
+  ],
+  "prompt_version": "v1"
+ }
+]
