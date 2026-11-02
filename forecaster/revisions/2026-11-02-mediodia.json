@@ -1,0 +1,643 @@
+[
+ {
+  "market_id": "630806",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.37,
+  "p_yes_revisada": 0.2,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "NYT/Siena final: El-Sayed 53-42 sobre Rogers; RCP +3,5.",
+  "razonamiento": "Michigan es Lean D.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630805",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.8,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Idem.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630772",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.72,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Siena: Jackson 51-45 sobre Collins; otras encuestas +4 a +9.",
+  "razonamiento": "Maine con ventaja demócrata.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "631057",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.65,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Siena: Brown 49-44; RCP +2,6 (toss up).",
+  "razonamiento": "Brown lidera por poco.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630733",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.5,
+  "p_yes_revisada": 0.48,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "Siena: Turek 48-47; RCP: Hinson +0,5. Prácticamente empate.",
+  "razonamiento": "Iowa es la más pareja.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630734",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.47,
+  "p_yes_revisada": 0.52,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "Idem.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630746",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Siena y CNN: Hamilton (D) arriba por unos 4.",
+  "razonamiento": "Demócrata favorito leve en Kansas.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630747",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.57,
+  "p_yes_revisada": 0.45,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Idem.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "634976",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.62,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Siena: Peltola arriba; promedios +1 a +4.",
+  "razonamiento": "Peltola favorita leve.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "562793",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.7,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Poliwave: 78% demócrata (52 escaños); DDHQ 64% demócrata (52 escaños).",
+  "razonamiento": "Demócratas favoritos a controlar el Senado.",
+  "fuentes": [
+   {
+    "url": "https://www.poliwave.com/us/fed/projection",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://votes.decisiondeskhq.com/forecast/2026/senate",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "562828",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.48,
+  "p_yes_revisada": 0.62,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Cámara claramente demócrata y Senado ~70% demócrata.",
+  "razonamiento": "Producto de ambas probabilidades.",
+  "fuentes": [
+   {
+    "url": "https://www.poliwave.com/us/fed/projection",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://votes.decisiondeskhq.com/forecast/2026/senate",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5611044",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.43,
+  "p_yes_revisada": 0.3,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Con los demócratas 64-78% de controlar el Senado, queda ~30% a favor de los republicanos.",
+  "razonamiento": "Equivale a que los republicanos conserven el Senado.",
+  "fuentes": [
+   {
+    "url": "https://www.poliwave.com/us/fed/projection",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://votes.decisiondeskhq.com/forecast/2026/senate",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "943821",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.16,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Proyecciones: 52 escaños demócratas, es decir 48 republicanos; 49 exactos es una cola.",
+  "razonamiento": "Distribución centrada cerca de 48.",
+  "fuentes": [
+   {
+    "url": "https://www.poliwave.com/us/fed/projection",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://votes.decisiondeskhq.com/forecast/2026/senate",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "943819",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.35,
+  "p_yes_revisada": 0.3,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Con 52 demócratas proyectados, republicanos ≤47 requiere una ola.",
+  "razonamiento": "Cola baja del modelo.",
+  "fuentes": [
+   {
+    "url": "https://www.poliwave.com/us/fed/projection",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://votes.decisiondeskhq.com/forecast/2026/senate",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629557",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.58,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Cook: Lean D; promedios Acton +2 a +4; Echelon da Ramaswamy +2.",
+  "razonamiento": "Acton favorita leve.",
+  "fuentes": [
+   {
+    "url": "https://www.cookpolitical.com/analysis/governors/2026-final-governors-ratings",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629558",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.35,
+  "p_yes_revisada": 0.42,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Idem.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://www.cookpolitical.com/analysis/governors/2026-final-governors-ratings",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629506",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.5,
+  "p_yes_revisada": 0.52,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Todos los pronosticadores lo ven toss up; Noble 47-47.",
+  "razonamiento": "Moneda al aire.",
+  "fuentes": [
+   {
+    "url": "https://www.cookpolitical.com/analysis/governors/2026-final-governors-ratings",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629505",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.49,
+  "p_yes_revisada": 0.48,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Idem.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://www.cookpolitical.com/analysis/governors/2026-final-governors-ratings",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629721",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.3,
+  "p_yes_revisada": 0.3,
+  "direccion": "sin_cambio",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Cook pasó Wisconsin a Lean D; Crowley +3 a +7.",
+  "razonamiento": "Crowley favorito.",
+  "fuentes": [
+   {
+    "url": "https://www.cookpolitical.com/analysis/governors/2026-final-governors-ratings",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629324",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.22,
+  "p_yes_revisada": 0.22,
+  "direccion": "sin_cambio",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Donalds +4 (Siena) y +2 (St. Pete); Cook lo ve Lean R.",
+  "razonamiento": "Republicano favorito.",
+  "fuentes": [
+   {
+    "url": "https://www.cookpolitical.com/analysis/governors/2026-final-governors-ratings",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "629325",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.78,
+  "p_yes_revisada": 0.78,
+  "direccion": "sin_cambio",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Idem.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://www.cookpolitical.com/analysis/governors/2026-final-governors-ratings",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6274257",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.1,
+  "p_yes_revisada": 0.13,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "ganancia probable",
+  "novedades": "Siena: demócratas arriba en los siete estados (Iowa por 1); probabilidad conjunta subió con la correlación.",
+  "razonamiento": "Barrido demócrata posible pero improbable.",
+  "fuentes": [
+   {
+    "url": "https://sri.siena.edu/2026/11/01/nytimes-siena-poll-of-likely-voters-alaska-iowa-kansas-maine-michigan-ohio-and-texas/",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.forbes.com/sites/saradorn/2026/11/01/latest-polls-in-2026-midterms-democrats-lead-nearly-all-key-senate-races/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3247825",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.18,
+  "p_yes_revisada": 0.04,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Swaps de tasas: 100% de suba el 5/11.",
+  "razonamiento": "Suba prácticamente descontada.",
+  "fuentes": [
+   {
+    "url": "https://www.fxstreet.com/news/bank-of-england-gradual-hiking-path-rabobank-202610301323",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3247826",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.85,
+  "p_yes_revisada": 0.96,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Idem.",
+  "razonamiento": "Idem.",
+  "fuentes": [
+   {
+    "url": "https://www.fxstreet.com/news/bank-of-england-gradual-hiking-path-rabobank-202610301323",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "634893",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.42,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Echelon: Ricketts +1 sobre Osborn.",
+  "razonamiento": "Nebraska parejo, leve ventaja republicana.",
+  "fuentes": [
+   {
+    "url": "https://www.nbcnews.com/politics/2026-elections/senate-battleground-polls",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630924",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.35,
+  "p_yes_revisada": 0.47,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Times/Siena: empate 48-48; Citadel: Graham +4.",
+  "razonamiento": "Pelea pareja.",
+  "fuentes": [
+   {
+    "url": "https://www.nbcnews.com/politics/2026-elections/senate-battleground-polls",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "630925",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.63,
+  "p_yes_revisada": 0.52,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "Idem.",
+  "razonamiento": "Pelea pareja.",
+  "fuentes": [
+   {
+    "url": "https://www.nbcnews.com/politics/2026-elections/senate-battleground-polls",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166819",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.43,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 26/día (sem. al 18/10), Redsea Meridian 28/día, Windward 39/día; el rango 25-29 es plausible.",
+  "razonamiento": "Dos de tres fuentes caen dentro del rango.",
+  "fuentes": [
+   {
+    "url": "https://redseameridian.com/corridor-watch",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/bab-el-mandeb",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5219279",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.7,
+  "p_yes_revisada": 0.85,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Eurostat (jun/26): ~38M t de reservas de emergencia; liberación de 42M barriles en 3 meses, la mitad diésel (~2,9M t).",
+  "razonamiento": "Con ~38M t y una liberación chica, queda sobre 30M.",
+  "fuentes": [
+   {
+    "url": "https://www.aljazeera.com/news/2026/10/2/trump-vs-europe-as-us-presses-for-release-of-emergency-diesel-stocks",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166954",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.25,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "hormuz.now 7d ~5,9/día; PortWatch 2/día el 25/10.",
+  "razonamiento": "Depende de la fuente de conteo.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166953",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.8,
+  "p_yes_revisada": 0.72,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 2/día; hormuz.now 5,9/día, justo sobre 5.",
+  "razonamiento": "Sobre el borde del rango 0-5.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065257",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.3,
+  "p_yes_revisada": 0.35,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 26/día → ~182 en la semana; Redsea Meridian 28/día → ~196.",
+  "razonamiento": "El rango 190-209 está justo sobre el nivel PortWatch.",
+  "fuentes": [
+   {
+    "url": "https://redseameridian.com/corridor-watch",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/bab-el-mandeb",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065171",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.3,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 2/día el 25/10 (~14 en la semana); hormuz.now 5,9/día.",
+  "razonamiento": "Rango 20-24 exige ~3/día, sobre lo medido.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ }
+]
