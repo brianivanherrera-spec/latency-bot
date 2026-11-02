@@ -1,0 +1,112 @@
+[
+ {
+  "market_id": "5166819",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.43,
+  "p_yes_revisada": 0.58,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "incierto",
+  "novedades": "Promedio 7d de 29 al 25/10, en el borde del rango 25-29. [Noche 2/11: vencido, pendiente de publicación de PortWatch/Eurostat; sin datos nuevos.]",
+  "razonamiento": "Leve inclinación a que caiga dentro.",
+  "fuentes": [
+   {
+    "url": "https://predictionscout.com/research/shipping-chokepoint-prediction-markets-imf-portwatch/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5219279",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.7,
+  "p_yes_revisada": 0.85,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "pérdida probable",
+  "novedades": "Eurostat (jun/26): ~38M t de reservas de emergencia; liberación de 42M barriles en 3 meses, la mitad diésel (~2,9M t). [Noche 2/11: vencido, pendiente de publicación de PortWatch/Eurostat; sin datos nuevos.]",
+  "razonamiento": "Con ~38M t y una liberación chica, queda sobre 30M.",
+  "fuentes": [
+   {
+    "url": "https://www.aljazeera.com/news/2026/10/2/trump-vs-europe-as-us-presses-for-release-of-emergency-diesel-stocks",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166954",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.17,
+  "p_yes_revisada": 0.25,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "hormuz.now 7d ~5,9/día; PortWatch 2/día el 25/10. [Noche 2/11: vencido, pendiente de publicación de PortWatch/Eurostat; sin datos nuevos.]",
+  "razonamiento": "Depende de la fuente de conteo.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5166953",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.8,
+  "p_yes_revisada": 0.72,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch 2/día; hormuz.now 5,9/día, justo sobre 5. [Noche 2/11: vencido, pendiente de publicación de PortWatch/Eurostat; sin datos nuevos.]",
+  "razonamiento": "Sobre el borde del rango 0-5.",
+  "fuentes": [
+   {
+    "url": "https://hormuz.now/traffic",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://tankermap.com/analytics/straits/hormuz",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065257",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.3,
+  "p_yes_revisada": 0.4,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch: promedio 7d de Bab el-Mandeb 29 al 25/10 (~203 por semana), dentro de 190-209. [Noche 2/11: vencido, pendiente de publicación de PortWatch/Eurostat; sin datos nuevos.]",
+  "razonamiento": "El rango se volvió plausible.",
+  "fuentes": [
+   {
+    "url": "https://predictionscout.com/research/shipping-chokepoint-prediction-markets-imf-portwatch/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6065171",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.4,
+  "p_yes_revisada": 0.35,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "incierto",
+  "novedades": "PortWatch semana del 19/10: 23 tránsitos en Ormuz, dentro del rango 20-24. [Noche 2/11: vencido, pendiente de publicación de PortWatch/Eurostat; sin datos nuevos.]",
+  "razonamiento": "El rango es más probable de lo que estimé.",
+  "fuentes": [
+   {
+    "url": "https://predictionscout.com/research/shipping-chokepoint-prediction-markets-imf-portwatch/",
+    "tipo": "noticia"
+   }
+  ]
+ }
+]
