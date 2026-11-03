@@ -1,0 +1,7 @@
+[
+ {"market_id":"1321561","side":"SI","accion":"descartar","precio_visto":0.66,"motivo":"Anthropic presentó su S-1 público el 26/10 y apunta a cotizar a mediados de noviembre con valuación de $1,5-2 billones; con un salto el primer día puede superar los ~$2,1 billones de SpaceX. Mi 0,95 ciego no conocía esto: sin edge."},
+ {"market_id":"1321564","side":"NO","accion":"descartar","precio_visto":0.732,"motivo":"Misma razón: la salida de Anthropic en noviembre es real y el mercado (~27%) es razonable; mi 0,02 estaba mal informado."},
+ {"market_id":"1105742","side":"SI","accion":"descartar","precio_visto":0.11,"motivo":"Divergencia de 0,74 (mi 0,85 contra 0,11): el mercado ve muy probable que deje la presidencia o que no cuente como jefa de Estado oficial (hoja de ruta con declaración de vacancia). Es el caso típico de gran divergencia que perdió antes."},
+ {"market_id":"3128886","side":"NO","accion":"reducir","factor":0.5,"precio_visto":0.606,"motivo":"Divergencia de 0,21; el levantamiento del bloqueo es la primera condición iraní y Vance habla de progreso, aunque hubo ataques el 2/11. Se mantiene a la mitad."},
+ {"market_id":"676739","side":"NO","accion":"confirmar","precio_visto":0.37,"motivo":"Divergencia chica (0,11) y precio medio; Apple pasó a Nvidia el 30/10 y la brecha es de 2%, con dudas sobre el gasto en IA."}
+]
