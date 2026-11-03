@@ -1,0 +1,207 @@
+[
+ {
+  "market_id": "703257",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "No hay ninguna señal de que un organismo federal vaya a afirmar definitivamente la existencia de vida o tecnología extraterrestre en los próximos dos meses.",
+  "key_uncertainties": [
+   "Desclasificación sorpresa"
+  ],
+  "sources": [],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "616902",
+  "p_yes": 0.97,
+  "confidence": "high",
+  "reasoning": "En 2026 la Fed mantuvo de enero a julio, subió en septiembre a 3,75-4% y mantuvo en octubre con dos votos por subir; solo queda la reunión del 9/12, donde se discute una suba, no un recorte.",
+  "key_uncertainties": [
+   "Recorte de emergencia por crisis financiera"
+  ],
+  "sources": [
+   "https://www.moneyunder30.com/fed-holds-rates-steady-october-2026/",
+   "https://www.cnbc.com/2026/10/28/fed-rate-decision-warsh-takeaways.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2431414",
+  "p_yes": 0.08,
+  "confidence": "medium",
+  "reasoning": "Google lidera Arena (resolvió primero el 31/10) y Anthropic sigue; OpenAI (GPT-6 Astra) aparece segundo solo en WebDev. Necesitaría un lanzamiento que supere a Google antes del 31/12.",
+  "key_uncertainties": [
+   "Lanzamiento de GPT-6.x en noviembre-diciembre"
+  ],
+  "sources": [
+   "https://www.benchleader.com/benchmarks/lmarena_webdev",
+   "https://aitoolsrecap.com/Blog/ai-releases-november-2026"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "677407",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "No hubo enfrentamientos armados directos entre China y Taiwán en 2026 pese a los ejercicios; exige uso de fuerza real y quedan dos meses.",
+  "key_uncertainties": [
+   "Incidente naval con daños"
+  ],
+  "sources": [],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3128886",
+  "p_yes": 0.18,
+  "confidence": "low",
+  "reasoning": "El bloqueo naval rige desde el 13/7; Irán pide levantarlo como condición de su plan de reapertura y Vance habla de progreso, pero EE.UU. atacó Qeshm el 2/11 y amenaza con más ataques tras las elecciones.",
+  "key_uncertainties": [
+   "Acuerdo rápido tras el 3/11",
+   "Escalada"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/11/3/us-hits-qeshm-island-pezeshkian-signals-more-diplomacy-iran-war-latest",
+   "https://eaworldview.com/2026/11/us-war-on-iran-trump-threatens-strikes-november-4/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "1321561",
+  "p_yes": 0.95,
+  "confidence": "high",
+  "reasoning": "SpaceX salió a bolsa el 12/6 y cerró su primer día en ~$2,1 billones, la mayor salida de la historia. Solo otra salida en 2026 con capitalización mayor lo superaría; OpenAI apunta a 2027.",
+  "key_uncertainties": [
+   "Salida sorpresa de OpenAI en diciembre"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/06/12/spacex-ipo-spcx-live-updates.html",
+   "https://stockanalysis.com/stocks/spcx/market-cap/",
+   "https://aitoolsrecap.com/Blog/openai-ipo-2026-valuation-timeline-what-investors-need-to-know"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5676702",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Los fiscales mencionan contactos con la familia real saudí, no con China; no hay indicio de vínculo chino.",
+  "key_uncertainties": [
+   "Cargo nuevo"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/19/openai-bugging-suspect-alfozan-saudi-royal-family.html",
+   "https://winbuzzer.com/2026/10/28/former-openai-engineer-indicted-in-office-bugging-case-xcxwbn"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3491438",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "No hay conversaciones directas, EE.UU. atacó Qeshm el 2/11 y un funcionario iraní dice que están lejos de un acuerdo; firmar un acuerdo nuclear con límites medibles antes del 30/11 es muy improbable.",
+  "key_uncertainties": [
+   "Acuerdo sorpresa post-elecciones"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/11/3/us-hits-qeshm-island-pezeshkian-signals-more-diplomacy-iran-war-latest",
+   "https://eaworldview.com/2026/11/us-war-on-iran-trump-threatens-strikes-november-4/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5880782",
+  "p_yes": 0.04,
+  "confidence": "medium",
+  "reasoning": "Francia declaró estado de emergencia (ley de 1955) pocas veces (2005, 2015, Nueva Caledonia 2024). Sin un atentado o disturbio mayor, en dos meses es improbable.",
+  "key_uncertainties": [
+   "Atentado",
+   "Disturbios en territorios de ultramar"
+  ],
+  "sources": [],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "1321564",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Para ganar Anthropic tendría que salir a bolsa en 2026 y superar los ~$2,1 billones de SpaceX el primer día; no hay señales de una salida de Anthropic este año.",
+  "key_uncertainties": [
+   "Salida sorpresa"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/06/12/spacex-ipo-spcx-live-updates.html",
+   "https://stockanalysis.com/stocks/spcx/market-cap/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4664662",
+  "p_yes": 0.8,
+  "confidence": "medium",
+  "reasoning": "El mercado de fin de octubre resolvió con Google primero en Arena; Google mantiene ventaja y los lanzamientos rivales de noviembre son estimaciones.",
+  "key_uncertainties": [
+   "Lanzamiento de Anthropic u OpenAI en noviembre"
+  ],
+  "sources": [
+   "https://aitoolsrecap.com/Blog/ai-releases-november-2026"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3399468",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "No hay alto el fuego vigente con EE.UU.; Netanyahu presiona para atacar a Irán tras las elecciones y EE.UU. advirtió a países del Golfo de ataques desde el 4/11. Basta un ataque aéreo o con misiles entre Israel e Irán para resolver NO.",
+  "key_uncertainties": [
+   "Que la campaña sea solo de EE.UU.",
+   "Acuerdo de último momento"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/11/3/us-hits-qeshm-island-pezeshkian-signals-more-diplomacy-iran-war-latest",
+   "https://eaworldview.com/2026/11/us-war-on-iran-trump-threatens-strikes-november-4/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "1105742",
+  "p_yes": 0.85,
+  "confidence": "medium",
+  "reasoning": "Delcy Rodríguez es la presidenta encargada tras la salida de Maduro; promete elecciones sin fecha y la hoja de ruta prevé dejar la presidencia vacante en 2027.",
+  "key_uncertainties": [
+   "Aceleración del calendario por presión de EE.UU.",
+   "Criterio de la ONU sobre jefe de Estado"
+  ],
+  "sources": [
+   "https://colombiaone.com/2026/11/02/delcy-rodriguez-promises-elections-in-venezuela-and-replaces-her-foreign-minister/",
+   "https://en.mercopress.com/2026/10/29/i-am-the-right-person-delcy-rodriguez-casts-herself-as-guarantor-of-venezuela-s-transition"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "676739",
+  "p_yes": 0.52,
+  "confidence": "low",
+  "reasoning": "Apple ($5,03 billones) pasó a Nvidia ($4,93 billones) el 30/10 tras una caída de semiconductores; la brecha es de 2% y los dos se alternaron en octubre.",
+  "key_uncertainties": [
+   "Resultados de Nvidia en noviembre",
+   "Dudas sobre el gasto en IA"
+  ],
+  "sources": [
+   "https://www.technology.org/2026/11/02/apple-passes-nvidia-most-valuable-company-5-03-trillion/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5676701",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "No hay indicio de vínculo con Rusia; la investigación menciona solo contactos con la familia real saudí.",
+  "key_uncertainties": [
+   "Cargo nuevo"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/10/19/openai-bugging-suspect-alfozan-saudi-royal-family.html",
+   "https://winbuzzer.com/2026/10/28/former-openai-engineer-indicted-in-office-bugging-case-xcxwbn"
+  ],
+  "prompt_version": "v1"
+ }
+]
