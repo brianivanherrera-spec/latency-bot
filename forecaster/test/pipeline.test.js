@@ -3,6 +3,16 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+
+test('posicionesEstrategia: lista solo abiertas y escala el monto', () => {
+  const pl = require('../src/pipeline');
+  const st = { resolved: new Set(['b']) };
+  const compras = [
+    { market_id: 'a', side: 'SI', avg_price: 0.5, stake_usd: 10, factor: 0.5 },
+    { market_id: 'b', side: 'NO', avg_price: 0.4, stake_usd: 10 },
+  ];
+  assert.deepEqual(pl.posicionesEstrategia('C', compras, st), ['POSICION_C a SI entrada=0.500 gastado=$5.00']);
+});
 const { mkMarket, mkEvent, book, setup, mockFetch } = require('./helpers');
 const pipeline = require('../src/pipeline');
 const { computeReport, bootstrapByEvent } = require('../src/metrics');

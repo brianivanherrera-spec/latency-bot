@@ -361,4 +361,12 @@ async function takeSnapshots(now = Date.now()) {
   return n;
 }
 
-module.exports = { posicionLine, resolucionLines, valorLine, valorCartera, reportePorTramo, tramoDe, estrategiaB, carteraB, estrategiaC, carteraC, readConfirmaciones, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };
+// Lineas por posicion abierta de una estrategia sombra (B o C), para ver que tiene cada una.
+function posicionesEstrategia(etiqueta, compras, st) {
+  return compras.filter((d) => !st.resolved.has(d.market_id)).map((d) => {
+    const f = d.factor === undefined ? 1 : d.factor;
+    return `POSICION_${etiqueta} ${d.market_id} ${d.side} entrada=${d.avg_price.toFixed(3)} gastado=$${(f * d.stake_usd).toFixed(2)}`;
+  });
+}
+
+module.exports = { posicionesEstrategia, posicionLine, resolucionLines, valorLine, valorCartera, reportePorTramo, tramoDe, estrategiaB, carteraB, estrategiaC, carteraC, readConfirmaciones, loadState, runSelection, publishedCandidates, ingestForecasts, checkResolutions, takeSnapshots, readForecastFiles, HORIZONS };

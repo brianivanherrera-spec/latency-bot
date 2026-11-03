@@ -58,7 +58,7 @@ function main() {
   log(`iniciando (solo paper, sin ordenes reales). DATA_DIR=${c.DATA_DIR} MARKETS_PER_DAY=${c.MARKETS_PER_DAY}`);
   server.start();
   try { logPosiciones(); } catch (e) { log(`posiciones: ${e.message}`); }
-  pipeline.valorCartera().then((v) => { v.lines.forEach((l) => log(l)); log(v.resumen); log(pipeline.carteraB(v.st, v.rows).resumen); log(pipeline.carteraC(v.st, v.rows).resumen); pipeline.reportePorTramo(pipeline.loadState(), v.rows).forEach((l) => log(l)); }).catch((e) => log(`valor cartera: ${e.message}`));
+  pipeline.valorCartera().then((v) => { v.lines.forEach((l) => log(l)); log(v.resumen); const b = pipeline.carteraB(v.st, v.rows); const c = pipeline.carteraC(v.st, v.rows); log(b.resumen); log(c.resumen); pipeline.posicionesEstrategia('B', b.b, v.st).forEach((l) => log(l)); pipeline.posicionesEstrategia('C', c.compras, v.st).forEach((l) => log(l)); pipeline.reportePorTramo(pipeline.loadState(), v.rows).forEach((l) => log(l)); }).catch((e) => log(`valor cartera: ${e.message}`));
   setInterval(() => tick().catch((e) => log(`tick: ${e.message}`)), 60000);
   tick().catch((e) => log(`tick: ${e.message}`));
 }
