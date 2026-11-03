@@ -355,5 +355,40 @@
   "nombre": "Espía de OpenAI acusado de trabajar para Arabia Saudita",
   "resuelve": "2026-12-31",
   "compras": 1
+ },
+ {
+  "market_id": "3128886",
+  "side": "NO",
+  "nombre": "EE.UU. anuncia fin del bloqueo a Irán antes del 31/12",
+  "resuelve": "2026-12-31",
+  "compras": 1
+ },
+ {
+  "market_id": "1321561",
+  "side": "SI",
+  "nombre": "SpaceX mayor salida a bolsa de 2026",
+  "resuelve": "2027-01-01",
+  "compras": 1
+ },
+ {
+  "market_id": "1321564",
+  "side": "NO",
+  "nombre": "Anthropic mayor salida a bolsa de 2026",
+  "resuelve": "2027-01-01",
+  "compras": 1
+ },
+ {
+  "market_id": "1105742",
+  "side": "SI",
+  "nombre": "Delcy Rodríguez líder de Venezuela a fin de 2026",
+  "resuelve": "2026-12-31",
+  "compras": 1
+ },
+ {
+  "market_id": "676739",
+  "side": "NO",
+  "nombre": "Nvidia mayor empresa del mundo el 31/12",
+  "resuelve": "2026-12-31",
+  "compras": 1
  }
 ]
