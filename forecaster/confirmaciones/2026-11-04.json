@@ -1,0 +1,10 @@
+[
+ {"market_id":"3580933","side":"SI","accion":"descartar","precio_visto":0.291,"motivo":"Divergencia de 0,31 (mi 0,60 contra ~0,29): las encuestas que dan ventaja a Shen son de medios afines al DPP y la UDN espera que gane Chiang; Taipei vota históricamente al KMT."},
+ {"market_id":"5971398","side":"NO","accion":"descartar","precio_visto":0.10,"motivo":"El mercado da ~90% a un GPT Astra 6.1+ antes del 30/11 contra mi 0,30: probablemente sabe de un relanzamiento inminente (hubo adelantos el 31/10). Gran divergencia."},
+ {"market_id":"5997213","side":"NO","accion":"descartar","precio_visto":0.044,"motivo":"Misma razón, ~96% de mercado al 15/12; entrada muy barata y gran divergencia."},
+ {"market_id":"5339986","side":"NO","accion":"confirmar","precio_visto":0.32,"motivo":"Divergencia chica (mercado ~68% de que siga, mi 0,60), precio medio y 11 días: hay presión israelí por atacar y amenazas iraníes."},
+ {"market_id":"1107878","side":"SI","accion":"descartar","precio_visto":0.039,"motivo":"Entrada a menos de 0,10 a casi dos meses, sin catalizador con fecha: es el tipo de apuesta que perdió siempre."},
+ {"market_id":"4319439","side":"NO","accion":"descartar","precio_visto":0.14,"motivo":"El mercado da ~86% a la salida a bolsa de Anthropic antes del 30/11, en línea con los reportes del debut la semana del 16/11; entrada barata y edge chico."},
+ {"market_id":"4178412","side":"NO","accion":"descartar","precio_visto":0.058,"motivo":"Divergencia de 0,49 (mercado ~94% de un Fable 5.2+ antes del 31/12): el mercado parece saber de un lanzamiento que no encontré."},
+ {"market_id":"1105744","side":"NO","accion":"descartar","precio_visto":0.103,"motivo":"El mercado da ~90% a Maduro como jefe de Estado oficial al 31/12: probablemente el gobierno o la ONU siguen listándolo como titular con Rodríguez como encargada. Mi 0,02 leyó mal la regla."}
+]
