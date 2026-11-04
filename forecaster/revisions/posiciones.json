@@ -49,41 +49,6 @@
   "compras": 1
  },
  {
-  "market_id": "562793",
-  "side": "NO",
-  "nombre": "Demócratas controlan el Senado",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "5611044",
-  "side": "SI",
-  "nombre": "Petróleo >=80 el 2/11 y Republicanos ganan el Senado",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "630806",
-  "side": "SI",
-  "nombre": "Republicanos ganan Senado de Michigan",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "630805",
-  "side": "NO",
-  "nombre": "Demócratas ganan Senado de Michigan",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "629557",
-  "side": "NO",
-  "nombre": "Demócratas ganan gobernación de Ohio",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "634893",
   "side": "SI",
   "nombre": "Independiente gana Senado de Nebraska",
@@ -91,30 +56,9 @@
   "compras": 2
  },
  {
-  "market_id": "630924",
-  "side": "SI",
-  "nombre": "Demócratas ganan Senado de Carolina del Sur",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "629506",
   "side": "SI",
   "nombre": "Republicanos ganan gobernación de Nevada",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "630734",
-  "side": "NO",
-  "nombre": "Republicanos ganan Senado de Iowa",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "630733",
-  "side": "SI",
-  "nombre": "Demócratas ganan Senado de Iowa",
   "resuelve": "2026-11-04",
   "compras": 1
  },
@@ -168,27 +112,6 @@
   "compras": 1
  },
  {
-  "market_id": "630772",
-  "side": "NO",
-  "nombre": "Demócratas ganan Senado de Maine",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "630925",
-  "side": "NO",
-  "nombre": "Republicanos ganan Senado de Carolina del Sur",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "629558",
-  "side": "SI",
-  "nombre": "Republicanos ganan gobernación de Ohio",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "6172751",
   "side": "NO",
   "nombre": "WTI toca máximo $110 en noviembre",
@@ -210,13 +133,6 @@
   "compras": 1
  },
  {
-  "market_id": "630746",
-  "side": "NO",
-  "nombre": "Demócratas ganan Senado de Kansas",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "6065171",
   "side": "NO",
   "nombre": "Ormuz 20-24 tránsitos 26/10-1/11 (PortWatch)",
@@ -231,24 +147,10 @@
   "compras": 1
  },
  {
-  "market_id": "630747",
-  "side": "SI",
-  "nombre": "Republicanos ganan Senado de Kansas",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "5238398",
   "side": "NO",
   "nombre": "USS Theodore Roosevelt llega a CENTCOM antes del 30/11",
   "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "631057",
-  "side": "NO",
-  "nombre": "Demócratas ganan Senado de Ohio",
-  "resuelve": "2026-11-04",
   "compras": 1
  },
  {
@@ -280,13 +182,6 @@
   "compras": 1
  },
  {
-  "market_id": "629324",
-  "side": "NO",
-  "nombre": "Demócratas ganan gobernación de Florida",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "6274257",
   "side": "NO",
   "nombre": "Republicanos pierden los 7 escaños (AK, IA, KS, ME, MI, OH, TX)",
@@ -308,23 +203,9 @@
   "compras": 1
  },
  {
-  "market_id": "629721",
-  "side": "SI",
-  "nombre": "Republicanos ganan gobernación de Wisconsin",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "629505",
   "side": "NO",
   "nombre": "Demócratas ganan gobernación de Nevada",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "629325",
-  "side": "SI",
-  "nombre": "Republicanos ganan gobernación de Florida",
   "resuelve": "2026-11-04",
   "compras": 1
  },

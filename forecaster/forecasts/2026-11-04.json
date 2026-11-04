@@ -1,0 +1,209 @@
+[
+ {
+  "market_id": "3580933",
+  "p_yes": 0.6,
+  "confidence": "medium",
+  "reasoning": "Las encuestas recientes dan a Shen (DPP) adelante: 52,6-35,3 (SPRIT, post-debate), 50,3-33,3, y 45-41 (UDN), aunque TVBS daba a Chiang adelante en octubre y Taipei suele votar al KMT.",
+  "key_uncertainties": [
+   "Sesgo de las encuestadoras",
+   "Voto oculto KMT",
+   "Faltan tres semanas"
+  ],
+  "sources": [
+   "https://www.taipeitimes.com/News/taiwan/archives/2026/11/03/2003867062",
+   "https://www.taiwannews.com.tw/news/6467763"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "2154920",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "El directorio de eBay rechazó en mayo la oferta no vinculante de GameStop y no hubo oferta nueva; los warrants para financiar vencieron el 30/10. Hace falta un anuncio oficial de acuerdo antes del 31/12.",
+  "key_uncertainties": [
+   "Oferta hostil nueva",
+   "Cambio del directorio"
+  ],
+  "sources": [
+   "https://finance.yahoo.com/markets/stocks/articles/gamestop-just-raised-stake-ebay-205407860.html",
+   "https://www.npr.org/2026/05/05/nx-s1-5810499/gamestop-makes-unsolicited-bid-to-acquire-online-auction-giant-ebay-for-56b"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5971398",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "OpenAI suspendió en septiembre el lanzamiento de GPT-6.1 Astra por problemas de seguridad y no anunció nueva fecha; hay reportes del 31/10 de que adelanta un lanzamiento 'tipo Astra'.",
+  "key_uncertainties": [
+   "Relanzamiento rápido",
+   "Nombre del modelo"
+  ],
+  "sources": [
+   "https://www.forbes.com/sites/jonmarkman/2026/09/29/openai-calls-off-gpt-61-astras-october-launch-over-safety-concerns/",
+   "https://gizmodo.com/openai-cancels-release-of-gpt-6-1-astra-because-it-regressed-on-safety-2000818566"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "6367369",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "EE.UU. atacó Qeshm el 2/11, Netanyahu presiona por una nueva ola de ataques tras las elecciones y Khamenei amenazó con represalias más amplias. Basta un ataque entre Israel e Irán para resolver NO.",
+  "key_uncertainties": [
+   "Que la campaña sea solo de EE.UU.",
+   "Acuerdo por mediadores"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/liveblog/2026/11/4/iran-war-live-tehran-prepares-maximum-deterrence-plan-for-any-new-attack",
+   "https://www.pbs.org/newshour/world/u-s-launches-new-attacks-on-iranian-targets-days-after-netanyahu-pressed-trump-for-more-strikes"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "665513",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "No hay crisis de gobierno conocida que amenace a Merz en dos meses; la salida exige renuncia o moción de censura constructiva.",
+  "key_uncertainties": [
+   "Ruptura de la coalición"
+  ],
+  "sources": [],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3224927",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "El oro ronda $3.900-4.000 tras caer el 30/10 por apuestas de suba de tasas; $5.000 al cierre exige +25-28% en dos meses.",
+  "key_uncertainties": [
+   "Escalada mayor en Medio Oriente"
+  ],
+  "sources": [
+   "https://www.usagold.com/daily-precious-metals-market-report-october-30-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5997213",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Igual que el mercado al 30/11 pero con dos semanas más para relanzar 6.1 Astra tras la suspensión de septiembre.",
+  "key_uncertainties": [
+   "Relanzamiento rápido"
+  ],
+  "sources": [
+   "https://www.forbes.com/sites/jonmarkman/2026/09/29/openai-calls-off-gpt-61-astras-october-launch-over-safety-concerns/",
+   "https://gizmodo.com/openai-cancels-release-of-gpt-6-1-astra-because-it-regressed-on-safety-2000818566"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "5339986",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "Hasta el 15/11 quedan 11 días; Trump dice que no hay planes inmediatos de atacar pero Netanyahu presiona y hay riesgo de represalia iraní.",
+  "key_uncertainties": [
+   "Ataque israelí post-elecciones"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/liveblog/2026/11/4/iran-war-live-tehran-prepares-maximum-deterrence-plan-for-any-new-attack",
+   "https://www.pbs.org/newshour/world/u-s-launches-new-attacks-on-iranian-targets-days-after-netanyahu-pressed-trump-for-more-strikes"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "1107878",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Trump volvió a hablar de intervenir en Cuba, hay un bloqueo de combustible y reportes de preparación logística a 90-120 días desde fines de septiembre, pero el gobierno dice preferir un acuerdo.",
+  "key_uncertainties": [
+   "Operación tipo Venezuela",
+   "Acuerdo con La Habana"
+  ],
+  "sources": [
+   "https://www.pbs.org/newshour/politics/watch-trump-at-gop-rally-in-florida-revives-idea-of-military-intervention-in-cuba-after-iran",
+   "https://www.npr.org/2026/05/22/nx-s1-5830999/rubio-diplomacy-cuba-trump-military-action"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4319439",
+  "p_yes": 0.75,
+  "confidence": "medium",
+  "reasoning": "Anthropic hizo público su S-1 el 26/10 y lo enmendó el 2/11; WSJ y Reuters reportan debut la semana del 16/11 y Bloomberg antes del 26/11. Falta fijar rango de precio.",
+  "key_uncertainties": [
+   "Demora por el mercado",
+   "Revisión de la SEC"
+  ],
+  "sources": [
+   "https://finance.yahoo.com/markets/article/anthropics-ipo-could-start-trading-as-soon-as-nov-16--heres-the-road-from-filing-to-first-trade-155405578.html",
+   "https://www.cnbc.com/2026/10/26/anthropic-ipo-live-updates-ai-s-1-filing.html"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "4178412",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "No encontré reportes de un Fable 5.2; un rastreador estimaba un Fable 5.5 en noviembre sin confirmación. La cadencia de Anthropic hace posible un lanzamiento en dos meses.",
+  "key_uncertainties": [
+   "Que el próximo modelo use otro nombre"
+  ],
+  "sources": [
+   "https://aitoolsrecap.com/Blog/ai-releases-november-2026"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "687642",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "No hubo enfrentamientos armados directos entre China y Japón en 2026; exige uso de fuerza real o embestida con daño grave.",
+  "key_uncertainties": [
+   "Incidente en Senkaku"
+  ],
+  "sources": [],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "1105744",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Maduro fue capturado por EE.UU. en enero y Delcy Rodríguez ejerce como presidenta encargada.",
+  "key_uncertainties": [
+   "Criterio de la ONU"
+  ],
+  "sources": [
+   "https://colombiaone.com/2026/11/02/delcy-rodriguez-promises-elections-in-venezuela-and-replaces-her-foreign-minister/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "3222416",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "El oro ronda $3.900-4.000; bajar a $3.000 al cierre exige -23% en dos meses.",
+  "key_uncertainties": [
+   "Desplome por suba de tasas"
+  ],
+  "sources": [
+   "https://www.usagold.com/daily-precious-metals-market-report-october-30-2026/"
+  ],
+  "prompt_version": "v1"
+ },
+ {
+  "market_id": "653788",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "OpenAI no anunció AGI y acaba de suspender GPT-6.1 Astra por seguridad; un anuncio formal de AGI en dos meses es muy improbable.",
+  "key_uncertainties": [
+   "Cambio contractual con Microsoft"
+  ],
+  "sources": [
+   "https://www.forbes.com/sites/jonmarkman/2026/09/29/openai-calls-off-gpt-61-astras-october-launch-over-safety-concerns/",
+   "https://gizmodo.com/openai-cancels-release-of-gpt-6-1-astra-because-it-regressed-on-safety-2000818566"
+  ],
+  "prompt_version": "v1"
+ }
+]
