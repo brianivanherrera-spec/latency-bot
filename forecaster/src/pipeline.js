@@ -173,6 +173,14 @@ function valorLine(d, b) {
   return `VALOR ${d.market_id} ${d.side} entrada=${d.avg_price.toFixed(3)} actual=${b.mid.toFixed(3)} bid=${bid.toFixed(3)} valor=$${vMid.toFixed(2)} pnl=${usd(vMid - costo)} pnl_al_bid=${usd(d.shares * bid - costo)}`;
 }
 
+const preciosPath = () => path.join(config().DATA_DIR, 'ultimos_precios.json');
+function leerUltimosPrecios() {
+  try { return JSON.parse(fs.readFileSync(preciosPath(), 'utf8')) || {}; } catch { return {}; }
+}
+function guardarUltimosPrecios(p) {
+  try { fs.writeFileSync(preciosPath(), JSON.stringify(p)); } catch (e) { log(`ultimos precios: ${e.message}`); }
+}
+
 async function valorCartera(st = loadState(), fetchBook = clob.fetchBook) {
   const open = st.decisions.filter((d) => d.action === 'comprar' && !st.resolved.has(d.market_id));
   const outcome = new Map(st.resolutions.map((r) => [r.market_id, r.outcome_yes]));
@@ -182,12 +190,22 @@ async function valorCartera(st = loadState(), fetchBook = clob.fetchBook) {
     const gano = (d.side === 'SI') === Boolean(outcome.get(d.market_id));
     realizado += (gano ? d.shares : 0) - d.stake_usd - (d.fee_usd || 0);
   }
+  // Ultimo precio conocido por token: si un libro deja de responder (mercado cerrado sin resolver),
+  // la posicion se valua a ese precio y no al costo.
+  const precios = leerUltimosPrecios();
   const rows = [];
+  let precioViejo = 0;
   for (let i = 0; i < open.length; i += 8) {
     const chunk = open.slice(i, i + 8);
     const books = await Promise.all(chunk.map((d) => fetchBook(d.token).catch(() => null)));
-    chunk.forEach((d, j) => rows.push({ d, b: books[j] }));
+    chunk.forEach((d, j) => {
+      let b = books[j];
+      if (b && b.mid !== null) precios[d.token] = { mid: b.mid, bid: b.bid ?? null, ts: new Date().toISOString() };
+      else if (precios[d.token]) { b = { ...precios[d.token], viejo: true }; precioViejo++; }
+      rows.push({ d, b });
+    });
   }
+  guardarUltimosPrecios(precios);
   let invertido = 0, vMid = 0, vBid = 0, sinPrecio = 0;
   for (const { d, b } of rows) {
     const costo = d.stake_usd + (d.fee_usd || 0);
@@ -197,8 +215,8 @@ async function valorCartera(st = loadState(), fetchBook = clob.fetchBook) {
     vBid += d.shares * (b.bid ?? 0);
   }
   const noReal = vMid - invertido, noRealBid = vBid - invertido;
-  const resumen = `CARTERA abiertas=${open.length} invertido=$${invertido.toFixed(2)} valor_actual=$${vMid.toFixed(2)} pnl_no_realizado=${usd(noReal)} (al bid ${usd(noRealBid)}) pnl_realizado=${usd(realizado)} pnl_total=${usd(realizado + noReal)} (al bid ${usd(realizado + noRealBid)}) sin_precio=${sinPrecio}`;
-  return { st, rows, lines: rows.map(({ d, b }) => valorLine(d, b)), resumen, realizado, noReal, noRealBid, invertido, abiertas: open.length, sinPrecio };
+  const resumen = `CARTERA abiertas=${open.length} invertido=$${invertido.toFixed(2)} valor_actual=$${vMid.toFixed(2)} pnl_no_realizado=${usd(noReal)} (al bid ${usd(noRealBid)}) pnl_realizado=${usd(realizado)} pnl_total=${usd(realizado + noReal)} (al bid ${usd(realizado + noRealBid)}) sin_precio=${sinPrecio} precio_viejo=${precioViejo}`;
+  return { st, rows, lines: rows.map(({ d, b }) => valorLine(d, b)), resumen, realizado, noReal, noRealBid, invertido, abiertas: open.length, sinPrecio, precioViejo };
 }
 
 // Rendimiento por tramo (precio de entrada, edge, divergencia con el mercado, confianza, categoria, horizonte).
@@ -321,22 +339,27 @@ function readConfirmaciones() {
 }
 
 function estrategiaC(st, conf = readConfirmaciones()) {
-  const compras = st.decisions.filter((d) => d.action === 'comprar');
+  const compras = st.decisions.filter((d) => d.action === 'comprar').sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
   const out = [];
-  let descartadas = 0, sinRevisar = 0;
+  // Como B: una posicion por mercado y una abierta por evento, para no apostar dos veces a lo mismo.
+  const mercados = new Set(), eventosAbiertos = new Set();
+  let descartadas = 0, sinRevisar = 0, duplicadas = 0;
   for (const d of compras) {
     const c = conf.get(`${String(d.ts).slice(0, 10)}|${d.market_id}|${d.side}`);
     if (!c) { sinRevisar++; continue; }
     if (c.accion === 'descartar') { descartadas++; continue; }
+    if (mercados.has(d.market_id) || (d.event_id && eventosAbiertos.has(d.event_id))) { duplicadas++; continue; }
+    mercados.add(d.market_id);
+    if (d.event_id && !st.resolved.has(d.market_id)) eventosAbiertos.add(d.event_id);
     const factor = c.accion === 'reducir' ? (c.factor > 0 && c.factor < 1 ? c.factor : 0.5) : 1;
     out.push({ ...d, factor });
   }
-  return { compras: out, descartadas, sinRevisar };
+  return { compras: out, descartadas, sinRevisar, duplicadas };
 }
 
 function carteraC(st, rows = [], conf) {
   const c = estrategiaC(st, conf);
-  return { ...c, ...carteraEstrategia('C', c.compras, st, rows, ` descartadas=${c.descartadas} sin_revisar=${c.sinRevisar}`) };
+  return { ...c, ...carteraEstrategia('C', c.compras, st, rows, ` descartadas=${c.descartadas} duplicadas=${c.duplicadas} sin_revisar=${c.sinRevisar}`) };
 }
 
 async function takeSnapshots(now = Date.now()) {

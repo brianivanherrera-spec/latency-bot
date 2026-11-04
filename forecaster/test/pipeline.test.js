@@ -162,9 +162,25 @@ test('valorCartera: valor actual, P&L no realizado y total', async () => {
   assert.ok(Math.abs(v.realizado - (50 - 10 + -10)) < 1e-9);
   assert.match(v.resumen, /abiertas=2 invertido=\$20.50 valor_actual=\$16.00 pnl_no_realizado=-\$4.50/);
   assert.match(v.lines[0], /VALOR a NO entrada=0.500 actual=0.600 bid=0.550 valor=\$12.00 pnl=\+\$2.00/);
+  // sin libro: usa el ultimo precio conocido, no el costo
+  const viejo = await pipeline.valorCartera(st, async () => null);
+  assert.equal(viejo.sinPrecio, 0);
+  assert.equal(viejo.precioViejo, 2);
+  assert.ok(Math.abs(viejo.noReal - v.noReal) < 1e-9);
+  // sin libro y sin precio guardado: al costo
+  require('fs').rmSync(path.join(process.env.DATA_DIR, 'ultimos_precios.json'));
   const sin = await pipeline.valorCartera(st, async () => null);
   assert.equal(sin.sinPrecio, 2);
   assert.equal(sin.noReal, 0);
+});
+
+test('estrategiaC: una posicion por evento abierto y por mercado', () => {
+  const mk = (key, id, ev, ts) => ({ action: 'comprar', key, ts, market_id: id, event_id: ev, side: 'SI', stake_usd: 10, shares: 20, avg_price: 0.5, fee_usd: 0 });
+  const st = { decisions: [mk('k1', 'a', 'e1', '2026-11-05T12:00:00Z'), mk('k2', 'b', 'e1', '2026-11-05T12:01:00Z'), mk('k3', 'c', 'e2', '2026-11-05T12:02:00Z')], resolved: new Set(), resolutions: [] };
+  const conf = new Map(['a', 'b', 'c'].map((m) => [`2026-11-05|${m}|SI`, { accion: 'confirmar' }]));
+  const e = pipeline.estrategiaC(st, conf);
+  assert.deepEqual(e.compras.map((d) => d.market_id), ['a', 'c']);
+  assert.equal(e.duplicadas, 1);
 });
 
 test('reportePorTramo: agrupa por precio, edge, divergencia y confianza', () => {
