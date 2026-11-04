@@ -35,34 +35,6 @@
   "compras": 1
  },
  {
-  "market_id": "943821",
-  "side": "SI",
-  "nombre": "Republicanos exactamente 49 escaños en el Senado",
-  "resuelve": "2026-11-03",
-  "compras": 1
- },
- {
-  "market_id": "562828",
-  "side": "NO",
-  "nombre": "Balance of Power: D Senado y D Diputados",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "634893",
-  "side": "SI",
-  "nombre": "Independiente gana Senado de Nebraska",
-  "resuelve": "2026-11-04",
-  "compras": 2
- },
- {
-  "market_id": "629506",
-  "side": "SI",
-  "nombre": "Republicanos ganan gobernación de Nevada",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "3247825",
   "side": "SI",
   "nombre": "Banco de Inglaterra sin cambio tras reunión de noviembre",
@@ -116,13 +88,6 @@
   "side": "NO",
   "nombre": "WTI toca máximo $110 en noviembre",
   "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "943819",
-  "side": "NO",
-  "nombre": "Republicanos 47 o menos escaños en el Senado",
-  "resuelve": "2026-11-03",
   "compras": 1
  },
  {
@@ -203,13 +168,6 @@
   "compras": 1
  },
  {
-  "market_id": "629505",
-  "side": "NO",
-  "nombre": "Demócratas ganan gobernación de Nevada",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
   "market_id": "2431413",
   "side": "NO",
   "nombre": "Anthropic mejor modelo de IA fin de diciembre (Arena)",
@@ -269,6 +227,62 @@
   "market_id": "676739",
   "side": "NO",
   "nombre": "Nvidia mayor empresa del mundo el 31/12",
+  "resuelve": "2026-12-31",
+  "compras": 1
+ },
+ {
+  "market_id": "3580933",
+  "side": "SI",
+  "nombre": "Taipei: gana Shen",
+  "resuelve": "2026-11-28",
+  "compras": 1
+ },
+ {
+  "market_id": "5971398",
+  "side": "NO",
+  "nombre": "GPT Astra 6.1+ antes del 30/11",
+  "resuelve": "2026-11-30",
+  "compras": 1
+ },
+ {
+  "market_id": "5997213",
+  "side": "NO",
+  "nombre": "GPT Astra 6.1+ antes del 15/12",
+  "resuelve": "2026-12-15",
+  "compras": 1
+ },
+ {
+  "market_id": "5339986",
+  "side": "NO",
+  "nombre": "Alto el fuego Israel-Irán hasta el 15/11",
+  "resuelve": "2026-11-15",
+  "compras": 1
+ },
+ {
+  "market_id": "1107878",
+  "side": "SI",
+  "nombre": "EE.UU. invade Cuba en 2026",
+  "resuelve": "2026-12-31",
+  "compras": 1
+ },
+ {
+  "market_id": "4319439",
+  "side": "NO",
+  "nombre": "Salida a bolsa de Anthropic antes del 30/11",
+  "resuelve": "2026-11-30",
+  "compras": 1
+ },
+ {
+  "market_id": "4178412",
+  "side": "NO",
+  "nombre": "Fable 5.2+ antes del 31/12",
+  "resuelve": "2026-12-31",
+  "compras": 1
+ },
+ {
+  "market_id": "1105744",
+  "side": "NO",
+  "nombre": "Maduro líder de Venezuela a fin de 2026",
   "resuelve": "2026-12-31",
   "compras": 1
  }
