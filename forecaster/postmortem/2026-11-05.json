@@ -1,0 +1,32 @@
+{
+  "semana": "2026-10-30 a 2026-11-05 (UTC), estrategia A",
+  "resueltas": 43,
+  "ganadas": 10,
+  "perdidas": 33,
+  "pnl_semana": -212.24,
+  "por_causa": {
+    "regla_mal_leida": { "n": 3, "ids": ["3685385", "4853905", "3554762"], "nota": "Gemini 'Pro' x2; Anthropic #1 (acceso limitado tomado como lanzamiento)" },
+    "dato_viejo": { "n": 4, "ids": ["5166967", "5166969", "5180417", "5180413"], "nota": "capitalizacion al 31/10 con datos de dias anteriores; mismo evento" },
+    "signo_p_yes": { "n": 1, "ids": ["4869280"], "nota": "Meta Muse Spark" },
+    "mercado_sabia_algo": { "n": 24, "ids": ["3554659", "3554692", "3554475", "3554472", "5167212", "3247826", "3247825", "562793", "562828", "629505", "629506", "629557", "629558", "629721", "630746", "630747", "630772", "630805", "630806", "631057", "634893", "943819", "943821", "5611044"], "nota": "17 son la ola demócrata del 3/11 (un solo evento correlacionado); 4 rankings de IA; BoE subio 25bp (x2); Arabia Saudita/Yemen" },
+    "mala_suerte": { "n": 1, "ids": ["5743142"], "nota": "WTI minimo $95 en octubre" }
+  },
+  "por_categoria": {
+    "politica": { "n": 23, "ganadas": 6, "pnl": -75.43 },
+    "tecnologia": { "n": 9, "ganadas": 1, "pnl": -77.86 },
+    "economia": { "n": 8, "ganadas": 1, "pnl": -65.95 },
+    "mundo": { "n": 3, "ganadas": 2, "pnl": 7.00 }
+  },
+  "A": { "pnl_total": -133.48, "realizado": -178.65, "abiertas": 50 },
+  "B": { "pnl_total": -2.73, "realizado": -9.81, "abiertas": 12 },
+  "C": { "pnl_total": 6.10, "realizado": 0.00, "abiertas": 7 },
+  "brier_modelo": 0.1435,
+  "brier_mercado": 0.1246,
+  "n_brier": 130,
+  "lecciones": [
+    "Concentracion: 17 de 33 perdidas vienen de un solo evento (elecciones); A compra ambos lados y varias patas del mismo evento. B y C (una por evento) perdieron mucho menos.",
+    "Tecnologia y economia: 2/17 aciertos y -$144. Regla mal leida y dato viejo explican 7 perdidas; research-v2 y confirmacion-v2 (desde 6/11) ya atacan ambas.",
+    "Cuando la diferencia con el mercado es grande en rankings de IA o bancos centrales, el mercado tuvo razon casi siempre: tratar esa divergencia como señal de alerta, no de ventaja."
+  ],
+  "propuesta": "Las causas repetidas (regla, dato viejo, mercado sabia en tecnologia/economia) ya quedan cubiertas por research-v2 y confirmacion-v2. No se propone v3 hasta ver una semana con v2."
+}
