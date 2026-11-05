@@ -1,203 +1,283 @@
 [
- {
-  "market_id": "4906128",
-  "p_yes": 0.08,
-  "confidence": "medium",
-  "reasoning": "El bloqueo rige desde el 13/7; levantarlo es la primera condición iraní, pero hubo ataques el 2/11 y no hay acuerdo en 25 días.",
-  "key_uncertainties": [
-   "Acuerdo rápido por mediadores"
-  ],
-  "sources": [
-   "https://www.aljazeera.com/news/liveblog/2026/11/4/iran-war-live-tehran-prepares-maximum-deterrence-plan-for-any-new-attack"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "676739",
-  "p_yes": 0.52,
-  "confidence": "low",
-  "reasoning": "Apple ($5,03 billones) pasó a Nvidia ($4,93 billones) el 30/10; la brecha es de 2% y se alternaron en octubre.",
-  "key_uncertainties": [
-   "Resultados de Nvidia en noviembre"
-  ],
-  "sources": [
-   "https://www.technology.org/2026/11/02/apple-passes-nvidia-most-valuable-company-5-03-trillion/"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "6365377",
-  "p_yes": 0.25,
-  "confidence": "low",
-  "reasoning": "Carbon se anunció el 28/10 con acceso limitado a defensores y socios; Argon pasó a público en unas dos semanas, lo que apunta a mediados de noviembre. La ventana 16-22/11 es una de varias posibles.",
-  "key_uncertainties": [
-   "Fecha exacta del lanzamiento público"
-  ],
-  "sources": [
-   "https://help.apiyi.com/en/gemini-4-carbon-release-api-availability-en.html",
-   "https://ahmetbalaman.com/en/blog/when-is-gemini-4-carbon-coming-who-can-use-it-en/"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "5339986",
-  "p_yes": 0.6,
-  "confidence": "low",
-  "reasoning": "Faltan 10 días; Trump dice que no hay planes inmediatos pero Netanyahu presiona y Khamenei amenaza con represalias amplias.",
-  "key_uncertainties": [
-   "Ataque israelí"
-  ],
-  "sources": [
-   "https://www.aljazeera.com/news/liveblog/2026/11/4/iran-war-live-tehran-prepares-maximum-deterrence-plan-for-any-new-attack"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "1450214",
-  "p_yes": 0.07,
-  "confidence": "medium",
-  "reasoning": "Trump no descartó una emergencia antes de la elección, pero no la declaró; tras una derrota demócrata amplia y con límites legales claros, una declaración formal bajo la Ley de Emergencias Nacionales es improbable.",
-  "key_uncertainties": [
-   "Impugnación de resultados"
-  ],
-  "sources": [
-   "https://www.france24.com/en/americas/20261103-how-state-officials-prepared-for-possible-trump-interference-in-the-midterms",
-   "https://www.cnn.com/2026/08/11/politics/trump-national-emergency-election"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "676741",
-  "p_yes": 0.45,
-  "confidence": "low",
-  "reasoning": "Apple lidera por 2% sobre Nvidia tras la caída de semiconductores del 30/10; el liderazgo cambió varias veces en octubre.",
-  "key_uncertainties": [
-   "Rebote de Nvidia"
-  ],
-  "sources": [
-   "https://www.technology.org/2026/11/02/apple-passes-nvidia-most-valuable-company-5-03-trillion/"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "6422298",
-  "p_yes": 0.7,
-  "confidence": "medium",
-  "reasoning": "Un 'Súper El Niño' rompió récords (Niño 3.4 sobre +3°C) y octubre va camino a ser el más cálido registrado, superando a 2023; el pico se espera entre noviembre y enero.",
-  "key_uncertainties": [
-   "Diferencias entre NASA y Copernicus",
-   "Variabilidad mensual"
-  ],
-  "sources": [
-   "https://www.scientificamerican.com/article/this-october-is-on-track-to-be-the-hottest-ever-recorded/",
-   "https://www.carbonbrief.org/analysis-super-el-nino-reaches-remarkable-all-time-record"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "1709755",
-  "p_yes": 0.01,
-  "confidence": "high",
-  "reasoning": "No hay indicios de un cambio de poder en Arabia Saudita.",
-  "key_uncertainties": [
-   "Salud del rey"
-  ],
-  "sources": [],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "567689",
-  "p_yes": 0.03,
-  "confidence": "high",
-  "reasoning": "No hay elecciones ni proceso de salida previsto antes de fin de año.",
-  "key_uncertainties": [
-   "Acuerdo de paz con elecciones"
-  ],
-  "sources": [],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "6172751",
-  "p_yes": 0.08,
-  "confidence": "medium",
-  "reasoning": "El WTI bajó a ~$88-95 por esperanzas de acuerdo con Irán; $110 exige +15-25% en tres semanas.",
-  "key_uncertainties": [
-   "Escalada con Irán"
-  ],
-  "sources": [
-   "https://tradingeconomics.com/commodity/crude-oil",
-   "https://www.investing.com/commodities/crude-oil-historical-data"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "2698814",
-  "p_yes": 0.45,
-  "confidence": "low",
-  "reasoning": "Waymo opera en unas 15 ciudades según rastreadores; tiene en proceso Londres (este año), Washington, Detroit y otras, por lo que podría pasar de 15 antes del 31/12.",
-  "key_uncertainties": [
-   "Cuántas aperturas nuevas llegan a tiempo",
-   "Conteo de áreas metropolitanas"
-  ],
-  "sources": [
-   "https://ride-share.com/waymo-cities-2026/",
-   "https://techcrunch.com/2026/02/24/waymo-robotaxis-are-now-operating-in-10-us-cities/"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "3902370",
-  "p_yes": 0.42,
-  "confidence": "low",
-  "reasoning": "Tres semanas y media de riesgo con presión israelí por atacar y amenazas iraníes; mediadores siguen activos.",
-  "key_uncertainties": [
-   "Ataque israelí",
-   "Acuerdo"
-  ],
-  "sources": [
-   "https://www.aljazeera.com/news/liveblog/2026/11/4/iran-war-live-tehran-prepares-maximum-deterrence-plan-for-any-new-attack"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "3580932",
-  "p_yes": 0.4,
-  "confidence": "low",
-  "reasoning": "Las encuestas recientes favorecen a Shen (DPP), pero Taipei suele votar al KMT y algunas encuestadoras son afines al DPP.",
-  "key_uncertainties": [
-   "Sesgo de encuestas"
-  ],
-  "sources": [
-   "https://www.taipeitimes.com/News/taiwan/archives/2026/11/03/2003867062"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "6685533",
-  "p_yes": 0.04,
-  "confidence": "medium",
-  "reasoning": "El WTI ronda $88-95; $65 exige -26% en tres semanas, solo con un acuerdo de paz y reapertura total de Ormuz.",
-  "key_uncertainties": [
-   "Acuerdo de paz repentino"
-  ],
-  "sources": [
-   "https://tradingeconomics.com/commodity/crude-oil",
-   "https://www.investing.com/commodities/crude-oil-historical-data"
-  ],
-  "prompt_version": "v1"
- },
- {
-  "market_id": "6366415",
-  "p_yes": 0.4,
-  "confidence": "low",
-  "reasoning": "Carbon está en acceso limitado desde el 28/10; si sigue el ritmo de Argon (dos semanas), el lanzamiento público podría caer cerca del 11-13/11.",
-  "key_uncertainties": [
-   "Demoras por seguridad"
-  ],
-  "sources": [
-   "https://help.apiyi.com/en/gemini-4-carbon-release-api-availability-en.html",
-   "https://ahmetbalaman.com/en/blog/when-is-gemini-4-carbon-coming-who-can-use-it-en/"
-  ],
-  "prompt_version": "v1"
- }
+  {
+    "market_id": "4906128",
+    "p_yes": 0.08,
+    "confidence": "medium",
+    "reasoning": "El bloqueo rige desde el 13/7; levantarlo es la primera condición iraní, pero hubo ataques el 2/11 y no hay acuerdo en 25 días.",
+    "key_uncertainties": [
+      "Acuerdo rápido por mediadores"
+    ],
+    "sources": [
+      "https://www.aljazeera.com/news/liveblog/2026/11/4/iran-war-live-tehran-prepares-maximum-deterrence-plan-for-any-new-attack"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "676739",
+    "p_yes": 0.52,
+    "confidence": "low",
+    "reasoning": "Apple ($5,03 billones) pasó a Nvidia ($4,93 billones) el 30/10; la brecha es de 2% y se alternaron en octubre.",
+    "key_uncertainties": [
+      "Resultados de Nvidia en noviembre"
+    ],
+    "sources": [
+      "https://www.technology.org/2026/11/02/apple-passes-nvidia-most-valuable-company-5-03-trillion/"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "6365377",
+    "p_yes": 0.25,
+    "confidence": "low",
+    "reasoning": "Carbon se anunció el 28/10 con acceso limitado a defensores y socios; Argon pasó a público en unas dos semanas, lo que apunta a mediados de noviembre. La ventana 16-22/11 es una de varias posibles.",
+    "key_uncertainties": [
+      "Fecha exacta del lanzamiento público"
+    ],
+    "sources": [
+      "https://help.apiyi.com/en/gemini-4-carbon-release-api-availability-en.html",
+      "https://ahmetbalaman.com/en/blog/when-is-gemini-4-carbon-coming-who-can-use-it-en/"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "5339986",
+    "p_yes": 0.6,
+    "confidence": "low",
+    "reasoning": "Faltan 10 días; Trump dice que no hay planes inmediatos pero Netanyahu presiona y Khamenei amenaza con represalias amplias.",
+    "key_uncertainties": [
+      "Ataque israelí"
+    ],
+    "sources": [
+      "https://www.aljazeera.com/news/liveblog/2026/11/4/iran-war-live-tehran-prepares-maximum-deterrence-plan-for-any-new-attack"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "1450214",
+    "p_yes": 0.07,
+    "confidence": "medium",
+    "reasoning": "Trump no descartó una emergencia antes de la elección, pero no la declaró; tras una derrota demócrata amplia y con límites legales claros, una declaración formal bajo la Ley de Emergencias Nacionales es improbable.",
+    "key_uncertainties": [
+      "Impugnación de resultados"
+    ],
+    "sources": [
+      "https://www.france24.com/en/americas/20261103-how-state-officials-prepared-for-possible-trump-interference-in-the-midterms",
+      "https://www.cnn.com/2026/08/11/politics/trump-national-emergency-election"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "676741",
+    "p_yes": 0.45,
+    "confidence": "low",
+    "reasoning": "Apple lidera por 2% sobre Nvidia tras la caída de semiconductores del 30/10; el liderazgo cambió varias veces en octubre.",
+    "key_uncertainties": [
+      "Rebote de Nvidia"
+    ],
+    "sources": [
+      "https://www.technology.org/2026/11/02/apple-passes-nvidia-most-valuable-company-5-03-trillion/"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "6422298",
+    "p_yes": 0.7,
+    "confidence": "medium",
+    "reasoning": "Un 'Súper El Niño' rompió récords (Niño 3.4 sobre +3°C) y octubre va camino a ser el más cálido registrado, superando a 2023; el pico se espera entre noviembre y enero.",
+    "key_uncertainties": [
+      "Diferencias entre NASA y Copernicus",
+      "Variabilidad mensual"
+    ],
+    "sources": [
+      "https://www.scientificamerican.com/article/this-october-is-on-track-to-be-the-hottest-ever-recorded/",
+      "https://www.carbonbrief.org/analysis-super-el-nino-reaches-remarkable-all-time-record"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "1709755",
+    "p_yes": 0.01,
+    "confidence": "high",
+    "reasoning": "No hay indicios de un cambio de poder en Arabia Saudita.",
+    "key_uncertainties": [
+      "Salud del rey"
+    ],
+    "sources": [],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "567689",
+    "p_yes": 0.03,
+    "confidence": "high",
+    "reasoning": "No hay elecciones ni proceso de salida previsto antes de fin de año.",
+    "key_uncertainties": [
+      "Acuerdo de paz con elecciones"
+    ],
+    "sources": [],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "6172751",
+    "p_yes": 0.08,
+    "confidence": "medium",
+    "reasoning": "El WTI bajó a ~$88-95 por esperanzas de acuerdo con Irán; $110 exige +15-25% en tres semanas.",
+    "key_uncertainties": [
+      "Escalada con Irán"
+    ],
+    "sources": [
+      "https://tradingeconomics.com/commodity/crude-oil",
+      "https://www.investing.com/commodities/crude-oil-historical-data"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "2698814",
+    "p_yes": 0.45,
+    "confidence": "low",
+    "reasoning": "Waymo opera en unas 15 ciudades según rastreadores; tiene en proceso Londres (este año), Washington, Detroit y otras, por lo que podría pasar de 15 antes del 31/12.",
+    "key_uncertainties": [
+      "Cuántas aperturas nuevas llegan a tiempo",
+      "Conteo de áreas metropolitanas"
+    ],
+    "sources": [
+      "https://ride-share.com/waymo-cities-2026/",
+      "https://techcrunch.com/2026/02/24/waymo-robotaxis-are-now-operating-in-10-us-cities/"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "3902370",
+    "p_yes": 0.42,
+    "confidence": "low",
+    "reasoning": "Tres semanas y media de riesgo con presión israelí por atacar y amenazas iraníes; mediadores siguen activos.",
+    "key_uncertainties": [
+      "Ataque israelí",
+      "Acuerdo"
+    ],
+    "sources": [
+      "https://www.aljazeera.com/news/liveblog/2026/11/4/iran-war-live-tehran-prepares-maximum-deterrence-plan-for-any-new-attack"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "3580932",
+    "p_yes": 0.4,
+    "confidence": "low",
+    "reasoning": "Las encuestas recientes favorecen a Shen (DPP), pero Taipei suele votar al KMT y algunas encuestadoras son afines al DPP.",
+    "key_uncertainties": [
+      "Sesgo de encuestas"
+    ],
+    "sources": [
+      "https://www.taipeitimes.com/News/taiwan/archives/2026/11/03/2003867062"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "6685533",
+    "p_yes": 0.04,
+    "confidence": "medium",
+    "reasoning": "El WTI ronda $88-95; $65 exige -26% en tres semanas, solo con un acuerdo de paz y reapertura total de Ormuz.",
+    "key_uncertainties": [
+      "Acuerdo de paz repentino"
+    ],
+    "sources": [
+      "https://tradingeconomics.com/commodity/crude-oil",
+      "https://www.investing.com/commodities/crude-oil-historical-data"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "6366415",
+    "p_yes": 0.4,
+    "confidence": "low",
+    "reasoning": "Carbon está en acceso limitado desde el 28/10; si sigue el ritmo de Argon (dos semanas), el lanzamiento público podría caer cerca del 11-13/11.",
+    "key_uncertainties": [
+      "Demoras por seguridad"
+    ],
+    "sources": [
+      "https://help.apiyi.com/en/gemini-4-carbon-release-api-availability-en.html",
+      "https://ahmetbalaman.com/en/blog/when-is-gemini-4-carbon-coming-who-can-use-it-en/"
+    ],
+    "prompt_version": "v1"
+  },
+  {
+    "market_id": "3215008",
+    "p_yes": 0.65,
+    "confidence": "medium",
+    "reasoning": "Fed en 3,75-4% tras pausa del 28/10 con 2 disensos a favor de subir; IPC de septiembre 3,7% interanual y subiendo (dato 28/10-5/11). Warsh no da guia; quedan empleo e IPC de octubre antes del 8-9/12.",
+    "key_uncertainties": [
+      "regla: un +50bp no cuenta para este tramo",
+      "IPC y empleo de octubre",
+      "nota: vi en la prensa probabilidades derivadas de futuros (FedWatch); no las use como base"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/10/28/fed-interest-rate-decision-october-2026.html",
+      "https://think.ing.com/articles/fed-holds-rates-steady-despite-inflation-being-too-high/",
+      "https://www.fxstreet.com/analysis/fed-holds-rates-as-warsh-offers-no-explicit-signal-on-december-202610291159"
+    ],
+    "prompt_version": "v2"
+  },
+  {
+    "market_id": "4620900",
+    "p_yes": 0.69,
+    "confidence": "medium",
+    "reasoning": "Cuenta cualquier suba entre el 17/9 y la reunion de diciembre inclusive; octubre fue pausa, asi que depende casi todo de diciembre (+ suba de emergencia, improbable). Inflacion 3,7% y subiendo, disensos halcones (datos al 5/11).",
+    "key_uncertainties": [
+      "IPC de octubre",
+      "Warsh sin guia explicita",
+      "nota: vi probabilidades de futuros en la prensa; no las use"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/10/28/fed-interest-rate-decision-october-2026.html",
+      "https://www.thestreet.com/fed/fed-warsh-interest-rate-pause-december-hike"
+    ],
+    "prompt_version": "v2"
+  },
+  {
+    "market_id": "3215007",
+    "p_yes": 0.30,
+    "confidence": "medium",
+    "reasoning": "Complemento de una suba en diciembre: pausa posible si el IPC de octubre se modera (MUFG daba 55% de suba). Recorte practicamente descartado con inflacion 3,7% (dato al 5/11).",
+    "key_uncertainties": [
+      "IPC y empleo de octubre",
+      "si no hay comunicado resuelve 'sin cambio'"
+    ],
+    "sources": [
+      "https://www.fxstreet.com/analysis/fed-holds-rates-as-warsh-offers-no-explicit-signal-on-december-202610291159",
+      "https://invezz.com/news/2026/10/31/a-fed-pause-a-confusing-message-and-a-december-dilemma/"
+    ],
+    "prompt_version": "v2"
+  },
+  {
+    "market_id": "4425410",
+    "p_yes": 0.10,
+    "confidence": "medium",
+    "reasoning": "La lista 'People' de Year in Search mide picos de busqueda contra el año anterior: Trump fue #1 en 2024 (año electoral) pero no estuvo en el top 10 de 2025. En 2026 su base de busquedas ya es alta, lo que juega en contra de un pico.",
+    "key_uncertainties": [
+      "regla: lista 'Trending' de personas en EE.UU., no 'mas buscados' en volumen",
+      "la guerra con Iran podria disparar busquedas"
+    ],
+    "sources": [
+      "https://parade.com/news/google-year-in-search-reveals-2025-top-trending-people",
+      "https://spectrumlocalnews.com/us/snplus/technology/2024/12/12/google-2024-trending-searches"
+    ],
+    "prompt_version": "v2"
+  },
+  {
+    "market_id": "3399468",
+    "p_yes": 0.40,
+    "confidence": "low",
+    "reasoning": "Al 4-5/11 no hubo ataques directos Israel-Iran, pero no hay acuerdo vigente y EE.UU. e Israel planean ataques cortos e intensos despues de las elecciones (NYT/NPR 22/10); Trump aun no los aprobo y el 2/11 EE.UU. golpeo defensas en Qeshm (EE.UU., no Israel). Quedan ~8 semanas.",
+    "key_uncertainties": [
+      "regla: solo cuenta un ataque aereo o con misiles de Israel o Iran que impacte territorio del otro; ataques de EE.UU. no cuentan",
+      "decision de Trump post-midterms",
+      "represalia irani sobre Israel"
+    ],
+    "sources": [
+      "https://www.npr.org/2026/10/22/nx-s1-6011514/us-israel-iran-war",
+      "https://time.com/article/2026/10/22/us-israel-iran-war-strikes-midterms/",
+      "https://www.globalsecurity.org/military/ops/iran-war-oprep.htm"
+    ],
+    "prompt_version": "v2"
+  }
 ]
