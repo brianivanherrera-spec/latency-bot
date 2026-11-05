@@ -1,0 +1,10 @@
+[
+ {"market_id":"4906128","side":"NO","accion":"confirmar","precio_visto":0.78,"motivo":"Divergencia chica (mercado ~22% contra mi 0,08) y 25 días: hubo ataques el 2/11 y no hay acuerdo; levantar el bloqueo exige un acuerdo previo."},
+ {"market_id":"676739","side":"SI","accion":"descartar","precio_visto":0.39,"motivo":"Es el mismo mercado donde C ya tiene NO (3/11); además el mercado bajó a Nvidia de ~63% a ~38% en dos días y mi 0,52 no lo refleja."},
+ {"market_id":"6365377","side":"SI","accion":"descartar","precio_visto":0.117,"motivo":"Entrada barata a más de 10 días sin fecha confirmada de lanzamiento; la ventana 16-22/11 es solo una estimación."},
+ {"market_id":"5339986","side":"NO","accion":"descartar","precio_visto":0.20,"motivo":"C ya tiene esta posición del 4/11; el mercado subió a ~80% de que el alto el fuego se mantenga."},
+ {"market_id":"6422298","side":"NO","accion":"descartar","precio_visto":0.08,"motivo":"El mercado da ~92% a récord con un Súper El Niño y octubre récord; entrada barata y divergencia de 0,22."},
+ {"market_id":"2698814","side":"NO","accion":"reducir","factor":0.5,"precio_visto":0.41,"motivo":"Divergencia chica (mercado ~59% de 12-15 ciudades contra mi 0,45) pero el conteo depende de definiciones (áreas metropolitanas, acceso por fases)."},
+ {"market_id":"3580932","side":"NO","accion":"descartar","precio_visto":0.28,"motivo":"El mercado da ~72% a Chiang contra mi 0,40: igual que con Shen ayer, la divergencia es grande y Taipei suele votar al KMT."},
+ {"market_id":"6366415","side":"NO","accion":"descartar","precio_visto":0.20,"motivo":"El mercado da ~80% al lanzamiento público de Carbon antes del 13/11 contra mi 0,40; probablemente sabe de un anuncio cercano."}
+]
