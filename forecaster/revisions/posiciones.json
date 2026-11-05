@@ -35,20 +35,6 @@
   "compras": 1
  },
  {
-  "market_id": "3247825",
-  "side": "SI",
-  "nombre": "Banco de Inglaterra sin cambio tras reunión de noviembre",
-  "resuelve": "2026-11-05",
-  "compras": 1
- },
- {
-  "market_id": "3247826",
-  "side": "NO",
-  "nombre": "Banco de Inglaterra sube 25 pb en noviembre",
-  "resuelve": "2026-11-05",
-  "compras": 1
- },
- {
   "market_id": "5775586",
   "side": "NO",
   "nombre": "USS Theodore Roosevelt llega a CENTCOM antes del 12/11",
@@ -284,6 +270,55 @@
   "side": "NO",
   "nombre": "Maduro líder de Venezuela a fin de 2026",
   "resuelve": "2026-12-31",
+  "compras": 1
+ },
+ {
+  "market_id": "4906128",
+  "side": "NO",
+  "nombre": "EE.UU. anuncia fin del bloqueo antes del 30/11",
+  "resuelve": "2026-11-30",
+  "compras": 1
+ },
+ {
+  "market_id": "676739",
+  "side": "SI",
+  "nombre": "Nvidia mayor empresa el 31/12 (segunda punta)",
+  "resuelve": "2026-12-31",
+  "compras": 1
+ },
+ {
+  "market_id": "6365377",
+  "side": "SI",
+  "nombre": "Gemini Carbon público entre 16 y 22/11",
+  "resuelve": "2026-11-22",
+  "compras": 1
+ },
+ {
+  "market_id": "6422298",
+  "side": "NO",
+  "nombre": "Noviembre 2026 el más cálido registrado",
+  "resuelve": "2026-12-29",
+  "compras": 1
+ },
+ {
+  "market_id": "2698814",
+  "side": "NO",
+  "nombre": "Waymo en 12-15 ciudades el 31/12",
+  "resuelve": "2026-12-31",
+  "compras": 1
+ },
+ {
+  "market_id": "3580932",
+  "side": "NO",
+  "nombre": "Taipei: gana Chiang",
+  "resuelve": "2026-11-28",
+  "compras": 1
+ },
+ {
+  "market_id": "6366415",
+  "side": "NO",
+  "nombre": "Gemini Carbon público antes del 13/11",
+  "resuelve": "2026-11-13",
   "compras": 1
  }
 ]
