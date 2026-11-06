@@ -369,5 +369,26 @@
     "nombre": "Anthropic lanza agente tipo Muse antes de 2027",
     "resuelve": "2027-01-01",
     "compras": 1
+  },
+  {
+    "market_id": "6328750",
+    "side": "NO",
+    "nombre": "Fable 5.2+ antes del 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "3215007",
+    "side": "SI",
+    "nombre": "Fed sin cambio en diciembre",
+    "resuelve": "2026-12-09",
+    "compras": 1
+  },
+  {
+    "market_id": "3215008",
+    "side": "NO",
+    "nombre": "Fed sube 25 pb en diciembre",
+    "resuelve": "2026-12-09",
+    "compras": 1
   }
 ]
