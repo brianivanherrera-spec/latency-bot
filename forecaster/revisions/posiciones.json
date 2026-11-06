@@ -1,324 +1,373 @@
 [
- {
-  "market_id": "682708",
-  "side": "NO",
-  "nombre": "Eisenkot próximo primer ministro de Israel",
-  "resuelve": "2026-10-28",
-  "compras": 1
- },
- {
-  "market_id": "5166819",
-  "side": "NO",
-  "nombre": "Bab el-Mandeb entre 25 y 29 tránsitos diarios promedio 7d el 31/10",
-  "resuelve": "2026-11-01",
-  "compras": 2
- },
- {
-  "market_id": "5219279",
-  "side": "NO",
-  "nombre": "Stock de emergencia de diésel UE >=30M toneladas fin de octubre (Eurostat)",
-  "resuelve": "2026-11-01",
-  "compras": 2
- },
- {
-  "market_id": "5166954",
-  "side": "SI",
-  "nombre": "Entre 5 y 10 tránsitos diarios promedio del estrecho el 31/10",
-  "resuelve": "2026-11-01",
-  "compras": 1
- },
- {
-  "market_id": "5166953",
-  "side": "NO",
-  "nombre": "Ormuz promedio 7d 0-5 tránsitos el 31/10",
-  "resuelve": "2026-11-01",
-  "compras": 1
- },
- {
-  "market_id": "5775586",
-  "side": "NO",
-  "nombre": "USS Theodore Roosevelt llega a CENTCOM antes del 12/11",
-  "resuelve": "2026-11-13",
-  "compras": 1
- },
- {
-  "market_id": "5401165",
-  "side": "SI",
-  "nombre": "Pakistán ataca Afganistán antes del 15/11",
-  "resuelve": "2026-11-16",
-  "compras": 1
- },
- {
-  "market_id": "4664660",
-  "side": "NO",
-  "nombre": "Anthropic mejor modelo de IA fin de noviembre (Arena)",
-  "resuelve": "2026-12-01",
-  "compras": 2
- },
- {
-  "market_id": "5238401",
-  "side": "NO",
-  "nombre": "2 portaaviones de EE.UU. en CENTCOM el 30/11",
-  "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "6364486",
-  "side": "NO",
-  "nombre": "UKMTO publica 4-7 avisos entre 2/11 y 8/11",
-  "resuelve": "2026-11-09",
-  "compras": 1
- },
- {
-  "market_id": "6172751",
-  "side": "NO",
-  "nombre": "WTI toca máximo $110 en noviembre",
-  "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "6065257",
-  "side": "NO",
-  "nombre": "Bab el-Mandeb 190-209 tránsitos 26/10-1/11 (PortWatch)",
-  "resuelve": "2026-11-02",
-  "compras": 1
- },
- {
-  "market_id": "6065171",
-  "side": "NO",
-  "nombre": "Ormuz 20-24 tránsitos 26/10-1/11 (PortWatch)",
-  "resuelve": "2026-11-02",
-  "compras": 1
- },
- {
-  "market_id": "634976",
-  "side": "NO",
-  "nombre": "Peltola gana Senado de Alaska",
-  "resuelve": "2026-11-04",
-  "compras": 1
- },
- {
-  "market_id": "5238398",
-  "side": "NO",
-  "nombre": "USS Theodore Roosevelt llega a CENTCOM antes del 30/11",
-  "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "4393420",
-  "side": "NO",
-  "nombre": "Banco de Canadá sin cambio en diciembre",
-  "resuelve": "2026-12-09",
-  "compras": 1
- },
- {
-  "market_id": "6207379",
-  "side": "NO",
-  "nombre": "WTI máximo $115 en noviembre",
-  "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "6279754",
-  "side": "NO",
-  "nombre": "Otro modelo mejor IA el 9/11",
-  "resuelve": "2026-11-10",
-  "compras": 1
- },
- {
-  "market_id": "5238400",
-  "side": "SI",
-  "nombre": "1 portaaviones en CENTCOM el 30/11",
-  "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "6274257",
-  "side": "NO",
-  "nombre": "Republicanos pierden los 7 escaños (AK, IA, KS, ME, MI, OH, TX)",
-  "resuelve": "2026-11-03",
-  "compras": 1
- },
- {
-  "market_id": "6403113",
-  "side": "SI",
-  "nombre": "Corea del Norte 4 o más pruebas en noviembre",
-  "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "6403111",
-  "side": "NO",
-  "nombre": "Corea del Norte exactamente 2 pruebas en noviembre",
-  "resuelve": "2026-12-01",
-  "compras": 1
- },
- {
-  "market_id": "2431413",
-  "side": "NO",
-  "nombre": "Anthropic mejor modelo de IA fin de diciembre (Arena)",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "2126461",
-  "side": "NO",
-  "nombre": "Petróleo récord histórico (CL > $147,27) antes del 31/12",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "2431412",
-  "side": "SI",
-  "nombre": "Google mejor modelo de IA fin de diciembre (Arena)",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "5676703",
-  "side": "NO",
-  "nombre": "Espía de OpenAI acusado de trabajar para Arabia Saudita",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "3128886",
-  "side": "NO",
-  "nombre": "EE.UU. anuncia fin del bloqueo a Irán antes del 31/12",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "1321561",
-  "side": "SI",
-  "nombre": "SpaceX mayor salida a bolsa de 2026",
-  "resuelve": "2027-01-01",
-  "compras": 1
- },
- {
-  "market_id": "1321564",
-  "side": "NO",
-  "nombre": "Anthropic mayor salida a bolsa de 2026",
-  "resuelve": "2027-01-01",
-  "compras": 1
- },
- {
-  "market_id": "1105742",
-  "side": "SI",
-  "nombre": "Delcy Rodríguez líder de Venezuela a fin de 2026",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "676739",
-  "side": "NO",
-  "nombre": "Nvidia mayor empresa del mundo el 31/12",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "3580933",
-  "side": "SI",
-  "nombre": "Taipei: gana Shen",
-  "resuelve": "2026-11-28",
-  "compras": 1
- },
- {
-  "market_id": "5971398",
-  "side": "NO",
-  "nombre": "GPT Astra 6.1+ antes del 30/11",
-  "resuelve": "2026-11-30",
-  "compras": 1
- },
- {
-  "market_id": "5997213",
-  "side": "NO",
-  "nombre": "GPT Astra 6.1+ antes del 15/12",
-  "resuelve": "2026-12-15",
-  "compras": 1
- },
- {
-  "market_id": "5339986",
-  "side": "NO",
-  "nombre": "Alto el fuego Israel-Irán hasta el 15/11",
-  "resuelve": "2026-11-15",
-  "compras": 1
- },
- {
-  "market_id": "1107878",
-  "side": "SI",
-  "nombre": "EE.UU. invade Cuba en 2026",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "4319439",
-  "side": "NO",
-  "nombre": "Salida a bolsa de Anthropic antes del 30/11",
-  "resuelve": "2026-11-30",
-  "compras": 1
- },
- {
-  "market_id": "4178412",
-  "side": "NO",
-  "nombre": "Fable 5.2+ antes del 31/12",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "1105744",
-  "side": "NO",
-  "nombre": "Maduro líder de Venezuela a fin de 2026",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "4906128",
-  "side": "NO",
-  "nombre": "EE.UU. anuncia fin del bloqueo antes del 30/11",
-  "resuelve": "2026-11-30",
-  "compras": 1
- },
- {
-  "market_id": "676739",
-  "side": "SI",
-  "nombre": "Nvidia mayor empresa el 31/12 (segunda punta)",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "6365377",
-  "side": "SI",
-  "nombre": "Gemini Carbon público entre 16 y 22/11",
-  "resuelve": "2026-11-22",
-  "compras": 1
- },
- {
-  "market_id": "6422298",
-  "side": "NO",
-  "nombre": "Noviembre 2026 el más cálido registrado",
-  "resuelve": "2026-12-29",
-  "compras": 1
- },
- {
-  "market_id": "2698814",
-  "side": "NO",
-  "nombre": "Waymo en 12-15 ciudades el 31/12",
-  "resuelve": "2026-12-31",
-  "compras": 1
- },
- {
-  "market_id": "3580932",
-  "side": "NO",
-  "nombre": "Taipei: gana Chiang",
-  "resuelve": "2026-11-28",
-  "compras": 1
- },
- {
-  "market_id": "6366415",
-  "side": "NO",
-  "nombre": "Gemini Carbon público antes del 13/11",
-  "resuelve": "2026-11-13",
-  "compras": 1
- }
+  {
+    "market_id": "682708",
+    "side": "NO",
+    "nombre": "Eisenkot próximo primer ministro de Israel",
+    "resuelve": "2026-10-28",
+    "compras": 1
+  },
+  {
+    "market_id": "5166819",
+    "side": "NO",
+    "nombre": "Bab el-Mandeb entre 25 y 29 tránsitos diarios promedio 7d el 31/10",
+    "resuelve": "2026-11-01",
+    "compras": 2
+  },
+  {
+    "market_id": "5219279",
+    "side": "NO",
+    "nombre": "Stock de emergencia de diésel UE >=30M toneladas fin de octubre (Eurostat)",
+    "resuelve": "2026-11-01",
+    "compras": 2
+  },
+  {
+    "market_id": "5166954",
+    "side": "SI",
+    "nombre": "Entre 5 y 10 tránsitos diarios promedio del estrecho el 31/10",
+    "resuelve": "2026-11-01",
+    "compras": 1
+  },
+  {
+    "market_id": "5166953",
+    "side": "NO",
+    "nombre": "Ormuz promedio 7d 0-5 tránsitos el 31/10",
+    "resuelve": "2026-11-01",
+    "compras": 1
+  },
+  {
+    "market_id": "5775586",
+    "side": "NO",
+    "nombre": "USS Theodore Roosevelt llega a CENTCOM antes del 12/11",
+    "resuelve": "2026-11-13",
+    "compras": 1
+  },
+  {
+    "market_id": "5401165",
+    "side": "SI",
+    "nombre": "Pakistán ataca Afganistán antes del 15/11",
+    "resuelve": "2026-11-16",
+    "compras": 1
+  },
+  {
+    "market_id": "4664660",
+    "side": "NO",
+    "nombre": "Anthropic mejor modelo de IA fin de noviembre (Arena)",
+    "resuelve": "2026-12-01",
+    "compras": 2
+  },
+  {
+    "market_id": "5238401",
+    "side": "NO",
+    "nombre": "2 portaaviones de EE.UU. en CENTCOM el 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6364486",
+    "side": "NO",
+    "nombre": "UKMTO publica 4-7 avisos entre 2/11 y 8/11",
+    "resuelve": "2026-11-09",
+    "compras": 1
+  },
+  {
+    "market_id": "6172751",
+    "side": "NO",
+    "nombre": "WTI toca máximo $110 en noviembre",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6065257",
+    "side": "NO",
+    "nombre": "Bab el-Mandeb 190-209 tránsitos 26/10-1/11 (PortWatch)",
+    "resuelve": "2026-11-02",
+    "compras": 1
+  },
+  {
+    "market_id": "6065171",
+    "side": "NO",
+    "nombre": "Ormuz 20-24 tránsitos 26/10-1/11 (PortWatch)",
+    "resuelve": "2026-11-02",
+    "compras": 1
+  },
+  {
+    "market_id": "634976",
+    "side": "NO",
+    "nombre": "Peltola gana Senado de Alaska",
+    "resuelve": "2026-11-04",
+    "compras": 1
+  },
+  {
+    "market_id": "5238398",
+    "side": "NO",
+    "nombre": "USS Theodore Roosevelt llega a CENTCOM antes del 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "4393420",
+    "side": "NO",
+    "nombre": "Banco de Canadá sin cambio en diciembre",
+    "resuelve": "2026-12-09",
+    "compras": 1
+  },
+  {
+    "market_id": "6207379",
+    "side": "NO",
+    "nombre": "WTI máximo $115 en noviembre",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6279754",
+    "side": "NO",
+    "nombre": "Otro modelo mejor IA el 9/11",
+    "resuelve": "2026-11-10",
+    "compras": 1
+  },
+  {
+    "market_id": "5238400",
+    "side": "SI",
+    "nombre": "1 portaaviones en CENTCOM el 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6274257",
+    "side": "NO",
+    "nombre": "Republicanos pierden los 7 escaños (AK, IA, KS, ME, MI, OH, TX)",
+    "resuelve": "2026-11-03",
+    "compras": 1
+  },
+  {
+    "market_id": "6403113",
+    "side": "SI",
+    "nombre": "Corea del Norte 4 o más pruebas en noviembre",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6403111",
+    "side": "NO",
+    "nombre": "Corea del Norte exactamente 2 pruebas en noviembre",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "2431413",
+    "side": "NO",
+    "nombre": "Anthropic mejor modelo de IA fin de diciembre (Arena)",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "2126461",
+    "side": "NO",
+    "nombre": "Petróleo récord histórico (CL > $147,27) antes del 31/12",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "2431412",
+    "side": "SI",
+    "nombre": "Google mejor modelo de IA fin de diciembre (Arena)",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "5676703",
+    "side": "NO",
+    "nombre": "Espía de OpenAI acusado de trabajar para Arabia Saudita",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "3128886",
+    "side": "NO",
+    "nombre": "EE.UU. anuncia fin del bloqueo a Irán antes del 31/12",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "1321561",
+    "side": "SI",
+    "nombre": "SpaceX mayor salida a bolsa de 2026",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "1321564",
+    "side": "NO",
+    "nombre": "Anthropic mayor salida a bolsa de 2026",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "1105742",
+    "side": "SI",
+    "nombre": "Delcy Rodríguez líder de Venezuela a fin de 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "676739",
+    "side": "NO",
+    "nombre": "Nvidia mayor empresa del mundo el 31/12",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "3580933",
+    "side": "SI",
+    "nombre": "Taipei: gana Shen",
+    "resuelve": "2026-11-28",
+    "compras": 1
+  },
+  {
+    "market_id": "5971398",
+    "side": "NO",
+    "nombre": "GPT Astra 6.1+ antes del 30/11",
+    "resuelve": "2026-11-30",
+    "compras": 1
+  },
+  {
+    "market_id": "5997213",
+    "side": "NO",
+    "nombre": "GPT Astra 6.1+ antes del 15/12",
+    "resuelve": "2026-12-15",
+    "compras": 1
+  },
+  {
+    "market_id": "5339986",
+    "side": "NO",
+    "nombre": "Alto el fuego Israel-Irán hasta el 15/11",
+    "resuelve": "2026-11-15",
+    "compras": 1
+  },
+  {
+    "market_id": "1107878",
+    "side": "SI",
+    "nombre": "EE.UU. invade Cuba en 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "4319439",
+    "side": "NO",
+    "nombre": "Salida a bolsa de Anthropic antes del 30/11",
+    "resuelve": "2026-11-30",
+    "compras": 1
+  },
+  {
+    "market_id": "4178412",
+    "side": "NO",
+    "nombre": "Fable 5.2+ antes del 31/12",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "1105744",
+    "side": "NO",
+    "nombre": "Maduro líder de Venezuela a fin de 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "4906128",
+    "side": "NO",
+    "nombre": "EE.UU. anuncia fin del bloqueo antes del 30/11",
+    "resuelve": "2026-11-30",
+    "compras": 1
+  },
+  {
+    "market_id": "676739",
+    "side": "SI",
+    "nombre": "Nvidia mayor empresa el 31/12 (segunda punta)",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "6365377",
+    "side": "SI",
+    "nombre": "Gemini Carbon público entre 16 y 22/11",
+    "resuelve": "2026-11-22",
+    "compras": 1
+  },
+  {
+    "market_id": "6422298",
+    "side": "NO",
+    "nombre": "Noviembre 2026 el más cálido registrado",
+    "resuelve": "2026-12-29",
+    "compras": 1
+  },
+  {
+    "market_id": "2698814",
+    "side": "NO",
+    "nombre": "Waymo en 12-15 ciudades el 31/12",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "3580932",
+    "side": "NO",
+    "nombre": "Taipei: gana Chiang",
+    "resuelve": "2026-11-28",
+    "compras": 1
+  },
+  {
+    "market_id": "6366415",
+    "side": "NO",
+    "nombre": "Gemini Carbon público antes del 13/11",
+    "resuelve": "2026-11-13",
+    "compras": 1
+  },
+  {
+    "market_id": "2695678",
+    "side": "SI",
+    "nombre": "Sánchez próximo presidente del Gobierno de España",
+    "resuelve": "2026-11-30",
+    "compras": 1
+  },
+  {
+    "market_id": "2695686",
+    "side": "NO",
+    "nombre": "Feijóo próximo presidente del Gobierno de España",
+    "resuelve": "2026-11-30",
+    "compras": 1
+  },
+  {
+    "market_id": "4425434",
+    "side": "NO",
+    "nombre": "Inde Navarrette top 5 actores Google 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "6281141",
+    "side": "SI",
+    "nombre": "Irán cierra todo su espacio aéreo antes del 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "4487265",
+    "side": "NO",
+    "nombre": "Houthíes entran a Arabia Saudita antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "1811265",
+    "side": "NO",
+    "nombre": "Hegseth fuera de Defensa antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "5430611",
+    "side": "NO",
+    "nombre": "Anthropic lanza agente tipo Muse antes de 2027",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  }
 ]
