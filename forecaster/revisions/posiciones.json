@@ -354,7 +354,7 @@
     "side": "NO",
     "nombre": "Houthíes entran a Arabia Saudita antes del 31/12",
     "resuelve": "2027-01-01",
-    "compras": 1
+    "compras": 2
   },
   {
     "market_id": "1811265",
@@ -389,6 +389,48 @@
     "side": "NO",
     "nombre": "Fed sube 25 pb en diciembre",
     "resuelve": "2026-12-09",
+    "compras": 1
+  },
+  {
+    "market_id": "6594166",
+    "side": "SI",
+    "nombre": "Nvidia mayor empresa el 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "5087228",
+    "side": "NO",
+    "nombre": "Acuerdo EE.UU.-Irán sobre Ormuz antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6366846",
+    "side": "SI",
+    "nombre": "Gemini Carbon NO sale antes del 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "5336560",
+    "side": "SI",
+    "nombre": "PSOE gana más escaños en España (29/11)",
+    "resuelve": "2026-11-30",
+    "compras": 1
+  },
+  {
+    "market_id": "6625225",
+    "side": "SI",
+    "nombre": "GPT Astra 6.1+ NO sale antes del 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6328832",
+    "side": "NO",
+    "nombre": "Qwen Max 3.9+ antes del 31/12",
+    "resuelve": "2027-01-01",
     "compras": 1
   }
 ]
