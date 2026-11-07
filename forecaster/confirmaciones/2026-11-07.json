@@ -1,0 +1,9 @@
+[
+{"market_id":"6594166","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.300,"categoria":"economia","version":"v2","motivo":"Dato viejo: Apple paso a Nvidia el 4/11 (US$5,08 vs 4,82 billones) tras la rotacion post-electoral; mis rankings eran de dias antes. Divergencia 0,30 en economia."},
+{"market_id":"5087228","side":"NO","accion":"confirmar","factor":1,"precio_visto":0.650,"categoria":"politica","version":"v2","motivo":"Divergencia 0,10 y precio dentro de 0,30-0,70; Iran exige 7 condiciones y el gabinete de EE.UU. esta dividido (5-7/11)."},
+{"market_id":"6366846","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.046,"categoria":"tecnologia","version":"v2","motivo":"Tecnologia con divergencia 0,25: el mercado espera el lanzamiento publico de Carbon antes del 30/11; sin razon verificada para ir en contra."},
+{"market_id":"4487265","side":"NO","accion":"descartar","factor":0.5,"precio_visto":0.280,"categoria":"mundo","version":"v2","motivo":"Segunda compra del mismo mercado: C ya lo tiene desde el 6/11 (reducida). Una por mercado."},
+{"market_id":"5336560","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.110,"categoria":"politica","version":"v2","motivo":"Mismo patron que ayer en España: mi 0,22 se apoya en encuestas minoritarias (CIS, SW Demoscopia); el promedio de 23 encuestadoras da al PP primero. Precio bajo 0,30 a 22 dias."},
+{"market_id":"6625225","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.151,"categoria":"tecnologia","version":"v2","motivo":"Tecnologia con divergencia 0,73: el mercado espera GPT Astra 6.1 antes del 30/11; mi informacion llega solo hasta ~10/10 (posible dato viejo)."},
+{"market_id":"6328832","side":"NO","accion":"descartar","factor":0.5,"precio_visto":0.086,"categoria":"tecnologia","version":"v2","motivo":"Tecnologia con divergencia 0,53: el mercado da ~0,91 a un Qwen Max 3.9+ antes de fin de año; sin razon verificada para ir en contra."}
+]
