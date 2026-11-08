@@ -1,0 +1,3 @@
+[
+{"market_id":"6279754","lado_abierto":"NO","p_yes_original":0.50,"p_yes_revisada":0.62,"direccion":"debilita","cambia_de_lado":false,"resultado_probable":"incierto","novedades":"Gemini 4 Carbon sigue #1 en LMArena Text (1528 ±9) delante de Argon (1520) y Opus 5.5 (1509) al 4-5/11, y #1 tambien en Coding y Hard Prompts. No hay datos del 8/11.","razonamiento":"Si Carbon no esta listado como opcion del mercado, 'Otro' gana; su liderazgo se mantiene a horas del corte.","fuentes":[{"url":"https://www.benchleader.com/benchmarks/lmarena_text","tipo":"noticia"},{"url":"https://af.net/realtime/google-gemini-4-carbon-leads-lmarena-text-leaderboard-with-1528-score/","tipo":"noticia"}]}
+]
