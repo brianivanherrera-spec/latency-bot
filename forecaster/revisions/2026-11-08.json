@@ -1,0 +1,4 @@
+[
+{"market_id":"6364486","lado_abierto":"NO","p_yes_original":0.35,"p_yes_revisada":0.12,"direccion":"fortalece","cambia_de_lado":false,"resultado_probable":"NO","novedades":"Sin busqueda nueva: anoche se confirmo el aviso 198-26 (7/11); el periodo termina hoy 8/11.","razonamiento":"Con avisos a mas de uno por dia, superar 7 entre el 2 y el 8/11 es lo mas probable.","fuentes":[{"url":"https://www.ertnews.gr/eidiseis/ukmto-anafora-gia-stratiotiko-peristatiko-me-fortigo-ploio-ston-kolpo-tou-oman/","tipo":"noticia"}]},
+{"market_id":"6279754","lado_abierto":"NO","p_yes_original":0.50,"p_yes_revisada":0.60,"direccion":"debilita","cambia_de_lado":false,"resultado_probable":"incierto","novedades":"Sin busqueda nueva: Gemini 4 Carbon sigue primero en LMArena y no salio al publico (6/11).","razonamiento":"Si Carbon no figura como opcion del mercado, gana 'Otro'.","fuentes":[{"url":"https://tech-ish.com/2026/11/06/gemini-4-carbon-two-weeks-after-argon/","tipo":"noticia"}]}
+]

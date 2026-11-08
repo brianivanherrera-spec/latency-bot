@@ -7,32 +7,11 @@
     "compras": 1
   },
   {
-    "market_id": "5166819",
-    "side": "NO",
-    "nombre": "Bab el-Mandeb entre 25 y 29 tránsitos diarios promedio 7d el 31/10",
-    "resuelve": "2026-11-01",
-    "compras": 2
-  },
-  {
     "market_id": "5219279",
     "side": "NO",
     "nombre": "Stock de emergencia de diésel UE >=30M toneladas fin de octubre (Eurostat)",
     "resuelve": "2026-11-01",
     "compras": 2
-  },
-  {
-    "market_id": "5166954",
-    "side": "SI",
-    "nombre": "Entre 5 y 10 tránsitos diarios promedio del estrecho el 31/10",
-    "resuelve": "2026-11-01",
-    "compras": 1
-  },
-  {
-    "market_id": "5166953",
-    "side": "NO",
-    "nombre": "Ormuz promedio 7d 0-5 tránsitos el 31/10",
-    "resuelve": "2026-11-01",
-    "compras": 1
   },
   {
     "market_id": "5775586",
@@ -80,13 +59,6 @@
     "market_id": "6065257",
     "side": "NO",
     "nombre": "Bab el-Mandeb 190-209 tránsitos 26/10-1/11 (PortWatch)",
-    "resuelve": "2026-11-02",
-    "compras": 1
-  },
-  {
-    "market_id": "6065171",
-    "side": "NO",
-    "nombre": "Ormuz 20-24 tránsitos 26/10-1/11 (PortWatch)",
     "resuelve": "2026-11-02",
     "compras": 1
   },
