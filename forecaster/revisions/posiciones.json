@@ -404,5 +404,68 @@
     "nombre": "Qwen Max 3.9+ antes del 31/12",
     "resuelve": "2027-01-01",
     "compras": 1
+  },
+  {
+    "market_id": "2299955",
+    "side": "NO",
+    "nombre": "Valuación de Anthropic toca US$1,75 billones",
+    "resuelve": "2027-01-05",
+    "compras": 1
+  },
+  {
+    "market_id": "2698815",
+    "side": "SI",
+    "nombre": "Waymo en 16-19 ciudades el 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "2657590",
+    "side": "NO",
+    "nombre": "Dos subas de la Fed en 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "1469737",
+    "side": "NO",
+    "nombre": "Mojtaba Khamenei jefe de Estado a fin de 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "6594168",
+    "side": "NO",
+    "nombre": "Apple mayor empresa el 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6328833",
+    "side": "NO",
+    "nombre": "Qwen Max 3.9+ antes del 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "5091134",
+    "side": "SI",
+    "nombre": "Eritrea invade Etiopía antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "2299960",
+    "side": "SI",
+    "nombre": "Valuación de Anthropic baja a US$800 mil millones",
+    "resuelve": "2027-01-05",
+    "compras": 1
+  },
+  {
+    "market_id": "2364961",
+    "side": "SI",
+    "nombre": "Trump y Putin no se reúnen antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
   }
 ]
