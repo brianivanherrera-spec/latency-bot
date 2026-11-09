@@ -460,5 +460,68 @@
     "nombre": "Trump y Putin no se reúnen antes del 31/12",
     "resuelve": "2027-01-01",
     "compras": 1
+  },
+  {
+    "market_id": "3581102",
+    "side": "SI",
+    "nombre": "Huang Shih-chieh gana Taoyuan",
+    "resuelve": "2026-11-29",
+    "compras": 1
+  },
+  {
+    "market_id": "666659",
+    "side": "NO",
+    "nombre": "Hegseth deja el gobierno antes de 2027",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6282800",
+    "side": "NO",
+    "nombre": "Gemini Carbon público antes del 15/11",
+    "resuelve": "2026-11-16",
+    "compras": 1
+  },
+  {
+    "market_id": "4664935",
+    "side": "NO",
+    "nombre": "Google mejor texto-a-video a fin de noviembre",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "665427",
+    "side": "SI",
+    "nombre": "Nuevo país en los Acuerdos de Abraham antes de 2027",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "4867452",
+    "side": "SI",
+    "nombre": "Reunión diplomática EE.UU.-Irán antes del 31/12",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "4425469",
+    "side": "SI",
+    "nombre": "Wembanyama top 5 atletas Google 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "4425443",
+    "side": "SI",
+    "nombre": "Avengers: Doomsday top 5 películas Google 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "3915302",
+    "side": "SI",
+    "nombre": "Países Bajos cruza Ormuz con buques de guerra",
+    "resuelve": "2027-01-01",
+    "compras": 1
   }
 ]
