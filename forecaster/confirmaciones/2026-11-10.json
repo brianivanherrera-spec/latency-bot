@@ -1,0 +1,9 @@
+[
+{"market_id":"4620900","side":"NO","accion":"descartar","factor":0.5,"precio_visto":0.100,"categoria":"economia","version":"v2","motivo":"Economia con divergencia 0,15 (mercado ~0,90 a otra suba, yo 0,75); Waller apoya subir aun con dato mejor."},
+{"market_id":"4170752","side":"NO","accion":"descartar","factor":0.5,"precio_visto":0.096,"categoria":"economia","version":"v2","motivo":"Economia con divergencia 0,15; mismo evento economico que otra suba en diciembre."},
+{"market_id":"4170753","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.090,"categoria":"economia","version":"v2","motivo":"Economia con divergencia 0,16 y precio bajo 0,30 a 29 dias; apuesta contra la suba que espera el mercado."},
+{"market_id":"814613","side":"NO","accion":"descartar","factor":0.5,"precio_visto":0.679,"categoria":"politica","version":"v2","motivo":"Divergencia 0,20: encuestas de noviembre muestran al DPP empatando en Nuevo Taipei (42-39), adelante en Taipei en una encuesta y a 4 puntos en Taoyuan; mi 0,12 subestima un vuelco."},
+{"market_id":"2657589","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.100,"categoria":"economia","version":"v2","motivo":"Economia con divergencia 0,15; misma apuesta contra la suba de diciembre."},
+{"market_id":"6831494","side":"SI","accion":"confirmar","factor":1,"precio_visto":0.470,"categoria":"politica","version":"v2","motivo":"Divergencia 0,15 y precio dentro de 0,30-0,70: basta que el periodo de 14 dias sin ataques de EE.UU. empiece antes del 15/11; Trump dijo que retomar ataques es muy improbable si hay avances (8/11)."},
+{"market_id":"6364969","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.370,"categoria":"tecnologia","version":"v2","motivo":"Tecnologia con divergencia 0,18: hay señales de preparacion de Grok 4.8 y el mercado lo espera antes del 30/11."}
+]

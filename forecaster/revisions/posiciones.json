@@ -502,5 +502,54 @@
     "nombre": "Países Bajos cruza Ormuz con buques de guerra",
     "resuelve": "2027-01-01",
     "compras": 1
+  },
+  {
+    "market_id": "4620900",
+    "side": "NO",
+    "nombre": "Otra suba de la Fed en 2026",
+    "resuelve": "2026-12-10",
+    "compras": 1
+  },
+  {
+    "market_id": "4170752",
+    "side": "NO",
+    "nombre": "Fed Suba-Pausa-Suba (sep-oct-dic)",
+    "resuelve": "2026-12-09",
+    "compras": 1
+  },
+  {
+    "market_id": "4170753",
+    "side": "SI",
+    "nombre": "Fed Suba-Pausa-Pausa (sep-oct-dic)",
+    "resuelve": "2026-12-09",
+    "compras": 1
+  },
+  {
+    "market_id": "814613",
+    "side": "NO",
+    "nombre": "DPP gana más jefaturas en Taiwán",
+    "resuelve": "2026-11-29",
+    "compras": 1
+  },
+  {
+    "market_id": "2657589",
+    "side": "SI",
+    "nombre": "Exactamente 1 suba de la Fed en 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "6831494",
+    "side": "SI",
+    "nombre": "Alto el fuego efectivo EE.UU.-Irán (14 días) antes del 15/11",
+    "resuelve": "2026-11-15",
+    "compras": 1
+  },
+  {
+    "market_id": "6364969",
+    "side": "SI",
+    "nombre": "No sale Grok 4.8+ antes del 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
   }
 ]
