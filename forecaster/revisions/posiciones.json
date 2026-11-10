@@ -84,13 +84,6 @@
     "compras": 1
   },
   {
-    "market_id": "6279754",
-    "side": "NO",
-    "nombre": "Otro modelo mejor IA el 9/11",
-    "resuelve": "2026-11-10",
-    "compras": 1
-  },
-  {
     "market_id": "5238400",
     "side": "SI",
     "nombre": "1 portaaviones en CENTCOM el 30/11",
@@ -224,13 +217,6 @@
     "compras": 1
   },
   {
-    "market_id": "4178412",
-    "side": "NO",
-    "nombre": "Fable 5.2+ antes del 31/12",
-    "resuelve": "2026-12-31",
-    "compras": 1
-  },
-  {
     "market_id": "1105744",
     "side": "NO",
     "nombre": "Maduro líder de Venezuela a fin de 2026",
@@ -333,13 +319,6 @@
     "side": "NO",
     "nombre": "Anthropic lanza agente tipo Muse antes de 2027",
     "resuelve": "2027-01-01",
-    "compras": 1
-  },
-  {
-    "market_id": "6328750",
-    "side": "NO",
-    "nombre": "Fable 5.2+ antes del 30/11",
-    "resuelve": "2026-12-01",
     "compras": 1
   },
   {
