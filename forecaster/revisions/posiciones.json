@@ -551,5 +551,26 @@
     "nombre": "No sale Grok 4.8+ antes del 30/11",
     "resuelve": "2026-12-01",
     "compras": 1
+  },
+  {
+    "market_id": "4570946",
+    "side": "SI",
+    "nombre": "BCE sin cambio en diciembre",
+    "resuelve": "2026-12-17",
+    "compras": 1
+  },
+  {
+    "market_id": "3862800",
+    "side": "SI",
+    "nombre": "Rusia toma Dobropillia antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "1370611",
+    "side": "SI",
+    "nombre": "Anthropic primera en llegar a 1550 en Arena",
+    "resuelve": "2027-01-01",
+    "compras": 1
   }
 ]

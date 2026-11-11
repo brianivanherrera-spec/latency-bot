@@ -1,0 +1,5 @@
+[
+{"market_id":"4570946","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.090,"categoria":"economia","version":"v2","motivo":"Economia con divergencia 0,16: el mercado da ~0,91 a una suba del BCE en diciembre (inflacion 4%, Lagarde 7/11)."},
+{"market_id":"3862800","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.150,"categoria":"mundo","version":"v2","motivo":"Divergencia 0,20 con precio bajo 0,30 a 50 dias y sin catalizador con fecha; ISW no confirma posiciones rusas establecidas en la ciudad."},
+{"market_id":"1370611","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.150,"categoria":"tecnologia","version":"v2","motivo":"Tecnologia con divergencia 0,30: el 1538 de Fable 5.2 sale de un espejo no oficial; el mercado no lo toma como señal de llegar primero a 1550."}
+]
