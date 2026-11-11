@@ -1,0 +1,4 @@
+[
+{"market_id":"5775586","lado_abierto":"NO","p_yes_original":null,"p_yes_revisada":0.10,"direccion":"igual","cambia_de_lado":false,"resultado_probable":"NO","novedades":"Sin busqueda nueva: sin confirmacion de llegada del Roosevelt a CENTCOM (revisado a las 19:48 UTC).","razonamiento":"Estimaciones de llegada entre mediados y fin de noviembre.","fuentes":[{"url":"https://nationalinterest.org/blog/buzz/uss-theodore-roosevelt-finally-on-way-to-middle-east-ps-111026","tipo":"noticia"}]},
+{"market_id":"6366415","lado_abierto":"NO","p_yes_original":null,"p_yes_revisada":0.98,"direccion":"igual","cambia_de_lado":false,"resultado_probable":"SI","novedades":"Sin busqueda nueva: Carbon publico desde el 10/11.","razonamiento":"Posicion perdida.","fuentes":[{"url":"https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-carbon-now-available/","tipo":"oficial"}]}
+]
