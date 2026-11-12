@@ -5,19 +5,55 @@
   "perdidas": 14,
   "pnl_semana_realizado": -125.70,
   "por_causa": {
-    "mercado_sabia_algo": { "n": 14, "nota": "9 de tecnologia por lanzamientos inminentes que el mercado anticipo (Gemini Carbon x4, Fable 5.2 x2, Qwen x2, 'otro mejor modelo' el 9/11) y 5 de transitos PortWatch (Ormuz/Bab el-Mandeb) donde el mercado ya veia datos diarios" },
-    "regla_mal_leida": { "n": 0 },
-    "dato_viejo": { "n": 0, "nota": "hubo casos (Nvidia vs Apple, GPT Astra) pero la capa 2 los descarto antes de C; en A siguen abiertos" },
-    "signo_p_yes": { "n": 0 },
-    "mala_suerte": { "n": 0 }
+    "mercado_sabia_algo": {
+      "n": 14,
+      "nota": "9 de tecnologia por lanzamientos inminentes que el mercado anticipo (Gemini Carbon x4, Fable 5.2 x2, Qwen x2, 'otro mejor modelo' el 9/11) y 5 de transitos PortWatch (Ormuz/Bab el-Mandeb) donde el mercado ya veia datos diarios"
+    },
+    "regla_mal_leida": {
+      "n": 0
+    },
+    "dato_viejo": {
+      "n": 0,
+      "nota": "hubo casos (Nvidia vs Apple, GPT Astra) pero la capa 2 los descarto antes de C; en A siguen abiertos"
+    },
+    "signo_p_yes": {
+      "n": 0
+    },
+    "mala_suerte": {
+      "n": 0
+    }
   },
   "por_categoria": {
-    "tecnologia": { "n": 9, "ganadas": 0, "pnl": -92.79 },
-    "mundo": { "n": 7, "ganadas": 2, "pnl": -32.91 }
+    "tecnologia": {
+      "n": 9,
+      "ganadas": 0,
+      "pnl": -92.79
+    },
+    "mundo": {
+      "n": 7,
+      "ganadas": 2,
+      "pnl": -32.91
+    }
   },
-  "A": { "pnl_total": -363.38, "realizado": -304.35, "abiertas": 83, "cambio_semana": -229.90 },
-  "B": { "pnl_total": 20.86, "realizado": 7.28, "abiertas": 13, "cambio_semana": 23.59 },
-  "C": { "pnl_total": 6.79, "realizado": 0.00, "abiertas": 16, "descartadas": 56, "cambio_semana": 0.69 },
+  "A": {
+    "pnl_total": -363.38,
+    "realizado": -304.35,
+    "abiertas": 83,
+    "cambio_semana": -229.90
+  },
+  "B": {
+    "pnl_total": 20.86,
+    "realizado": 7.28,
+    "abiertas": 13,
+    "cambio_semana": 23.59
+  },
+  "C": {
+    "pnl_total": 6.79,
+    "realizado": 0.00,
+    "abiertas": 16,
+    "descartadas": 56,
+    "cambio_semana": 0.69
+  },
   "brier_modelo": 0.1530,
   "brier_mercado": 0.1255,
   "n_brier": 148,
@@ -31,5 +67,5 @@
     "2) confirmacion-v3: C toma el filtro de B como base (entrada >=0,30, |p-mid| <=0,15, una por evento) y la revision con precios solo puede reducir o descartar.",
     "3) research-v3: no pronosticar lanzamientos de modelos de IA ni rankings de Arena salvo noticia de las ultimas 48 h; excluir mercados que resuelven por cuotas de mercados de prediccion; mercados de datos diarios (PortWatch, UKMTO) solo con el dato mas reciente publicado."
   ],
-  "estado_propuesta": "pendiente de aprobacion de Brian"
+  "estado_propuesta": "aprobada por Brian el 2026-11-12: diciembre se evalua con B; confirmacion-v3 y research-v3 desde el 2026-11-13"
 }
