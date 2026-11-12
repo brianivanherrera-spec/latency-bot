@@ -572,5 +572,33 @@
     "nombre": "Anthropic primera en llegar a 1550 en Arena",
     "resuelve": "2027-01-01",
     "compras": 1
+  },
+  {
+    "market_id": "6947944",
+    "side": "NO",
+    "nombre": "Tregua energética Rusia-Ucrania antes del 31/12",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "6947942",
+    "side": "NO",
+    "nombre": "Tregua energética Rusia-Ucrania antes del 30/11",
+    "resuelve": "2026-11-30",
+    "compras": 1
+  },
+  {
+    "market_id": "4664765",
+    "side": "SI",
+    "nombre": "Anthropic #1 en Arena a fin de noviembre",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "5765888",
+    "side": "SI",
+    "nombre": "JD Vance líder de cuotas 2028 el 30/11",
+    "resuelve": "2026-11-30",
+    "compras": 1
   }
 ]

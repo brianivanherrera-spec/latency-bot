@@ -1,0 +1,6 @@
+[
+{"market_id":"6947944","side":"NO","accion":"descartar","factor":0.5,"precio_visto":0.710,"categoria":"politica","version":"v2","motivo":"Divergencia 0,17: Ucrania ofrecio tregua energetica y maritima en Abu Dabi y los enviados de EE.UU. llevan la respuesta de Putin (12/11); mi 0,12 subestima la chance de un acuerdo parcial antes de fin de año."},
+{"market_id":"6947942","side":"NO","accion":"reducir","factor":0.5,"precio_visto":0.860,"categoria":"politica","version":"v2","motivo":"Divergencia 0,08, pero precio fuera de 0,30-0,70 a 18 dias: maximo reducir. Rusia no respondio aun y Lavrov rechazo un alto el fuego inmediato."},
+{"market_id":"4664765","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.180,"categoria":"tecnologia","version":"v2","motivo":"Tecnologia con divergencia 0,32: el 1538 de Fable 5.2 viene de un espejo; la tabla oficial muestra a Carbon primero y el mercado lo da como favorito."},
+{"market_id":"5765888","side":"SI","accion":"descartar","factor":0.5,"precio_visto":0.160,"categoria":"politica","version":"v2","motivo":"Mercado que resuelve por cuotas de mercados de prediccion: mi pronostico ciego no tiene base (no puedo consultar esas cuotas). Excluido de C."}
+]
