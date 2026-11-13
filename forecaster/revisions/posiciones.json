@@ -308,13 +308,6 @@
     "compras": 1
   },
   {
-    "market_id": "5430611",
-    "side": "NO",
-    "nombre": "Anthropic lanza agente tipo Muse antes de 2027",
-    "resuelve": "2027-01-01",
-    "compras": 1
-  },
-  {
     "market_id": "3215007",
     "side": "SI",
     "nombre": "Fed sin cambio en diciembre",
