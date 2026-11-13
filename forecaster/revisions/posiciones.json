@@ -593,5 +593,33 @@
     "nombre": "JD Vance líder de cuotas 2028 el 30/11",
     "resuelve": "2026-11-30",
     "compras": 1
+  },
+  {
+    "market_id": "6992350",
+    "side": "NO",
+    "nombre": "Jensen Huang top 5 personas Year in Search 2026",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "2373683",
+    "side": "NO",
+    "nombre": "Rusia captura todo Bilytske antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "4425441",
+    "side": "NO",
+    "nombre": "Obsession top 5 peliculas Year in Search 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "4425467",
+    "side": "NO",
+    "nombre": "Balogun top 5 atletas Year in Search 2026",
+    "resuelve": "2026-12-31",
+    "compras": 1
   }
 ]

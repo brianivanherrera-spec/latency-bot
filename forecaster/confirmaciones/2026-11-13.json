@@ -1,0 +1,6 @@
+[
+  {"market_id":"6992350","side":"NO","accion":"confirmar","factor":1,"precio_visto":0.59,"categoria":"otro","version":"v3","motivo":"Pasa el filtro B: entrada 0,59 y p del NO 0,70 (div 0,11). Faltan mas de 10 dias pero el precio esta dentro de 0,30-0,70; sin regla que obligue a reducir."},
+  {"market_id":"2373683","side":"NO","accion":"descartar","factor":0,"precio_visto":0.31,"categoria":"mundo","version":"v3","motivo":"No pasa el filtro B: p del NO 0,60 contra entrada 0,31 (div 0,29 > 0,15). El mercado ve mas probable la toma completa de Bilytske que yo."},
+  {"market_id":"4425441","side":"NO","accion":"descartar","factor":0,"precio_visto":0.19,"categoria":"otro","version":"v3","motivo":"No pasa el filtro B: entrada 0,19 < 0,30."},
+  {"market_id":"4425467","side":"NO","accion":"descartar","factor":0,"precio_visto":0.76,"categoria":"otro","version":"v3","motivo":"No pasa el filtro B: p del NO 0,93 contra entrada 0,76 (div 0,17 > 0,15). El mercado parece saber algo de Balogun que no encontre."}
+]
