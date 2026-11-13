@@ -1,0 +1,334 @@
+[
+ {
+  "market_id": "3215008",
+  "p_yes": 0.82,
+  "confidence": "medium",
+  "reasoning": "Waller y Logan apoyan subir en diciembre; el CPI de octubre salio caliente (nucleo 0,3% por tercer mes, dato del 10/11). La alternativa principal es +50 pb (~10-15%), no mantener.",
+  "key_uncertainties": [
+   "regla: el bracket es +25 exacto; un +50 resuelve No",
+   "la Fed decide el 9/12 sin el CPI de noviembre",
+   "nota: aparecieron probabilidades de futuros (CME), no se usaron como base"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/11/10/fed-governor-waller-sees-december-hike-likely.html",
+   "https://www.kitco.com/news/article/2026-11-10/feds-waller-and-logan-signal-readiness-hike-higher-and-faster-50-bps-table"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6066698",
+  "p_yes": 0.92,
+  "confidence": "high",
+  "reasoning": "Anthropic anuncio (12/11) que fija precio el 18/11 y cotiza en Nasdaq como ANT el 19/11, antes del limite del 20/11 a las 23:59 ET.",
+  "key_uncertainties": [
+   "la SEC tiene que declarar efectivo el registro",
+   "una postergacion de ultimo momento por mercado"
+  ],
+  "sources": [
+   "https://finance.yahoo.com/technology/article/anthropic-ipo-claude-maker-to-begin-trading-on-thursday-nov-19-173550865.html",
+   "https://www.upi.com/Top_News/US/2026/11/10/anthropic-ipo-stock-range-nasdaq/6651794326745/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6991847",
+  "p_yes": 0.88,
+  "confidence": "medium",
+  "reasoning": "El 11/11 en Abu Dabi acordaron un canje grande de prisioneros a ejecutarse en 2-3 semanas; los canjes y las reuniones humanitarias cuentan como reunion diplomatica. Ademas sigue la mediacion de EE.UU.",
+  "key_uncertainties": [
+   "regla: la reunion tiene que ser posterior a la creacion del mercado; la de Abu Dabi del 11/11 puede no contar",
+   "un canje sin reunion de representantes no alcanza"
+  ],
+  "sources": [
+   "https://www.washingtonpost.com/world/2026/11/11/russia-ukraine-agree-prisoner-swap-little-else-us-mediated-talks/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3128886",
+  "p_yes": 0.25,
+  "confidence": "low",
+  "reasoning": "Qatar propone un acuerdo puente que levantaria el bloqueo de puertos, pero Trump dice que 'no hace falta un acuerdo' y Rubio rechaza las demandas iranies; el bloqueo se amplio (Iron Gate).",
+  "key_uncertainties": [
+   "regla: tiene que ser fin general, no excepciones parciales",
+   "un acuerdo puente rapido cambiaria todo"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/features/2026/11/13/why-is-trump-saying-no-deal-necessary-with-iran-as-he-sidelines-jd-vance",
+   "https://www.rigzone.com/news/wire/us_holds_off_strikes_after_qatari_mediation-10-nov-2026-185048-article/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6977214",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Huang renuncio a Nvidia el 12/11; Musk dijo que contratarlo 'seria un honor', sin oferta concreta. Hay investigacion y citacion del Congreso para el 1/12, lo que frena un nombramiento rapido.",
+  "key_uncertainties": [
+   "regla: basta anuncio de rol formal en SpaceX",
+   "clausulas de no competencia o escandalo en curso"
+  ],
+  "sources": [
+   "https://fortune.com/2026/11/13/jensen-huang-nvidia-elon-musk-hire-honor/",
+   "https://edition.cnn.com/2026/11/11/business/live-news/nvidia-jensen-huang-investigation-fallout"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2232192",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "ISW (12/11) ve a Rusia buscando juntar tropas para empujar hacia Druzhkivka, pero Kostiantynivka sigue sin caer tras un ano y Druzhkivka es de las ciudades mas fortificadas; avances recientes casi nulos.",
+  "key_uncertainties": [
+   "regla: alcanza cualquier parte del municipio sombreada en el mapa ISW",
+   "pausa humanitaria en Kostiantynivka podria acelerar"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-12-2026",
+   "https://euromaidanpress.com/2026/11/13/russia-asks-for-a-pause-in-the-donbas-city-of-kostiantynivka-after-more-than-a-year-of-assaults-failed-to-take-it-isw-sees-a-bid-to-mass-troops-for-nearby-druzhkivka/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4599796",
+  "p_yes": 0.18,
+  "confidence": "low",
+  "reasoning": "Hay ataques ocasionales de Iran, pero Israel evita cerrar el espacio aereo (mantiene Ben Gurion abierto) y EE.UU. frena ataques grandes mientras media Qatar. Haria falta una reanudacion fuerte de la guerra.",
+  "key_uncertainties": [
+   "regla: cierre general por NOTAM; cierres planificados no cuentan",
+   "fecha de creacion del mercado"
+  ],
+  "sources": [
+   "https://www.ibtimes.com.au/middle-east-airports-flight-disruptions-iran-war-1878467",
+   "https://www.calcalistech.com/ctechnews/article/hjrlkk4bgx"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2657590",
+  "p_yes": 0.8,
+  "confidence": "medium",
+  "reasoning": "Ya hubo una suba en septiembre de 2026 (octubre sin cambios). Si en diciembre suben 25 pb quedan exactamente 2; un +50 contaria 3.",
+  "key_uncertainties": [
+   "regla: exactamente 2 subas de 25",
+   "una suba de emergencia extra es improbable"
+  ],
+  "sources": [
+   "https://www.cnn.com/2026/10/28/business/live-news/federal-reserve-interest-rate-october",
+   "https://www.cnbc.com/2026/11/10/fed-governor-waller-sees-december-hike-likely.html"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6992350",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "El escandalo y la renuncia de Huang del 12/11 generan un pico enorme de busquedas al final del ano; la lista global de personas suele premiar picos asi, pero compite con figuras de todo el ano y el corte de datos de Google puede ser a fines de noviembre.",
+  "key_uncertainties": [
+   "fecha de corte de datos de Year in Search",
+   "lista global vs EE.UU."
+  ],
+  "sources": [
+   "https://fortune.com/2026/11/13/jensen-huang-nvidia-elon-musk-hire-honor/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2373683",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "ISW confirma avances rusos en el centro de Bilytske el 10/11; quedan 7 semanas para cubrir todo el pueblo en el mapa.",
+  "key_uncertainties": [
+   "regla: tiene que estar sombreado entero",
+   "ritmo de avance en invierno"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-11-2026"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "667083",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "No hay reunion Zelenskyy-Putin agendada; las conversaciones van por enviados (Kushner/Witkoff en Moscu y Dublin). Que sea en EE.UU. y antes de 2027 es muy improbable.",
+  "key_uncertainties": [
+   "una cumbre sorpresa organizada por Trump"
+  ],
+  "sources": [
+   "https://www.washingtonpost.com/world/2026/11/11/russia-ukraine-agree-prisoner-swap-little-else-us-mediated-talks/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6172751",
+  "p_yes": 0.04,
+  "confidence": "high",
+  "reasoning": "El WTI cerro ~89 USD el 12/11; llegar a 110 en ~12 sesiones exige +24% sin un shock nuevo grande.",
+  "key_uncertainties": [
+   "escalada fuerte en Ormuz"
+  ],
+  "sources": [
+   "https://www.macrotrends.net/2516/wti-crude-oil-prices-10-year-daily-chart",
+   "https://worldoilmonitor.com/daily-oil-market-summary"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6685525",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "El WTI cerro ~89 USD el 12/11 (subio 3% ese dia); tocar 95 en un minuto de vela en lo que resta de noviembre requiere +7% con volatilidad alta por Iran.",
+  "key_uncertainties": [
+   "regla: cuenta el maximo intradiario del contrato activo segun Pyth",
+   "rollover del contrato activo a fin de mes"
+  ],
+  "sources": [
+   "https://www.macrotrends.net/2516/wti-crude-oil-prices-10-year-daily-chart"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4425441",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Obsession fue el gran fenomeno de taquilla de 2026 (~521M USD con 750 mil de presupuesto); buen candidato al top 5 global de peliculas, aunque compite con estrenos globales grandes.",
+  "key_uncertainties": [
+   "el listado global pesa mucho fuera de EE.UU.",
+   "peliculas de fin de ano"
+  ],
+  "sources": [
+   "https://variety.com/2026/film/box-office/obsession-box-office-breakout-hit-horror-1236757946/",
+   "https://boxofficewatch.com/movies/obsession"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4477142",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "Bab el-Mandeb tiene ~23-30 transitos diarios a principios de noviembre (semana 2-8/11: 184); un dia con 0 requiere cierre total o un error de datos.",
+  "key_uncertainties": [
+   "regla: errores obvios de datos pueden dejar el mercado abierto",
+   "escalada hutí"
+  ],
+  "sources": [
+   "https://github.com/rzjy54n5sh-rgb/OSINT/pull/68",
+   "https://mereja.com/index/601943"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5420004",
+  "p_yes": 0.3,
+  "confidence": "medium",
+  "reasoning": "Las encuestas dan segunda vuelta Jankovic-Mesec el 29/11; Valicon (10-12/11) da a Jankovic 54-46 en el balotaje; Ninamedia mas parejo.",
+  "key_uncertainties": [
+   "regla: resuelve por el que asuma, incluida la segunda vuelta",
+   "la participacion"
+  ],
+  "sources": [
+   "https://english.sta.si/3621962/zurnal24-poll-suggests-runoff-in-ljubljana-between-jankovic-and-mesec",
+   "https://english.sta.si/3611843/poll-shows-run-off-between-jankovic-and-mesec-most-likely"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5430614",
+  "p_yes": 0.08,
+  "confidence": "low",
+  "reasoning": "Amazon empuja Alexa+ como agente, pero no hay senal de un agente con computadora en la nube dedicada por usuario y acceso publico antes de 2027; la definicion es estricta.",
+  "key_uncertainties": [
+   "regla: computadora dedicada persistente y tareas autonomas",
+   "anuncio en re:Invent (diciembre)"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/02/04/amazon-alexa-plus-us-releas.html"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6424815",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "No hay noticias de operaciones para tomar la isla Farsi; EE.UU. frena ataques grandes y media Qatar. Exige control efectivo establecido.",
+  "key_uncertainties": [
+   "una operacion anfibia sorpresa"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/features/2026/11/13/why-is-trump-saying-no-deal-necessary-with-iran-as-he-sidelines-jd-vance"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6831495",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Ultimo ataque de EE.UU. reportado el 6/11 (Qeshm); Trump dice que nuevos ataques son 'bastante improbables', pero hubo dos ataques a Qeshm para proteger buques e Iran sigue atacando tanqueros.",
+  "key_uncertainties": [
+   "regla: periodo de 14 dias que empiece entre la creacion y el 22/11; fecha de creacion desconocida",
+   "nuevos ataques a Qeshm para escoltar buques"
+  ],
+  "sources": [
+   "https://www.rigzone.com/news/wire/us_holds_off_strikes_after_qatari_mediation-10-nov-2026-185048-article/",
+   "https://www.usnews.com/news/politics/articles/2026-11-06/iran-is-reviewing-proposals-focusing-on-tehrans-nuclear-program-officials-say"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3358974",
+  "p_yes": 0.48,
+  "confidence": "low",
+  "reasoning": "Nvidia cerro el 12/11 con ~4,01 billones (cayo debajo de 4 en el dia por la renuncia de Huang); queda casi en la frontera, con resultados el 17/11 y CEO interino.",
+  "key_uncertainties": [
+   "regla: la frontera exacta va al bracket mayor",
+   "dato de capitalizacion difiere entre fuentes (3,67 vs 4,01)"
+  ],
+  "sources": [
+   "https://www.bloomberg.com/news/articles/2026-11-12/nvidia-market-value-sinks-below-4-trillion-after-huang-resigns",
+   "https://stockanalysis.com/stocks/nvda/market-cap/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4425467",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "No encontre un evento de 2026 que haga de Balogun uno de los 5 atletas mas buscados del mundo; el listado global suele tener figuras de mayor alcance.",
+  "key_uncertainties": [
+   "un momento viral en el Mundial 2026 que no encontre"
+  ],
+  "sources": [],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "678778",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Para 2026 cuento al menos Venezuela, Iran, Ecuador (marzo) y Somalia, mas posibles Yemen, Irak, Siria y Nigeria; el conteo exacto incierto y el mercado pide exactamente 9.",
+  "key_uncertainties": [
+   "regla: bracket de 9 paises exactos",
+   "cuales operaciones de 2026 cuentan (Nigeria fue 25/12/2025)"
+  ],
+  "sources": [
+   "https://www.washingtonpost.com/national-security/interactive/2026/trump-strikes-second-term-iran-venezuela/",
+   "https://www.cfr.org/articles/guide-trumps-second-term-military-strikes-and-actions"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5087228",
+  "p_yes": 0.2,
+  "confidence": "low",
+  "reasoning": "La propuesta qatari incluye intercambio de levantamiento de bloqueo por acceso al OIEA, pero no hay acuerdo y Trump dice que no hace falta; Iran sigue atacando buques en Ormuz.",
+  "key_uncertainties": [
+   "regla: acuerdo aceptado por ambos con compromisos sobre el transito",
+   "un acuerdo puente amplio en diciembre"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/features/2026/11/13/why-is-trump-saying-no-deal-necessary-with-iran-as-he-sidelines-jd-vance",
+   "https://www.rigzone.com/news/wire/us_holds_off_strikes_after_qatari_mediation-10-nov-2026-185048-article/"
+  ],
+  "prompt_version": "v3"
+ }
+]
