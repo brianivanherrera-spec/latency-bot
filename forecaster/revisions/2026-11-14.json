@@ -1,0 +1,66 @@
+[
+ {
+  "market_id": "5775586",
+  "side": "NO",
+  "accion": "mantener",
+  "p_yes": 0.07,
+  "p_side": 0.93,
+  "motivo": "Sin cambios; falta la resolucion formal.",
+  "fuentes": []
+ },
+ {
+  "market_id": "6366415",
+  "side": "NO",
+  "accion": "mantener",
+  "p_yes": 0.97,
+  "p_side": 0.03,
+  "motivo": "Carbon publico desde el 10/11; perdida.",
+  "fuentes": []
+ },
+ {
+  "market_id": "6282800",
+  "side": "NO",
+  "accion": "mantener",
+  "p_yes": 0.97,
+  "p_side": 0.03,
+  "motivo": "Carbon publico desde el 10/11; perdida.",
+  "fuentes": []
+ },
+ {
+  "market_id": "6831494",
+  "side": "SI",
+  "accion": "mantener",
+  "p_yes": 0.5,
+  "p_side": 0.5,
+  "motivo": "No encontre ataques de EE.UU. a Iran el 13-14/11; el de Sirik del 12/11 sigue sin atribucion.",
+  "fuentes": [
+   {
+    "url": "https://www.cbsnews.com/news/u-s-strikes-iran-targets/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5339986",
+  "side": "NO",
+  "accion": "mantener",
+  "p_yes": 0.88,
+  "p_side": 0.12,
+  "motivo": "Sin ataques israelies a Iran confirmados; Trump frena. Queda ~1 dia.",
+  "fuentes": [
+   {
+    "url": "https://www.timesofisrael.com/liveblog-november-13-2026/",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "5401165",
+  "side": "SI",
+  "accion": "mantener",
+  "p_yes": 0.15,
+  "p_side": 0.15,
+  "motivo": "Sigue sin reportes de ataques pakistanies en Afganistan en noviembre; queda ~1 dia.",
+  "fuentes": []
+ }
+]
