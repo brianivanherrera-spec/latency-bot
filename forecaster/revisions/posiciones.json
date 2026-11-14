@@ -592,7 +592,7 @@
     "side": "NO",
     "nombre": "Jensen Huang top 5 personas Year in Search 2026",
     "resuelve": "2027-01-01",
-    "compras": 1
+    "compras": 2
   },
   {
     "market_id": "2373683",
@@ -613,6 +613,41 @@
     "side": "NO",
     "nombre": "Balogun top 5 atletas Year in Search 2026",
     "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "1796706",
+    "side": "NO",
+    "nombre": "Lutnick deja Comercio antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6617836",
+    "side": "SI",
+    "nombre": "Bab el-Mandeb promedio 7 dias 20-24 el 30/11",
+    "resuelve": "2026-12-01",
+    "compras": 1
+  },
+  {
+    "market_id": "2364962",
+    "side": "NO",
+    "nombre": "Proxima reunion Trump-Putin en China",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6015290",
+    "side": "NO",
+    "nombre": "Otra falla critica de PHP en 2026",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "3581389",
+    "side": "SI",
+    "nombre": "Ho Hsin-chun gana Taichung",
+    "resuelve": "2026-11-29",
     "compras": 1
   }
 ]

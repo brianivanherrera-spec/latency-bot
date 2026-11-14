@@ -1,0 +1,8 @@
+[
+  {"market_id":"6992350","side":"NO","accion":"descartar","factor":0,"precio_visto":0.22,"categoria":"otro","version":"v3","motivo":"No pasa el filtro B: entrada 0,22 < 0,30 y p del NO 0,70 (div 0,48). El mercado salto fuerte a favor de Huang en el top 5; ademas ya hay una compra previa del mismo mercado."},
+  {"market_id":"1796706","side":"NO","accion":"descartar","factor":0,"precio_visto":0.50,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: p del NO 0,93 contra entrada 0,50 (div 0,43). Mi dato de Lutnick es viejo (mayo); el mercado parece saber algo nuevo."},
+  {"market_id":"6617836","side":"SI","accion":"descartar","factor":0,"precio_visto":0.05,"categoria":"mundo","version":"v3","motivo":"No pasa el filtro B: entrada 0,05 < 0,30."},
+  {"market_id":"2364962","side":"NO","accion":"descartar","factor":0,"precio_visto":0.038,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: entrada 0,038 < 0,30."},
+  {"market_id":"6015290","side":"NO","accion":"descartar","factor":0,"precio_visto":0.70,"categoria":"tecnologia","version":"v3","motivo":"No pasa el filtro B: p del NO 0,92 contra entrada 0,70 (div 0,22)."},
+  {"market_id":"3581389","side":"SI","accion":"descartar","factor":0,"precio_visto":0.237,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: entrada 0,237 < 0,30."}
+]
