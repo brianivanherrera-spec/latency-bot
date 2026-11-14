@@ -1,0 +1,6 @@
+[
+  {"market_id":"5339986","side":"NO","accion":"mantener","p_yes":0.90,"p_side":0.10,"motivo":"Al 13-14/11 no hay ataque israeli a Iran confirmado; el gabinete israeli subio la preparacion pero Trump frena. Queda menos de un dia; lado probablemente perdedor.","fuentes":[{"url":"https://www.aljazeera.com/news/2026/11/13/iran-says-it-struck-us-radar-site-in-bahrain","tipo":"noticia"}]},
+  {"market_id":"6831494","side":"SI","accion":"mantener","p_yes":0.50,"p_side":0.50,"motivo":"Sin ataques de EE.UU. a Iran confirmados el 13-14/11 (CENTCOM solo derribo drones sobre Bahrein); el ataque a Sirik del 12/11 sigue sin atribucion. El periodo de 14 dias puede arrancar a tiempo.","fuentes":[{"url":"https://dailycaller.com/2026/11/13/iran-drone-attack-bahrain-irgc-centcom","tipo":"noticia"}]},
+  {"market_id":"5401165","side":"SI","accion":"mantener","p_yes":0.12,"p_side":0.12,"motivo":"Sin reportes de ataques pakistanies en Afganistan en noviembre; el plazo vence el 15/11.","fuentes":[]},
+  {"market_id":"6282800","side":"NO","accion":"mantener","p_yes":0.97,"p_side":0.03,"motivo":"Carbon publico desde el 10/11; perdida.","fuentes":[]}
+]
