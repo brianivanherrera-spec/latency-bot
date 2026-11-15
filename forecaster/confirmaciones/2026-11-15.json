@@ -1,0 +1,5 @@
+[
+  {"market_id":"6977509","side":"SI","accion":"descartar","factor":0,"precio_visto":0.06,"categoria":"tecnologia","version":"v3","motivo":"No pasa el filtro B: entrada 0,06 < 0,30."},
+  {"market_id":"5238395","side":"NO","accion":"descartar","factor":0,"precio_visto":0.12,"categoria":"mundo","version":"v3","motivo":"No pasa el filtro B: entrada 0,12 < 0,30. Mercado y pronostico coinciden en que el George Washington probablemente sale."},
+  {"market_id":"3581450","side":"NO","accion":"descartar","factor":0,"precio_visto":0.15,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: entrada 0,15 < 0,30."}
+]

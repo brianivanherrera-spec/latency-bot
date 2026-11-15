@@ -649,5 +649,26 @@
     "nombre": "Ho Hsin-chun gana Taichung",
     "resuelve": "2026-11-29",
     "compras": 1
+  },
+  {
+    "market_id": "6977509",
+    "side": "SI",
+    "nombre": "Jensen Huang se une a otra empresa antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "5238395",
+    "side": "NO",
+    "nombre": "USS George Washington sale de CENTCOM antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "3581450",
+    "side": "NO",
+    "nombre": "Lai Jui-lung gana Kaohsiung",
+    "resuelve": "2026-11-29",
+    "compras": 1
   }
 ]
