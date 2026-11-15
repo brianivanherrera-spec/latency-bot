@@ -1,0 +1,287 @@
+[
+ {
+  "market_id": "6947944",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Segun Zelenskyy, Rusia rechazo la tregua energetica en Abu Dabi (11/11) y la decision quedo en Putin via enviados de EE.UU.; el 'alto el fuego energetico' anunciado por Trump el 11/10 nunca se aplico.",
+  "key_uncertainties": [
+   "regla: acuerdo mutuo; un anuncio unilateral de Trump no alcanza",
+   "viaje de Kushner/Witkoff a Moscu"
+  ],
+  "sources": [
+   "https://report.az/en/region/zelenskyy-russia-rejects-energy-ceasefire-proposal",
+   "https://www.semafor.com/article/11/11/2026/russia-ukraine-ceasefire-negotiations-stall"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6977509",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Huang renuncio el 12/11 y esta bajo investigacion y citado por el Congreso el 1/12; Musk dijo que contratarlo 'seria un honor' pero sin oferta. Un rol formal en 6 semanas es posible pero improbable con el escandalo abierto.",
+  "key_uncertainties": [
+   "regla: cualquier empresa calificada, incluso un directorio",
+   "un anuncio rapido de SpaceX o startup propia"
+  ],
+  "sources": [
+   "https://fortune.com/2026/11/13/jensen-huang-nvidia-elon-musk-hire-honor/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5238395",
+  "p_yes": 0.8,
+  "confidence": "medium",
+  "reasoning": "El George Washington esta en CENTCOM desde el 19/8; USNI informa que el Roosevelt lo releva y este llega desde mediados de noviembre. Con un despliegue largo, la salida antes de fin de ano es lo esperable.",
+  "key_uncertainties": [
+   "que el Pentagono mantenga dos o tres portaaviones por la tension con Iran",
+   "sin anuncio oficial de salida"
+  ],
+  "sources": [
+   "https://news.usni.org/2026/11/02/usni-news-fleet-and-marine-tracker-nov-2-2026",
+   "https://www.inss.org.il/publication/us-forces-november-1-7/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3581418",
+  "p_yes": 0.1,
+  "confidence": "medium",
+  "reasoning": "Tainan es bastion del DPP; Chen Ting-fei (DPP) lidera las encuestas, con margenes de 5 a 40 puntos segun encuestadora.",
+  "key_uncertainties": [
+   "pocas encuestas publicadas",
+   "nota: aparecieron cuotas de mercados de prediccion, se ignoraron"
+  ],
+  "sources": [
+   "https://www.taiwannews.com.tw/news/6315439",
+   "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-preview-2-the-big-six-special-municipalities",
+   "https://www.taipeitimes.com/News/feat/archives/2026/11/12/2003867584"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "7018013",
+  "p_yes": 0.1,
+  "confidence": "low",
+  "reasoning": "Hasta el 14/11 no hay un cuarto caso en medios de primera linea; solo especulacion en sitios menores. Quedan 5 dias.",
+  "key_uncertainties": [
+   "regla: solo cuentan medios calificados",
+   "investigaciones periodisticas en curso"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair",
+   "https://www.cnn.com/2026/11/10/china/nvidia-china-spy-scandal-hnk-intl"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2318107",
+  "p_yes": 0.07,
+  "confidence": "medium",
+  "reasoning": "ISW (13-14/11): Rusia no avanzo en el oeste de Zaporiyia y Ucrania contraataco al sureste de Orikhiv.",
+  "key_uncertainties": [
+   "regla: basta el icono de la estacion sombreado",
+   "ofensiva de invierno"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-14-2026"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "666659",
+  "p_yes": 0.08,
+  "confidence": "low",
+  "reasoning": "El impeachment de Hegseth se archivo el 10/11 (211-204) y Trump lo respalda; no hay senales de salida en 6 semanas.",
+  "key_uncertainties": [
+   "un escandalo nuevo"
+  ],
+  "sources": [
+   "https://www.cnn.com/politics"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6999516",
+  "p_yes": 0.25,
+  "confidence": "low",
+  "reasoning": "El conteo arranca en 3; un cuarto caso reportado por medios de primera linea hasta el 31/12 es plausible por la investigacion del Congreso (1/12), pero hoy no hay ninguno. Exactamente 4 excluye 5 o mas.",
+  "key_uncertainties": [
+   "regla: bracket de exactamente 4"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair",
+   "https://www.cnn.com/2026/11/10/china/nvidia-china-spy-scandal-hnk-intl"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6395202",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "ISW (14/11): Rusia ataca en direccion Dobropillia pero no avanzo; un asalto mecanizado del 13/11 fue repelido. Tomar la interseccion en el centro antes del 30/11 es muy improbable.",
+  "key_uncertainties": [
+   "niebla invernal favorece infiltraciones"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-14-2026",
+   "https://mezha.net/eng/news/mezha-db42701255c2b17f20cc93eb"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3581627",
+  "p_yes": 0.15,
+  "confidence": "medium",
+  "reasoning": "Kao Hung-an (independiente, con apoyo KMT/TPP) lidera la mayoria de las encuestas (TVBS fines de octubre 46-31), aunque una da 38-36.",
+  "key_uncertainties": [
+   "division del voto opositor si Ho Chih-yung se presenta",
+   "nota: aparecieron cuotas de mercados de prediccion, se ignoraron"
+  ],
+  "sources": [
+   "https://www.kharistempleman.com/blog/taiwan-2026-local-elections-preview-3-north-and-central-taiwan"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6999519",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Haria falta que se reporten 4 casos nuevos en medios de primera linea en 6 semanas; hoy no hay ni uno confirmado.",
+  "key_uncertainties": [
+   "regla: solo medios calificados"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair",
+   "https://www.cnn.com/2026/11/10/china/nvidia-china-spy-scandal-hnk-intl"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6992350",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Sin cambios respecto de ayer: el escandalo genera un pico fuerte de busquedas a fin de ano, pero compite con figuras de todo el ano.",
+  "key_uncertainties": [
+   "fecha de corte de Year in Search"
+  ],
+  "sources": [
+   "https://fortune.com/2026/11/13/jensen-huang-nvidia-elon-musk-hire-honor/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6617828",
+  "p_yes": 0.2,
+  "confidence": "low",
+  "reasoning": "PortWatch registra ~3,5-3,9 transitos diarios en Ormuz (ultimo dato 8/11: 3; promedio de octubre 3,8). El rango 5-9 requiere una mejora moderada; otros contadores dan mas (~7,4), pero el mercado usa PortWatch.",
+  "key_uncertainties": [
+   "dato del dia: PortWatch publica con varios dias de atraso",
+   "un acuerdo puente con Iran podria reabrir trafico"
+  ],
+  "sources": [
+   "https://hormuz.now/traffic",
+   "https://straits.live/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3581450",
+  "p_yes": 0.62,
+  "confidence": "low",
+  "reasoning": "Lai Jui-lung (DPP) lidera en Kaohsiung, bastion del DPP; la encuesta mas reciente de UDN le da 7 puntos, aunque otras mostraron empate.",
+  "key_uncertainties": [
+   "pocas encuestas",
+   "efecto nacional de la impopularidad del gobierno"
+  ],
+  "sources": [
+   "https://www.taiwannews.com.tw/news/6383006",
+   "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-preview-2-the-big-six-special-municipalities",
+   "https://www.taipeitimes.com/News/feat/archives/2026/11/12/2003867584"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6997774",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Hoy hay 3 casos reportados; la cobertura intensa y la citacion del Congreso del 1/12 hacen posible un cuarto antes de fin de ano, pero no hay indicio concreto.",
+  "key_uncertainties": [
+   "regla: solo medios calificados"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair",
+   "https://www.cnn.com/2026/11/10/china/nvidia-china-spy-scandal-hnk-intl"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6617838",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Bab el-Mandeb esta en ~23-27 transitos diarios segun PortWatch y S&P; un promedio de 30-34 el 30/11 requiere una recuperacion. Windward conto 37 el 12/11, pero con otra metodologia.",
+  "key_uncertainties": [
+   "dato del dia: no tengo PortWatch de noviembre"
+  ],
+  "sources": [
+   "https://www.elestrechodigital.com/en/indicators/ship-traffic-through-the-bab-el-mandeb-strait",
+   "https://ramon8.substack.com/p/suez-one-fixture-at-a-time"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2668007",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "No hay acuerdo EE.UU.-Iran; Trump dice que no hace falta y la propuesta qatari incluye acceso del OIEA, no la entrega de uranio.",
+  "key_uncertainties": [
+   "un acuerdo puente amplio en diciembre"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/features/2026/11/13/why-is-trump-saying-no-deal-necessary-with-iran-as-he-sidelines-jd-vance"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6910695",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "El WTI cerro 88,56 el 13/11; tocar 90 en un minuto de vela en lo que resta de noviembre requiere +1,6%, pero la tendencia semanal es bajista por excedente de oferta.",
+  "key_uncertainties": [
+   "regla: maximo intradiario del contrato activo segun Pyth; cambio de contrato a fin de mes",
+   "fecha de creacion del mercado"
+  ],
+  "sources": [
+   "https://energynow.com/2026/11/oil-prices-fall-for-second-straight-week-as-global-supply-surplus-emerges-wti-closes-at-88-56-brent-at-95-84/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6617831",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "PortWatch muestra ~4 transitos diarios en Ormuz; un promedio de 20-24 el 30/11 exigiria una reapertura casi inmediata.",
+  "key_uncertainties": [
+   "un acuerdo sorpresa que reabra el estrecho"
+  ],
+  "sources": [
+   "https://hormuz.now/traffic",
+   "https://straits.live/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2747434",
+  "p_yes": 0.08,
+  "confidence": "low",
+  "reasoning": "En julio se anuncio un acuerdo de desarme via la Junta de Paz, pero Hamas condiciona cualquier paso a la retirada israeli; no encontre un anuncio oficial nuevo de desarme.",
+  "key_uncertainties": [
+   "regla: anuncio oficial de Hamas; el de julio puede no contar",
+   "dato viejo: lo ultimo encontrado es de julio"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/news/2026/7/31/gaza-board-of-peace-announces-hamas-disarmament-agreement-what-we-know"
+  ],
+  "prompt_version": "v3"
+ }
+]
