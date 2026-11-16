@@ -957,6 +957,15 @@ async function main() {
     logger.info(`[PAPER-B] ✅ Cuenta B activa — ${paperB.describe()}`);
     logger.info(paperB.summary());
   }
+  // Paper CAL: cuenta de paper de la señal de calibración de BTC 5 min (bitácora 16/11). PAPER_CAL_ENABLED=false la apaga.
+  if (shadow && process.env.PAPER_CAL_ENABLED !== 'false') {
+    const { PaperCal } = require('./paper-cal');
+    const paperCal = new PaperCal();
+    shadow.setPaperCal(paperCal);
+    paperCal.start();
+    logger.info(`[PAPER-CAL] ✅ Cuenta CAL activa — ${paperCal.describe()}`);
+    logger.info(paperCal.summary());
+  }
   // Chequeo del libro: el mejor bid/ask del WS contra la API REST de Polymarket cada 30 s (solo
   // registro; con la segunda conexión, también la de ella). BOOK_CHECK_MS=0 lo apaga.
   if (process.env.BOOK_CHECK_MS !== '0') {

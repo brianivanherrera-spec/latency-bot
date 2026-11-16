@@ -5,7 +5,7 @@
  * ([LOOP] y [WS-DUAL] salen cada minuto), lee estas dos líneas por hora. Mira cada línea
  * que pasa por el Logger, cuenta eventos y guarda máximos; no cambia nada del bot.
  *
- *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B … | B15 (paper de BTC 15 min) … | B15 ETH (paper de ETH 15 min) … | B1H (paper de BTC horario) …
+ *   [RESUMEN] cuentas HH:20-HH:20 UTC | A … | B … | pérdidas B … | B15 (paper de BTC 15 min) … | B15 ETH (paper de ETH 15 min) … | B1H (paper de BTC horario) … | CAL (paper de la señal de calibración, BTC 5 min) …
  *   [RESUMEN] salud HH:20-HH:20 UTC | reconexiones … | 1013 … | BOOK-CHECK … | LOOP … | WARN/ERROR …
  *
  * Sale a los :20 UTC de cada hora (el chequeo corre a los :22). LOG_DIGEST=off lo apaga.
@@ -82,6 +82,7 @@ class LogDigest {
     this.baseB = null;      // Balance B al cerrar la ventana anterior (para las diferencias)
     this.attempts = new Map(); // "UP mercado" → {secs, edge} del intento de B
     this.lastB15 = {};      // id de la serie (btc15m, eth15m) → último "Balance B15" de su cuenta en paper
+    this.lastCal = null;    // último "Balance CAL" (cuenta de la señal de calibración)
     this._reset(now);
   }
 
@@ -93,6 +94,7 @@ class LogDigest {
     this.a = { w: 0, l: 0, pnl: 0 };
     this.b = { w: 0, l: 0, pnl: 0, losses: [] };
     this.b15 = {};          // id de la serie → { att, fill, w, l, pnl, losses } de la ventana
+    this.cal = { att: 0, fill: 0, w: 0, l: 0, pnl: 0 };
     this._aPending = false;
     this.strike = { n: 0, notCl: 0, maxWait: null };
     this.ptb = { n: 0, maxRtds: null, maxPb: null, nonZero: 0 };
@@ -108,6 +110,7 @@ class LogDigest {
     if (line.includes('[PAPER-B15]') || line.includes('[PAPER-B1H]')) this._b15(line);
     else if (prefix === 'TRACKER') this._a(line);
     else if (prefix === 'PAPER-B') this._b(line);
+    else if (prefix === 'PAPER-CAL') this._cal(line);
     else if (prefix === 'LOOP') this._loop(line);
     else if (prefix === 'BOOK-CHECK') this._book(line);
     else if (line.includes('[PTB-CHECK]')) this._ptb(line);
@@ -233,7 +236,7 @@ class LogDigest {
       `A: ${this.a.w}-${this.a.l} ${usd(this.a.pnl)}; ${A}`,
       `B: ${this.b.w}-${this.b.l} ${usd(this.b.pnl)}${this._bWindow()}; ${this._bTotal()}`,
       `pérdidas B: ${this.b.losses.length ? this.b.losses.join('; ') : 'ninguna'}`,
-      ...this._b15Items()];
+      ...this._b15Items(), ...this._calItems()];
     const top = [...this.others.values()].sort((x, y) => y.n - x.n).slice(0, 4)
       .map(o => `${o.level === 'error' ? 'ERROR ' : ''}×${o.n} "${o.ex}"`);
     const f = (v, d = 0) => (v == null ? 'n/a' : v.toFixed(d));
@@ -267,6 +270,28 @@ class LogDigest {
       const total = s ? `total ${usd(s.pnl)} (${s.w}-${s.l}), intentos ${s.attempts}, llenadas ${s.filled}, abiertas ${s.open}` : 'total sin dato';
       return `${label}: intentos ${B.att}, llenadas ${B.fill}, ${B.w}-${B.l} ${usd(B.pnl)}; ${total}${B.losses.length ? `; pérdidas: ${B.losses.join('; ')}` : ''}`;
     });
+  }
+
+  // Cuenta CAL: intentos ("… restantes (momento N s) …"), cierres (WIN/LOSS … → ±$x) y el último balance
+  _cal(line) {
+    const C = this.cal;
+    let m;
+    if (/\[PAPER-CAL\] (UP|DOWN) .* restantes \(momento/.test(line)) { C.att++; if (/→ lleno a/.test(line)) C.fill++; }
+    else if ((m = /\[PAPER-CAL\] (WIN|LOSS) .*→ ([+−])\$([\d.]+)/.exec(line))) {
+      const v = (m[2] === '−' ? -1 : 1) * num(m[3]);
+      C.pnl += v; if (m[1] === 'WIN') C.w++; else C.l++;
+    }
+    if ((m = /Balance CAL: ([+−])\$([\d.]+) \((\d+)-(\d+)(?:, z (-?[\d.]+))?\), intentos (\d+), llenadas (\d+), sin fill \d+, abiertas (\d+)/.exec(line))) {
+      this.lastCal = { pnl: (m[1] === '−' ? -1 : 1) * num(m[2]), w: +m[3], l: +m[4], z: m[5] != null ? num(m[5]) : null, attempts: +m[6], filled: +m[7], open: +m[8] };
+    }
+  }
+
+  // "CAL: …" desde que aparece la cuenta
+  _calItems() {
+    const C = this.cal, s = this.lastCal;
+    if (!s && !C.att && !(C.w + C.l)) return [];
+    const total = s ? `total ${usd(s.pnl)} (${s.w}-${s.l}${s.z != null ? `, z ${s.z}` : ''}), intentos ${s.attempts}, llenadas ${s.filled}, abiertas ${s.open}` : 'total sin dato';
+    return [`CAL: intentos ${C.att}, llenadas ${C.fill}, ${C.w}-${C.l} ${usd(C.pnl)}; ${total}`];
   }
 
   _bTotal() {

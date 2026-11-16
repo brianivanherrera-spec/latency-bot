@@ -179,7 +179,7 @@ function oldMarket(start) {
   assert.deepStrictEqual([lmk[0].liveAtt.side, lmk[1].liveAtt, lmk[2].liveAtt.sl], ['UP', undefined, 60]);
   const lfs = liveAttemptFiles('/data/shadow-ticks-eth15m.jsonl');
   assert.deepStrictEqual([lfs[0], path.basename(lfs[1])], ['/data/paper-b15-attempts-eth15m.jsonl', 'paper-b15-attempts-seed-eth15m.jsonl']);
-  assert.deepStrictEqual(liveAttemptFiles('/data/shadow-ticks.jsonl'), [], 'el de 5 min no tiene B15');
+  assert.deepStrictEqual(liveAttemptFiles('/data/shadow-ticks.jsonl'), ['/data/paper-b-attempts.jsonl'], 'el de 5 min usa los intentos de la cuenta B');
   fs.rmSync(dl, { recursive: true, force: true });
   // Filtro del book de agosto: las entradas de B separadas por la profundidad de compra al entrar (orientada al lado comprado)
   const depthMarket = (start, winner, imb, imb5) => {

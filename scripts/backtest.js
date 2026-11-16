@@ -10,7 +10,8 @@
  *   - ventaja neta pa − precio − comisión(precio) ≥ eMin
  * Fill conservador: max(ask en t, ask en t+1) — un segundo de latencia en contra. En los mercados donde B15 intentó en
  * vivo (mismo lado, ±3 s), el ask de t+1 se reemplaza por el ask del libro REST a +200 ms que registró el vivo
- * (DATA_DIR/paper-b15-attempts-<id>.jsonl y la semilla scripts/b15-seed/paper-b15-attempts-seed-<id>.jsonl, sacada de los logs).
+ * (DATA_DIR/paper-b15-attempts-<id>.jsonl y la semilla scripts/b15-seed/paper-b15-attempts-seed-<id>.jsonl, sacada de los logs;
+ * en 5 min, los intentos de la cuenta B en DATA_DIR/paper-b-attempts.jsonl, desde el 16/11).
  * Comisión taker TAKER_FEE_RATE (0.072)·p·(1−p) por acción. $5 por trade (floor(5/precio) acciones).
  *
  * Familias extra (cada una con su propia selección en train y prueba en test):
@@ -197,7 +198,7 @@ function fires(R, i, side, cfg, ask, bid) {
   return pa - ask - fee(ask) >= cfg.e;
 }
 
-// Intentos de B15 en vivo por inicio de mercado: { side, sl, ask200 } (el primero que aparece en los archivos)
+// Intentos en vivo (B15, o B en 5 min) por inicio de mercado: { side, sl, ask200 } (el primero que aparece en los archivos)
 function loadLiveAttempts(files) {
   const byStart = new Map();
   for (const f of files) {
@@ -215,8 +216,10 @@ function attachLive(markets, byStart) {
   for (const mk of markets) { const a = byStart.get(mk.start); if (a) { mk.liveAtt = a; n++; } }
   return n;
 }
-// Archivos de intentos de la serie de IN (shadow-ticks-<id>.jsonl); el de 5 min (shadow-ticks.jsonl) no tiene B15
+// Archivos de intentos de la serie de IN (shadow-ticks-<id>.jsonl, los de B15); el de 5 min (shadow-ticks.jsonl) usa los
+// intentos de la cuenta B (paper-b-attempts.jsonl, desde el 16/11), con el ask del REST a +200 ms
 function liveAttemptFiles(inFile) {
+  if (path.basename(inFile) === 'shadow-ticks.jsonl') return [path.join(path.dirname(inFile), 'paper-b-attempts.jsonl')];
   const m = /^shadow-ticks-(.+)\.jsonl$/.exec(path.basename(inFile));
   if (!m) return [];
   return [path.join(path.dirname(inFile), `paper-b15-attempts-${m[1]}.jsonl`),
@@ -945,7 +948,7 @@ if (require.main === module) (async () => {
     const one = x => `${hm(x.start)} UTC ${x.side} ${Math.round(x.secsLeft)} s ask $${x.ask.toFixed(2)}${x.escaped ? ` → $${x.ask2 == null ? 'n/a' : x.ask2.toFixed(2)} ${x.live ? 'a +200 ms (vivo)' : '1 s después'}: se escapó` : ` → paga $${x.price.toFixed(2)} ${x.win ? 'G' : 'P'}${x.live ? ' V' : ''}`} (límite justo $${x.fairLimit.toFixed(2)}: ${x.fairFill ? 'llena' : 'no llena'})`;
     const esc = pb.entries.filter(x => x.escaped).length, nLive = pb.entries.filter(x => x.live).length;
     const list = `${pb.entries.length > 12 ? `últimos 12 de ${pb.entries.length}: ` : ''}${pb.entries.slice(-12).map(one).join(', ')}`;
-    console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | disparos (inicio del mercado; ${esc} con el precio escapado, sin entrada; ${nLive} con el ask a +200 ms de B15 en vivo, marcados V o "(vivo)", el resto con el de 1 s después): ${list}` : ''}`); }
+    console.log(`[BACKTEST-ANCLA] regla de la cuenta B desde ${pb.from} (fuera de muestra, ${pb.markets} mercados): n=${h.n} WR=${h.wr} EV/acc=${h.evPerShare} P&L=$${h.pnl}${pb.entries.length ? ` | disparos (inicio del mercado; ${esc} con el precio escapado, sin entrada; ${nLive} con el ask a +200 ms del vivo (B o B15), marcados V o "(vivo)", el resto con el de 1 s después): ${list}` : ''}`); }
   { const P = report.paperBParts, f6 = Math.round(P.floorE6);
     const sd = x => `n=${x.n} WR=${x.wr} EV/acc=${x.evPerShare} z=${x.z} P&L=$${x.pnl}`;
     const cut = c => `ventaja 8-15 pts ${sd(c.edge[0])} | 15-25 ${sd(c.edge[1])} | ≥ 25 ${sd(c.edge[2])} || σ corta < piso del modo blend (${f6}e-6) ${sd(c.sigma[0])} | ≥ piso ${sd(c.sigma[1])}${c.sigma[2].n ? ` | sin σ ${c.sigma[2].n}` : ''} || P del modelo ≥ 99 % ${sd(c.sat[0])} | < 99 % ${sd(c.sat[1])} || ask del lado comprado en los 3 s previos: bajó ≥ 2¢ ${sd(c.trend[0])} | estable ${sd(c.trend[1])} | subió ≥ 2¢ ${sd(c.trend[2])}`;

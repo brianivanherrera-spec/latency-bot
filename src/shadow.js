@@ -87,6 +87,8 @@ class Shadow {
   // Paper B (src/paper-b.js): segunda cuenta de paper con la regla anclada; recibe cada muestra
   // y el ganador oficial de cada mercado
   setPaperB(pb) { this.paperB = pb || null; }
+  // Paper CAL (src/paper-cal.js): cuenta de paper de la señal de calibración; recibe cada muestra y el ganador oficial
+  setPaperCal(pc) { this.paperCal = pc || null; }
 
   start() {
     if (this.timer) return;
@@ -268,6 +270,9 @@ class Shadow {
     if (this.paperB) {
       try { this.paperB.onSample(m, { T, yesBid, yesAsk, noAsk, p, src: F?.src ?? null }); } catch (e) { this.stats.errors++; }
     }
+    if (this.paperCal) {
+      try { this.paperCal.onSample(m, { T, yesBid, yesAsk, noAsk, p }); } catch (e) { this.stats.errors++; }
+    }
     let snap = null;
     try { snap = this.signalFn ? this.signalFn() : null; } catch (_) {}
     m.rows.push([t, rnd(T, 1), rnd(S, 2), rnd(p, 4), yesBid, yesAsk, noBid, noAsk, rnd(sigma == null ? null : sigma * 1e6, 3), imb, F ? F.src : null,
@@ -392,6 +397,7 @@ class Shadow {
     source === 'gamma' ? this.stats.resolved_gamma++ : this.stats.resolved_fallback++;
     this.pending.delete(m.gammaId);
     if (this.paperB) { try { this.paperB.onResolved(m.gammaId, winner, source); } catch (e) { this.stats.errors++; } }
+    if (this.paperCal) { try { this.paperCal.onResolved(m.gammaId, winner, source); } catch (e) { this.stats.errors++; } }
     this._write(m, winner, source);
   }
 

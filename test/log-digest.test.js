@@ -116,6 +116,16 @@ has(s2, 'BOOK-CHECK n/a');
 has(s2, 'otros: ninguno');
 
 // Próxima emisión a los :20 UTC
+// Cuenta CAL: no aparece hasta que hay una línea suya; después, intentos, cierres y total
+{
+  const dc = new LogDigest(T0);
+  ok(!dc.report(T0 + 3600000)[0].includes('CAL:'), 'sin cuenta CAL no hay item');
+  dc.observe('info', 'PAPER-CAL', '[PAPER-CAL] Balance CAL: +$0.00 (0-0), intentos 0, llenadas 0, sin fill 0, abiertas 0 | desde 2026-11-16T15:00 UTC');
+  dc.observe('info', 'PAPER-CAL', '[PAPER-CAL] UP Nov 16, 10:00AM-10:05AM ET | 61 s restantes (momento 60 s) | precio justo anclado 58.0% vs mercado 52.5% (5.5 pts) | ask $0.53 | orden 9 a $0.55 | ask REST a +200ms $0.53 → lleno a $0.53 | Balance CAL: +$0.00 (0-0), intentos 1, llenadas 1, sin fill 0, abiertas 1 | desde 2026-11-16T15:00 UTC');
+  dc.observe('info', 'PAPER-CAL', '[PAPER-CAL] LOSS UP Nov 16, 10:00AM-10:05AM ET @ $0.53 ×9 → −$4.89 (comisión $0.16) | Balance CAL: −$4.89 (0-1, z -1.05), intentos 1, llenadas 1, sin fill 0, abiertas 0 | desde 2026-11-16T15:00 UTC');
+  const lc = dc.report(T0 + 7200000)[0];
+  has(lc, 'CAL: intentos 1, llenadas 1, 0-1 −$4.89; total −$4.89 (0-1, z -1.05), intentos 1, llenadas 1, abiertas 0', 'item CAL');
+}
 ok(msToNextEmit(Date.UTC(2026, 9, 16, 13, 19, 0)) === 60000, 'falta 1 min');
 ok(msToNextEmit(Date.UTC(2026, 9, 16, 13, 20, 0)) === 3600000, 'justo a los :20 → la próxima hora');
 ok(msToNextEmit(Date.UTC(2026, 9, 16, 23, 50, 0)) === 30 * 60000, 'pasa de día');

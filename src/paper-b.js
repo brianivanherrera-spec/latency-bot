@@ -33,6 +33,8 @@
  * (hipótesis (ii) del 12/10: entrar solo con el ask subiendo ≥ 2¢; solo registro).
  * Con la segunda conexión al WS (probe, src/ws-probe.js; solo medición) la línea REST suma el ask de la
  * segunda al decidir y a +PAPER_B_DELAY_MS, comparado con el WS principal y el REST de ese momento.
+ * Cada intento con el libro REST queda en DATA_DIR/paper-b-attempts.jsonl (inicio del mercado, lado, segundos, ask, ask del
+ * REST a +PAPER_CHECK_MS): el backtest de 5 min llena con ese ask en vez del de 1 s después (como con B15; bitácora 16/11).
  */
 'use strict';
 const fs = require('fs');
@@ -59,6 +61,7 @@ class PaperB {
     this.poly = polyWs;
     this.probe = probe; // segunda conexión al WS: solo registro, no cambia la decisión ni el fill
     this.stateFile = stateFile || path.join(env.DATA_DIR || '/data', 'paper-b.json');
+    this.attFile = path.join(path.dirname(this.stateFile), 'paper-b-attempts.jsonl');
     this.fetch = fetchFn;
     const c = this.cfg = {
       edge: num(env.PAPER_B_EDGE, 0.08), lo: num(env.PAPER_B_MIN_ASK, 0.30), hi: num(env.PAPER_B_MAX_ASK, 0.70),
@@ -242,6 +245,11 @@ class PaperB {
         if (!filled) S.rest200Open.push(pos);
       }
       this._save();
+      // Registro del intento para el backtest de 5 min (usa el ask del REST a +checkMs en vez del de 1 s después)
+      try {
+        fs.appendFileSync(this.attFile, JSON.stringify({ start: m.endTs - 300000, side, sl: pos.secsLeft, ask, ask200: pos.restAsk200,
+          limit, filled, restFill200: pos.restFill200, paid200: pos.restPaid200 ?? null, t: pos.t }) + '\n');
+      } catch (e) { logger.warn(`[PAPER-B] no se pudo registrar el intento: ${e.message}`); }
       let two = '';
       try { if (this.probe) two = ` | WS2 (medición): al decidir ${this.probe.vs(w0, ask, pos.restAsk0)}; a +${c.delayMs}ms ${this.probe.vs(w400, b400.ask, pos.restAsk400)}`; } catch (_) {}
       logger.info(`[PAPER-B] REST: al decidir ask ${px(pos.restAsk0)} (WS ${px(ask)}${pos.restMs0 != null ? `; respuesta en ${pos.restMs0} ms` : ''}) | a +${c.delayMs}ms ${px(pos.restAsk400)} (WS ${px(b400.ask)}), ${sz ?? 'n/a'} acciones hasta $${limit} → con REST ${pos.restFill == null ? 'sin dato' : pos.restFill ? `llenaba a $${pos.restPaid}` : 'no llenaba'} (paper: ${filled ? 'lleno' : 'no'}) | retraso del WS al decidir ${lag0 ?? 'n/a'} ms${phantom ? ' | PRECIO VIEJO del WS al decidir: entró igual (se cuenta aparte)' : ''} | REST a +${c.checkMs}ms: ${px(pos.restAsk200)} (WS ${px(b200.ask)}), ${sz2 ?? 'n/a'} acciones hasta $${limit} → ${pos.restFill200 == null ? 'sin dato' : pos.restFill200 ? `llenaba a $${pos.restPaid200}` : 'no llenaba'}${two}`);

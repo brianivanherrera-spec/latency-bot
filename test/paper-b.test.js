@@ -58,6 +58,9 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.strictEqual(pos.restAsk0, 0.45, 'libro REST al decidir');
   assert.strictEqual(pos.restFill, true, 'con el REST también llenaba');
   assert.deepStrictEqual([pos.restAsk200, pos.restFill200, pos.restPaid200], [0.45, true, 0.46], 'libro REST a +200 ms');
+  // El intento queda registrado para el backtest de 5 min (inicio del mercado, lado, segundos, ask y ask del REST a +200 ms)
+  const att0 = JSON.parse(fs.readFileSync(path.join(dir, 'paper-b-attempts.jsonl'), 'utf8').split('\n')[0]);
+  assert.deepStrictEqual([att0.start, att0.side, att0.sl, att0.ask, att0.ask200, att0.filled], [pos.endTs - 300000, pos.side, pos.secsLeft, pos.ask, 0.45, true], 'registro del intento');
   assert.deepStrictEqual([pos.ask3, pos.trend], [null, null], 'sin 3 muestras previas no hay movimiento del ask');
   // 3) Un solo intento por mercado
   pb.onSample(m1, sample(90, 0.70));
@@ -364,5 +367,5 @@ const sample = (T, p, yesAsk = 0.45, yesBid = 0.44, noAsk = 0.56) => ({ T, yesBi
   assert.deepStrictEqual([pq2.state.attempts, pq2.state.ws2g.n], [1, 0], 'principal al día: entra normal');
   delete polyWs.getTopAge;
   fs.rmSync(dir, { recursive: true, force: true });
-  console.log('paper-b: 128 ok');
+  console.log('paper-b: 129 ok');
 })().catch(e => { console.error(e); process.exit(1); });
