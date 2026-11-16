@@ -259,13 +259,6 @@
     "compras": 1
   },
   {
-    "market_id": "6366415",
-    "side": "NO",
-    "nombre": "Gemini Carbon público antes del 13/11",
-    "resuelve": "2026-11-13",
-    "compras": 1
-  },
-  {
     "market_id": "2695678",
     "side": "SI",
     "nombre": "Sánchez próximo presidente del Gobierno de España",
@@ -438,13 +431,6 @@
     "side": "NO",
     "nombre": "Hegseth deja el gobierno antes de 2027",
     "resuelve": "2027-01-01",
-    "compras": 1
-  },
-  {
-    "market_id": "6282800",
-    "side": "NO",
-    "nombre": "Gemini Carbon público antes del 15/11",
-    "resuelve": "2026-11-16",
     "compras": 1
   },
   {
