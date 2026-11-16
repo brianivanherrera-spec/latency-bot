@@ -670,5 +670,12 @@
     "nombre": "Lai Jui-lung gana Kaohsiung",
     "resuelve": "2026-11-29",
     "compras": 1
+  },
+  {
+    "market_id": "3581572",
+    "side": "SI",
+    "nombre": "Hsu Hsin-ying gana el condado de Hsinchu",
+    "resuelve": "2026-11-29",
+    "compras": 1
   }
 ]
