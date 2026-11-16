@@ -1,0 +1,273 @@
+[
+ {
+  "market_id": "665374",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "Trump dice que la guerra 'esta ganada' y que no hace falta acuerdo; EE.UU. mantiene bloqueo y ataques limitados, sin senales de una ofensiva terrestre para controlar territorio.",
+  "key_uncertainties": [
+   "regla: cualquier ofensiva para controlar territorio, incluso islas",
+   "escalada si Israel retoma la guerra"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/features/2026/11/13/why-is-trump-saying-no-deal-necessary-with-iran-as-he-sidelines-jd-vance",
+   "https://www.nation.com.pk/02-Nov-2026/iran-us-continue-doha-talks-tehran-warns-wider-war"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6999515",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "El conteo arranca en 3 y hoy no hay un cuarto caso confirmado por medios de primera linea; la citacion del Congreso del 1/12 puede destapar mas.",
+  "key_uncertainties": [
+   "regla: exactamente 3 significa que no aparezca ninguno nuevo"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5238391",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Los combates siguen (misiles hutíes contra Riad el 11 y 12/11; ataques sauditas el 16/11); hay contactos via Iran pero las posiciones estan lejos (los hutíes piden 51 mil millones) y Riad rechaza oficialmente una tregua nueva.",
+  "key_uncertainties": [
+   "regla: acuerdo con fecha de cese explicita",
+   "un acuerdo pagado via Iran"
+  ],
+  "sources": [
+   "https://www.ksat.com/news/world/2026/11/16/houthis-accuse-saudi-arabia-of-strikes-that-killed-3-including-a-child-and-other-mideast-news/",
+   "https://www.israelhayom.com/2026/10/26/saudi-arabia-reportedly-offers-houthis-1-billion-in-iran-brokered-deal-to-halt-attacks/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5087226",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "La mediacion de Qatar no produjo acuerdo; Trump dice que no hace falta y quedan 2 semanas.",
+  "key_uncertainties": [
+   "un acuerdo puente rapido"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/features/2026/11/13/why-is-trump-saying-no-deal-necessary-with-iran-as-he-sidelines-jd-vance",
+   "https://www.nation.com.pk/02-Nov-2026/iran-us-continue-doha-talks-tehran-warns-wider-war"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6999517",
+  "p_yes": 0.05,
+  "confidence": "low",
+  "reasoning": "Llegar a exactamente 5 requiere dos reportes nuevos en medios de primera linea; hoy no hay ninguno.",
+  "key_uncertainties": [
+   "regla: bracket exacto"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2412369",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "Kuwait mantiene una de las posturas mas duras contra la normalizacion y la guerra con Iran sigue; no hay senales.",
+  "key_uncertainties": [],
+  "sources": [],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5336560",
+  "p_yes": 0.12,
+  "confidence": "medium",
+  "reasoning": "Casi todas las encuestas del 14-16/11 dan al PP primero (125-137 escanos) y al PSOE segundo (102-119); solo SW Demoscopia da al PSOE delante.",
+  "key_uncertainties": [
+   "error de encuestas como en 2023",
+   "40dB muestra el PSOE a 1,2 puntos"
+  ],
+  "sources": [
+   "https://www.democrata.es/en/center-of-surveys-and-electoral-polls/general-elections/general-election-poll-the-psoe-closes-the-gap-but-the-pp-and-vox-maintain-up-to-205-seats-according-to-nc-report/",
+   "https://www.democrata.es/en/center-of-surveys-and-electoral-polls/general-elections/general-election-survey-sanchez-exceeds-30-but-feijoo-maintains-192-seats-with-vox-according-to-the-40db-tracking/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3358975",
+  "p_yes": 0.38,
+  "confidence": "low",
+  "reasoning": "Nvidia cerro el 13/11 en ~3,92 billones, justo debajo del rango; resultados el 17/11 y CEO interino. Quedar entre 4,0 y 4,5 a fin de ano requiere recuperar algo pero sin pasarse.",
+  "key_uncertainties": [
+   "resultados del 17/11",
+   "busqueda del nuevo CEO"
+  ],
+  "sources": [
+   "https://www.macrotrends.net/stocks/charts/NVDA/nvidia/market-cap",
+   "https://www.fool.com/coverage/stock-market-today/2026/11/13/stock-market-today-nov-13-nvidia-slides-after-hsbc-downgrades-stock-to-hold-on-ceo-uncertainty/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2698816",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "Waymo tenia 14 ciudades al 1/9 y abrio al publico San Antonio, San Diego y Tampa en octubre (ya contadas); faltan Washington y Las Vegas confirmadas. Llegar a 20 en 6 semanas es muy improbable.",
+  "key_uncertainties": [
+   "regla: cuenta Uber y regiones como una ciudad",
+   "dato viejo: el ultimo conteo es de septiembre"
+  ],
+  "sources": [
+   "https://electrek.co/2026/09/01/waymo-public-robotaxi-denver-san-diego-tampa/",
+   "https://waymo.com/blog/2026/09/ride-in-denver-san-diego-tampa/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2373683",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Sin cambios: ISW marco avances rusos en el centro de Bilytske el 10/11; quedan 6 semanas para tomarlo entero.",
+  "key_uncertainties": [
+   "regla: tiene que estar sombreado entero"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-11-2026"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2750319",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "No conozco la lista exacta de lideres; en 6 semanas la salida permanente de alguno es poco frecuente. Sanchez podria perder el 29/11, pero la investidura del sucesor probablemente pase a 2027.",
+  "key_uncertainties": [
+   "regla: no tengo la lista de lideres",
+   "una investidura rapida en Espana"
+  ],
+  "sources": [
+   "https://www.democrata.es/en/center-of-surveys-and-electoral-polls/general-elections/general-election-poll-the-psoe-closes-the-gap-but-the-pp-and-vox-maintain-up-to-205-seats-according-to-nc-report/",
+   "https://www.democrata.es/en/center-of-surveys-and-electoral-polls/general-elections/general-election-survey-sanchez-exceeds-30-but-feijoo-maintains-192-seats-with-vox-according-to-the-40db-tracking/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6941767",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "El WTI cerro 88,56 el 13/11 tras caer 2,5% en la semana por excedente de oferta; tocar 85 requiere -4% en ~10 sesiones.",
+  "key_uncertainties": [
+   "regla: minimo intradiario del contrato activo segun Pyth",
+   "volatilidad por Iran"
+  ],
+  "sources": [
+   "https://www.marketscreener.com/news/december-wti-crude-oil-contract-closes-down-0-18-or-0-2-settles-at-88-56-per-barrel-january-br-ce785eded98bf326"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2872613",
+  "p_yes": 0.04,
+  "confidence": "medium",
+  "reasoning": "Clavicular fue acusado de violacion en Massachusetts despues de su viaje polemico a Israel de julio; no encontre ninguna foto con kipa ni planes de volver.",
+  "key_uncertainties": [
+   "un video viral inesperado"
+  ],
+  "sources": [
+   "https://www.ynetnews.com/culture/article/sjhtwng9ze"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4867452",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Las conversaciones de noviembre fueron indirectas via Qatar sin enviados de EE.UU. presentes; Araghchi dice que no hay planes de reunion directa y Trump dice que no hace falta acuerdo.",
+  "key_uncertainties": [
+   "regla: que cuenta como reunion indirecta de alto nivel",
+   "una ronda en Doha con Witkoff"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/features/2026/11/13/why-is-trump-saying-no-deal-necessary-with-iran-as-he-sidelines-jd-vance",
+   "https://www.nation.com.pk/02-Nov-2026/iran-us-continue-doha-talks-tehran-warns-wider-war"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "1125395",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "El S&P 500 cerro en ~7.561 el 13/11; bajar a 5.200 en diciembre exige una caida de 31%.",
+  "key_uncertainties": [],
+  "sources": [
+   "https://www.fool.com/coverage/stock-market-today/2026/11/13/stock-market-today-nov-13-nvidia-slides-after-hsbc-downgrades-stock-to-hold-on-ceo-uncertainty/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6424811",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "No hay operaciones para tomar la isla Tunb Mayor y la regla exige control efectivo establecido.",
+  "key_uncertainties": [],
+  "sources": [
+   "https://www.aljazeera.com/features/2026/11/13/why-is-trump-saying-no-deal-necessary-with-iran-as-he-sidelines-jd-vance",
+   "https://www.nation.com.pk/02-Nov-2026/iran-us-continue-doha-talks-tehran-warns-wider-war"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3581572",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Condado de Hsinchu (bastion KMT): las encuestas tempranas daban a Hsu (KMT) arriba, pero una encuesta mas reciente citada por Storm Media muestra a Cheng (DPP) adelante.",
+  "key_uncertainties": [
+   "metodologia de la encuesta reciente",
+   "escandalo de deepfake en la campana"
+  ],
+  "sources": [
+   "https://world.storm.mg/articles/1181794",
+   "https://www.kharistempleman.com/blog/taiwan-2026-local-elections-preview-3-north-and-central-taiwan"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6910695",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "Igual que ayer: WTI en 88,56; tocar 90 requiere +1,6% con tendencia semanal bajista.",
+  "key_uncertainties": [
+   "regla: maximo intradiario segun Pyth"
+  ],
+  "sources": [
+   "https://www.marketscreener.com/news/december-wti-crude-oil-contract-closes-down-0-18-or-0-2-settles-at-88-56-per-barrel-january-br-ce785eded98bf326"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2676529",
+  "p_yes": 0.06,
+  "confidence": "medium",
+  "reasoning": "Segun Mashovets (citado por ISW), Ucrania limpio la mayor parte de Mala Tokmachka y quedan solo dos grupos rusos chicos; el Estado Mayor no reporta asaltos en Orikhiv el 14/11.",
+  "key_uncertainties": [
+   "regla: basta la interseccion sombreada"
+  ],
+  "sources": [
+   "https://euromaidanpress.com/2026/11/06/russias-defense-minister-congratulated-a-division-on-taking-mala-tokmachka-a-year-later-that-division-is-still-trying/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3581388",
+  "p_yes": 0.55,
+  "confidence": "low",
+  "reasoning": "Taichung parejo: cuatro de cinco encuestas desde octubre daban a Chiang (KMT) arriba, pero la ultima (28-30/10) da a Ho (DPP) 41-30.",
+  "key_uncertainties": [
+   "pocas encuestas publicadas"
+  ],
+  "sources": [
+   "https://www.taipeitimes.com/News/taiwan/archives/2026/11/04/2003867132"
+  ],
+  "prompt_version": "v3"
+ }
+]
