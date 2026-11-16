@@ -1,0 +1,6 @@
+[
+  {"market_id":"5775586","side":"NO","accion":"mantener","p_yes":0.02,"p_side":0.98,"motivo":"El Roosevelt entro a CENTCOM el 15/11 (confirmado por CENTCOM), despues del plazo del 12/11: el NO queda practicamente ganado.","fuentes":[{"url":"https://www.thenationalnews.com/news/us/2026/11/16/uss-theodore-roosevelt-middle-east-centcom/","tipo":"noticia"},{"url":"https://www.middleeasteye.net/live-blog/live-blog-update/uss-theodore-roosevelt-operating-centcom-area","tipo":"noticia"}]},
+  {"market_id":"5339986","side":"NO","accion":"mantener","p_yes":0.92,"p_side":0.08,"motivo":"Vencio el 15/11 sin ataque israeli confirmado; pendiente de resolucion formal.","fuentes":[]},
+  {"market_id":"6831494","side":"SI","accion":"mantener","p_yes":0.50,"p_side":0.50,"motivo":"Sin ataques de EE.UU. a Iran confirmados; el arribo de un tercer portaaviones el 15/11 y los drones irani sobre Bahrein suben algo la tension. Pendiente de resolucion.","fuentes":[{"url":"https://www.aljazeera.com/news/2026/11/16/uss-roosevelt-arrives-in-middle-east-is-the-us-iran-war-about-to-resume","tipo":"noticia"}]},
+  {"market_id":"5401165","side":"SI","accion":"mantener","p_yes":0.08,"p_side":0.08,"motivo":"Vencio sin ataques pakistanies reportados; pendiente de resolucion.","fuentes":[]}
+]
