@@ -1,0 +1,287 @@
+[
+ {
+  "market_id": "3580932",
+  "p_yes": 0.38,
+  "confidence": "medium",
+  "reasoning": "Las encuestas de noviembre dan ventaja a Shen (DPP): 47,7-42,7 (TIA, 17/11) y 46,3-42,2 (Brain Trust, 16/11), aunque mas ajustadas que las de fines de octubre (+17).",
+  "key_uncertainties": [
+   "encuestadoras cercanas al DPP",
+   "participacion"
+  ],
+  "sources": [
+   "https://www.taipeitimes.com/News/taiwan/archives/2026/11/17/2003867903",
+   "https://www.taiwannews.com.tw/news/6476596"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6997774",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Hoy hay 3 casos reportados y ninguno nuevo en medios de primera linea; la presion del Congreso (1/12) y la investigacion pueden sumar otro.",
+  "key_uncertainties": [
+   "regla: solo medios calificados"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "1419324",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Ruiz Velasco ('Tripa', CJNG) tiene cargos en EE.UU. desde el 5/8 y recompensa de 10 millones; no encontre noticias de captura ni operativos recientes.",
+  "key_uncertainties": [
+   "nota: aparecio una cuota de mercado de prediccion alta (46%), se ignoro; puede haber informacion que no encontre",
+   "operativos conjuntos con Mexico"
+  ],
+  "sources": [
+   "https://www.state.gov/ricardo-ruiz-velasco",
+   "https://www.usnews.com/news/world/articles/2026-08-05/us-announces-five-indictments-against-high-ranking-cjng-cartel-leaders"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3580933",
+  "p_yes": 0.6,
+  "confidence": "medium",
+  "reasoning": "Shen lidera las dos encuestas de noviembre por 4-5 puntos, dentro o cerca del margen de error.",
+  "key_uncertainties": [
+   "empate tecnico en Brain Trust"
+  ],
+  "sources": [
+   "https://www.taipeitimes.com/News/taiwan/archives/2026/11/17/2003867903",
+   "https://www.taiwannews.com.tw/news/6476596"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6999515",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Que no aparezca un cuarto caso en medios calificados antes del 31/12; hoy no hay ninguno.",
+  "key_uncertainties": [
+   "regla: exactamente 3"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4487265",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Los hutíes atacan Arabia Saudita con misiles y drones (Riad, aeropuertos del sur), pero no encontre incursiones terrestres en noviembre; las de la frontera son de anos anteriores.",
+  "key_uncertainties": [
+   "regla: cualquier entrada de fuerzas hutíes a territorio saudi",
+   "escalada terrestre en Najran/Jizan"
+  ],
+  "sources": [
+   "https://houseofsaud.com/us-embassy-houthi-warning-saudi-nov14/",
+   "https://www.ksat.com/news/world/2026/11/16/houthis-accuse-saudi-arabia-of-strikes-that-killed-3-including-a-child-and-other-mideast-news/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6947942",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "Segun Zelenskyy, Rusia rechazo la tregua energetica en Abu Dabi (11/11); quedan 2 semanas.",
+  "key_uncertainties": [
+   "regla: acuerdo mutuo"
+  ],
+  "sources": [
+   "https://report.az/en/region/zelenskyy-russia-rejects-energy-ceasefire-proposal"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6588820",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "El WTI cayo a ~85 USD el 16/11 (-4%) por recuperacion de exportaciones del Golfo; 100 en noviembre requiere +17%.",
+  "key_uncertainties": [
+   "un shock en Ormuz"
+  ],
+  "sources": [
+   "https://tradingeconomics.com/commodity/crude-oil",
+   "https://armenpress.am/en/article/1265811"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2698815",
+  "p_yes": 0.4,
+  "confidence": "low",
+  "reasoning": "Waymo tenia 14 ciudades publicas al 1/9; con Washington y Las Vegas anunciadas y otras en preparacion, 16-19 a fin de ano es posible pero no seguro.",
+  "key_uncertainties": [
+   "dato viejo: el ultimo conteo es de septiembre",
+   "regla: regiones cuentan como una ciudad"
+  ],
+  "sources": [
+   "https://electrek.co/2026/09/01/waymo-public-robotaxi-denver-san-diego-tampa/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3708873",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Kostiantynivka sigue disputada (zona gris, tropas mezcladas); Rusia pidio una pausa local y ISW no ve avances el 12-13/11. Un edificio puntual puede quedar sombreado en 6 semanas.",
+  "key_uncertainties": [
+   "regla: basta el edificio sombreado",
+   "no se la ubicacion del edificio respecto del frente"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-13-2026",
+   "https://euromaidanpress.com/2026/11/13/russia-asks-for-a-pause-in-the-donbas-city-of-kostiantynivka-after-more-than-a-year-of-assaults-failed-to-take-it-isw-sees-a-bid-to-mass-troops-for-nearby-druzhkivka/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6172754",
+  "p_yes": 0.25,
+  "confidence": "low",
+  "reasoning": "El WTI cayo a ~85 el 16/11 (-4% en el dia) por la recuperacion de exportaciones del Golfo y excedente de oferta; tocar 80 en un minuto de vela antes de fin de mes requiere -6%.",
+  "key_uncertainties": [
+   "regla: minimo intradiario segun Pyth",
+   "volatilidad por Iran"
+  ],
+  "sources": [
+   "https://tradingeconomics.com/commodity/crude-oil",
+   "https://armenpress.am/en/article/1265811"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2846149",
+  "p_yes": 0.08,
+  "confidence": "low",
+  "reasoning": "El Estado Mayor ucraniano desmintio en octubre la toma de Oleksiievo-Druzhkivka; ISW no reporta avances recientes en ese sector.",
+  "key_uncertainties": [
+   "regla: basta la estacion sombreada",
+   "ofensiva hacia Druzhkivka"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-13-2026",
+   "https://euromaidanpress.com/2026/11/13/russia-asks-for-a-pause-in-the-donbas-city-of-kostiantynivka-after-more-than-a-year-of-assaults-failed-to-take-it-isw-sees-a-bid-to-mass-troops-for-nearby-druzhkivka/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "1796706",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Dato nuevo: la Casa Blanca discute el futuro de Lutnick por el escandalo de chips de Nvidia y crece la presion republicana; pero Trump dice tener 'total confianza', lo lleva a China y Lutnick declarara en el Senado el 10/12.",
+  "key_uncertainties": [
+   "la audiencia del 10/12",
+   "un anuncio de renuncia cuenta aunque sea efectiva despues"
+  ],
+  "sources": [
+   "https://www.scmp.com/news/world/united-states-canada/article/3374266/white-house-discussing-howard-lutnicks-future-commerce-secretary-sources-say",
+   "https://www.semafor.com/article/11/15/2026/under-pressure-lutnick-joins-trump-in-china",
+   "https://washingtonpost.com/politics/2026/11/15/gop-glare-lutnick-grows-amid-nvidia-scandal"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2299962",
+  "p_yes": 0.03,
+  "confidence": "medium",
+  "reasoning": "Anthropic sale a bolsa el 19/11 con un rango que implica ~0,9-1 billon; que el precio de Nasdaq Private Market caiga a 600 mil millones es muy improbable.",
+  "key_uncertainties": [
+   "regla: el NPM puede dejar de publicar tras la salida a bolsa"
+  ],
+  "sources": [
+   "https://www.upi.com/Top_News/US/2026/11/10/anthropic-ipo-stock-range-nasdaq/6651794326745/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5234720",
+  "p_yes": 0.06,
+  "confidence": "low",
+  "reasoning": "Igual que el mercado de fin de ano pero con 2 semanas: Rusia no avanza en Kostiantynivka segun ISW.",
+  "key_uncertainties": [
+   "regla: basta el edificio sombreado"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-13-2026",
+   "https://euromaidanpress.com/2026/11/13/russia-asks-for-a-pause-in-the-donbas-city-of-kostiantynivka-after-more-than-a-year-of-assaults-failed-to-take-it-isw-sees-a-bid-to-mass-troops-for-nearby-druzhkivka/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4743423",
+  "p_yes": 0.08,
+  "confidence": "low",
+  "reasoning": "Arabia Saudita cerro aeropuertos del sur y Riad por ataques hutíes, pero no encontre un cierre general del FIR de Jeddah; la regla exige cierre general de la aviacion comercial.",
+  "key_uncertainties": [
+   "regla: cierre general por NOTAM",
+   "escalada fuerte de Iran o hutíes"
+  ],
+  "sources": [
+   "https://airguide.info/saudi-arabia-closes-najran-and-jazan-airports-after-houthi-attacks/",
+   "https://houseofsaud.com/us-embassy-houthi-warning-saudi-nov14/",
+   "https://www.ksat.com/news/world/2026/11/16/houthis-accuse-saudi-arabia-of-strikes-that-killed-3-including-a-child-and-other-mideast-news/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6976744",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "La renuncia de Huang ya fue anunciada (12/11); falta que Nvidia cierre 2026 debajo de 4 billones. Hoy esta en ~3,76 billones tras caer 30-40% desde octubre; resultados hoy 17/11.",
+  "key_uncertainties": [
+   "los resultados y la guia del 17/11",
+   "busqueda de CEO"
+  ],
+  "sources": [
+   "https://www.fool.com/investing/2026/11/15/nvidia-reports-earnings-on-nov-17-2026-heres-what-investors-should-be-watching/",
+   "https://www.fxempire.com/forecasts/article/nvidia-nvda-earnings-preview-40-stock-crash-can-results-stop-the-slide-1645065"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "916718",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Starship lleva 15 vuelos en total; en 2026 hubo unos 4 (el 14 el 28/9 y el 15 el 13/11) y el 16 apunta a diciembre. Llegar a 9-10 en 2026 es imposible en la practica.",
+  "key_uncertainties": [
+   "conteo exacto de vuelos de 2026"
+  ],
+  "sources": [
+   "https://www.nasaspaceflight.com/2026/10/spacex-flight-15-16-milestones/",
+   "https://en.wikipedia.org/wiki/SpaceX_Starship"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2232194",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "Kramatorsk esta detras de Sloviansk y Druzhkivka; el frente de Sloviansk se estanco y Kostiantynivka sigue sin caer.",
+  "key_uncertainties": [],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-13-2026",
+   "https://euromaidanpress.com/2026/11/13/russia-asks-for-a-pause-in-the-donbas-city-of-kostiantynivka-after-more-than-a-year-of-assaults-failed-to-take-it-isw-sees-a-bid-to-mass-troops-for-nearby-druzhkivka/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3581101",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Taoyuan es gobernada por el KMT; en septiembre una encuesta daba ventaja a Chang (KMT) sobre Huang (DPP). No encontre encuestas de noviembre.",
+  "key_uncertainties": [
+   "dato viejo: ultima encuesta de septiembre",
+   "tendencia nacional a favor del DPP en Taipei"
+  ],
+  "sources": [
+   "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-preview-2-the-big-six-special-municipalities"
+  ],
+  "prompt_version": "v3"
+ }
+]
