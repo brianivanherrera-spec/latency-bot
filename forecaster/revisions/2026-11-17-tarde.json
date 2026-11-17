@@ -1,0 +1,5 @@
+[
+  {"market_id":"5339986","side":"NO","accion":"mantener","p_yes":0.92,"p_side":0.08,"motivo":"Vencio el 15/11 sin ataque israeli confirmado; sigue pendiente de resolucion formal. Sin novedades desde la manana.","fuentes":[]},
+  {"market_id":"6831494","side":"SI","accion":"mantener","p_yes":0.50,"p_side":0.50,"motivo":"Pendiente de resolucion; sin ataques de EE.UU. a Iran confirmados desde el 6/11. Sin novedades desde la manana.","fuentes":[]},
+  {"market_id":"5401165","side":"SI","accion":"mantener","p_yes":0.08,"p_side":0.08,"motivo":"Vencio sin ataques pakistanies reportados; pendiente de resolucion.","fuentes":[]}
+]
