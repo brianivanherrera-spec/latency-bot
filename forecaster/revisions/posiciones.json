@@ -649,5 +649,19 @@
     "nombre": "Hsu Hsin-ying gana el condado de Hsinchu",
     "resuelve": "2026-11-29",
     "compras": 1
+  },
+  {
+    "market_id": "6997774",
+    "side": "NO",
+    "nombre": "Cuarto caso de Jensen Huang reportado antes del 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6999515",
+    "side": "SI",
+    "nombre": "Exactamente 3 casos de Jensen Huang al 31/12",
+    "resuelve": "2027-01-01",
+    "compras": 1
   }
 ]

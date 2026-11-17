@@ -1,0 +1,4 @@
+[
+  {"market_id":"6997774","side":"NO","accion":"descartar","factor":0,"precio_visto":0.52,"categoria":"otro","version":"v3","motivo":"No pasa el filtro B: p del NO 0,70 contra entrada 0,52 (div 0,18 > 0,15). El mercado ve casi 50% de un cuarto caso; puede saber algo que no encontre."},
+  {"market_id":"6999515","side":"SI","accion":"descartar","factor":0,"precio_visto":0.51,"categoria":"otro","version":"v3","motivo":"No pasa el filtro B: p del SI 0,70 contra entrada 0,51 (div 0,19). Es la misma apuesta que 6997774 (que no aparezca un cuarto caso)."}
+]
