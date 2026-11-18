@@ -1,0 +1,20 @@
+[
+ {
+  "market_id": "5339986",
+  "side": "NO",
+  "accion": "mantener",
+  "p_yes": 0.92,
+  "p_side": 0.08,
+  "motivo": "Vencio el 15/11 sin ataque israeli confirmado; pendiente de resolucion formal.",
+  "fuentes": []
+ },
+ {
+  "market_id": "5401165",
+  "side": "SI",
+  "accion": "mantener",
+  "p_yes": 0.08,
+  "p_side": 0.08,
+  "motivo": "Vencio sin ataques pakistanies reportados; pendiente de resolucion.",
+  "fuentes": []
+ }
+]

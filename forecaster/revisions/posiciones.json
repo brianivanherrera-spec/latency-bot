@@ -42,13 +42,6 @@
     "compras": 1
   },
   {
-    "market_id": "634976",
-    "side": "NO",
-    "nombre": "Peltola gana Senado de Alaska",
-    "resuelve": "2026-11-04",
-    "compras": 1
-  },
-  {
     "market_id": "4393420",
     "side": "NO",
     "nombre": "Banco de Canadá sin cambio en diciembre",
@@ -67,13 +60,6 @@
     "side": "SI",
     "nombre": "1 portaaviones en CENTCOM el 30/11",
     "resuelve": "2026-12-01",
-    "compras": 1
-  },
-  {
-    "market_id": "6274257",
-    "side": "NO",
-    "nombre": "Republicanos pierden los 7 escaños (AK, IA, KS, ME, MI, OH, TX)",
-    "resuelve": "2026-11-03",
     "compras": 1
   },
   {
@@ -158,20 +144,6 @@
     "side": "SI",
     "nombre": "Taipei: gana Shen",
     "resuelve": "2026-11-28",
-    "compras": 1
-  },
-  {
-    "market_id": "5971398",
-    "side": "NO",
-    "nombre": "GPT Astra 6.1+ antes del 30/11",
-    "resuelve": "2026-11-30",
-    "compras": 1
-  },
-  {
-    "market_id": "5997213",
-    "side": "NO",
-    "nombre": "GPT Astra 6.1+ antes del 15/12",
-    "resuelve": "2026-12-15",
     "compras": 1
   },
   {
@@ -326,13 +298,6 @@
     "side": "SI",
     "nombre": "PSOE gana más escaños en España (29/11)",
     "resuelve": "2026-11-30",
-    "compras": 1
-  },
-  {
-    "market_id": "6625225",
-    "side": "SI",
-    "nombre": "GPT Astra 6.1+ NO sale antes del 30/11",
-    "resuelve": "2026-12-01",
     "compras": 1
   },
   {
@@ -494,13 +459,6 @@
     "side": "SI",
     "nombre": "Exactamente 1 suba de la Fed en 2026",
     "resuelve": "2026-12-31",
-    "compras": 1
-  },
-  {
-    "market_id": "6831494",
-    "side": "SI",
-    "nombre": "Alto el fuego efectivo EE.UU.-Irán (14 días) antes del 15/11",
-    "resuelve": "2026-11-15",
     "compras": 1
   },
   {

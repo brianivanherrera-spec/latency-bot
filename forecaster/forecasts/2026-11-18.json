@@ -1,0 +1,274 @@
+[
+ {
+  "market_id": "6831495",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "EE.UU. ataco un sitio de misiles en Qeshm el 17/11 ('autodefensa') y viene atacando cada 4-5 dias (2, 6-7, 17/11); Iran respondio con drones a Kuwait y Bahrein el 18/11. Para que resuelva Si no puede haber otro ataque que corte el periodo que arranca a mas tardar el 22/11.",
+  "key_uncertainties": [
+   "regla: el periodo de 14 dias puede completarse despues del 22/11 si empieza antes",
+   "ataques 'defensivos' para proteger buques"
+  ],
+  "sources": [
+   "https://www.cnn.com/2026/11/17/politics/us-iran-self-defense-strikes"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6997774",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Sigue sin un cuarto caso en medios calificados; la citacion del Congreso (1/12) puede sumar informacion.",
+  "key_uncertainties": [
+   "regla: solo medios calificados"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "1419326",
+  "p_yes": 0.06,
+  "confidence": "medium",
+  "reasoning": "Mendoza Gaytan (CJNG, ahijado de El Mencho) tiene recompensa de 15 millones y cargos en EE.UU.; no encontre noticias de captura.",
+  "key_uncertainties": [
+   "operativos conjuntos con Mexico"
+  ],
+  "sources": [
+   "https://www.state.gov/gonzalo-mendoza-gaytan"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6999655",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "La Casa Blanca discute el futuro de Lutnick por el escandalo de Nvidia, pero Trump lo respalda y lo llevo a China; su audiencia en el Senado es el 10/12, despues del plazo.",
+  "key_uncertainties": [
+   "un anuncio de salida antes de la audiencia"
+  ],
+  "sources": [
+   "https://www.scmp.com/news/world/united-states-canada/article/3374266/white-house-discussing-howard-lutnicks-future-commerce-secretary-sources-say",
+   "https://www.semafor.com/article/11/15/2026/under-pressure-lutnick-joins-trump-in-china"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6999515",
+  "p_yes": 0.7,
+  "confidence": "low",
+  "reasoning": "Que no aparezca un cuarto caso en medios calificados antes del 31/12.",
+  "key_uncertainties": [
+   "regla: exactamente 3"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jensen_Huang_extramarital_affair"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6403111",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "En noviembre hubo lanzamientos el 3-4/11 (posiblemente un solo dia en hora de Pyongyang); no encontre otros. Exactamente 2 dias requiere otro lanzamiento en las 2 semanas restantes y que el 3/4 cuente como uno.",
+  "key_uncertainties": [
+   "regla: cuenta dias calendario en hora de Pyongyang",
+   "Corea del Norte lanzo 4 veces en un mes"
+  ],
+  "sources": [
+   "https://www.japantimes.co.jp/news/2026/11/04/asia-pacific/north-korea-missile-test-november-4/",
+   "https://www.usnews.com/news/world/articles/2026-11-03/north-korea-fires-unidentified-projectile-toward-sea-off-its-east-coast-seoul-says"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5784291",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "El cargo esta vacante desde que Zacharia salio a mediados de octubre; Trump ofrecio el puesto a Dana White el 7/11 sin confirmacion. Un anuncio antes de fin de ano es probable pero no seguro.",
+  "key_uncertainties": [
+   "regla: anuncio de un reemplazo de Zacharia",
+   "que White acepte o se nombre a Anna Kelly"
+  ],
+  "sources": [
+   "https://www.nbcnews.com/politics/2026-election/live-blog/rump-taps-stephen-miller-chief-staff-wiles-cabinet-midterm-elections-rcna607914",
+   "https://hollywoodlife.com/feature/who-will-replace-katie-zacharia-white-house-press-secretary-5566539/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6910695",
+  "p_yes": 0.2,
+  "confidence": "low",
+  "reasoning": "El WTI cayo a ~85 USD el 16/11 por recuperacion de exportaciones del Golfo; tocar 90 requiere +6% en ~9 sesiones, aunque el ataque de EE.UU. del 17/11 suma riesgo.",
+  "key_uncertainties": [
+   "escalada con Iran"
+  ],
+  "sources": [
+   "https://tradingeconomics.com/commodity/crude-oil"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "2318183",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Segun ISW (mayo, dato viejo), Rusia controla el este y centro de Chasiv Yar y Ucrania el oeste; no encontre un reporte actual. Tomar todo el pueblo en 6 semanas es posible pero lento.",
+  "key_uncertainties": [
+   "dato viejo: ultimo dato de mayo",
+   "regla: tiene que estar sombreado entero"
+  ],
+  "sources": [
+   "https://www.forbes.com/sites/vikrammittal/2026/05/02/the-battle-for-chasiv-yar-how-drones-reshaped-urban-combat/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6831496",
+  "p_yes": 0.38,
+  "confidence": "low",
+  "reasoning": "Mismo mercado con plazo al 30/11: un periodo de 14 dias sin ataques de EE.UU. que empiece antes del 30/11. Con ataques cada 4-5 dias, es menos probable que no.",
+  "key_uncertainties": [
+   "ataques defensivos frecuentes"
+  ],
+  "sources": [
+   "https://www.cnn.com/2026/11/17/politics/us-iran-self-defense-strikes"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "3392727",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "SpaceX vale ~1,9 billones y es la sexta empresa del mundo; Apple (~5,2), Microsoft (~3,9), Nvidia (~3,8) y Alphabet (~3,6) estan muy arriba.",
+  "key_uncertainties": [],
+  "sources": [
+   "https://companiesmarketcap.com/spacex/marketcap/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4425383",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Haaland es una figura global del futbol y hubo Mundial en 2026, pero la lista de personas suele premiar picos de noticias; no encontre un pico especifico.",
+  "key_uncertainties": [
+   "exposicion en el Mundial 2026"
+  ],
+  "sources": [],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5238401",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Hoy hay 3 portaaviones en CENTCOM (llego el Roosevelt el 15/11); para quedar en 2 el 30/11 tiene que irse el George Washington antes, algo esperado pero sin fecha.",
+  "key_uncertainties": [
+   "cuando sale el George Washington",
+   "refuerzo por el ataque del 17/11"
+  ],
+  "sources": [
+   "https://www.thenationalnews.com/news/us/2026/11/16/uss-theodore-roosevelt-middle-east-centcom/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "5622719",
+  "p_yes": 0.22,
+  "confidence": "low",
+  "reasoning": "La participacion fue 66,6% en 2023 y 66,2% en noviembre de 2019; solo abril de 2019 supero 70% (75,8%). Una eleccion polarizada podria subirla pero noviembre la suele bajar.",
+  "key_uncertainties": [
+   "movilizacion por la polarizacion",
+   "regla: dato oficial"
+  ],
+  "sources": [],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6685525",
+  "p_yes": 0.04,
+  "confidence": "medium",
+  "reasoning": "WTI en ~85 USD; 95 en noviembre requiere +12% en ~9 sesiones.",
+  "key_uncertainties": [
+   "escalada fuerte con Iran"
+  ],
+  "sources": [
+   "https://tradingeconomics.com/commodity/crude-oil"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4425386",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Bad Bunny fue figura global en 2026 (show del Super Bowl en febrero y gira mundial); candidato fuerte al top 5 global de personas, aunque compite con noticias de todo el ano.",
+  "key_uncertainties": [
+   "la lista global pesa noticias, no solo popularidad"
+  ],
+  "sources": [],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6977084",
+  "p_yes": 0.04,
+  "confidence": "medium",
+  "reasoning": "Huang esta citado a una entrevista cerrada del Congreso (1/12) y hay preguntas de inteligencia sobre Alice Huang, pero no hay acusaciones penales ni investigacion criminal confirmada.",
+  "key_uncertainties": [
+   "una investigacion de espionaje"
+  ],
+  "sources": [
+   "https://www.cnn.com/2026/11/10/china/nvidia-china-spy-scandal-hnk-intl"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6172735",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "La plata cayo a ~45,6 USD el 18/11 (minimo del ano); 54 en noviembre requiere +18%.",
+  "key_uncertainties": [],
+  "sources": [
+   "https://www.fxstreet.com/news/silver-price-forecast-xag-usd-hits-fresh-yearly-low-near-4560-as-us-dollar-extends-rally-202611180832"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "666593",
+  "p_yes": 0.12,
+  "confidence": "low",
+  "reasoning": "Trump dijo que 'podria' ver a Kim en China si Xi lo arregla, pero Corea del Norte no es parte de APEC, Kim no confirmo y funcionarios de EE.UU. dicen que no hay planes; los analistas lo ven improbable.",
+  "key_uncertainties": [
+   "un encuentro sorpresa en Shenzhen junto a Putin"
+  ],
+  "sources": [
+   "https://www.koreatimes.co.kr/amp/foreignaffairs/20261117/trump-floats-kim-summit-in-china-but-experts-see-no-signs-of-preparation",
+   "https://www.detroitnews.com/story/news/world/2026/11/17/trump-kim-meeting-on-apec-sidelines-appears-more-likely-analysts-say/92827194007/"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "6172740",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "La plata cayo a ~45,6 USD el 18/11 (-3% en el dia) con el dolar fuerte y apuestas a subas de la Fed; tocar 44 requiere -3,5% en ~9 sesiones.",
+  "key_uncertainties": [
+   "regla: minimo de 1 minuto",
+   "rebote tecnico"
+  ],
+  "sources": [
+   "https://www.fxstreet.com/news/silver-price-forecast-xag-usd-hits-fresh-yearly-low-near-4560-as-us-dollar-extends-rally-202611180832"
+  ],
+  "prompt_version": "v3"
+ },
+ {
+  "market_id": "4425440",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "The Odyssey (Nolan, julio 2026) fue uno de los grandes estrenos del ano; candidato natural al top 5 global de peliculas, aunque compite con Obsession y otros.",
+  "key_uncertainties": [
+   "la lista global y estrenos de fin de ano"
+  ],
+  "sources": [],
+  "prompt_version": "v3"
+ }
+]
