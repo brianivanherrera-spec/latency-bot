@@ -147,13 +147,6 @@
     "compras": 1
   },
   {
-    "market_id": "5339986",
-    "side": "NO",
-    "nombre": "Alto el fuego Israel-Irán hasta el 15/11",
-    "resuelve": "2026-11-15",
-    "compras": 1
-  },
-  {
     "market_id": "1107878",
     "side": "SI",
     "nombre": "EE.UU. invade Cuba en 2026",
@@ -364,13 +357,6 @@
     "compras": 1
   },
   {
-    "market_id": "2364961",
-    "side": "SI",
-    "nombre": "Trump y Putin no se reúnen antes del 31/12",
-    "resuelve": "2027-01-01",
-    "compras": 1
-  },
-  {
     "market_id": "3581102",
     "side": "SI",
     "nombre": "Huang Shih-chieh gana Taoyuan",
@@ -557,13 +543,6 @@
     "side": "SI",
     "nombre": "Bab el-Mandeb promedio 7 dias 20-24 el 30/11",
     "resuelve": "2026-12-01",
-    "compras": 1
-  },
-  {
-    "market_id": "2364962",
-    "side": "NO",
-    "nombre": "Proxima reunion Trump-Putin en China",
-    "resuelve": "2027-01-01",
     "compras": 1
   },
   {
