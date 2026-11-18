@@ -1,0 +1,6 @@
+[
+  {"market_id":"6999655","side":"SI","accion":"descartar","factor":0,"precio_visto":0.06,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: entrada 0,06 < 0,30."},
+  {"market_id":"2318183","side":"NO","accion":"descartar","factor":0,"precio_visto":0.57,"categoria":"mundo","version":"v3","motivo":"No pasa el filtro B: p del NO 0,85 contra entrada 0,57 (div 0,28). Mi dato de Chasiv Yar es de mayo; el mercado ve mas avance ruso."},
+  {"market_id":"5622719","side":"NO","accion":"confirmar","factor":1,"precio_visto":0.65,"categoria":"politica","version":"v3","motivo":"Pasa el filtro B: entrada 0,65 y p del NO 0,78 (div 0,13). Participacion historica ~66% en 2019 y 2023; precio dentro de 0,30-0,70 aunque faltan 12 dias."},
+  {"market_id":"6172740","side":"NO","accion":"descartar","factor":0,"precio_visto":0.39,"categoria":"economia","version":"v3","motivo":"No pasa el filtro B por poco: p del NO 0,55 contra entrada 0,39 (div 0,16 > 0,15)."}
+]
