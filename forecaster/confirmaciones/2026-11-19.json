@@ -1,0 +1,6 @@
+[
+  {"market_id":"3581626","side":"NO","accion":"descartar","factor":0,"precio_visto":0.12,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: entrada 0,12 < 0,30."},
+  {"market_id":"6029656","side":"NO","accion":"confirmar","factor":1,"precio_visto":0.68,"categoria":"politica","version":"v3","motivo":"Pasa el filtro B: entrada 0,68 y p del NO 0,77 (div 0,09). Agregados provinciales dan PP 2, PSOE 1, Vox 1 en Caceres; evento distinto al de participacion ya tomado en C."},
+  {"market_id":"6617895","side":"NO","accion":"confirmar","factor":1,"precio_visto":0.71,"categoria":"politica","version":"v3","motivo":"Pasa el filtro B: entrada 0,71 y p del NO 0,80 (div 0,09). El DPP necesita ganar Taipei y Nuevo Taipei a la vez; encuestas contradictorias en Nuevo Taipei. Evento distinto al de Hsinchu condado."},
+  {"market_id":"6977205","side":"SI","accion":"descartar","factor":0,"precio_visto":0.15,"categoria":"empresas","version":"v3","motivo":"No pasa el filtro B: entrada 0,15 < 0,30."}
+]
