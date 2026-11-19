@@ -1,0 +1,5 @@
+[
+  {"market_id":"5401165","side":"SI","accion":"mantener","p_yes":0.08,"p_side":0.08,"motivo":"Vencio el 15/11 sin ataques pakistanies a Afganistan reportados (revisado el 18/11); pendiente de resolucion formal.","fuentes":[]},
+  {"market_id":"682708","side":"NO","accion":"mantener","p_yes":0.1,"p_side":0.9,"motivo":"Fecha de resolucion pasada; sigue abierto a la espera de la resolucion formal, sin novedades que cambien el lado.","fuentes":[]},
+  {"market_id":"5219279","side":"NO","accion":"mantener","p_yes":0.5,"p_side":0.5,"motivo":"Pendiente del dato de Eurostat de fin de octubre; sin publicacion nueva que permita revisar.","fuentes":[]}
+]

@@ -154,13 +154,6 @@
     "compras": 1
   },
   {
-    "market_id": "4319439",
-    "side": "NO",
-    "nombre": "Salida a bolsa de Anthropic antes del 30/11",
-    "resuelve": "2026-11-30",
-    "compras": 1
-  },
-  {
     "market_id": "1105744",
     "side": "NO",
     "nombre": "Maduro líder de Venezuela a fin de 2026",
@@ -543,13 +536,6 @@
     "side": "SI",
     "nombre": "Bab el-Mandeb promedio 7 dias 20-24 el 30/11",
     "resuelve": "2026-12-01",
-    "compras": 1
-  },
-  {
-    "market_id": "6015290",
-    "side": "NO",
-    "nombre": "Otra falla critica de PHP en 2026",
-    "resuelve": "2027-01-01",
     "compras": 1
   },
   {
