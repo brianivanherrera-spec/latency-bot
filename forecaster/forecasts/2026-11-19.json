@@ -1,0 +1,309 @@
+[
+  {
+    "market_id": "1321561",
+    "p_yes": 0.9,
+    "confidence": "high",
+    "reasoning": "SpaceX cerro su primer dia (12/6) en US$160,95, ~US$2,1 billones. Anthropic fijo US$83 (US$1,08-1,5 billones segun conteo de acciones); necesitaria subir 40-90% en el debut del 19/11 para superarlo.",
+    "key_uncertainties": [
+      "salto del primer dia de Anthropic",
+      "metodologia de capitalizacion (acciones en circulacion vs diluidas)",
+      "nota: aparecio una cuota de mercado de prediccion en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/18/investing/anthropic-ipo-price-stock",
+      "https://www.stocktitan.net/articles/anthropic-ipo-live-ant-first-trading-day-2026",
+      "https://www.cnbc.com/2026/06/12/spacex-ipo-spcx-live-updates.html"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "2299955",
+    "p_yes": 0.15,
+    "confidence": "low",
+    "reasoning": "A US$83 la valuacion totalmente diluida ronda US$1,5 billones; US$1,75 billones exige ~+17% sobre ese nivel. Incierto como reporta NPM tras la salida a bolsa.",
+    "key_uncertainties": [
+      "si NPM sigue publicando precio despues de la OPI",
+      "base de acciones usada por NPM",
+      "nota: aparecio una cuota de mercado de prediccion en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/18/investing/anthropic-ipo-price-stock",
+      "https://www.stocktitan.net/articles/anthropic-ipo-live-ant-first-trading-day-2026"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "2299956",
+    "p_yes": 0.4,
+    "confidence": "low",
+    "reasoning": "La OPI a US$83 implica ~US$1,49-1,50 billones totalmente diluido, justo en el umbral; depende de la medicion NPM y del primer precio reportado.",
+    "key_uncertainties": [
+      "si NPM reporto un precio pre-OPI o post-OPI que cruce el umbral",
+      "diluido vs en circulacion",
+      "nota: aparecio una cuota de mercado de prediccion en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/18/investing/anthropic-ipo-price-stock",
+      "https://www.stocktitan.net/articles/anthropic-ipo-live-ant-first-trading-day-2026"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "2747387",
+    "p_yes": 0.04,
+    "confidence": "high",
+    "reasoning": "Hay escalada externa con EE.UU. y operaciones contra celulas separatistas, pero ningun reporte de fracturas en la cupula o la Guardia Revolucionaria que sugiera un golpe.",
+    "key_uncertainties": [
+      "que cuenta como 'intento de golpe' ampliamente reportado"
+    ],
+    "sources": [
+      "https://www.aljazeera.com/news/2026/11/18/status-quo-between-us-and-iran-could-break-out-into-war-analysts-warn",
+      "https://www.newsbeep.com/815590/"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "3222415",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "El oro cayo a ~US$3.720 el 19/11 (minimo desde sep-2025, -9,5% en un mes) por dolar fuerte y expectativas de suba de la Fed. Tocar US$3.500 en liquidacion requiere ~-6% en 6 semanas.",
+    "key_uncertainties": [
+      "reaccion a la Fed de diciembre",
+      "rebote tecnico tras caida fuerte"
+    ],
+    "sources": [
+      "https://www.mitrade.com/insights/commodity-analysis/gold/gold-breaks-14-low-hawkish-fed-minutes",
+      "https://tradingeconomics.com/commodity/gold"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "3581419",
+    "p_yes": 0.88,
+    "confidence": "medium",
+    "reasoning": "Tainan es bastion del DPP; Chen Ting-fei le gano a Hsieh Lung-chieh en cinco contiendas previas. No encontre encuestas.",
+    "key_uncertainties": [
+      "sin encuestas publicas",
+      "voto de castigo al gobierno central"
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Taiwanese_local_elections",
+      "https://www.taipeitimes.com/News/taiwan/archives/2026/11/17/2003867880"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "3581626",
+    "p_yes": 0.6,
+    "confidence": "low",
+    "reasoning": "Kao (independiente, sin rival KMT) lideraba con amplitud en sep-oct, pero un sondeo del 16/11 la da 22,7% vs 21,8% del DPP Chuang con 35,6% indecisos.",
+    "key_uncertainties": [
+      "alto porcentaje de indecisos",
+      "antecedentes judiciales de Kao",
+      "nota: aparecio una cuota de mercado de prediccion en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://www.kharistempleman.com/blog/taiwan-2026-local-elections-preview-3-north-and-central-taiwan",
+      "https://en.wikipedia.org/wiki/2026_Taiwanese_local_elections"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "4425380",
+    "p_yes": 0.2,
+    "confidence": "low",
+    "reasoning": "Clancy aparecio 7a en un ranking mensual de busquedas (septiembre); la lista global de Google mide picos de tendencia y suele dominarse por figuras de alcance mundial.",
+    "key_uncertainties": [
+      "metodologia de 'tendencias' de Google",
+      "interes concentrado en EE.UU."
+    ],
+    "sources": [
+      "https://ahrefs.com/blog/most-searched-people/",
+      "https://x.com/StatiSense/status/2107122414718943389"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "4425404",
+    "p_yes": 0.35,
+    "confidence": "low",
+    "reasoning": "La captura de Maduro en enero genero un pico global de busquedas; la lista de Google premia picos interanuales, pero compite con deportistas y figuras virales.",
+    "key_uncertainties": [
+      "sin datos de volumen para Maduro",
+      "lista global vs EE.UU."
+    ],
+    "sources": [
+      "https://ahrefs.com/blog/most-searched-people/",
+      "https://x.com/StatiSense/status/2107122414718943389"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "4570123",
+    "p_yes": 0.05,
+    "confidence": "medium",
+    "reasoning": "Las listas 'Year in Search' miden busquedas en tendencia (crecimiento), lo que suele excluir figuras de busqueda constante como Trump.",
+    "key_uncertainties": [
+      "metodologia de Google",
+      "nota: aparecio una cuota de mercado de prediccion en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://ahrefs.com/blog/most-searched-people/",
+      "https://x.com/StatiSense/status/2107122414718943389"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6027293",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "La media de encuestas da a ERC ~10 escanos (horquilla 7-14); algunas casas le dan 8-9.",
+    "key_uncertainties": [
+      "dispersion entre encuestadoras"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://democrata.es/encuestas/elecciones-generales/tracking-encuesta-29n-hoy-40db-19-noviembre-2026"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6027370",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "Las encuestas ubican a Vox entre 17,2% (40dB) y 20,4% (Data10), mediana ~18,9%.",
+    "key_uncertainties": [
+      "sesgo de encuestas a Vox",
+      "limites del rango"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://democrata.es/encuestas/elecciones-generales/tracking-encuesta-29n-hoy-40db-19-noviembre-2026"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6027373",
+    "p_yes": 0.42,
+    "confidence": "low",
+    "reasoning": "La mediana de encuestas (18,9%) y el modelo central (18,5%) caen dentro del rango 18-20%.",
+    "key_uncertainties": [
+      "dispersion 17-20%",
+      "limites del rango"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://democrata.es/encuestas/elecciones-generales/tracking-encuesta-29n-hoy-40db-19-noviembre-2026"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6029653",
+    "p_yes": 0.75,
+    "confidence": "medium",
+    "reasoning": "Los agregados dan en Caceres PP 2, PSOE 1, Vox 1; si fuera 2-2 desempata por votos y el PP aventaja al PSOE ~4 puntos a nivel nacional. En 2023 el PSOE gano por 0,9 puntos.",
+    "key_uncertainties": [
+      "un modelo da 2-2 sin Vox",
+      "pocos sondeos provinciales"
+    ],
+    "sources": [
+      "https://elvotoutil.org/provincia/caceres/",
+      "https://vote-scope.com/en/spain/",
+      "https://generales2026.es/"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6029656",
+    "p_yes": 0.23,
+    "confidence": "medium",
+    "reasoning": "Complementario del PP en Caceres: los agregados dan PSOE 1 escano frente a 2 del PP.",
+    "key_uncertainties": [
+      "un modelo da 2-2",
+      "desempate por votos"
+    ],
+    "sources": [
+      "https://elvotoutil.org/provincia/caceres/",
+      "https://vote-scope.com/en/spain/",
+      "https://generales2026.es/"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6172754",
+    "p_yes": 0.4,
+    "confidence": "low",
+    "reasoning": "El WTI cayo 3,2% el 18/11 a ~US$83 por suba de inventarios; tocar US$80 en una vela de 1 minuto antes de fin de mes exige ~-3,5% en ~8 sesiones, con riesgo geopolitico por ataques EE.UU.-Iran al alza.",
+    "key_uncertainties": [
+      "escalada EE.UU.-Iran",
+      "datos de inventarios"
+    ],
+    "sources": [
+      "https://www.5paisa.com/blog/crude-oil-price-today-19-november-2026",
+      "https://univest.in/blogs/crude-oil-price-today-brent-92-wti-82"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6436446",
+    "p_yes": 0.25,
+    "confidence": "low",
+    "reasoning": "NVDA cerro en US$150,96 el 18/11 (-13% en la semana) pese a buenos resultados; superar US$160 al cierre de noviembre requiere ~+6% en 7 ruedas.",
+    "key_uncertainties": [
+      "anuncio de nuevo CEO",
+      "rebote tras caida"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/11/18/nvidia-stock-earnings.html",
+      "https://www.techtimes.com/articles/331079/20261119/nvidia-stock-slides-after-earnings-extra-week-makes-130b-guidance-4-growth-not-12.htm"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6617895",
+    "p_yes": 0.2,
+    "confidence": "low",
+    "reasoning": "En Taipei Shen (DPP) lidera algunas encuestas (46-42) pero Chiang es el incumbente en un distrito historicamente KMT; en Nuevo Taipei las encuestas se contradicen (Su +8 vs Lee levemente arriba). Requiere ganar ambas.",
+    "key_uncertainties": [
+      "confiabilidad de encuestas",
+      "correlacion entre ambas contiendas"
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Taiwanese_local_elections",
+      "https://www.taipeitimes.com/News/taiwan/archives/2026/11/17/2003867880",
+      "https://world.storm.mg/articles/1181364"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6977205",
+    "p_yes": 0.25,
+    "confidence": "low",
+    "reasoning": "Kress es interina; el directorio busca candidatos internos y externos y confirmo que Huang no vuelve. Busquedas de CEO en empresas de este tamano suelen llevar meses, aunque hay presion del mercado.",
+    "key_uncertainties": [
+      "presion de inversores por rapidez",
+      "candidato interno rapido"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/11/18/nvidia-stock-earnings.html",
+      "https://www.techtimes.com/articles/331079/20261119/nvidia-stock-slides-after-earnings-extra-week-makes-130b-guidance-4-growth-not-12.htm",
+      "https://www.indmoney.com/blog/us-stocks/nvidia-stock-q3-earnings-analysis-nvda"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6989178",
+    "p_yes": 0.25,
+    "confidence": "low",
+    "reasoning": "NYT y Reuters reportaron otras relaciones (incluida una ejecutiva de Nvidia), pero Huang no las admitio; podria hacerlo ante la investigacion o al testificar en el Congreso.",
+    "key_uncertainties": [
+      "testimonio ante el Congreso",
+      "que cuenta como admision publica"
+    ],
+    "sources": [
+      "https://techcrunch.com/2026/11/11/jensen-huang-accused-of-having-another-affair-with-a-nvidia-exec/",
+      "https://www.euronews.com/2026/11/12/nvidia-board-weighs-jensen-huangs-future-as-reports-emerge-of-second-affair"
+    ],
+    "prompt_version": "v3"
+  }
+]
