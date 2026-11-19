@@ -1,0 +1,31 @@
+{
+  "semana": "2026-11-13/2026-11-19",
+  "resueltas": 15,
+  "ganadas": 1,
+  "perdidas": 14,
+  "pnl_semana_A": -131.91,
+  "por_causa": {
+    "mala_suerte": {"n": 9, "ids": ["5430611","5238398","2364962","5339986","6274257","634976","4319439","5238395","6015290"], "nota": "En 8 de las 9 el pronostico favorecia el resultado que ocurrio, pero A compro el lado contrario porque el mercado era aun mas extremo (apuesta de valor contra el propio favorito)."},
+    "el_mercado_sabia_algo": {"n": 5, "ids": ["5971398","5997213","6625225","6831494","2364961"], "nota": "Lanzamiento de GPT Astra 6.1 (3 mercados, hoy excluidos por el paso 0), ataque de EE.UU. a Iran el 17/11 y reunion Trump-Putin en Shenzhen."},
+    "regla_mal_leida": {"n": 0},
+    "dato_viejo": {"n": 0},
+    "signo_mal_cargado": {"n": 0}
+  },
+  "por_categoria": {
+    "militar_geopolitica": {"n": 5, "ganadas": 1, "pnl": -30.00},
+    "politica": {"n": 4, "ganadas": 0, "pnl": -40.00},
+    "tecnologia_ia": {"n": 5, "ganadas": 0, "pnl": -51.57},
+    "empresas": {"n": 1, "ganadas": 0, "pnl": -10.34}
+  },
+  "A": {"pnl_total": -427.45, "realizado": -446.27},
+  "B": {"pnl_total": 24.67, "realizado": -12.72},
+  "C": {"pnl_total": -4.10, "realizado": -20.00},
+  "brier_modelo": 0.1745,
+  "brier_mercado": 0.1199,
+  "n_brier": 187,
+  "lecciones": [
+    "Comprar el lado que el propio pronostico considera menos probable (p_lado < 0,5) perdio 8 de 8 esta semana: el mercado era mas extremo y tenia razon. B y C ya lo evitan con el filtro de entrada >= 0,30 y divergencia <= 0,15.",
+    "Ante confirmaciones oficiales (S-1 enmendado, Casa Blanca confirma reunion, relevo de portaaviones anunciado) el pronostico quedo demasiado cerca de 0,5-0,8; deberia ir a 0,9+.",
+    "En politica y conflictos, la noticia de la ultima semana decide (Astra, Trump-Putin, ataques a Iran): hace falta un control explicito de noticias recientes antes de cerrar p."
+  ]
+}
