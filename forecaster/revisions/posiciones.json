@@ -635,5 +635,33 @@
     "nombre": "Nvidia nombra nuevo CEO antes del 31/12",
     "resuelve": "2027-01-01",
     "compras": 1
+  },
+  {
+    "market_id": "3072311",
+    "side": "NO",
+    "nombre": "Claude llega a 70% en Humanity's Last Exam en 2026",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "3222415",
+    "side": "NO",
+    "nombre": "Oro (GC) toca US$3.500 antes de fin de diciembre",
+    "resuelve": "2026-12-31",
+    "compras": 1
+  },
+  {
+    "market_id": "4867871",
+    "side": "SI",
+    "nombre": "Próxima reunión senior EE.UU.-Irán en Qatar",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6941724",
+    "side": "NO",
+    "nombre": "NVDA toca US$128 en noviembre",
+    "resuelve": "2026-12-01",
+    "compras": 1
   }
 ]

@@ -1,0 +1,6 @@
+[
+  {"market_id":"3072311","side":"NO","accion":"reducir","factor":0.5,"precio_visto":0.75,"categoria":"tecnologia","version":"v3","motivo":"Pasa el filtro B: entrada 0,75 y p del NO 0,85 (div 0,10). Reduzco a la mitad: Anthropic reporta 74,2% para Fable 5.2 y el leaderboard oficial podria incorporarlo antes del 31/12."},
+  {"market_id":"3222415","side":"NO","accion":"descartar","factor":0,"precio_visto":0.341,"categoria":"materias_primas","version":"v3","motivo":"No pasa el filtro B por poco: p del NO 0,50 contra entrada 0,341 (div 0,159 > 0,15)."},
+  {"market_id":"4867871","side":"SI","accion":"descartar","factor":0,"precio_visto":0.082,"categoria":"geopolitica","version":"v3","motivo":"No pasa el filtro B: entrada 0,082 < 0,30."},
+  {"market_id":"6941724","side":"NO","accion":"descartar","factor":0,"precio_visto":0.776,"categoria":"mercados","version":"v3","motivo":"No pasa el filtro B por poco: p del NO 0,93 contra entrada 0,776 (div 0,154 > 0,15)."}
+]
