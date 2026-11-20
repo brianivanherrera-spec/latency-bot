@@ -1,0 +1,294 @@
+[
+  {
+    "market_id": "2299954",
+    "p_yes": 0.07,
+    "confidence": "medium",
+    "reasoning": "Tras la OPI la regla usa el maximo precio regular x acciones en circulacion (13,22 mil millones): el maximo del 19/11 (US$115,10) da ~US$1,52 billones. US$2,0 billones exige ~US$151 (+55% sobre el cierre de US$97).",
+    "key_uncertainties": [
+      "NPM pre-OPI no publicado",
+      "volatilidad post-OPI",
+      "nota: aparecio una cuota de mercado de prediccion en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/11/19/anthropic-ipo-ant-live-updates.html",
+      "https://cryptoticker.io/en/anthropic-market-cap-first-day-close-ant-stock/"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "2299955",
+    "p_yes": 0.15,
+    "confidence": "medium",
+    "reasoning": "Con acciones en circulacion, US$1,75 billones exige ~US$132 (+36% sobre el cierre de US$97,17; maximo del dia US$115). Las cifras de US$1,76-1,8 billones de la prensa son totalmente diluidas y no cuentan segun la regla.",
+    "key_uncertainties": [
+      "si se usa conteo diluido",
+      "valuacion NPM previa a la OPI"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/11/19/anthropic-ipo-ant-live-updates.html",
+      "https://cryptoticker.io/en/anthropic-market-cap-first-day-close-ant-stock/"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "2668006",
+    "p_yes": 0.07,
+    "confidence": "medium",
+    "reasoning": "No hay acuerdo escrito; Iran no acepta ceder su uranio enriquecido y EE.UU. pide diluirlo o trasladarlo; la secuencia (bloqueo primero vs pasos simultaneos) traba las negociaciones y siguen los ataques.",
+    "key_uncertainties": [
+      "acuerdo marco rapido por mediacion de Qatar"
+    ],
+    "sources": [
+      "https://www.timesofisrael.com/us-iran-talks-show-signs-of-progress-even-as-trump-weighs-renewed-strikes/",
+      "https://www.euronews.com/2026/11/10/qatar-sees-progress-in-us-iran-talks-after-white-house-meeting",
+      "https://www.latintimes.com/iran-qatar-strait-hormuz-reopening-nuclear-talks-601047"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "3072311",
+    "p_yes": 0.15,
+    "confidence": "low",
+    "reasoning": "La regla usa el leaderboard oficial (agi.safe.ai): ahi el mejor Claude figura en 46,5% y el lider en 54,8%. El 74,2% de Fable 5.2 es reportado por Anthropic en agregadores, probablemente con herramientas, y no aparece en el oficial.",
+    "key_uncertainties": [
+      "si el oficial incorpora Fable 5.2 con ese puntaje",
+      "configuracion con herramientas vs sin herramientas"
+    ],
+    "sources": [
+      "https://benchlm.ai/benchmarks/hle",
+      "https://artificialanalysis.ai/evaluations/humanitys-last-exam"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "3222415",
+    "p_yes": 0.5,
+    "confidence": "low",
+    "reasoning": "El oro cayo a ~US$3.600-3.630 (futuros) el 20/11, -2,65% en el dia y en fuerte baja por expectativas de suba de la Fed; tocar US$3.500 en liquidacion requiere ~-3,5% en 6 semanas.",
+    "key_uncertainties": [
+      "rebote tecnico",
+      "decision de la Fed del 9/12"
+    ],
+    "sources": [
+      "https://www.tradingkey.com/analysis/stocks/us-stocks/262314280-us-tightens-ai-chip-rules-nvidia-amd-apec-oil-wti-xau-xag-gold-anthropic-spacex-tradingkey",
+      "https://www.mitrade.com/insights/commodity-analysis/gold/gold-slides-below-3600-fed-pressure"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "3222417",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "Requiere -31% desde ~US$3.620 en 6 semanas; sin precedente reciente.",
+    "key_uncertainties": [
+      "shock extremo de liquidez"
+    ],
+    "sources": [
+      "https://www.tradingkey.com/analysis/stocks/us-stocks/262314280-us-tightens-ai-chip-rules-nvidia-amd-apec-oil-wti-xau-xag-gold-anthropic-spacex-tradingkey",
+      "https://www.mitrade.com/insights/commodity-analysis/gold/gold-slides-below-3600-fed-pressure"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "3581985",
+    "p_yes": 0.2,
+    "confidence": "low",
+    "reasoning": "El DPP nunca gano Taitung; la unica encuesta (mayo) daba Wu (KMT) 51% vs Chen 22% mano a mano. Chen es legisladora y tiene buena relacion con la actual jefa del condado.",
+    "key_uncertainties": [
+      "encuesta vieja y unica",
+      "efecto de la salida de Liu"
+    ],
+    "sources": [
+      "https://www.kharistempleman.com/blog/taiwan-2026-local-elections-preview-4-south-east-and-offshore-islands",
+      "https://focustaiwan.tw/politics/202609075001"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "4570117",
+    "p_yes": 0.15,
+    "confidence": "low",
+    "reasoning": "Haaland aparece como favorito al #1 global segun coberturas; el #2 exacto es una posicion estrecha.",
+    "key_uncertainties": [
+      "metodologia de tendencias de Google",
+      "nota: aparecio una cuota de mercado de prediccion en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://ahrefs.com/blog/most-searched-people/",
+      "https://www.covers.com/entertainment/most-googled-person-prediction-markets"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "4570132",
+    "p_yes": 0.15,
+    "confidence": "low",
+    "reasoning": "Bad Bunny tuvo picos por el show del Super Bowl, pero el #2 exacto compite con varios nombres globales.",
+    "key_uncertainties": [
+      "metodologia de tendencias"
+    ],
+    "sources": [
+      "https://ahrefs.com/blog/most-searched-people/",
+      "https://www.covers.com/entertainment/most-googled-person-prediction-markets"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "4867871",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "Qatar es el mediador activo (reunion con Trump el 10/11, propuestas cruzadas); Iran ofrecio retomar rapido si cesan los ataques. Probabilidad de reunion senior antes del 31/12 ~50%, y de que sea en Qatar ~60%.",
+    "key_uncertainties": [
+      "ataques de EE.UU. que frenen las conversaciones",
+      "Oman o Suiza como sedes alternativas"
+    ],
+    "sources": [
+      "https://www.timesofisrael.com/us-iran-talks-show-signs-of-progress-even-as-trump-weighs-renewed-strikes/",
+      "https://www.euronews.com/2026/11/10/qatar-sees-progress-in-us-iran-talks-after-white-house-meeting",
+      "https://www.latintimes.com/iran-qatar-strait-hormuz-reopening-nuclear-talks-601047"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "5087228",
+    "p_yes": 0.15,
+    "confidence": "low",
+    "reasoning": "Hay progreso reportado y una propuesta de reapertura de Ormuz a cambio de alivio de sanciones, pero sin acuerdo y con disputas de secuencia y nuevos ataques.",
+    "key_uncertainties": [
+      "anuncio sorpresa por mediacion qatari"
+    ],
+    "sources": [
+      "https://www.timesofisrael.com/us-iran-talks-show-signs-of-progress-even-as-trump-weighs-renewed-strikes/",
+      "https://www.euronews.com/2026/11/10/qatar-sees-progress-in-us-iran-talks-after-white-house-meeting",
+      "https://www.latintimes.com/iran-qatar-strait-hormuz-reopening-nuclear-talks-601047"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "5621387",
+    "p_yes": 0.85,
+    "confidence": "medium",
+    "reasoning": "Media de encuestas: PP 127 + Vox 65 = 192; 15 de 17 sondeos con escanos les dan 176 o mas; solo CIS y SW Demoscopia quedan por debajo en parte de su rango.",
+    "key_uncertainties": [
+      "error de encuestas",
+      "movilizacion de la izquierda"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://periodistadigital.com/politica/20261118/dicen-sondeos-11-dias-29-n-pp-vox-super-mayoria-absoluta-190-escanos-noticia-689405268358"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "5636951",
+    "p_yes": 0.12,
+    "confidence": "low",
+    "reasoning": "Los hutíes amenazaron a Pakistan si interviene junto a Arabia Saudita y atacaron Riad el 19/11; Pakistan tiene tropas cerca de la frontera yemeni pero aun no entro en combate.",
+    "key_uncertainties": [
+      "que Pakistan ataque primero",
+      "definicion de 'target'"
+    ],
+    "sources": [
+      "https://tribune.com.pk/story/2641330/pakistan-calls-houthi-attack-on-riyadh-tower-grave-violation-of-saudi-sovereignty",
+      "https://tribune.com.pk/story/2630242/houthis-threaten-decisive-response-if-pakistan-turkiye-intervene-in-yemen"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6030127",
+    "p_yes": 0.7,
+    "confidence": "low",
+    "reasoning": "En 2023 Jaen quedo PP 2, PSOE 2, Vox 1 con el PSOE apenas arriba; el PP sube ~4 puntos a nivel nacional y es fuerte en Andalucia desde 2022.",
+    "key_uncertainties": [
+      "sin encuesta provincial",
+      "desempate por votos"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://periodistadigital.com/politica/20261118/dicen-sondeos-11-dias-29-n-pp-vox-super-mayoria-absoluta-190-escanos-noticia-689405268358"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6910695",
+    "p_yes": 0.07,
+    "confidence": "medium",
+    "reasoning": "WTI en ~US$83 el 20/11; tocar US$90 exige +8% en ~6 sesiones; el riesgo es una escalada con Iran.",
+    "key_uncertainties": [
+      "escalada en Ormuz"
+    ],
+    "sources": [
+      "https://www.tradingkey.com/analysis/stocks/us-stocks/262314280-us-tightens-ai-chip-rules-nvidia-amd-apec-oil-wti-xau-xag-gold-anthropic-spacex-tradingkey",
+      "https://www.mitrade.com/insights/commodity-analysis/gold/gold-slides-below-3600-fed-pressure"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6941724",
+    "p_yes": 0.07,
+    "confidence": "medium",
+    "reasoning": "NVDA en ~US$146 el 20/11 (minimo de 52 semanas); tocar US$128 exige -12% en ~6 sesiones.",
+    "key_uncertainties": [
+      "nuevas restricciones a chips",
+      "noticias del CEO"
+    ],
+    "sources": [
+      "https://www.tradingkey.com/analysis/stocks/us-stocks/262314280-us-tightens-ai-chip-rules-nvidia-amd-apec-oil-wti-xau-xag-gold-anthropic-spacex-tradingkey",
+      "https://www.mitrade.com/insights/commodity-analysis/gold/gold-slides-below-3600-fed-pressure"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6991520",
+    "p_yes": 0.01,
+    "confidence": "high",
+    "reasoning": "Oro en ~US$3.600; US$4.000 exige +11% en 6 sesiones en plena tendencia bajista.",
+    "key_uncertainties": [],
+    "sources": [
+      "https://www.tradingkey.com/analysis/stocks/us-stocks/262314280-us-tightens-ai-chip-rules-nvidia-amd-apec-oil-wti-xau-xag-gold-anthropic-spacex-tradingkey",
+      "https://www.mitrade.com/insights/commodity-analysis/gold/gold-slides-below-3600-fed-pressure"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6991521",
+    "p_yes": 0.01,
+    "confidence": "high",
+    "reasoning": "Plata en ~US$42,5; US$52 exige +22% en 6 sesiones.",
+    "key_uncertainties": [],
+    "sources": [
+      "https://www.tradingkey.com/analysis/stocks/us-stocks/262314280-us-tightens-ai-chip-rules-nvidia-amd-apec-oil-wti-xau-xag-gold-anthropic-spacex-tradingkey",
+      "https://www.mitrade.com/insights/commodity-analysis/gold/gold-slides-below-3600-fed-pressure"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "6992350",
+    "p_yes": 0.35,
+    "confidence": "low",
+    "reasoning": "El escandalo de Huang (renuncia, affairs, presunta espia) genero un pico global en noviembre; la lista global suele dominarse por figuras de tendencia anual, y la ventana de datos de Google cierra a fin de noviembre.",
+    "key_uncertainties": [
+      "corte de datos de Google",
+      "competencia con figuras deportivas y politicas"
+    ],
+    "sources": [
+      "https://ahrefs.com/blog/most-searched-people/",
+      "https://www.covers.com/entertainment/most-googled-person-prediction-markets"
+    ],
+    "prompt_version": "v3"
+  },
+  {
+    "market_id": "7121266",
+    "p_yes": 0.05,
+    "confidence": "medium",
+    "reasoning": "Lula no tuvo un pico global de busquedas comparable en 2026.",
+    "key_uncertainties": [
+      "eventos de fin de ano"
+    ],
+    "sources": [
+      "https://ahrefs.com/blog/most-searched-people/",
+      "https://www.covers.com/entertainment/most-googled-person-prediction-markets"
+    ],
+    "prompt_version": "v3"
+  }
+]

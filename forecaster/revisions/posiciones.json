@@ -119,13 +119,6 @@
     "compras": 1
   },
   {
-    "market_id": "1321564",
-    "side": "NO",
-    "nombre": "Anthropic mayor salida a bolsa de 2026",
-    "resuelve": "2027-01-01",
-    "compras": 1
-  },
-  {
     "market_id": "1105742",
     "side": "SI",
     "nombre": "Delcy Rodríguez líder de Venezuela a fin de 2026",
@@ -599,13 +592,6 @@
     "side": "NO",
     "nombre": "Participacion >=70% en Espana (29/11)",
     "resuelve": "2026-11-30",
-    "compras": 1
-  },
-  {
-    "market_id": "6172740",
-    "side": "NO",
-    "nombre": "Plata toca minimo 44 USD en noviembre",
-    "resuelve": "2026-12-01",
     "compras": 1
   },
   {
