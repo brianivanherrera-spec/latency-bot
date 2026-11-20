@@ -1,0 +1,4 @@
+[
+  {"market_id":"6365377","side":"SI","accion":"mantener","p_yes":0.02,"p_side":0.02,"motivo":"Gemini 4 Carbon fue publico el 10/11 (blog oficial de Google), antes de la ventana 16-22/11; casi seguro resuelve No. Sin cambios desde la manana.","fuentes":[{"url":"https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-carbon-now-available/","tipo":"oficial"}]},
+  {"market_id":"5401165","side":"SI","accion":"mantener","p_yes":0.08,"p_side":0.08,"motivo":"Vencio el 15/11 sin ataques reportados; pendiente de resolucion formal.","fuentes":[]}
+]
