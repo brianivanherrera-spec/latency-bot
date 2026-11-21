@@ -1,0 +1,270 @@
+[
+  {
+    "market_id": "1896800",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "Sin noticias de salud ni de crisis de sucesion del rey de Bahrein en la ultima semana; Bahrein sufre ataques con drones iranies contra bases de EE.UU. (18/11) que no amenazan al regimen.",
+    "key_uncertainties": [
+      "salud del rey"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/02/politics/us-strikes-iran-qeshm-island",
+      "https://en.wikipedia.org/wiki/2026_Iran_war"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "3358975",
+    "p_yes": 0.07,
+    "confidence": "medium",
+    "reasoning": "Nvidia cayo 14% el 20/11 y vale ~US$3,0-3,3 billones (4a empresa, detras de Apple, Microsoft y Alphabet); llegar a US$4,0-4,5 billones al 31/12 exige +25-35% en 6 semanas con investigacion de la SEC en curso.",
+    "key_uncertainties": [
+      "rebote tras anuncio de nuevo CEO",
+      "dato de la SEC no confirmado"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/11/20/nvidias-7-week-losing-streak-is-longest-since-2008-financial-crisis.html",
+      "https://companiesmarketcap.com/nvidia/marketcap/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "3358976",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "Requiere +40-55% desde ~US$3,0-3,3 billones en 6 semanas.",
+    "key_uncertainties": [],
+    "sources": [
+      "https://www.cnbc.com/2026/11/20/nvidias-7-week-losing-streak-is-longest-since-2008-financial-crisis.html",
+      "https://companiesmarketcap.com/nvidia/marketcap/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "4393418",
+    "p_yes": 0.45,
+    "confidence": "low",
+    "reasoning": "Tasa en 2,50% tras la suba del 28/10; IPC de octubre 3,1% y el BoC espera 3,5% a fin de ano, pero tres informes de empleo debiles. Economistas divididos: RBC y KPMG esperan suba; CIBC y Capital Economics, pausa (datos del 16-21/11).",
+    "key_uncertainties": [
+      "dato de empleo de noviembre (5/12)",
+      "nota: aparecio una cuota de mercado de prediccion o de swaps en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://www.fxstreet.com/news/bank-of-canada-december-hike-risk-stays-rbc-202611161615",
+      "https://www.theglobeandmail.com/investing/markets/inside-the-market/article-how-todays-inflation-data-has-moved-markets-and-bets-for-future-boc/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "4418550",
+    "p_yes": 0.01,
+    "confidence": "high",
+    "reasoning": "Ningun laboratorio anuncio una solucion; un problema del milenio resuelto y aceptado en 6 semanas es extremadamente improbable.",
+    "key_uncertainties": [
+      "anuncio no verificado de un laboratorio"
+    ],
+    "sources": [],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "4418553",
+    "p_yes": 0.01,
+    "confidence": "high",
+    "reasoning": "Igual que P vs NP: sin indicios de un anuncio y la conjetura sigue abierta.",
+    "key_uncertainties": [
+      "anuncio no verificado"
+    ],
+    "sources": [],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "5430612",
+    "p_yes": 0.4,
+    "confidence": "low",
+    "reasoning": "Microsoft lanzo el 17/11 Autopilot, agente personal con identidad, memoria y computadora en la nube propia, pero solo para clientes del programa Frontier de Microsoft 365 (empresas); la regla excluye productos vendidos solo a empresas. Paso a la app Copilot de consumo sin fecha de disponibilidad general.",
+    "key_uncertainties": [
+      "si Frontier incluye cuentas personales",
+      "lanzamiento de consumo antes del 31/12"
+    ],
+    "sources": [
+      "https://www.testingcatalog.com/microsoft-launches-autopilot-a-personal-agent-for-copilot/",
+      "https://blogs.microsoft.com/blog/2026/09/25/introducing-the-new-copilot-with-home-code-and-autopilot/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "5622719",
+    "p_yes": 0.2,
+    "confidence": "medium",
+    "reasoning": "La participacion fue 66,2% en nov-2019 y 66,6% en 2023; una eleccion polarizada puede subirla pero 70% seria la mas alta desde 2008.",
+    "key_uncertainties": [
+      "movilizacion por polarizacion"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://www.democrata.es/encuestas/elecciones-generales/encuesta-elecciones-generales-sanchez-mantiene-133-escanos-feijoo-no-alcanza-mayoria-con-vox-segun-sw-demoscopia/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6027264",
+    "p_yes": 0.25,
+    "confidence": "low",
+    "reasoning": "Media de encuestas: PSOE 113 escanos (ultima Data10 del 19/11); casas como DYM o GAD3 lo dan en 101-108 y solo SW Demoscopia (15/11) en 133.",
+    "key_uncertainties": [
+      "error sistematico de encuestas",
+      "voto util de la izquierda"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://www.democrata.es/encuestas/elecciones-generales/encuesta-elecciones-generales-sanchez-mantiene-133-escanos-feijoo-no-alcanza-mayoria-con-vox-segun-sw-demoscopia/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6027373",
+    "p_yes": 0.42,
+    "confidence": "low",
+    "reasoning": "Data10 (19/11) da a Vox 19,4% y la media ~18,9%; 40dB lo daba en 17,2%.",
+    "key_uncertainties": [
+      "dispersion entre encuestadoras",
+      "limites del rango"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://www.democrata.es/encuestas/elecciones-generales/encuesta-elecciones-generales-sanchez-mantiene-133-escanos-feijoo-no-alcanza-mayoria-con-vox-segun-sw-demoscopia/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6364437",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "La financiacion vence el 11/12 y al 18-21/11 no hay acuerdo: democratas divididos por la guerra con Iran y republicanos por el plan de defensa de US$350 mil millones; Cole dice que no hay tiempo para leyes anuales, lo que favorece otra prorroga.",
+    "key_uncertainties": [
+      "prorroga de ultimo momento"
+    ],
+    "sources": [
+      "https://www.latintimes.com/us-government-shutdown-risk-december-funding-deadline-601593",
+      "https://governmentshutdowntracker.com/funding-deadline/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6424814",
+    "p_yes": 0.03,
+    "confidence": "high",
+    "reasoning": "EE.UU. hizo ataques limitados sobre Qeshm y Hengam (2 y 17/11) pero no hay operacion terrestre ni ocupacion; Israel presiona por una campana de varios dias.",
+    "key_uncertainties": [
+      "escalada con operacion anfibia"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/02/politics/us-strikes-iran-qeshm-island",
+      "https://en.wikipedia.org/wiki/2026_Iran_war"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6600817",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "Tras la OPI cuenta la capitalizacion con acciones en circulacion (13,22 mil millones): con el cierre del 20/11 (US$88,91) vale ~US$1,18 billones; US$1,75 billones exige ~US$132 en 6 ruedas.",
+    "key_uncertainties": [
+      "valor NPM previo a la OPI"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/20/investing/us-stocks-anthropic-ai",
+      "https://financefeeds.com/anthropic-ant-stock-88-91-saturday-week-ahead-after-friday-low-tested-83-ipo-price-bull-97-bear-80/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6600818",
+    "p_yes": 0.03,
+    "confidence": "high",
+    "reasoning": "US$1,6 billones exige ~US$121 (+36% sobre US$88,91) antes del 30/11; el maximo intradia fue US$115,10 el 19/11.",
+    "key_uncertainties": [
+      "valor NPM previo a la OPI"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/20/investing/us-stocks-anthropic-ai",
+      "https://financefeeds.com/anthropic-ant-stock-88-91-saturday-week-ahead-after-friday-low-tested-83-ipo-price-bull-97-bear-80/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6652730",
+    "p_yes": 0.1,
+    "confidence": "medium",
+    "reasoning": "En Madrid (37 escanos) 2023 dio PP 16, PSOE 10, Sumar 6, Vox 5; aun con Vox ~19% nacional, el PSOE (~27%) deberia quedar segundo.",
+    "key_uncertainties": [
+      "fragmentacion de la izquierda",
+      "sin encuesta provincial"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://www.democrata.es/encuestas/elecciones-generales/encuesta-elecciones-generales-sanchez-mantiene-133-escanos-feijoo-no-alcanza-mayoria-con-vox-segun-sw-demoscopia/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "676741",
+    "p_yes": 0.8,
+    "confidence": "medium",
+    "reasoning": "Apple es la mayor empresa (~US$5 billones a inicios de noviembre) y Nvidia cayo al 4o puesto (~US$3 billones el 20/11); el rival mas cercano seria Microsoft.",
+    "key_uncertainties": [
+      "caida fuerte de Apple",
+      "subida de Microsoft o Alphabet"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/11/20/nvidias-7-week-losing-streak-is-longest-since-2008-financial-crisis.html",
+      "https://companiesmarketcap.com/nvidia/marketcap/",
+      "https://www.fool.com/research/largest-companies-by-market-cap/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6831496",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "El ultimo ataque de EE.UU. reportado fue el 17/11 (Qeshm); para Si hace falta un periodo de 14 dias sin ataques que empiece antes del 30/11. EE.UU. ataco cada 4-5 dias en noviembre y las conversaciones estan estancadas (noticias del 18-21/11).",
+    "key_uncertainties": [
+      "regla: periodo que empieza antes del 30/11 y termina despues",
+      "presion israeli por una campana"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/02/politics/us-strikes-iran-qeshm-island",
+      "https://en.wikipedia.org/wiki/2026_Iran_war"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6976743",
+    "p_yes": 0.08,
+    "confidence": "medium",
+    "reasoning": "La renuncia de Huang ya fue anunciada (12/11), asi que depende de que Nvidia supere US$4 billones al cierre del 31/12; hoy vale ~US$3,0-3,3 billones tras caer 14% el 20/11.",
+    "key_uncertainties": [
+      "rebote fuerte con nuevo CEO"
+    ],
+    "sources": [
+      "https://www.cnbc.com/2026/11/20/nvidias-7-week-losing-streak-is-longest-since-2008-financial-crisis.html",
+      "https://companiesmarketcap.com/nvidia/marketcap/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7185150",
+    "p_yes": 0.08,
+    "confidence": "medium",
+    "reasoning": "US$1,6 billones exige ~US$121 por accion (+36%) antes del 31/12 con la accion cerca del precio de OPI tras caer 8,5% el 20/11.",
+    "key_uncertainties": [
+      "volatilidad post-OPI",
+      "fin del periodo de silencio de analistas"
+    ],
+    "sources": [
+      "https://www.cnn.com/2026/11/20/investing/us-stocks-anthropic-ai",
+      "https://financefeeds.com/anthropic-ant-stock-88-91-saturday-week-ahead-after-friday-low-tested-83-ipo-price-bull-97-bear-80/"
+    ],
+    "prompt_version": "v4"
+  }
+]
