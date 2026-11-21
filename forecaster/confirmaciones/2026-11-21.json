@@ -1,0 +1,4 @@
+[
+  {"market_id":"5622719","side":"NO","accion":"descartar","factor":0,"precio_visto":0.542,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: p del NO 0,80 contra entrada 0,542 (div 0,26); ademas C ya tiene este mercado (confirmado el 18/11), una por mercado."},
+  {"market_id":"6831496","side":"NO","accion":"descartar","factor":0,"precio_visto":0.46,"categoria":"geopolitica","version":"v3","motivo":"No pasa el filtro B: p del NO 0,70 contra entrada 0,46 (div 0,24). El mercado ve mas probable el alto el fuego de lo que estimo."}
+]

@@ -592,7 +592,7 @@
     "side": "NO",
     "nombre": "Participacion >=70% en Espana (29/11)",
     "resuelve": "2026-11-30",
-    "compras": 1
+    "compras": 2
   },
   {
     "market_id": "2872613",
@@ -655,6 +655,13 @@
     "side": "SI",
     "nombre": "Próxima reunión senior EE.UU.-Irán en Qatar",
     "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "6831496",
+    "side": "NO",
+    "nombre": "Alto el fuego efectivo EE.UU.-Irán antes del 30/11",
+    "resuelve": "2026-11-30",
     "compras": 1
   }
 ]
