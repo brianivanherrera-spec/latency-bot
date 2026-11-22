@@ -663,5 +663,19 @@
     "nombre": "Alto el fuego efectivo EE.UU.-Irán antes del 30/11",
     "resuelve": "2026-11-30",
     "compras": 1
+  },
+  {
+    "market_id": "3072293",
+    "side": "NO",
+    "nombre": "Algún modelo llega a 70% en Humanity's Last Exam en 2026",
+    "resuelve": "2027-01-01",
+    "compras": 1
+  },
+  {
+    "market_id": "4412321",
+    "side": "SI",
+    "nombre": "IA resuelve 0 problemas del milenio en 2026",
+    "resuelve": "2027-01-01",
+    "compras": 1
   }
 ]

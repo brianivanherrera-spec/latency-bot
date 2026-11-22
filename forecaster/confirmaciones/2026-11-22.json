@@ -1,0 +1,4 @@
+[
+  {"market_id":"3072293","side":"NO","accion":"descartar","factor":0,"precio_visto":0.72,"categoria":"tecnologia","version":"v3","motivo":"No pasa el filtro B por poco: p del NO 0,88 contra entrada 0,72 (div 0,16 > 0,15). Ademas C ya tiene el mercado hermano de HLE de Claude (3072311)."},
+  {"market_id":"4412321","side":"SI","accion":"descartar","factor":0,"precio_visto":0.23,"categoria":"tecnologia","version":"v3","motivo":"No pasa el filtro B: entrada 0,23 < 0,30."}
+]
