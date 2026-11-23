@@ -1,0 +1,260 @@
+[
+  {
+    "market_id": "2318183",
+    "p_yes": 0.4,
+    "confidence": "low",
+    "reasoning": "ISW reporto avances rusos en la zona de Chasiv Yar (7/11) y un observador ucraniano afirmo una retirada ucraniana (no verificada); la regla exige que el mapa de ISW muestre todo el pueblo ruso antes del 31/12.",
+    "key_uncertainties": [
+      "confirmacion de ISW",
+      "contraataques",
+      "nota: aparecio una cuota de mercado de prediccion en los resultados; ignorada"
+    ],
+    "sources": [
+      "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-7-2026-6aefc4cc503e5",
+      "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-20-2026"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "3072296",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "El lider del leaderboard oficial esta en 54,8%; 90% en 5 semanas es casi imposible.",
+    "key_uncertainties": [],
+    "sources": [
+      "https://benchlm.ai/benchmarks/hle"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "4418554",
+    "p_yes": 0.01,
+    "confidence": "high",
+    "reasoning": "Sin anuncios de solucion de Collatz por laboratorios; el foco reciente es Riemann.",
+    "key_uncertainties": [
+      "anuncio sorpresa"
+    ],
+    "sources": [],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "5622715",
+    "p_yes": 0.2,
+    "confidence": "low",
+    "reasoning": "Participacion 66,2% (2019) y 66,6% (2023); 68-70% requiere +2-3 puntos de movilizacion.",
+    "key_uncertainties": [
+      "polarizacion"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/sevilla/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe",
+      "https://www.sevillaactualidad.com/sevilla/600954-el-pp-superaria-al-psoe-en-sevilla-en-las-elecciones-del-29n/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6027279",
+    "p_yes": 0.15,
+    "confidence": "medium",
+    "reasoning": "La media da a Vox 64-65 escanos; solo 40dB lo pone en 57 (53-61).",
+    "key_uncertainties": [
+      "sobreestimacion de Vox en encuestas"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/sevilla/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe",
+      "https://www.sevillaactualidad.com/sevilla/600954-el-pp-superaria-al-psoe-en-sevilla-en-las-elecciones-del-29n/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6027339",
+    "p_yes": 0.5,
+    "confidence": "low",
+    "reasoning": "Medias recientes dan al PP 31,0-31,5%; 40dB 32,4%; el rango 30-32 captura el centro de las estimaciones.",
+    "key_uncertainties": [
+      "error de encuestas de +-2 puntos"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/sevilla/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe",
+      "https://www.sevillaactualidad.com/sevilla/600954-el-pp-superaria-al-psoe-en-sevilla-en-las-elecciones-del-29n/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6030248",
+    "p_yes": 0.05,
+    "confidence": "medium",
+    "reasoning": "Guadalajara (3 escanos) reparte PP 1, PSOE 1, Vox 1 en todas las estimaciones; el desempate por votos favorece al PP o PSOE, con Vox tercero.",
+    "key_uncertainties": [
+      "sorpresa de Vox"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/sevilla/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe",
+      "https://www.sevillaactualidad.com/sevilla/600954-el-pp-superaria-al-psoe-en-sevilla-en-las-elecciones-del-29n/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6030972",
+    "p_yes": 0.42,
+    "confidence": "low",
+    "reasoning": "Sevilla (12): la media de Mapa Electoral (23/11) da 4-4 con el PSOE apenas arriba en votos (28,7 vs 27,7%) y primero en 57% de simulaciones; GAD3 (3-5/11) da PP 5-4.",
+    "key_uncertainties": [
+      "desempate por votos",
+      "encuestas divergentes"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/sevilla/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe",
+      "https://www.sevillaactualidad.com/sevilla/600954-el-pp-superaria-al-psoe-en-sevilla-en-las-elecciones-del-29n/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6030976",
+    "p_yes": 0.57,
+    "confidence": "low",
+    "reasoning": "Complementario: PSOE primero en 57% de las simulaciones de Mapa Electoral y CIS le da 4-5 escanos vs 3-4 del PP.",
+    "key_uncertainties": [
+      "GAD3 da ventaja al PP"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/sevilla/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe",
+      "https://www.sevillaactualidad.com/sevilla/600954-el-pp-superaria-al-psoe-en-sevilla-en-las-elecciones-del-29n/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6685525",
+    "p_yes": 0.01,
+    "confidence": "high",
+    "reasoning": "WTI en ~US$82,7 el 23/11 con temor a excedente; US$95 exige +15% en 6 ruedas.",
+    "key_uncertainties": [
+      "escalada en Ormuz"
+    ],
+    "sources": [
+      "https://tradingpedia.com/2026/11/23/wti-slides-as-surplus-fears-outweigh-mideast-risks"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "676739",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "Nvidia cayo al 4o puesto (~US$3 billones el 20/11), lejos de Apple (~US$5 billones).",
+    "key_uncertainties": [],
+    "sources": [
+      "https://www.cnbc.com/2026/11/20/nvidias-7-week-losing-streak-is-longest-since-2008-financial-crisis.html"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7276618",
+    "p_yes": 0.45,
+    "confidence": "low",
+    "reasoning": "El indice H100 de Ornn liquido en US$2,89 el 21/11 (2,78 el 19/11, 2,93 el 18/11); el umbral esta en el centro del rango reciente, con tendencia levemente alcista segun Ornn.",
+    "key_uncertainties": [
+      "volatilidad diaria",
+      "caida de demanda por correccion de IA"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison",
+      "https://cryptobriefing.com/ornn-exchange-gpu-rental-prices-rising/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7276619",
+    "p_yes": 0.65,
+    "confidence": "low",
+    "reasoning": "H100 entre US$2,78 y 2,93 en la semana del 18-21/11; promedio de diciembre por encima de 2,80 si se mantiene el nivel.",
+    "key_uncertainties": [
+      "baja de precios por mayor oferta"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison",
+      "https://cryptobriefing.com/ornn-exchange-gpu-rental-prices-rising/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7277465",
+    "p_yes": 0.5,
+    "confidence": "low",
+    "reasoning": "B300 en US$11,51-11,66 (18-21/11); el umbral 11,50 esta justo debajo del nivel actual.",
+    "key_uncertainties": [
+      "volatilidad"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison",
+      "https://cryptobriefing.com/ornn-exchange-gpu-rental-prices-rising/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7277466",
+    "p_yes": 0.78,
+    "confidence": "medium",
+    "reasoning": "B300 ~US$11,5-11,7; caer a un promedio de 11,00 en diciembre exige -5%.",
+    "key_uncertainties": [
+      "mayor oferta de Blackwell"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison",
+      "https://cryptobriefing.com/ornn-exchange-gpu-rental-prices-rising/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7277635",
+    "p_yes": 0.6,
+    "confidence": "low",
+    "reasoning": "B200 en US$9,09-9,21 (18-21/11), apenas sobre 9,00.",
+    "key_uncertainties": [
+      "volatilidad"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison",
+      "https://cryptobriefing.com/ornn-exchange-gpu-rental-prices-rising/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7277636",
+    "p_yes": 0.75,
+    "confidence": "medium",
+    "reasoning": "B200 ~US$9,1-9,2; el promedio de diciembre por debajo de 8,80 exige -4%.",
+    "key_uncertainties": [
+      "baja de precios"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison",
+      "https://cryptobriefing.com/ornn-exchange-gpu-rental-prices-rising/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "814612",
+    "p_yes": 0.85,
+    "confidence": "medium",
+    "reasoning": "El KMT gobierna 15-16 de 22; Templeman da ~10 inclinados al KMT y 7 al DPP con 4 empates, y PRIF (18/11) proyecta 12-13 para el campo azul-blanco.",
+    "key_uncertainties": [
+      "empates en Nuevo Taipei, Keelung, Hsinchu condado y Penghu"
+    ],
+    "sources": [
+      "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-state-of-the-race-one-month-out",
+      "https://blog.prif.org/en/2026/11/17/who-can-keep-taiwan-at-peace-security-politics-in-the-2026-local-elections-and-the-road-to-2028"
+    ],
+    "prompt_version": "v4"
+  }
+]
