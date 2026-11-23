@@ -1,0 +1,4 @@
+[
+  {"market_id":"2318183","side":"SI","accion":"confirmar","factor":1,"precio_visto":0.32,"categoria":"mundo","version":"v3","motivo":"Pasa el filtro B: entrada 0,32 y p del SI 0,40 (div 0,08). ISW reporta avances rusos y una retirada ucraniana no verificada; Bilytske acaba de resolver como capturado. C no tiene otra posicion en este mercado."},
+  {"market_id":"6027279","side":"NO","accion":"descartar","factor":0,"precio_visto":0.682,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: p del NO 0,85 contra entrada 0,682 (div 0,17 > 0,15)."}
+]
