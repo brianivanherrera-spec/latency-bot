@@ -1,0 +1,247 @@
+[
+  {
+    "market_id": "2412367",
+    "p_yes": 0.04,
+    "confidence": "medium",
+    "reasoning": "Venezuela rompio relaciones con Israel en 2009; aun con el giro de politica exterior tras la caida de Maduro, no hay anuncios de reconocimiento o restablecimiento en la ultima semana.",
+    "key_uncertainties": [
+      "regla: restablecer relaciones vs reconocer",
+      "acuerdo impulsado por EE.UU."
+    ],
+    "sources": [],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "3581483",
+    "p_yes": 0.5,
+    "confidence": "low",
+    "reasoning": "Keelung es un empate: Tung (DPP) 38,4 vs Hsieh (KMT) 35,1 en una encuesta de su campana (9-11/11); otra del 30/10-1/11 daba Hsieh +0,5; Templeman lo califica empate.",
+    "key_uncertainties": [
+      "encuestas de campana",
+      "17% de indecisos"
+    ],
+    "sources": [
+      "https://www.taiwannews.com.tw/news/6464185",
+      "https://world.storm.mg/articles/1183453",
+      "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-state-of-the-race-one-month-out"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "3740666",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "Las proyecciones dan a los Verdes 3-8 escanos y a los Nationals 7-9; One Nation (22% en encuestas) puede sumar escanos tambien, asi que el tercer puesto es disputado y los Nationals parten adelante.",
+    "key_uncertainties": [
+      "regla: Liberales y Nationals se cuentan por separado",
+      "conversion de votos de One Nation en escanos"
+    ],
+    "sources": [
+      "https://seatsandswings.com/forecasts/victorian-election",
+      "https://www.poliwave.com/au/vic/projection",
+      "https://www.pollingforecast.com/au/victoria"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "4412323",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "Solo hay un candidato en curso (Riemann, anunciado por un investigador de Anthropic); dos problemas mas en 5 semanas es casi imposible.",
+    "key_uncertainties": [],
+    "sources": [
+      "https://www.scientificamerican.com/article/anthropic-mathematician-claims-to-prove-riemann-hypothesis-most-famous-problem-in-all-of-math/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "4412324",
+    "p_yes": 0.01,
+    "confidence": "high",
+    "reasoning": "Tres problemas del milenio en 2026 es practicamente imposible.",
+    "key_uncertainties": [],
+    "sources": [
+      "https://www.scientificamerican.com/article/anthropic-mathematician-claims-to-prove-riemann-hypothesis-most-famous-problem-in-all-of-math/"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6027363",
+    "p_yes": 0.25,
+    "confidence": "low",
+    "reasoning": "La media da al PSOE 26,8-28,3%; solo 40dB lo pone en 30,4%.",
+    "key_uncertainties": [
+      "error de encuestas",
+      "voto util"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6027373",
+    "p_yes": 0.42,
+    "confidence": "low",
+    "reasoning": "Medias recientes dan a Vox 18,7-19,1%; 40dB 17,2%.",
+    "key_uncertainties": [
+      "limites del rango"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6030131",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "Complementario del PP en Jaen (5 escanos): en 2023 empataron 2-2 y el PP sube unos 3-4 puntos nacionalmente; Andalucia favorece al PP desde 2022.",
+    "key_uncertainties": [
+      "sin encuesta provincial"
+    ],
+    "sources": [
+      "https://mapaelectoral.es/encuestas/",
+      "https://democrata.es/encuestas/elecciones-generales/ultimo-escano-29n-provincias-pp-vox-psoe"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "665727",
+    "p_yes": 0.05,
+    "confidence": "medium",
+    "reasoning": "El parlamento irani amenazo con salir del TNP en otros momentos, pero no hay notificacion formal a la ONU ni anuncio en la ultima semana; las conversaciones mediadas por Qatar siguen.",
+    "key_uncertainties": [
+      "escalada con EE.UU. o Israel"
+    ],
+    "sources": [
+      "https://www.aljazeera.com/news/2026/11/18/status-quo-between-us-and-iran-could-break-out-into-war-analysts-warn"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "676739",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "Nvidia es la 4a empresa (~US$3 billones) lejos de Apple (~US$5 billones).",
+    "key_uncertainties": [],
+    "sources": [
+      "https://www.cnbc.com/2026/11/20/nvidias-7-week-losing-streak-is-longest-since-2008-financial-crisis.html"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "6989178",
+    "p_yes": 0.25,
+    "confidence": "low",
+    "reasoning": "Huang reconocio la infidelidad del 8/11 y el 17/11 dijo haber cometido 'errores graves' sin admitir otra relacion; NYT reporto un affair con Kimberly Powell y Forbes (23/11) habla de su regreso.",
+    "key_uncertainties": [
+      "investigacion del directorio",
+      "regla: que cuenta como admision"
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/Jensen_Huang_spying_scandal",
+      "https://forbes.com/sites/alisondurkee/2026/11/23/jensen-huang-returns-timeline-of-the-nvidia-scandal-as-he-makes-a-comeback"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7276616",
+    "p_yes": 0.15,
+    "confidence": "low",
+    "reasoning": "H100 de Ornn en US$2,78-2,93 (18-21/11); promedio de diciembre sobre 3,10 exige +7%.",
+    "key_uncertainties": [
+      "tendencia alcista citada por Ornn"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7276617",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "H100 en ~US$2,89; superar 3,00 de promedio en diciembre exige +4%.",
+    "key_uncertainties": [
+      "volatilidad"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7277454",
+    "p_yes": 0.02,
+    "confidence": "high",
+    "reasoning": "B300 en ~US$11,5-11,7; 14,50 exige +25%.",
+    "key_uncertainties": [],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7277464",
+    "p_yes": 0.3,
+    "confidence": "low",
+    "reasoning": "B300 en ~US$11,5-11,7; promedio sobre 12,00 exige +3-4%.",
+    "key_uncertainties": [
+      "tendencia alcista"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7277633",
+    "p_yes": 0.25,
+    "confidence": "low",
+    "reasoning": "B200 en ~US$9,09-9,21; 9,40 exige +2-3% sostenido.",
+    "key_uncertainties": [
+      "volatilidad"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "7277634",
+    "p_yes": 0.4,
+    "confidence": "low",
+    "reasoning": "B200 en ~US$9,09-9,21; el umbral 9,20 esta en el borde superior del rango reciente.",
+    "key_uncertainties": [
+      "volatilidad"
+    ],
+    "sources": [
+      "https://data.ornn.com/",
+      "https://data.ornn.com/gpu-cloud-price-comparison"
+    ],
+    "prompt_version": "v4"
+  },
+  {
+    "market_id": "950145",
+    "p_yes": 0.12,
+    "confidence": "low",
+    "reasoning": "Zelensky esta abierto a una trilateral en el G20 de diciembre si Ucrania es invitada, pero no recibio invitacion; los asesores preparan otra ronda tecnica antes de Navidad y Trump evito responder (19/11).",
+    "key_uncertainties": [
+      "G20 Miami",
+      "avance de negociaciones tecnicas"
+    ],
+    "sources": [
+      "https://censor.net/en/news/4034918/zelenskyy-has-left-open-possibility-of-trilateral-meeting-with-trump-and-putin-on-sidelines-of-g20",
+      "https://kyivindependent.com/trilateral-peace-talks-with-russia-us-negotiators-to-begin-in-november-zelensky-says/"
+    ],
+    "prompt_version": "v4"
+  }
+]
