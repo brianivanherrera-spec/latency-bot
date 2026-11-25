@@ -648,6 +648,12 @@ httpServer.listen(PORT, () => {
   logger.info(`🌐 HTTP server en puerto ${PORT} — endpoints: /signals?key=X | /fills?key=X | /stats?key=X`);
 });
 
+// Respaldo del estado (balances, posiciones e intentos) antes de que nadie lo lea: DATA_DIR/backup/<fecha>/
+try {
+  const bk = require('./state-backup').backupState();
+  if (bk.skipped) logger.info(`[BACKUP] sin respaldo (${bk.skipped})`);
+  else logger.info(`[BACKUP] ${bk.copied.length} archivo(s), ${(bk.bytes / 1024).toFixed(0)} KB → ${bk.dest}${bk.skippedBig.length ? ` | grandes salteados: ${bk.skippedBig.join(', ')}` : ''}${bk.removed.length ? ` | borrados ${bk.removed.length} respaldos viejos` : ''}`);
+} catch (e) { logger.warn(`[BACKUP] falló: ${e.message} (el bot sigue)`); }
 const tracker = new PnLTracker();
 const activePositions = new Map();
 let shuttingDown = false;       // SIGTERM: no abrir posiciones nuevas
