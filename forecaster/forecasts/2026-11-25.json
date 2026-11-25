@@ -1,0 +1,300 @@
+[
+ {
+  "market_id": "2299955",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "Cierre 24/11 de ANT US$81,91 (bajo el precio de OPI de US$83); ~13,22 mil M de acciones da ~US$1,08 billones. US$1,75 billones exige ~US$132 (+61%) antes del 31/12. Noticia mas reciente: 24/11.",
+  "key_uncertainties": [
+   "tendencia bajista post-OPI",
+   "regla: medida por el informe NPM, no la cifra totalmente diluida"
+  ],
+  "sources": [
+   "https://www.axios.com/2026/11/24/anthropic-stock-ipo-banks"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7185150",
+  "p_yes": 0.05,
+  "confidence": "high",
+  "reasoning": "US$1,6 billones exige ~US$121 (+48%) desde US$81,91 del 24/11, con la accion cayendo 6,5% ese dia. Noticia mas reciente: 24/11.",
+  "key_uncertainties": [
+   "volatilidad alta de una OPI reciente"
+  ],
+  "sources": [
+   "https://www.axios.com/2026/11/24/anthropic-stock-ipo-banks"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "2412365",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "Pakistan mantiene su postura de no reconocer a Israel sin un Estado palestino y hay guerra regional con Iran; no hay noticias de la ultima semana que indiquen un cambio.",
+  "key_uncertainties": [
+   "un acuerdo regional sorpresa"
+  ],
+  "sources": [
+   "https://www.euronews.com/2026/11/24/iran-orders-hormuz-closed-further-day-by-day-as-qatar-seeks-to-revive-peace-talks"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "2698455",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Waymo abrio Denver el 1/9 pero solo por invitacion desde lista de espera; la regla excluye el servicio por invitacion. Waymo dijo que trabaja para abrirlo a todos; una nota dice que la meta es antes de fin de ano, sin fecha. No halle noticias de noviembre de apertura total.",
+  "key_uncertainties": [
+   "regla: lista de espera = invite-only",
+   "Waymo abrio otras ciudades a todos a los pocos meses"
+  ],
+  "sources": [
+   "https://waymo.com/blog/2026/09/ride-in-denver-san-diego-tampa/",
+   "https://www.westword.com/news/waymo-self-driving-taxis-launch-denver-kind-of-40929588/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "3740633",
+  "p_yes": 0.12,
+  "confidence": "medium",
+  "reasoning": "Ultimas encuestas (YouGov MRP 6-23/11, Roy Morgan, Lighthouse): Coalicion 31-32% de primarios, Labor 20-22,5%, One Nation 20-23%; bipartidista ~55-45 a favor de la Coalicion. Labor tiene muchas bancas seguras pero con 20% de primarios seria dificil ganar mas bancas. Eleccion 28/11; noticia mas reciente 24/11.",
+  "key_uncertainties": [
+   "One Nation divide el voto y la distribucion de bancas es incierta",
+   "error de encuestas"
+  ],
+  "sources": [
+   "https://www.roymorgan.com/findings/10393-victorian-state-voting-intention-november-2026",
+   "https://en.wikipedia.org/wiki/Opinion_polling_for_the_2026_Victorian_state_election"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "3740634",
+  "p_yes": 0.82,
+  "confidence": "medium",
+  "reasoning": "Coalicion lidera todas las encuestas recientes (31% vs 20-22,5% Labor) y ~55-45 bipartidista. Riesgo: One Nation con ~21% puede ganar bancas rurales a la Coalicion. Noticia mas reciente: 24/11.",
+  "key_uncertainties": [
+   "One Nation puede quitarle bancas a la Coalicion",
+   "regla: Liberal y National cuentan juntos"
+  ],
+  "sources": [
+   "https://www.roymorgan.com/findings/10393-victorian-state-voting-intention-november-2026"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "3915303",
+  "p_yes": 0.04,
+  "confidence": "high",
+  "reasoning": "Grecia evaluo en mayo-junio enviar una fragata a Hormuz solo tras un alto el fuego; al 24/11 Iran mantiene el estrecho cerrado, hay ataques a buques y ataques de EE.UU. en Qeshm. No hay decision griega reciente.",
+  "key_uncertainties": [
+   "un alto el fuego rapido via Qatar"
+  ],
+  "sources": [
+   "https://greekcitytimes.com/2026/05/03/greek-navy-eyes-hormuz-role-only-after-ceasefire-agreement/",
+   "https://www.euronews.com/2026/11/24/iran-orders-hormuz-closed-further-day-by-day-as-qatar-seeks-to-revive-peace-talks"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "4412322",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "El 20/11 Levent Alpoge, matematico de Anthropic, anuncio que con Claude encontro una prueba de la hipotesis de Riemann (en Lean). La regla pide un anuncio del laboratorio o representante oficial que diga que esta resuelto; no hay comunicado oficial de Anthropic y Alpoge dice 'creo que encontre'. Si cuenta, el conteo seria 1. Noticia mas reciente 21-24/11.",
+  "key_uncertainties": [
+   "regla: si un investigador de Anthropic cuenta como representante oficial",
+   "regla: 'creo' vs 'resuelto'",
+   "verificacion pendiente"
+  ],
+  "sources": [
+   "https://www.nature.com/articles/d41586-026-03812-7",
+   "https://thenextweb.com/news/anthropic-alpoge-claude-riemann-hypothesis-proof-lean"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "5238402",
+  "p_yes": 0.08,
+  "confidence": "medium",
+  "reasoning": "Theodore Roosevelt reemplazo a George Washington (que ya esta en la 7a Flota); en CENTCOM quedan Roosevelt y George H.W. Bush. Ford en mantenimiento, Vinson sin desplegar. Para 3 el 30/11 haria falta otro portaaviones en 5 dias. Noticia mas reciente 23/11.",
+  "key_uncertainties": [
+   "escalada con Iran podria redirigir un portaaviones",
+   "regla: ubicacion exacta a las 12:00 ET"
+  ],
+  "sources": [
+   "https://navytimes.com/news/2026/11/23/uss-theodore-roosevelt-replaces-uss-george-washington-in-the-middle-east"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "5622719",
+  "p_yes": 0.22,
+  "confidence": "medium",
+  "reasoning": "La regla usa votantes/electores del BOE (incluye CERA): 2023 fue 66,6%. Previsiones de participacion de residentes 72,6-73% (SocioMetrica, Democrata), lo que da un total cerca de 69-69,5%. Voto por correo -58% vs 2023. Noticia mas reciente 20/11.",
+  "key_uncertainties": [
+   "regla: total con CERA vs residentes",
+   "movilizacion por polarizacion"
+  ],
+  "sources": [
+   "https://www.democrata.es/elecciones-generales-espana/voto-correo-hoy-participacion-29n/",
+   "https://www.eldebate.com/espana/20261120/voto-correo-desploma-29n-ante-temor-pucherazo-registra-60-menos-solicitudes_482734.html"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6027294",
+  "p_yes": 0.42,
+  "confidence": "low",
+  "reasoning": "Promedios y modelos recientes dan a ERC 9-10 escanos (horquilla 80% de 7 a 15). 10-11 cubre el centro de la distribucion.",
+  "key_uncertainties": [
+   "fragmentacion por circunscripcion",
+   "competencia con Junts y Frente Amplio"
+  ],
+  "sources": [
+   "https://mapaelectoral.es/encuestas/",
+   "https://www.elnacional.cat/es/elecciones/generales-2026/encuestas-elecciones-generales-2026-sondeos-29-n_1710013_102.html"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6329508",
+  "p_yes": 0.33,
+  "confidence": "low",
+  "reasoning": "Ultima encuesta publica (AtlasIntel/Talisman, 2-11/11): Burbano 26,5%, Munoz 23,5%; en sept-oct Munoz lideraba. Debate el 22/11. Eleccion 29/11 a una vuelta.",
+  "key_uncertainties": [
+   "muchos indecisos",
+   "pocas encuestas fiables"
+  ],
+  "sources": [
+   "https://talismanmp.com/encuestas/2026-11-quito-alcaldia/",
+   "https://lupa.com.ec/verificaciones/pabel-munoz-encuestas-pauta-quito/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6424813",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Al 24/11 Iran mantiene control y cierre del estrecho; EE.UU. ataco Qeshm pero la regla excluye ataques e incursiones temporales. No hay ocupacion de la isla de Hormuz.",
+  "key_uncertainties": [
+   "una operacion terrestre sorpresa"
+  ],
+  "sources": [
+   "https://www.euronews.com/2026/11/24/iran-orders-hormuz-closed-further-day-by-day-as-qatar-seeks-to-revive-peace-talks"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6530735",
+  "p_yes": 0.08,
+  "confidence": "medium",
+  "reasoning": "Agregadores de LiveBench Coding (sept-nov) muestran modelos de Anthropic arriba; no vi a Google primero. Quedan 5 semanas para nuevos lanzamientos.",
+  "key_uncertainties": [
+   "fuentes de terceros, no livebench.ai",
+   "un nuevo Gemini antes del 31/12"
+  ],
+  "sources": [
+   "https://www.benchleader.com/benchmarks/livebench2_coding",
+   "https://www.benchleader.com/benchmarks/livebench_coding"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6910695",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "WTI ~US$79-82 el 24/11, en minimo de tres meses por mas oferta; tocar US$90 antes del 30/11 exige +10% en 5 dias. Noticia mas reciente 24/11.",
+  "key_uncertainties": [
+   "escalada en Hormuz"
+  ],
+  "sources": [
+   "https://ukragroconsult.com/en/news/global-crude-oil-prices-fall-to-three-month-lows-amid-rising-supply/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6976264",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "Encuestas finales divididas: Shen +5 (TIA), +4 (Brain Trust), +1,7; Chiang +2 (TVBS), +6 (ETtoday), +7 (China Times). P(Shen gana) ~0,45 y margen de 4-8 dado que gana ~1/3.",
+  "key_uncertainties": [
+   "error de encuestas en Taiwan",
+   "participacion",
+   "nota: un resultado de busqueda mostro cuotas de un mercado de prediccion; ignoradas"
+  ],
+  "sources": [
+   "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865",
+   "https://www.taiwannews.com.tw/news/6476596"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6976265",
+  "p_yes": 0.07,
+  "confidence": "low",
+  "reasoning": "Para ganar por 8+ Shen necesitaria superar todas las encuestas finales (maximo +5).",
+  "key_uncertainties": [
+   "error de encuestas",
+   "nota: cuotas de mercado de prediccion vistas en un resultado; ignoradas"
+  ],
+  "sources": [
+   "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7276622",
+  "p_yes": 0.9,
+  "confidence": "medium",
+  "reasoning": "Ornn H100 en US$2,93-3,16 en la ultima semana (24/11: 3,16); un promedio de diciembre >2,50 requiere una caida de >20%.",
+  "key_uncertainties": [
+   "caida brusca por nueva oferta"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison",
+   "https://data.ornn.com/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7277467",
+  "p_yes": 0.7,
+  "confidence": "medium",
+  "reasoning": "Ornn B300: 11,66 (18/11), 11,19 (23/11), 10,87 (24/11) con tendencia bajista (-2% mensual). Promedio de diciembre >10,50 aun probable pero el margen se achica.",
+  "key_uncertainties": [
+   "tendencia bajista al llegar mas B300"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison",
+   "https://quiverquant.com/news/A+trader+just+placed+a+$12K+bet+against+the+average+Ornn+B300+rental+price+in+January+2027"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7277637",
+  "p_yes": 0.75,
+  "confidence": "medium",
+  "reasoning": "Ornn B200: 9,21 (18/11), 9,07 (24/11). Promedio diciembre >8,60 requiere no caer mas de ~5%.",
+  "key_uncertainties": [
+   "baja gradual"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7277638",
+  "p_yes": 0.84,
+  "confidence": "medium",
+  "reasoning": "Ornn B200 9,07 el 24/11; umbral 8,40 deja ~7% de margen.",
+  "key_uncertainties": [
+   "baja gradual"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison"
+  ],
+  "prompt_version": "v4"
+ }
+]
