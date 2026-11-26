@@ -1,0 +1,52 @@
+[
+ {
+  "market_id": "3580933",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.45,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "Chiang levemente favorito",
+  "novedades": "26/11: Shen cancelo su acto presencial de cierre por disputa de permisos de calles y lo hara en linea; rige la veda de encuestas desde el 18/11.",
+  "razonamiento": "Sin encuestas nuevas por la veda; las de cierre dejaron la carrera pareja con leve ventaja del incumbente. La polemica por el acto de cierre no cambia la estimacion de la manana.",
+  "fuentes": [
+   {
+    "url": "https://news.pts.org.tw/article/837439",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://news.ebc.net.tw/news/politics/582602",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3580932",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.38,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "Chiang levemente favorito",
+  "novedades": "26/11: Shen cancelo su acto presencial de cierre por disputa de permisos de calles y lo hara en linea; rige la veda de encuestas desde el 18/11.",
+  "razonamiento": "Igual que la revision de la manana: Chiang recupero terreno en los sondeos de cierre.",
+  "fuentes": [
+   {
+    "url": "https://news.pts.org.tw/article/837439",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://news.ebc.net.tw/news/politics/582602",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865",
+    "tipo": "noticia"
+   }
+  ]
+ }
+]
