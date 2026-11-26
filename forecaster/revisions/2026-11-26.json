@@ -1,0 +1,135 @@
+[
+ {
+  "market_id": "3580933",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.45,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "Chiang levemente favorito",
+  "novedades": "Encuestas finales (hasta 17/11) divididas: TVBS Chiang +2, ETtoday +6, China Times +7; TIA Shen +5, Brain Trust +4.",
+  "razonamiento": "Tras el cierre de encuestas la ventaja de Shen desaparecio en tres de seis sondeos; queda practicamente parejo con leve ventaja del incumbente.",
+  "fuentes": [
+   "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865",
+   "https://www.taiwannews.com.tw/news/6476596"
+  ]
+ },
+ {
+  "market_id": "3580932",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.38,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "Chiang levemente favorito",
+  "novedades": "Mismas encuestas finales del 16-17/11.",
+  "razonamiento": "El incumbente recupero terreno en los sondeos de cierre.",
+  "fuentes": [
+   "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865"
+  ]
+ },
+ {
+  "market_id": "3581102",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.25,
+  "p_yes_revisada": 0.25,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Gana Chang San-cheng (KMT)",
+  "novedades": "Tai Li-an: Chang 36,9% vs Huang 32,8%; analistas lo califican Likely KMT.",
+  "razonamiento": "Sin cambios relevantes: Chang sigue adelante.",
+  "fuentes": [
+   "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-state-of-the-race-one-month-out"
+  ]
+ },
+ {
+  "market_id": "814613",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.14,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "KMT gana mas jefaturas",
+  "novedades": "Calificaciones de analistas al 25/11 siguen favoreciendo al campo azul en mayoria de condados.",
+  "razonamiento": "Taipei y Taichung se inclinan al KMT, lo que refuerza el NO.",
+  "fuentes": [
+   "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-state-of-the-race-one-month-out",
+   "https://political.org/2026/11/25/what-to-know-about-taiwans-local-elections-and-why-they-matter-to-china/"
+  ]
+ },
+ {
+  "market_id": "3581389",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.42,
+  "p_yes_revisada": 0.38,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Gana Chiang (KMT)",
+  "novedades": "Lectura conjunta de encuestas (ajustando sesgo de casa): Chiang adelante por un digito medio-alto; rating Lean KMT.",
+  "razonamiento": "Solo Tai Li-an da a Ho adelante; el resto da a Chiang.",
+  "fuentes": [
+   "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-state-of-the-race-one-month-out",
+   "https://www.taipeitimes.com/News/taiwan/archives/2026/11/04/2003867132"
+  ]
+ },
+ {
+  "market_id": "3581450",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.68,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Gana Lai Jui-lung (DPP)",
+  "novedades": "Era: Lai 43,9% vs Ko 24,7%; ETtoday empate 43,2-43,1; rating Likely DPP.",
+  "razonamiento": "Kaohsiung es bastion del DPP y la mayoria de sondeos da a Lai adelante.",
+  "fuentes": [
+   "https://www.kharistempleman.com/blog/taiwans-2026-local-elections-state-of-the-race-one-month-out"
+  ]
+ },
+ {
+  "market_id": "3581572",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.45,
+  "p_yes_revisada": 0.48,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "Muy parejo",
+  "novedades": "Era (8-10/11): Cheng 36,9% vs Hsu 28,6%; Taiwan Public Policy Research (sin metodologia publica): Hsu 44,4% vs 37,5%.",
+  "razonamiento": "Encuestas contradictorias en un condado historicamente KMT; practicamente moneda al aire.",
+  "fuentes": [
+   "https://www.storm.mg/article/11180991",
+   "https://news.ltn.com.tw/news/politics/breakingnews/5638307"
+  ]
+ },
+ {
+  "market_id": "3581626",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.62,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Kao levemente favorita",
+  "novedades": "TVBS (27-31/10): Kao 46% vs Chuang 31%; Newtalk 38,1-36,1; Taiwan Democracy and Law Institute (16/11): 22,7-21,8 con 35,6% indecisos.",
+  "razonamiento": "Kao lidera en todos los sondeos, aunque el de cierre es muy parejo.",
+  "fuentes": [
+   "https://www.setn.com/news/1933866",
+   "https://newtalk.tw/news/view/2026-11-16/1071407"
+  ]
+ },
+ {
+  "market_id": "6617895",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.17,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "No gana ambas",
+  "novedades": "Nuevo Taipei: TVBS (17/11) Su 43% vs Lee 42,4%, China Times Lee +3,6, UDN Su +3. Taipei paso a leve favorito Chiang.",
+  "razonamiento": "Ganar las dos exige que el DPP gane dos carreras parejas a la vez; Taipei se debilito.",
+  "fuentes": [
+   "https://news.nextapple.com/politics/20261117/A52C7D9FCED922CF147385AD18D6C65A",
+   "https://www.chinatimes.com/realtimenews/20261115002960-260407",
+   "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865"
+  ]
+ }
+]

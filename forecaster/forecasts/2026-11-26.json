@@ -1,0 +1,273 @@
+[
+ {
+  "market_id": "2299960",
+  "p_yes": 0.15,
+  "confidence": "low",
+  "reasoning": "ANT cerro US$82,79 el 25/11 (~US$1,09 billones); US$800 mil M exige ~US$60,5 (-27%). La accion ya cayo 26% desde la apertura en una semana y toco US$73,85 intradia. Noticia mas reciente 25-26/11.",
+  "key_uncertainties": [
+   "volatilidad post-OPI",
+   "regla: medida por el informe NPM"
+  ],
+  "sources": [
+   "https://stockanalysis.com/stocks/ant/history/",
+   "https://www.trefis.com/stock/ant/articles/629153/anthropic-broke-its-83-ipo-price-what-did-facebook-do-next/2026-11-26"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "2696747",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "Al 24-25/11 Iran mantiene Hormuz cerrado, hay bloqueo de EE.UU. y ataques cruzados; Qatar intenta reactivar charlas. Firmar un instrumento nuclear final antes del 31/12 es muy improbable.",
+  "key_uncertainties": [
+   "un acuerdo rapido mediado por Qatar"
+  ],
+  "sources": [
+   "https://www.euronews.com/2026/11/24/iran-orders-hormuz-closed-further-day-by-day-as-qatar-seeks-to-revive-peace-talks"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "2750319",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "No conozco la lista exacta; si incluye a Netanyahu, Eisenkot busca jurar un gobierno minoritario el 2/12 con apoyo haredi, lo que lo sacaria antes de 2027. Sanchez seguiria en funciones hasta 2027 aunque pierda el 29/11 (en funciones no cuenta).",
+  "key_uncertainties": [
+   "regla: lista de lideres desconocida",
+   "votacion de la Knesset del 2/12"
+  ],
+  "sources": [
+   "https://www.haaretz.com/israel-news/elections/2026-11-25/ty-article/.premium/eisenkot-aims-to-hold-vote-to-swear-in-minority-government-next-week/000001a2-1324-d52d-afe2-db2432840000",
+   "http://www.jpost.com/israel-election-2026/2026-11-26/live-updates-916169"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "3581573",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "Hsinchu County: Era (8-10/11) Cheng 36,9% vs Hsu 28,6%; otra encuesta de origen poco transparente da Hsu 44,4% vs 37,5%. El condado es historicamente del KMT. Eleccion 28/11.",
+  "key_uncertainties": [
+   "muchos indecisos",
+   "encuestas contradictorias"
+  ],
+  "sources": [
+   "https://www.storm.mg/article/11180991",
+   "https://news.ltn.com.tw/news/politics/breakingnews/5638307"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "5622711",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Regla: votantes/electores del BOE (incluye CERA). 2019: 66,2%; 2023: 66,6%. Previsiones de participacion de residentes 72,6-73% (2023: 70,4%) sugieren un total cerca de 68,5-69%, justo arriba del rango.",
+  "key_uncertainties": [
+   "regla: total con CERA",
+   "movilizacion"
+  ],
+  "sources": [
+   "https://www.democrata.es/elecciones-generales-espana/voto-correo-hoy-participacion-29n/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "567688",
+  "p_yes": 0.58,
+  "confidence": "medium",
+  "reasoning": "Eisenkot recibio el mandato con 67 recomendaciones y busca jurar un gobierno minoritario el miercoles 2/12 con apoyo de partidos ultraortodoxos (UTJ acordo statu quo en religion y Estado; Raam se abstendria). Si la Knesset lo aprueba, Netanyahu deja el cargo. Noticias del 25-26/11.",
+  "key_uncertainties": [
+   "Likud negocia unidad con Yashar",
+   "defecciones de ultimas horas"
+  ],
+  "sources": [
+   "https://www.haaretz.com/israel-news/elections/2026-11-25/ty-article/.premium/eisenkot-aims-to-hold-vote-to-swear-in-minority-government-next-week/000001a2-1324-d52d-afe2-db2432840000",
+   "http://www.jpost.com/israel-election-2026/2026-11-26/live-updates-916169",
+   "https://www.timesofisrael.com/liveblog_entry/eisenkot-said-planning-to-declare-coalition-at-surprise-timing-call-knesset-vote-quickly-to-limit-counter-maneuvers/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6027359",
+  "p_yes": 0.58,
+  "confidence": "medium",
+  "reasoning": "Media final de encuestas: PSOE 28,4% (elDiario.es); Sociometrica 29%, Data10 28,3%; CIS 34,4% es atipico. El centro de la distribucion cae dentro de 28-30%.",
+  "key_uncertainties": [
+   "error de encuestas",
+   "voto oculto"
+  ],
+  "sources": [
+   "https://eldiario.es/politica/media-final-encuestas-psoe-sube-bloques-acercan-apagon-demoscopico_1_13688784.html",
+   "https://www.elespanol.com/espana/politica/20261123/ultimo-sondeo-feijoo-sanchez-alza-puntos-escanos-favor-pp-mayoria-absoluta-derecha/1003744469260_0.html"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6067060",
+  "p_yes": 0.05,
+  "confidence": "high",
+  "reasoning": "Todas las encuestas privadas dan al PP primero (31-32%, 126-139 escanos) frente al PSOE (28-29%); solo el CIS da al PSOE ganador. PP segundo requiere que el PSOE lo supere en escanos.",
+  "key_uncertainties": [
+   "CIS atipico"
+  ],
+  "sources": [
+   "https://eldiario.es/politica/media-final-encuestas-psoe-sube-bloques-acercan-apagon-demoscopico_1_13688784.html",
+   "https://www.elespanol.com/espana/politica/20261123/ultimo-sondeo-feijoo-sanchez-alza-puntos-escanos-favor-pp-mayoria-absoluta-derecha/1003744469260_0.html"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6207382",
+  "p_yes": 0.02,
+  "confidence": "high",
+  "reasoning": "WTI cerro US$83,68 el 25/11 (+2%) tras ataques hutíes a una refineria saudi; tocar US$75 antes del 30/11 exige -10%.",
+  "key_uncertainties": [
+   "un alto el fuego sorpresa en Hormuz"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/11/25/oil-wti-brent-hormuz-middle-east.html"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6530777",
+  "p_yes": 0.08,
+  "confidence": "medium",
+  "reasoning": "Agregadores de LiveBench Coding (sept-nov) muestran modelos de Anthropic primeros; no vi a OpenAI arriba.",
+  "key_uncertainties": [
+   "fuentes de terceros",
+   "nuevo lanzamiento antes del 31/12"
+  ],
+  "sources": [
+   "https://www.benchleader.com/benchmarks/livebench2_coding"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "670058",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "Un corte marketwide exige una caida de 7% del S&P 500 en el dia; el indice esta en correccion pero sin caidas de esa magnitud. Quedan ~5 semanas.",
+  "key_uncertainties": [
+   "escalada con Iran",
+   "regla: ventana desde 7/11/2025"
+  ],
+  "sources": [
+   "https://www.cnbc.com/2026/11/25/oil-wti-brent-hormuz-middle-east.html"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6976261",
+  "p_yes": 0.25,
+  "confidence": "low",
+  "reasoning": "Encuestas finales divididas (Chiang +2 a +7 en TVBS, ETtoday, China Times; Shen +2 a +5 en otras). P(Chiang gana) ~0,55 y margen <4 dado que gana ~0,45.",
+  "key_uncertainties": [
+   "error de encuestas",
+   "participacion"
+  ],
+  "sources": [
+   "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6976263",
+  "p_yes": 0.24,
+  "confidence": "low",
+  "reasoning": "P(Shen gana) ~0,45 y margen <4 dado que gana ~0,55 (sus ventajas en encuestas son de 2-5 puntos).",
+  "key_uncertainties": [
+   "error de encuestas"
+  ],
+  "sources": [
+   "https://www.taipeitimes.com/News/front/archives/2026/11/17/2003867865",
+   "https://www.taiwannews.com.tw/news/6476596"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7276616",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Ornn H100: 2,93 (18/11), 3,03 (23/11), 3,16 (24/11), 3,10 (25/11, fuente secundaria). El umbral 3,10 esta en el centro del rango reciente.",
+  "key_uncertainties": [
+   "volatilidad diaria",
+   "dato del 25/11 de fuente secundaria"
+  ],
+  "sources": [
+   "https://wisevoter.com/world/2026/11/26/polymarket-nvidia-gpu-rental-price-markets",
+   "https://data.ornn.com/markets/h100-sxm"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7277632",
+  "p_yes": 0.28,
+  "confidence": "low",
+  "reasoning": "Ornn B200: 9,21 (18/11), 9,07 (24/11); una fuente secundaria da 9,76 el 25/11. Promedio de diciembre >9,60 requiere sostener el salto.",
+  "key_uncertainties": [
+   "dato del 25/11 sin confirmar en Ornn"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison",
+   "https://wisevoter.com/world/2026/11/26/polymarket-nvidia-gpu-rental-price-markets"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7277633",
+  "p_yes": 0.38,
+  "confidence": "low",
+  "reasoning": "Igual que el anterior con umbral 9,40: requiere que el B200 se mantenga arriba de su nivel de la semana pasada.",
+  "key_uncertainties": [
+   "dato del 25/11 sin confirmar"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison",
+   "https://wisevoter.com/world/2026/11/26/polymarket-nvidia-gpu-rental-price-markets"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7295429",
+  "p_yes": 0.08,
+  "confidence": "low",
+  "reasoning": "El Year in Search 2026 aun no se publico (sale a inicios de diciembre). Las listas de terceros de personas mas buscadas no incluyen a Flavio Bolsonaro en el top 100.",
+  "key_uncertainties": [
+   "la eleccion de Brasil pudo generar picos de busqueda",
+   "regla: lista global vs por pais"
+  ],
+  "sources": [
+   "https://ahrefs.com/blog/most-searched-people/",
+   "https://meetglimpse.com/top-searched/most-searched-person/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7362305",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Ornn H200: 7,11 (18/11), 6,00 (21/11), 6,53 (24/11, +6,7% diario). El umbral 6,50 esta en el medio del rango.",
+  "key_uncertainties": [
+   "volatilidad alta"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison",
+   "https://data.ornn.com/markets/h200"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7362306",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "Con H200 entre 6,00 y 7,11 en la ultima semana, el promedio de diciembre por encima de 6,25 es algo mas probable que no.",
+  "key_uncertainties": [
+   "volatilidad alta"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison"
+  ],
+  "prompt_version": "v4"
+ }
+]
