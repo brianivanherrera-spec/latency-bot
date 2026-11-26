@@ -1,0 +1,33 @@
+{
+ "semana": "2026-11-19/2026-11-26",
+ "resueltas": 4,
+ "ganadas": 1,
+ "perdidas": 3,
+ "nota_conteo": "Posiciones paper de A resueltas (5 compras: Bilytske tenia 2). Pronosticos resueltos en la semana: 10.",
+ "perdidas_detalle": [
+  {"market_id":"6172740","pregunta":"Plata toca (LOW) US$44 en noviembre","lado":"NO","p_yes":0.45,"pnl":-10.24,"causa":"mala_suerte","nota":"El pronostico (0,45) favorecia levemente el NO; la plata siguio cayendo."},
+  {"market_id":"6941724","pregunta":"NVDA toca (LOW) US$128 en noviembre","lado":"NO","p_yes":0.07,"pnl":-10.09,"causa":"el_mercado_sabia_algo","nota":"Nvidia cayo ~14% el mismo 20/11 tras resultados; el 0,07 subestimo la volatilidad post-resultados que el precio ya reflejaba."},
+  {"market_id":"2373683","pregunta":"Rusia toma todo Bilytske antes del 31/12","lado":"NO","p_yes":0.40,"pnl":-20.00,"causa":"mala_suerte","nota":"2 compras; el pronostico (0,40) favorecia el NO pero el avance ruso fue mas rapido."}
+ ],
+ "por_causa": {"mala_suerte": 2, "el_mercado_sabia_algo": 1, "regla_mal_leida": 0, "dato_viejo": 0, "signo_mal_cargado": 0},
+ "por_categoria": {
+  "commodities_acciones": {"n": 2, "ganadas": 0, "pnl": -20.33},
+  "militar_geopolitica": {"n": 1, "ganadas": 0, "pnl": -20.00},
+  "empresas_ipo": {"n": 1, "ganadas": 1, "pnl": 3.55}
+ },
+ "pnl_semana_A": -36.78,
+ "A": {"pnl_total": -484.96, "realizado": -483.05},
+ "B": {"pnl_total": 27.49, "realizado": -12.72},
+ "C": {"pnl_total": 11.56, "realizado": -20.00},
+ "brier_modelo": 0.1812,
+ "brier_mercado": 0.1213,
+ "n_brier": 197,
+ "brier_semana_modelo": 0.2526,
+ "n_brier_semana": 10,
+ "lecciones": [
+  "Mercados de 'tocar' un precio (LOW/HIGH): 4 de 4 resolvieron SI con p_yes <= 0,45 (plata 0,45, WTI 0,40, Anthropic 1,5T 0,40, NVDA 0,07). Subestimo la probabilidad de tocar un umbral intradia; tocar es ~2 veces mas probable que cerrar del otro lado.",
+  "Las perdidas de B/C fueron 0 esta semana: el filtro de B evito las compras lejos del pronostico; A sigue perdiendo cuando compra contra precios de mercado bien informados.",
+  "Las confirmaciones oficiales funcionaron (Lean 0,88 y treguas 0,85 resolvieron SI): mantener la regla 5b de research-v4."
+ ],
+ "propuesta_para_brian": "Crear research-v5 con una regla para mercados de 'tocar' un precio: estimar con la volatilidad realizada reciente y usar como piso la regla del reflejo (P(tocar) ~ 2 x P(cerrar mas alla del umbral)); no bajar de 0,10 si el umbral esta a menos de 2 desvios del precio actual. No aplicada: requiere aprobacion."
+}
