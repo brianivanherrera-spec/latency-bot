@@ -1,0 +1,5 @@
+[
+ {"market_id":"4418550","side":"NO","accion":"reducir","factor":0.5,"precio_visto":0.849,"categoria":"tecnologia","version":"v3","motivo":"Pasa el filtro B: entrada 0,849 y p del NO 0,99 (div 0,141). Faltan mas de 10 dias con entrada fuera de 0,30-0,70 y es tecnologia con divergencia > 0,10: maximo reducir."},
+ {"market_id":"5727013","side":"SI","accion":"descartar","factor":0,"precio_visto":0.23,"categoria":"economia","version":"v3","motivo":"No pasa el filtro B: entrada 0,23 < 0,30."},
+ {"market_id":"6029248","side":"NO","accion":"descartar","factor":0,"precio_visto":0.65,"categoria":"politica","version":"v3","motivo":"No pasa el filtro B: p del NO 0,85 vs entrada 0,65 (div 0,20 > 0,15)."}
+]
