@@ -1,0 +1,191 @@
+[
+ {
+  "market_id": "3580933",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.45,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "Chiang levemente favorito",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. Tras el cierre de encuestas la ventaja de Shen desaparecio en tres de seis sondeos; queda practicamente parejo con leve ventaja del incumbente.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3580932",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.38,
+  "p_yes_revisada": 0.55,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "Chiang levemente favorito",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. El incumbente recupero terreno en los sondeos de cierre.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3581102",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.25,
+  "p_yes_revisada": 0.25,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Gana Chang San-cheng (KMT)",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. Sin cambios relevantes: Chang sigue adelante.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "814613",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.14,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "KMT gana mas jefaturas",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. Taipei y Taichung se inclinan al KMT, lo que refuerza el NO.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3581389",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.42,
+  "p_yes_revisada": 0.38,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Gana Chiang (KMT)",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. Solo Tai Li-an da a Ho adelante; el resto da a Chiang.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3581450",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.68,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Gana Lai Jui-lung (DPP)",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. Kaohsiung es bastion del DPP y la mayoria de sondeos da a Lai adelante.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3581572",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.45,
+  "p_yes_revisada": 0.48,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "Muy parejo",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. Encuestas contradictorias en un condado historicamente KMT; practicamente moneda al aire.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "3581626",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.62,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Kao levemente favorita",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. Kao lidera en todos los sondeos, aunque el de cierre es muy parejo.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ },
+ {
+  "market_id": "6617895",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.17,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "No gana ambas",
+  "novedades": "27/11: actos de cierre (Chiang en Ketagalan con lleno; Shen solo en linea; Lee y Su con actos masivos en Banqiao); medios estatales chinos atacaron a Shen. Veda de encuestas vigente.",
+  "razonamiento": "Sin datos medibles nuevos; se mantiene la estimacion de la manana. Ganar las dos exige que el DPP gane dos carreras parejas a la vez; Taipei se debilito.",
+  "fuentes": [
+   {
+    "url": "https://udn.com/news/story/125076/9906823",
+    "tipo": "noticia"
+   },
+   {
+    "url": "https://www.cna.com.tw/news/aipl/202611270270.aspx",
+    "tipo": "noticia"
+   }
+  ]
+ }
+]
