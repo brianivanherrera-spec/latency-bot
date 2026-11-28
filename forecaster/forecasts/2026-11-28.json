@@ -1,0 +1,282 @@
+[
+ {
+  "market_id": "1108137",
+  "p_yes": 0.05,
+  "confidence": "medium",
+  "reasoning": "Tras la captura de Maduro en enero, EE.UU. coopera con el gobierno de Rodriguez (apoyo con drones contra el ELN, SOFA en negociacion). La regla pide una ofensiva para controlar territorio; la cooperacion consentida no califica.",
+  "key_uncertainties": [
+   "regla: operaciones con consentimiento",
+   "Mexico/carteles"
+  ],
+  "sources": [
+   "https://www.caracaschronicles.com/2026/11/11/how-us-venezuela-military-cooperation-looks-like/",
+   "https://en.wikipedia.org/wiki/2026_United_States_intervention_in_Venezuela"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "2668004",
+  "p_yes": 0.03,
+  "confidence": "high",
+  "reasoning": "No hay acuerdo EE.UU.-Iran: bloqueo vigente, EE.UU. disparo contra un buque el 28/11 y Hormuz sigue cerrado. Un tope de enriquecimiento escrito antes del 31/12 es muy improbable.",
+  "key_uncertainties": [
+   "acuerdo rapido via Qatar"
+  ],
+  "sources": [
+   "https://euronews.com/2026/11/28/us-military-fires-at-a-ship-that-violated-blockade-of-iranian-ports"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "3764739",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "ISW (18/11): Rusia prioriza avanzar a Mykolaivka para infiltrarse en Sloviansk, con asaltos mas grandes aprovechando el clima; reportes al 22/11 dicen que los intentos de infiltracion no tuvieron exito. Quedan 5 semanas.",
+  "key_uncertainties": [
+   "regla: mapa de ISW y la interseccion indicada",
+   "ritmo de avance invernal"
+  ],
+  "sources": [
+   "https://www.criticalthreats.org/analysis/russian-offensive-campaign-assessment-november-18-2026",
+   "https://euromaidanpress.com/2026/11/19/russian-armor-joins-some-bad-weather-assaults-toward-sloviansk-and-still-gets-nowhere-ukrainian-soldier-says/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "3915301",
+  "p_yes": 0.8,
+  "confidence": "medium",
+  "reasoning": "Destructores de EE.UU. hicieron transitos disputados por Hormuz (USS Michael Murphy: 12) y escoltan tanqueros; ~17 buques en CENTCOM y el bloqueo se aplica activamente (28/11). La regla cuenta transitos desde la creacion del mercado.",
+  "key_uncertainties": [
+   "regla: fecha de creacion del mercado",
+   "EE.UU. puede operar el bloqueo desde el golfo de Oman sin cruzar"
+  ],
+  "sources": [
+   "https://www.armyrecognition.com/news/navy-news/2026/u-s-navy-destroyer-uss-michael-murphy-supports-iran-blockade-with-12-contested-hormuz-transits",
+   "https://www.inss.org.il/publication/us-forces-november-8-15/",
+   "https://euronews.com/2026/11/28/us-military-fires-at-a-ship-that-violated-blockade-of-iranian-ports"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "4418555",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "No hay anuncios de laboratorios sobre Goldbach fuerte.",
+  "key_uncertainties": [
+   "ninguna"
+  ],
+  "sources": [
+   "https://www.nature.com/articles/d41586-026-03812-7"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "4418557",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "No hay anuncios de laboratorios sobre numeros perfectos impares.",
+  "key_uncertainties": [
+   "ninguna"
+  ],
+  "sources": [
+   "https://www.nature.com/articles/d41586-026-03812-7"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "4425386",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Sin datos nuevos: el Year in Search 2026 sale a inicios de diciembre; Bad Bunny tuvo el show del Super Bowl y gira mundial.",
+  "key_uncertainties": [
+   "listas de terceros no incluyen siempre artistas",
+   "regla: lista global"
+  ],
+  "sources": [
+   "https://ahrefs.com/blog/most-searched-people/"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "4487265",
+  "p_yes": 0.1,
+  "confidence": "medium",
+  "reasoning": "Los hutíes atacan Arabia Saudita con misiles y drones; Siria asesora a Riad. No hay incursiones terrestres hutíes recientes.",
+  "key_uncertainties": [
+   "escalada terrestre en la frontera"
+  ],
+  "sources": [
+   "https://www.haaretz.com/middle-east-news/2026-11-06/ty-article/syria-aiding-saudi-arabia-in-war-against-the-houthis-sources-say/000001a1-b1e4-d2e9-a5ad-bbfe22660000"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "5609864",
+  "p_yes": 0.35,
+  "confidence": "low",
+  "reasoning": "Hubo allanamiento del HSI (12/10), se desclasificaron 169 paginas que citan delitos 'desde 1980' y se convoco un gran jurado en DC; Comer predice acusacion (27/11). Sin cargos al 28/11.",
+  "key_uncertainties": [
+   "tiempos del gran jurado",
+   "Comer no aporto pruebas"
+  ],
+  "sources": [
+   "https://www.washingtontimes.com/news/2026/nov/23/ilhan-omar-search-warrant-revealed/",
+   "https://www.latintimes.com/unsealed-filings-ilhan-omar-federal-investigation-601779"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "567688",
+  "p_yes": 0.55,
+  "confidence": "medium",
+  "reasoning": "El mandato de Eisenkot vence el 6/12; planea un voto de confianza antes con o sin mayoria. UTJ (7) daria 55-46 si los arabes se abstienen; Shas se niega y UTJ necesita aprobacion rabinica; Yisrael Beytenu podria votar en contra. Noticias del 28/11.",
+  "key_uncertainties": [
+   "decision de UTJ",
+   "Likud negocia con Yashar"
+  ],
+  "sources": [
+   "https://www.timesofisrael.com/eisenkot-said-planning-vote-on-new-government-before-mandate-ends-even-without-majority/",
+   "https://www.jpost.com/israel-election-2026/article-915594"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "5784291",
+  "p_yes": 0.5,
+  "confidence": "low",
+  "reasoning": "Vacante desde el 16/10; la oferta a Dana White (7/11) Trump la calific como broma. Sin anuncio en tres semanas.",
+  "key_uncertainties": [
+   "Trump puede anunciar en cualquier momento",
+   "regla: interino no cuenta"
+  ],
+  "sources": [
+   "https://www.nbcnews.com/politics/white-house/trump-offers-press-secretary-job-ufc-ceo-dana-white-rcna608039"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6831496",
+  "p_yes": 0.01,
+  "confidence": "high",
+  "reasoning": "Exige un periodo continuo de 14 dias sin ataques antes del 30/11; EE.UU. ataco Qeshm (~24/11) y disparo contra un buque el 28/11.",
+  "key_uncertainties": [
+   "ninguna"
+  ],
+  "sources": [
+   "https://euronews.com/2026/11/28/us-military-fires-at-a-ship-that-violated-blockade-of-iranian-ports"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6975336",
+  "p_yes": 0.1,
+  "confidence": "medium",
+  "reasoning": "Huang fue reinstalado el 23/11; la investigacion independiente sigue pero apunta a un esfuerzo de inteligencia extranjera. No hay reportes de salida de Powell.",
+  "key_uncertainties": [
+   "conclusiones de la investigacion"
+  ],
+  "sources": [
+   "https://www.sec.gov/Archives/edgar/data/0001045810/000104581026000090/nov23pressrelease.htm",
+   "https://qz.com/kimberly-powell-nvidia-healthcare-chief-jensen-huang-scandal"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "6992421",
+  "p_yes": 0.85,
+  "confidence": "medium",
+  "reasoning": "El 11/11 en Abu Dabi ambos acordaron en principio un canje grande (314 a 1.000+ por lado); un oficial ruso dijo que podria ser en 2-3 semanas. Los canjes han sido frecuentes.",
+  "key_uncertainties": [
+   "el numero final no se confirmo",
+   "demoras"
+  ],
+  "sources": [
+   "https://www.aljazeera.com/amp/news/2026/11/11/russia-ukraine-talks-in-abu-dhabi-end-with-prisoner-exchange-agreement",
+   "https://www.latintimes.com/abu-dhabi-russia-ukraine-pow-exchange-talks-601227"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7276618",
+  "p_yes": 0.62,
+  "confidence": "low",
+  "reasoning": "Ornn H100: 2,93 (18/11), 3,03 (23/11), 3,16 (24/11), 3,10 (25/11). El umbral 2,90 esta debajo del rango reciente.",
+  "key_uncertainties": [
+   "caida por nueva oferta"
+  ],
+  "sources": [
+   "https://wisevoter.com/world/2026/11/26/polymarket-nvidia-gpu-rental-price-markets",
+   "https://data.ornn.com/markets/h100-sxm"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7277465",
+  "p_yes": 0.3,
+  "confidence": "low",
+  "reasoning": "Ornn B300: 11,66 (18/11), 11,19 (23/11), 10,87 (24/11), 10,83 (25/11) en baja; un promedio de diciembre sobre 11,50 requiere revertir.",
+  "key_uncertainties": [
+   "volatilidad"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison",
+   "https://wisevoter.com/world/2026/11/26/polymarket-nvidia-gpu-rental-price-markets"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7277633",
+  "p_yes": 0.38,
+  "confidence": "low",
+  "reasoning": "Ornn B200: 9,07 (24/11), 9,76 (25/11, fuente secundaria). Umbral 9,40 en el medio.",
+  "key_uncertainties": [
+   "dato del 25/11 sin confirmar"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison",
+   "https://wisevoter.com/world/2026/11/26/polymarket-nvidia-gpu-rental-price-markets"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7277635",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "B200 entre 9,07 y 9,76 en la ultima semana; sobre 9,00 algo mas probable que no.",
+  "key_uncertainties": [
+   "baja gradual"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison",
+   "https://wisevoter.com/world/2026/11/26/polymarket-nvidia-gpu-rental-price-markets"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7362305",
+  "p_yes": 0.45,
+  "confidence": "low",
+  "reasoning": "Ornn H200: 7,11 (18/11), 6,00 (21/11), 6,53 (24/11).",
+  "key_uncertainties": [
+   "volatilidad alta"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison"
+  ],
+  "prompt_version": "v4"
+ },
+ {
+  "market_id": "7362306",
+  "p_yes": 0.6,
+  "confidence": "low",
+  "reasoning": "Con H200 entre 6,00 y 7,11, sobre 6,25 algo mas probable que no.",
+  "key_uncertainties": [
+   "volatilidad alta"
+  ],
+  "sources": [
+   "https://data.ornn.com/gpu-cloud-price-comparison"
+  ],
+  "prompt_version": "v4"
+ }
+]

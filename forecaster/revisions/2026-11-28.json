@@ -1,0 +1,280 @@
+[
+ {
+  "market_id": "3580933",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.02,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "Gana Chiang",
+  "novedades": "28/11: Shen reconocio la derrota; CEC preliminar Chiang ~53,9% vs 45,6%.",
+  "razonamiento": "Resultado de la noche electoral; falta la proclamacion del 4/12.",
+  "fuentes": [
+   "https://focustaiwan.tw/politics/202611285002",
+   "https://www.taiwannews.com.tw/news/6482043"
+  ]
+ },
+ {
+  "market_id": "3580932",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.38,
+  "p_yes_revisada": 0.98,
+  "direccion": "debilita",
+  "cambia_de_lado": true,
+  "resultado_probable": "Gana Chiang",
+  "novedades": "28/11: Chiang declaro victoria tras el reconocimiento de Shen.",
+  "razonamiento": "Igual que el anterior.",
+  "fuentes": [
+   "https://focustaiwan.tw/politics/202611285002"
+  ]
+ },
+ {
+  "market_id": "3581102",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.25,
+  "p_yes_revisada": 0.15,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Probable Chang (KMT)",
+  "novedades": "28/11 19h: el KMT iba adelante en Taoyuan en el conteo parcial; sin ganador declarado en las fuentes.",
+  "razonamiento": "Conteo parcial favorable al incumbente.",
+  "fuentes": [
+   "https://world.storm.mg/articles/1185994",
+   "https://focustaiwan.tw/politics/202611285002"
+  ]
+ },
+ {
+  "market_id": "814613",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.35,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Incierto",
+  "novedades": "28/11 20:20: conteo parcial DPP 8 vs KMT 7 jefaturas; el DPP gano el condado de Hsinchu y lidera Taichung.",
+  "razonamiento": "El DPP rindio mejor de lo esperado; la cuenta final de 22 jefaturas sigue abierta.",
+  "fuentes": [
+   "https://focustaiwan.tw/politics/202611285002"
+  ]
+ },
+ {
+  "market_id": "3581389",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.42,
+  "p_yes_revisada": 0.8,
+  "direccion": "refuerza",
+  "cambia_de_lado": true,
+  "resultado_probable": "Probable Ho (DPP)",
+  "novedades": "28/11: Ho 50,38% vs Chiang 48,69% con mas de 1 millon de votos contados; sin ganador declarado.",
+  "razonamiento": "Ventaja de 1,7 puntos con la mayoria contada.",
+  "fuentes": [
+   "https://focustaiwan.tw/politics/202611285002"
+  ]
+ },
+ {
+  "market_id": "3581450",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.62,
+  "p_yes_revisada": 0.98,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Gana Lai",
+  "novedades": "28/11: Lai Jui-lung declaro victoria sobre Ko Chih-en.",
+  "razonamiento": "Resultado de la noche electoral.",
+  "fuentes": [
+   "https://focustaiwan.tw/politics/202611285002"
+  ]
+ },
+ {
+  "market_id": "3581572",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.45,
+  "p_yes_revisada": 0.03,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Gana Cheng (DPP)",
+  "novedades": "28/11: Cheng Chao-fang declaro victoria sobre Hsu Hsin-ying, primera vez del DPP en casi 30 anos.",
+  "razonamiento": "Resultado de la noche electoral.",
+  "fuentes": [
+   "https://focustaiwan.tw/politics/202611285002"
+  ]
+ },
+ {
+  "market_id": "3581626",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.6,
+  "p_yes_revisada": 0.85,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Probable Kao",
+  "novedades": "28/11: Focus Taiwan da Hsinchu City ganada por un independiente; Kao era la independiente favorita (tambien competia el independiente Ho Chih-yung).",
+  "razonamiento": "Falta confirmar el nombre del ganador en la fuente.",
+  "fuentes": [
+   "https://focustaiwan.tw/politics/202611285002"
+  ]
+ },
+ {
+  "market_id": "6617895",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.01,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "No",
+  "novedades": "28/11: el DPP perdio Taipei; en Nuevo Taipei Lee (KMT) iba 50,7% vs 48,75%.",
+  "razonamiento": "Al perder Taipei no puede ganar ambas.",
+  "fuentes": [
+   "https://focustaiwan.tw/politics/202611285002"
+  ]
+ },
+ {
+  "market_id": "2695678",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.2,
+  "p_yes_revisada": 0.15,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Feijoo presidente",
+  "novedades": "Media final (elDiario.es, 23-24/11): PP 31,2%, PSOE 28,4%, Vox 18,3%; PP+Vox ~192 escanos.",
+  "razonamiento": "Con PP+Vox sobre la mayoria absoluta en casi todas las encuestas privadas, Sanchez solo seguiria si el CIS acierta.",
+  "fuentes": [
+   "https://eldiario.es/politica/media-final-encuestas-psoe-sube-bloques-acercan-apagon-demoscopico_1_13688784.html"
+  ]
+ },
+ {
+  "market_id": "2695686",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.74,
+  "p_yes_revisada": 0.8,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "Feijoo presidente",
+  "novedades": "Misma media final del 23-24/11.",
+  "razonamiento": "El bloque de derecha supera 176 en las proyecciones; el NO a Feijoo se debilita.",
+  "fuentes": [
+   "https://eldiario.es/politica/media-final-encuestas-psoe-sube-bloques-acercan-apagon-demoscopico_1_13688784.html"
+  ]
+ },
+ {
+  "market_id": "5336560",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.12,
+  "p_yes_revisada": 0.08,
+  "direccion": "debilita",
+  "cambia_de_lado": false,
+  "resultado_probable": "PP gana mas escanos",
+  "novedades": "Sociometrica PP 133 vs PSOE 115; Data10 132 vs 117; solo el CIS da al PSOE primero.",
+  "razonamiento": "El PSOE subio pero sigue 3 puntos y ~15-20 escanos atras.",
+  "fuentes": [
+   "https://eldiario.es/politica/media-final-encuestas-psoe-sube-bloques-acercan-apagon-demoscopico_1_13688784.html"
+  ]
+ },
+ {
+  "market_id": "5622719",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.22,
+  "p_yes_revisada": 0.22,
+  "direccion": "sin_cambio",
+  "cambia_de_lado": false,
+  "resultado_probable": "Participacion total ~69%",
+  "novedades": "Sin datos nuevos desde el 25/11.",
+  "razonamiento": "Igual que el pronostico del 25/11.",
+  "fuentes": [
+   "https://www.democrata.es/elecciones-generales-espana/voto-correo-hoy-participacion-29n/"
+  ]
+ },
+ {
+  "market_id": "6029656",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.23,
+  "p_yes_revisada": 0.2,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "PP gana mas en Caceres",
+  "novedades": "Media nacional con PP +3.",
+  "razonamiento": "Sin encuestas provinciales nuevas; el PP sigue favorito en Caceres.",
+  "fuentes": [
+   "https://eldiario.es/politica/media-final-encuestas-psoe-sube-bloques-acercan-apagon-demoscopico_1_13688784.html"
+  ]
+ },
+ {
+  "market_id": "6027279",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.12,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "Vox saca 56 o mas",
+  "novedades": "Media final: Vox 18,3% (~60-65 escanos).",
+  "razonamiento": "Vox bajo un poco pero sigue lejos de 56.",
+  "fuentes": [
+   "https://eldiario.es/politica/media-final-encuestas-psoe-sube-bloques-acercan-apagon-demoscopico_1_13688784.html"
+  ]
+ },
+ {
+  "market_id": "6947942",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.05,
+  "p_yes_revisada": 0.04,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "Sin tregua energetica",
+  "novedades": "Sin novedades desde el rechazo ruso del 11/11.",
+  "razonamiento": "Quedan 3 dias.",
+  "fuentes": []
+ },
+ {
+  "market_id": "5765888",
+  "lado_abierto": "SI",
+  "p_yes_original": 0.55,
+  "p_yes_revisada": 0.55,
+  "direccion": "sin_cambio",
+  "cambia_de_lado": false,
+  "resultado_probable": "Incierto",
+  "novedades": "Mercado de cuotas; no se consultan cuotas por regla.",
+  "razonamiento": "Sin revision posible sin mirar cuotas.",
+  "fuentes": []
+ },
+ {
+  "market_id": "4906128",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.12,
+  "p_yes_revisada": 0.03,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "El bloqueo sigue",
+  "novedades": "28/11: EE.UU. disparo contra el Pacific Archer por violar el bloqueo; CENTCOM dice que inhabilito 6 buques y desvio 158.",
+  "razonamiento": "Bloqueo activo a 2 dias del cierre.",
+  "fuentes": [
+   "https://euronews.com/2026/11/28/us-military-fires-at-a-ship-that-violated-blockade-of-iranian-ports"
+  ]
+ },
+ {
+  "market_id": "6831496",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.3,
+  "p_yes_revisada": 0.01,
+  "direccion": "refuerza",
+  "cambia_de_lado": false,
+  "resultado_probable": "Sin alto el fuego",
+  "novedades": "28/11: nuevos disparos de EE.UU. en el bloqueo.",
+  "razonamiento": "No hay forma de cumplir 14 dias continuos sin ataques antes del 30/11.",
+  "fuentes": [
+   "https://euronews.com/2026/11/28/us-military-fires-at-a-ship-that-violated-blockade-of-iranian-ports"
+  ]
+ },
+ {
+  "market_id": "6029248",
+  "lado_abierto": "NO",
+  "p_yes_original": 0.15,
+  "p_yes_revisada": 0.15,
+  "direccion": "sin_cambio",
+  "cambia_de_lado": false,
+  "resultado_probable": "PP o empate en Badajoz",
+  "novedades": "Sin datos provinciales nuevos.",
+  "razonamiento": "Igual que el pronostico del 27/11.",
+  "fuentes": [
+   "https://eldiario.es/politica/media-final-encuestas-psoe-sube-bloques-acercan-apagon-demoscopico_1_13688784.html"
+  ]
+ }
+]
